@@ -15,6 +15,8 @@ install_requires = []
 install_requires += ['numpy'],
 install_requires += ['dask'],
 install_requires += ['zarr'],
+install_requires += ['s3fs'],
+install_requires += ['requests'],
 
 
 setup(
