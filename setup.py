@@ -13,6 +13,7 @@ def read(fname):
 
 install_requires = []
 install_requires += ['dask'],
+install_requires += ['zarr'],
 
 
 setup(
@@ -41,4 +42,7 @@ setup(
             'ome_zarr = ome_zarr',
         ],
     },
+    tests_require=[
+        'pytest',
+    ],
 )
