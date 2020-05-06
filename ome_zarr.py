@@ -92,20 +92,20 @@ class BaseZarr:
         """Load OMERO metadata as json and convert for napari"""
         metadata = {}
         try:
-            print(self.image_data)
+            channels = self.image_data['channels']
             colormaps = []
-            for ch in image_data['channels']:
+            for ch in channels:
                 # 'FF0000' -> [1, 0, 0]
                 rgb = [(int(ch['color'][i:i+2], 16)/255) for i in range(0, 6, 2)]
-                if image_data['rdefs']['model'] == 'greyscale':
+                if self.image_data['rdefs']['model'] == 'greyscale':
                     rgb = [1, 1, 1]
                 colormaps.append(Colormap([[0, 0, 0], rgb]))
             metadata['colormap'] = colormaps
-            metadata['contrast_limits'] = [[ch['window']['start'], ch['window']['end']] for ch in image_data['channels']]
-            metadata['name'] = [ch['label'] for ch in image_data['channels']]
-            metadata['visible'] = [ch['active'] for ch in image_data['channels']]
-        except Exception:
-            pass
+            metadata['contrast_limits'] = [[ch['window']['start'], ch['window']['end']] for ch in channels]
+            metadata['name'] = [ch['label'] for ch in channels]
+            metadata['visible'] = [ch['active'] for ch in channels]
+        except Exception as e:
+            print(e)
 
         return metadata
 
