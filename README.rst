@@ -19,8 +19,9 @@ Install the latest release of `ome-zarr`_ from PyPI::
     pip install ome-zarr
 
 
-Install developer mode::
+Install developer mode to run from your current branch::
 
+    git clone git@github.com:ome/ome-zarr-py.git
     cd ome-zarr-py
     pip install -e .
 
