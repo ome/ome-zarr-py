@@ -150,4 +150,11 @@ class LocalZarr(BaseZarr):
 class RemoteZarr(BaseZarr):
 
     def get_json(self, subpath):
-        return requests.get("/".join([self.zarr_path, subpath])).json()
+        rsp = requests.get(f"{self.zarr_path}{subpath}")
+        try:
+            if rsp.status_code == 403:  # file doesn't exist
+                return {}
+            return rsp.json()
+        except:
+            print("FIXME", rsp.text, dir(rsp))
+            return {}
