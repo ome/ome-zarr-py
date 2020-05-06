@@ -8,7 +8,6 @@ Experimental implementation of images in Zarr files.
 
 The `napari`_ plugin was generated with `Cookiecutter`_ along with `@napari`_'s `cookiecutter-napari-plugin`_ template.
 
-
 Features
 --------
 
@@ -33,17 +32,13 @@ Install developer mode::
 Usage
 -----
 
-Open images based on their ID in the Image Data Resource.
+Open Zarr filesets containing images with associated OME metadata.
 
-NB: Only select images are available currently.
-
-For example ID = 9822151 or 6001240.
-
-E.g. to open Image at http://idr.openmicroscopy.org/webclient/?show=image-6001240::
+For example, to load select images by their ID in the Image Data Resource
+such as http://idr.openmicroscopy.org/webclient/?show=image-6001240::
 
 
     $ napari 'https://s3.embassy.ebi.ac.uk/idr/zarr/v0.1/6001240.zarr/'
-
 
 OR in python::
 
@@ -51,6 +46,17 @@ OR in python::
     with napari.gui_qt():
         viewer = napari.Viewer()
         viewer.open('https://s3.embassy.ebi.ac.uk/idr/zarr/v0.1/6001240.zarr/')
+
+
+Alternatively, download one of these datasets with all associated metadata and
+open locally::
+
+    $ napari '/tmp/6001240.zarr/'
+
+If single zarray is passed to the plugin, it will be opened without the use of
+the metadata::
+
+    $ napari '/tmp/6001240.zarr/0'
 
 
 License
