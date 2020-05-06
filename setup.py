@@ -12,6 +12,7 @@ def read(fname):
 
 
 install_requires = []
+install_requires += ['numpy'],
 install_requires += ['dask'],
 install_requires += ['zarr'],
 
