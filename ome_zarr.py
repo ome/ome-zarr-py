@@ -67,12 +67,15 @@ class BaseZarr:
         self.zarr_path = path.endswith("/") and path or f"{path}/"
         self.zarray = self.get_json(".zarray")
         self.zgroup = self.get_json(".zgroup")
-        if self.is_zarr():
+        if self.zgroup:
             self.image_data = self.get_json("omero.json")
             self.root_attrs = self.get_json(".zattrs")
 
     def is_zarr(self):
         return self.zarray or self.zgroup
+
+    def is_ome_zarr(self):
+        return self.zgroup and "multiscales" in self.root_attrs
 
     def get_json(self, subpath):
         raise NotImplementedError("unknown")
@@ -84,9 +87,17 @@ class BaseZarr:
 
     def reader_function(self, path: PathLike) -> List[LayerData]:
         """Take a path or list of paths and return a list of LayerData tuples."""
+
         if isinstance(path, list):
             path = path[0]
-        return [self.load_omero_zarr()]
+            # TODO: safe to ignore this path?
+
+        if self.is_ome_zarr():
+            return [self.load_ome_zarr()]
+
+        elif self.zarray:
+            data = da.from_zarr(f"{self.zarr_path}")
+            return [(data, {'channel_axis': 1})]
 
     def load_omero_metadata(self):
         """Load OMERO metadata as json and convert for napari"""
@@ -110,7 +121,7 @@ class BaseZarr:
         return metadata
 
 
-    def load_omero_zarr(self):
+    def load_ome_zarr(self):
 
         resolutions = ["0"]  # TODO: could be first alphanumeric dataset on err
         try:
@@ -131,7 +142,7 @@ class BaseZarr:
             pyramid.append(data)
 
         metadata = self.load_omero_metadata()
-        return(pyramid, {'channel_axis': 1, **metadata})
+        return (pyramid, {'channel_axis': 1, **metadata})
 
 
 
