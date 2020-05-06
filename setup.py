@@ -12,7 +12,13 @@ def read(fname):
 
 
 install_requires = []
+install_requires += ['numpy'],
 install_requires += ['dask'],
+install_requires += ['zarr'],
+install_requires += ['s3fs'],
+install_requires += ['requests'],
+install_requires += ['toolz'],
+install_requires += ['vispy'],
 
 
 setup(
@@ -41,4 +47,7 @@ setup(
             'ome_zarr = ome_zarr',
         ],
     },
+    tests_require=[
+        'pytest',
+    ],
 )
