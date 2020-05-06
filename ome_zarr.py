@@ -56,13 +56,34 @@ def reader_function(path: PathLike) -> List[LayerData]:
     return [load_omero_zarr(path)]
 
 
+def load_omero_metadata(zarr_path):
+    """Load OMERO metadata as json and convert for napari"""
+    omero_path = zarr_path + "omero.json"
+    metadata = {}
+    try:
+        image_data = requests.get(omero_path).json()
+        print(image_data)
+        colormaps = []
+        for ch in image_data['channels']:
+            # 'FF0000' -> [1, 0, 0]
+            rgb = [(int(ch['color'][i:i+2], 16)/255) for i in range(0, 6, 2)]
+            if image_data['rdefs']['model'] == 'greyscale':
+                rgb = [1, 1, 1]
+            colormaps.append(Colormap([[0, 0, 0], rgb]))
+        metadata['colormap'] = colormaps
+        metadata['contrast_limits'] = [[ch['window']['start'], ch['window']['end']] for ch in image_data['channels']]
+        metadata['name'] = [ch['label'] for ch in image_data['channels']]
+        metadata['visible'] = [ch['active'] for ch in image_data['channels']]
+    except Exception:
+        pass
+
+    return metadata
+
+
 def load_omero_zarr(path):
     zarr_path = path.endswith("/") and path or f"{path}/"
-    omero_path = zarr_path + "omero.json"
     attrs_path = zarr_path + ".zattrs"
-    image_data = requests.get(omero_path).json()
     root_attrs = requests.get(attrs_path).json()
-    print(image_data)
 
     resolutions = ["0"]  # TODO: could be first alphanumeric dataset on err
     try:
@@ -82,23 +103,9 @@ def load_omero_zarr(path):
         print('resolution', resolution, 'shape (t, c, z, y, x)', data.shape, 'chunks', chunk_sizes, 'dtype', data.dtype)
         pyramid.append(data)
 
-    colormaps = []
-    for ch in image_data['channels']:
-        # 'FF0000' -> [1, 0, 0]
-        rgb = [(int(ch['color'][i:i+2], 16)/255) for i in range(0, 6, 2)]
-        if image_data['rdefs']['model'] == 'greyscale':
-            rgb = [1, 1, 1]
-        colormaps.append(Colormap([[0, 0, 0], rgb]))
-    contrast_limits = [[ch['window']['start'], ch['window']['end']] for ch in image_data['channels']]
-    names = [ch['label'] for ch in image_data['channels']]
-    visible = [ch['active'] for ch in image_data['channels']]
+    metadata = load_omero_metadata(zarr_path)
 
-    return(pyramid, {
-        'channel_axis': 1,
-        'colormap': colormaps,
-        'name': names,
-        'contrast_limits': contrast_limits,
-        'visible': visible})
+    return(pyramid, {'channel_axis': 1, **metadata})
 
     # TODO: would be nice to be able to:
     # viewer.dims.set_axis_label(0, 'T')
