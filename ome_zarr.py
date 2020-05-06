@@ -60,11 +60,7 @@ def load_omero_zarr(path):
     zarr_path = path.endswith("/") and path or f"{path}/"
     omero_path = zarr_path + "omero.json"
     attrs_path = zarr_path + ".zattrs"
-    # image_data = requests.get(omero_path).json()
-    match = re.search(r'^.*/(\d+)\.zarr.*', path)
-    image_id = match.group(1)
-    print('image_id', image_id)
-    image_data = requests.get('https://idr.openmicroscopy.org/webclient/imgData/%s/' % image_id).json()
+    image_data = requests.get(omero_path).json()
     root_attrs = requests.get(attrs_path).json()
     print(image_data)
 
