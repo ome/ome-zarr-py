@@ -8,7 +8,7 @@ Experimental implementation of images in Zarr files.
 Features
 --------
 
- - Use as a image reader plugin for `napari`_. The `napari`_ plugin was generated with `Cookiecutter`_ along with `@napari`_'s `cookiecutter-napari-plugin`_ template.
+- Use as a image reader plugin for `napari`_. The `napari`_ plugin was generated with `Cookiecutter`_ along with `@napari`_'s `cookiecutter-napari-plugin`_ template.
 
 
 Installation
