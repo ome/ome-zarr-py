@@ -2,13 +2,15 @@
 ome-zarr-py
 ===========
 
-Experimental implementation of images in Zarr files.
+Experimental support for images stored in Zarr filesets.
 
 
 Features
 --------
 
 - Use as a image reader plugin for `napari`_. The `napari`_ plugin was generated with `Cookiecutter`_ along with `@napari`_'s `cookiecutter-napari-plugin`_ template.
+- Simple command-line to read and download conforming Zarr filesets.
+- Helper methods for parsing related metadata.
 
 
 Installation
@@ -31,9 +33,14 @@ Usage
 
 Open Zarr filesets containing images with associated OME metadata.
 
+Use the `ome_zarr` command to interrogate and download Zarr datasets:
+
+    $ ome_zarr info https://s3.embassy.ebi.ac.uk/idr/zarr/v0.1/6001240.zarr/
+    $ ome_zarr download https://s3.embassy.ebi.ac.uk/idr/zarr/v0.1/6001240.zarr/
+    $ ome_zarr info 6001240.zarr/
+
 For example, to load select images by their ID in the Image Data Resource
 such as http://idr.openmicroscopy.org/webclient/?show=image-6001240::
-
 
     $ napari 'https://s3.embassy.ebi.ac.uk/idr/zarr/v0.1/6001240.zarr/'
 
