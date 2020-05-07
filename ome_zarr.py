@@ -74,6 +74,14 @@ class BaseZarr:
             self.image_data = self.get_json("omero.json")
             self.root_attrs = self.get_json(".zattrs")
 
+    def __str__(self):
+        suffix = ""
+        if self.zgroup:
+            suffix += " [zgroup]"
+        if self.zarray:
+            suffix += " [zarray]"
+        return f"{self.zarr_path}{suffix}"
+
     def is_zarr(self):
         return self.zarray or self.zgroup
 
@@ -85,7 +93,7 @@ class BaseZarr:
 
     def get_reader_function(self):
         if not self.is_zarr():
-            raise Exception("not a zarr")
+            raise Exception(f"not a zarr: {self}")
         return self.reader_function
 
     def reader_function(self, path: PathLike) -> List[LayerData]:
@@ -180,7 +188,7 @@ def info(path):
     """
     zarr = parse_url(path)
     if not zarr.is_ome_zarr():
-        print(f"not an ome-zarr: {path}")
+        print(f"not an ome-zarr: {zarr}")
         return
     reader = zarr.get_reader_function()
     data = reader(path)
