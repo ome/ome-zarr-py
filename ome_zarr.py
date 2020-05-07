@@ -18,6 +18,8 @@ import json
 import zarr
 import requests
 import dask.array as da
+import warnings
+
 from vispy.color import Colormap
 
 from urllib.parse import urlparse
@@ -76,6 +78,8 @@ class BaseZarr:
                 # TODO: start checking metadata version
             else:
                 # Backup location that can be removed in the future.
+                warnings.warn("deprecated loading of omero.josn",
+                              DeprecationWarning)
                 self.image_data = self.get_json("omero.json")
 
     def is_zarr(self):
