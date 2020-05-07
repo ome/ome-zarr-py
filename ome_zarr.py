@@ -70,8 +70,13 @@ class BaseZarr:
         self.zarray = self.get_json(".zarray")
         self.zgroup = self.get_json(".zgroup")
         if self.zgroup:
-            self.image_data = self.get_json("omero.json")
             self.root_attrs = self.get_json(".zattrs")
+            if "omero" in self.root_attrs:
+                self.image_data = self.root_attrs["omero"]
+                # TODO: start checking metadata version
+            else:
+                # Backup location that can be removed in the future.
+                self.image_data = self.get_json("omero.json")
 
     def is_zarr(self):
         return self.zarray or self.zgroup
