@@ -174,11 +174,11 @@ class RemoteZarr(BaseZarr):
     def get_json(self, subpath):
         rsp = requests.get(f"{self.zarr_path}{subpath}")
         try:
-            if rsp.status_code == 403:  # file doesn't exist
+            if rsp.status_code in (403, 404):  # file doesn't exist
                 return {}
             return rsp.json()
         except:
-            print("FIXME", rsp.text, dir(rsp))
+            print("FIXME", rsp.status_code, rsp.text, dir(rsp))
             return {}
 
 
