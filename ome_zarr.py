@@ -49,16 +49,18 @@ def napari_get_reader(path: PathLike) -> Optional[ReaderFunction]:
     """
     if isinstance(path, list):
         path = path[0]
+    instance = parse_url(path)
+    if instance.is_zarr():
+        return instance.get_reader_function()
 
+
+def parse_url(path):
     result = urlparse(path)
     if result.scheme in ("", "file"):
         # Strips 'file://' if necessary
-        instance = LocalZarr(result.path)
+        return LocalZarr(result.path)
     else:
-        instance = RemoteZarr(path)
-
-    if instance.is_zarr():
-        return instance.get_reader_function()
+        return RemoteZarr(path)
 
 
 class BaseZarr:
@@ -169,3 +171,16 @@ class RemoteZarr(BaseZarr):
         except:
             print("FIXME", rsp.text, dir(rsp))
             return {}
+
+
+def info(path):
+    """
+    print information about the ome-zarr fileset
+    """
+    zarr = parse_url(path)
+    if not zarr.is_ome_zarr():
+        print("not an ome-zarr: {zarr}")
+        return
+    reader = zarr.get_reader_function()
+    data = reader(path)
+    print(data)
