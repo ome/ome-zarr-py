@@ -20,6 +20,7 @@ import requests
 import dask.array as da
 import warnings
 
+from dask.diagnostics import ProgressBar
 from vispy.color import Colormap
 
 from urllib.parse import urlparse
@@ -82,6 +83,14 @@ class BaseZarr:
                               DeprecationWarning)
                 self.image_data = self.get_json("omero.json")
 
+    def __str__(self):
+        suffix = ""
+        if self.zgroup:
+            suffix += " [zgroup]"
+        if self.zarray:
+            suffix += " [zarray]"
+        return f"{self.zarr_path}{suffix}"
+
     def is_zarr(self):
         return self.zarray or self.zgroup
 
@@ -93,7 +102,7 @@ class BaseZarr:
 
     def get_reader_function(self):
         if not self.is_zarr():
-            raise Exception("not a zarr")
+            raise Exception(f"not a zarr: {self}")
         return self.reader_function
 
     def reader_function(self, path: PathLike) -> List[LayerData]:
@@ -193,3 +202,39 @@ def info(path):
     reader = zarr.get_reader_function()
     data = reader(path)
     print(data)
+
+
+def download(path, output_dir='.', zarr_name=''):
+    """
+    download zarr from URL
+    """
+    omezarr = parse_url(path)
+    if not omezarr.is_ome_zarr():
+        print(f"not an ome-zarr: {path}")
+
+    image_id = omezarr.image_data.get('id', 'unknown')
+    print('image_id', image_id)
+    if not zarr_name:
+        zarr_name = f'{image_id}.zarr'
+
+    try:
+        datasets = [x['path'] for x in omezarr.root_attrs["multiscales"][0]["datasets"]]
+    except KeyError:
+        datasets = ["0"]
+    print('datasets', datasets)
+    resolutions = [da.from_zarr(path, component=str(i)) for i in datasets]
+    # levels = list(range(len(resolutions)))
+
+    target_dir = os.path.join(output_dir, f'{zarr_name}')
+    print(f'downloading to {target_dir}')
+
+    pbar = ProgressBar()
+    for dataset, data in reversed(list(zip(datasets, resolutions))):
+        print(f'resolution {dataset}...')
+        with pbar:
+            data.to_zarr(os.path.join(target_dir, dataset))
+
+    with open(os.path.join(target_dir, '.zgroup'), 'w') as f:
+        f.write(json.dumps(omezarr.zgroup))
+    with open(os.path.join(target_dir, '.zattrs'), 'w') as f:
+        f.write(json.dumps(omezarr.root_attrs))
