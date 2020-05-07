@@ -18,6 +18,7 @@ import json
 import zarr
 import requests
 import dask.array as da
+from dask.diagnostics import ProgressBar
 from vispy.color import Colormap
 
 from urllib.parse import urlparse
@@ -184,3 +185,37 @@ def info(path):
     reader = zarr.get_reader_function()
     data = reader(path)
     print(data)
+
+
+def download(path, dir_name=''):
+    """
+    download zarr from URL
+    """
+    omezarr = parse_url(path)
+    if not omezarr.is_ome_zarr():
+        print(f"not an ome-zarr: {path}")
+
+    image_id = omezarr.image_data['id']
+    print('image_id', image_id)
+
+    try:
+        datasets = [x['path'] for x in omezarr.root_attrs["multiscales"][0]["datasets"]]
+    except KeyError:
+        datasets = ["0"]
+    print('datasets', datasets)
+    resolutions = [da.from_zarr(path, component=str(i)) for i in datasets]
+    # levels = list(range(len(resolutions)))
+
+    target_dir = os.path.join(dir_name, f'{image_id}.zarr')
+    print(f'downloading to {target_dir}')
+
+    pbar = ProgressBar()
+    for dataset, data in reversed(list(zip(datasets, resolutions))):
+        print(f'resolution {dataset}...')
+        with pbar:
+            data.to_zarr(os.path.join(target_dir, dataset))
+
+    with open(os.path.join(target_dir, '.zgroup'), 'w') as f:
+        f.write(json.dumps(omezarr.zgroup))
+    with open(os.path.join(target_dir, '.zattrs'), 'w') as f:
+        f.write(json.dumps(omezarr.root_attrs))
