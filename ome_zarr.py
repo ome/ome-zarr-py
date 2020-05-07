@@ -180,7 +180,7 @@ def info(path):
     """
     zarr = parse_url(path)
     if not zarr.is_ome_zarr():
-        print(f"not an ome-zarr: {zarr}")
+        print(f"not an ome-zarr: {path}")
         return
     reader = zarr.get_reader_function()
     data = reader(path)
