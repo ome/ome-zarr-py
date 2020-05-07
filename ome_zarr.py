@@ -18,6 +18,8 @@ import json
 import zarr
 import requests
 import dask.array as da
+import warnings
+
 from dask.diagnostics import ProgressBar
 from vispy.color import Colormap
 
@@ -71,8 +73,15 @@ class BaseZarr:
         self.zarray = self.get_json(".zarray")
         self.zgroup = self.get_json(".zgroup")
         if self.zgroup:
-            self.image_data = self.get_json("omero.json")
             self.root_attrs = self.get_json(".zattrs")
+            if "omero" in self.root_attrs:
+                self.image_data = self.root_attrs["omero"]
+                # TODO: start checking metadata version
+            else:
+                # Backup location that can be removed in the future.
+                warnings.warn("deprecated loading of omero.josn",
+                              DeprecationWarning)
+                self.image_data = self.get_json("omero.json")
 
     def __str__(self):
         suffix = ""
@@ -174,11 +183,11 @@ class RemoteZarr(BaseZarr):
     def get_json(self, subpath):
         rsp = requests.get(f"{self.zarr_path}{subpath}")
         try:
-            if rsp.status_code == 403:  # file doesn't exist
+            if rsp.status_code in (403, 404):  # file doesn't exist
                 return {}
             return rsp.json()
         except:
-            print("FIXME", rsp.text, dir(rsp))
+            print("FIXME", rsp.status_code, rsp.text)
             return {}
 
 
