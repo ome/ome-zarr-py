@@ -195,7 +195,7 @@ def info(path):
     print(data)
 
 
-def download(path, dir_name=''):
+def download(path, output_dir='.', zarr_name=''):
     """
     download zarr from URL
     """
@@ -203,8 +203,10 @@ def download(path, dir_name=''):
     if not omezarr.is_ome_zarr():
         print(f"not an ome-zarr: {path}")
 
-    image_id = omezarr.image_data['id']
+    image_id = omezarr.image_data.get('id', 'unknown')
     print('image_id', image_id)
+    if not zarr_name:
+        zarr_name = f'{image_id}.zarr'
 
     try:
         datasets = [x['path'] for x in omezarr.root_attrs["multiscales"][0]["datasets"]]
@@ -214,7 +216,7 @@ def download(path, dir_name=''):
     resolutions = [da.from_zarr(path, component=str(i)) for i in datasets]
     # levels = list(range(len(resolutions)))
 
-    target_dir = os.path.join(dir_name, f'{image_id}.zarr')
+    target_dir = os.path.join(output_dir, f'{zarr_name}')
     print(f'downloading to {target_dir}')
 
     pbar = ProgressBar()
