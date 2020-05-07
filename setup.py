@@ -43,6 +43,9 @@ setup(
         'or later (GPLv2+)',
     ],
     entry_points={
+        'console_scripts': [
+            'ome_zarr = ome_zarr_cli:main',
+        ],
         'napari.plugin': [
             'ome_zarr = ome_zarr',
         ],

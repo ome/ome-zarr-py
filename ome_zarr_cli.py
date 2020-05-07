@@ -4,14 +4,16 @@ import argparse
 from ome_zarr import info as zarr_info
 from ome_zarr import download as zarr_download
 
+
 def info(args):
     zarr_info(args.path)
+
 
 def download(args):
     zarr_download(args.path, args.output, args.name)
 
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest='command')
     subparsers.required = True
