@@ -178,7 +178,7 @@ class RemoteZarr(BaseZarr):
                 return {}
             return rsp.json()
         except:
-            print("FIXME", rsp.status_code, rsp.text, dir(rsp))
+            print("FIXME", rsp.status_code, rsp.text)
             return {}
 
 
