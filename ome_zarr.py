@@ -161,6 +161,8 @@ class BaseZarr:
             print('resolution', resolution, 'shape (t, c, z, y, x)', data.shape, 'chunks', chunk_sizes, 'dtype', data.dtype)
             pyramid.append(data)
 
+        if len(pyramid) == 1:
+            pyramid = pyramid[0]
         metadata = self.load_omero_metadata()
         return (pyramid, {'channel_axis': 1, **metadata})
 
