@@ -9,3 +9,11 @@ install:
   - pip install scikit-image  # only needed for tests
 # command to run tests
 script: pytest
+
+deploy:
+  provider: pypi
+  user: $PYPI_USER
+  password: $PYPI_PASSWORD
+  distributions: sdist bdist_wheel
+  on:
+    tags: true
