@@ -33,7 +33,7 @@ Usage
 
 Open Zarr filesets containing images with associated OME metadata.
 
-Use the `ome_zarr` command to interrogate and download Zarr datasets:
+Use the `ome_zarr` command to interrogate and download Zarr datasets::
 
     $ ome_zarr info https://s3.embassy.ebi.ac.uk/idr/zarr/v0.1/6001240.zarr/
     $ ome_zarr download https://s3.embassy.ebi.ac.uk/idr/zarr/v0.1/6001240.zarr/
