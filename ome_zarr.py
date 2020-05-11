@@ -229,6 +229,9 @@ def download(path, output_dir='.', zarr_name=''):
     # levels = list(range(len(resolutions)))
 
     target_dir = os.path.join(output_dir, f'{zarr_name}')
+    if os.path.exists(target_dir):
+        print(f'{target_dir} already exists!')
+        return
     print(f'downloading to {target_dir}')
 
     pbar = ProgressBar()
