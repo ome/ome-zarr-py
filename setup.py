@@ -40,8 +40,7 @@ setup(
         'Programming Language :: Python',
         'Programming Language :: Python :: 3',
         'Operating System :: OS Independent',
-        'License :: OSI Approved :: GNU General Public License v2 '
-        'or later (GPLv2+)',
+        'License :: OSI Approved :: BSD License',
     ],
     entry_points={
         'console_scripts': [
