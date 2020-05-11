@@ -213,6 +213,7 @@ def download(path, output_dir='.', zarr_name=''):
     omezarr = parse_url(path)
     if not omezarr.is_ome_zarr():
         print(f"not an ome-zarr: {path}")
+        return
 
     image_id = omezarr.image_data.get('id', 'unknown')
     print('image_id', image_id)
