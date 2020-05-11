@@ -84,13 +84,13 @@ Remember to ``git push`` all commits and tags.
 License
 -------
 
-Distributed under the terms of the `GNU GPL v3.0`_ license,
+Distributed under the terms of the `BSD`_ license,
 "ome-zarr-py" is free and open source software
 
 
 .. _`Cookiecutter`: https://github.com/audreyr/cookiecutter
 .. _`@napari`: https://github.com/napari
-.. _`GNU GPL v3.0`: http://www.gnu.org/licenses/gpl-3.0.txt
+.. _`BSD`: https://opensource.org/licenses/BSD-2-Clause
 .. _`Apache Software License 2.0`: http://www.apache.org/licenses/LICENSE-2.0
 .. _`Mozilla Public License 2.0`: https://www.mozilla.org/media/MPL/2.0/index.txt
 .. _`cookiecutter-napari-plugin`: https://github.com/napari/cookiecutter-napari-plugin
