@@ -19,7 +19,7 @@ install_requires += ['s3fs'],
 install_requires += ['requests'],
 install_requires += ['toolz'],
 install_requires += ['vispy'],
-install_requires += ['pluggy'],
+install_requires += ['napari-plugin-engine'],
 
 
 setup(
