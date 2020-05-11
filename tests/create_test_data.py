@@ -33,12 +33,6 @@ def create_zarr(zarr_directory):
         grp.create_dataset(str(path), data=pyramid[path])
         paths.append({"path": str(path)})
 
-    multiscales = [{
-        "version": "0.1",
-        "datasets": paths,
-    }]
-    grp.attrs["multiscales"] = multiscales
-
     image_data = {
         'id': 1,
         'channels': [{
@@ -61,5 +55,10 @@ def create_zarr(zarr_directory):
             'model': 'color',
         }
     }
-    with open(os.path.join(zarr_directory, 'omero.json'), 'w') as f:
-        f.write(json.dumps(image_data))
+
+    multiscales = [{
+        "version": "0.1",
+        "datasets": paths,
+    }]
+    grp.attrs["multiscales"] = multiscales
+    grp.attrs["omero"] = image_data

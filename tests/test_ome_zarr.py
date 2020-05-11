@@ -46,7 +46,7 @@ class TestOmeZarr:
         reader = napari_get_reader('fake.file')
         assert reader is None
 
-    def check_info_stdout(self, out, check_metadata=True):
+    def check_info_stdout(self, out):
         # from print statements in reader
         assert ("resolution 0 shape (t, c, z, y, x) (1, 3, 1, 1024, 1024)"
                 " chunks ['1', '1', '1', '256', '256'] dtype float64") in out
@@ -59,12 +59,11 @@ class TestOmeZarr:
                 " chunksize=(1, 1, 1, 256, 256), chunktype=numpy.ndarray>,"
                 " dask.array<from-zarr, shape=(1, 3, 1, 256, 256), dtype=float64,"
                 " chunksize=(1, 2, 1, 128, 128), chunktype=numpy.ndarray>") in out
-        # from info's print of omero json
-        if check_metadata:
-            assert "'channel_axis': 1" in out
-            assert "'name': ['Red', 'Green', 'Blue']" in out
-            assert "'contrast_limits': [[0, 1], [0, 1], [0, 1]]" in out
-            assert "'visible': [True, True, True]" in out
+        # from info's print of omero metadata
+        assert "'channel_axis': 1" in out
+        assert "'name': ['Red', 'Green', 'Blue']" in out
+        assert "'contrast_limits': [[0, 1], [0, 1], [0, 1]]" in out
+        assert "'visible': [True, True, True]" in out
 
     def test_info(self, capsys):
         info(self.path)
@@ -79,7 +78,6 @@ class TestOmeZarr:
         assert os.path.exists(download_zarr)
         info(download_zarr)
         out = capsys.readouterr().out
-        # omero.json metadata not downloaded
-        self.check_info_stdout(out, check_metadata=False)
+        self.check_info_stdout(out)
         # check download progress in stdout
         assert "100% Completed" in out
