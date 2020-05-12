@@ -2,7 +2,7 @@
 ome-zarr-py
 ===========
 
-Experimental support for images stored in Zarr filesets.
+Experimental support for multi-resolution images stored in Zarr filesets, according to the `OME zarr spec`_.
 
 
 Features
@@ -32,17 +32,41 @@ Usage
 -----
 
 Open Zarr filesets containing images with associated OME metadata.
+The examples below use the image at http://idr.openmicroscopy.org/webclient/?show=image-6001240.
 
-Use the `ome_zarr` command to interrogate and download Zarr datasets::
+info
+====
 
+Use the `ome_zarr` command to interrogate Zarr datasets::
+
+    # Remote data
     $ ome_zarr info https://s3.embassy.ebi.ac.uk/idr/zarr/v0.1/6001240.zarr/
-    $ ome_zarr download https://s3.embassy.ebi.ac.uk/idr/zarr/v0.1/6001240.zarr/
+
+    # Local data (after downloading as below)
     $ ome_zarr info 6001240.zarr/
 
-For example, to load select images by their ID in the Image Data Resource
-such as http://idr.openmicroscopy.org/webclient/?show=image-6001240::
+download
+========
+
+To download all the resolutions and metadata for an image::
+
+    # creates local 6001240.zarr/
+    $ ome_zarr download https://s3.embassy.ebi.ac.uk/idr/zarr/v0.1/6001240.zarr/
+
+    # Specify output directory
+    $ ome_zarr download https://s3.embassy.ebi.ac.uk/idr/zarr/v0.1/6001240.zarr/ --output image_dir
+
+napari plugin
+=============
+
+Napari will use `ome-zarr` to open images that the plugin recognises as ome-zarr.
+The image metadata from OMERO will be used to set channel names and rendering settings
+in napari::
 
     $ napari 'https://s3.embassy.ebi.ac.uk/idr/zarr/v0.1/6001240.zarr/'
+
+    # Also works with local files
+    $ napari 6001240.zarr
 
 OR in python::
 
@@ -50,12 +74,6 @@ OR in python::
     with napari.gui_qt():
         viewer = napari.Viewer()
         viewer.open('https://s3.embassy.ebi.ac.uk/idr/zarr/v0.1/6001240.zarr/')
-
-
-Alternatively, download one of these datasets with all associated metadata and
-open locally::
-
-    $ napari '/tmp/6001240.zarr/'
 
 If single zarray is passed to the plugin, it will be opened without the use of
 the metadata::
@@ -87,7 +105,7 @@ License
 Distributed under the terms of the `BSD`_ license,
 "ome-zarr-py" is free and open source software
 
-
+.. _`OME zarr spec`: https://github.com/ome/omero-ms-zarr/blob/master/spec.md
 .. _`Cookiecutter`: https://github.com/audreyr/cookiecutter
 .. _`@napari`: https://github.com/napari
 .. _`BSD`: https://opensource.org/licenses/BSD-2-Clause
