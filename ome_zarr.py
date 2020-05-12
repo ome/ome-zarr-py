@@ -24,7 +24,16 @@ from dask.diagnostics import ProgressBar
 from vispy.color import Colormap
 
 from urllib.parse import urlparse
-from napari_plugin_engine import napari_hook_implementation
+
+
+try:
+    from napari_plugin_engine import napari_hook_implementation
+except ImportError:
+    def napari_hook_implementation(*args, **kwargs):
+        def noop(*args, **kwargs):
+            pass
+        return noop
+
 
 import logging
 # DEBUG logging for s3fs so we can track remote calls
