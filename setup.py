@@ -24,7 +24,7 @@ install_requires += ['pluggy'],
 
 setup(
     name='ome-zarr',
-    version='0.0.6',
+    version='0.0.7.dev0',
     author='The Open Microscopy Team',
     url='https://github.com/ome/ome-zarr-py',
     description='Implementation of images in Zarr files.',
