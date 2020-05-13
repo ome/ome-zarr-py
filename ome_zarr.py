@@ -30,6 +30,7 @@ import logging
 # DEBUG logging for s3fs so we can track remote calls
 logging.basicConfig(level=logging.INFO)
 logging.getLogger('s3fs').setLevel(logging.DEBUG)
+LOGGER = logging.getLogger("ome_zarr")
 
 # for optional type hints only, otherwise you can delete/ignore this stuff
 from typing import List, Optional, Union, Any, Tuple, Dict, Callable
@@ -136,7 +137,7 @@ class BaseZarr:
             metadata['name'] = [ch['label'] for ch in channels]
             metadata['visible'] = [ch['active'] for ch in channels]
         except Exception as e:
-            print(e)
+            LOGGER.error(f"failed to parse metadata: {e}")
 
         return metadata
 
@@ -183,13 +184,18 @@ class LocalZarr(BaseZarr):
 class RemoteZarr(BaseZarr):
 
     def get_json(self, subpath):
-        rsp = requests.get(f"{self.zarr_path}{subpath}")
+        url = f"{self.zarr_path}{subpath}"
+        try:
+            rsp = requests.get(url)
+        except:
+            LOGGER.warn(f"unreachable: {url}")
+            return {}
         try:
             if rsp.status_code in (403, 404):  # file doesn't exist
                 return {}
             return rsp.json()
         except:
-            print("FIXME", rsp.status_code, rsp.text)
+            LOGGER.error(f"({rsp.status_code}): {rsp.text}")
             return {}
 
 
