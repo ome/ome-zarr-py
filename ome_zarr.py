@@ -169,9 +169,13 @@ class BaseZarr:
 
                 window = ch.get('window', None)
                 if window is not None:
-                    start = window.get('start', 0)
-                    end = window.get('end', -1)  # FIXME
-                    contrast_limits[idx] = [start, end]
+                    start = window.get('start', None)
+                    end = window.get('end', None)
+                    if start is None or end is None:
+                        # Disable contrast limits settings if one is missing
+                        contrast_limits = None
+                    elif contrast_limits is not None:
+                        contrast_limits[idx] = [start, end]
 
             metadata['colormap'] = colormaps
             metadata['contrast_limits'] = contrast_limits
