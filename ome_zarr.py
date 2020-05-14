@@ -124,18 +124,46 @@ class BaseZarr:
         """Load OMERO metadata as json and convert for napari"""
         metadata = {}
         try:
-            channels = self.image_data['channels']
+            model = "unknown"
+            rdefs = self.image_data.get('rdefs', {})
+            if rdefs:
+                model = rdefs.get('model', 'unset')
+
+            channels = self.image_data.get('channels', {})
+
             colormaps = []
-            for ch in channels:
+            contrast_limits = [None for x in channels]
+            names = [("channel_%d" % idx) for idx, ch in enumerate(channels)]
+            visibles = [True for x in channels]
+
+            for idx, ch in enumerate(channels):
                 # 'FF0000' -> [1, 0, 0]
-                rgb = [(int(ch['color'][i:i+2], 16)/255) for i in range(0, 6, 2)]
-                if self.image_data['rdefs']['model'] == 'greyscale':
-                    rgb = [1, 1, 1]
-                colormaps.append(Colormap([[0, 0, 0], rgb]))
+
+                color = ch.get('color', None)
+                if color is not None:
+                    rgb = [(int(color[i:i+2], 16)/255) for i in range(0, 6, 2)]
+                    if model == 'greyscale':
+                        rgb = [1, 1, 1]
+                    colormaps.append(Colormap([[0, 0, 0], rgb]))
+
+                label = ch.get('label', None)
+                if label is not None:
+                    names[idx] = label
+
+                visible = ch.get('active', None)
+                if visible is not None:
+                    visibles[idx] = visible
+
+                window = ch.get('window', None)
+                if window is not None:
+                    start = window.get('start', 0)
+                    end = window.get('end', -1)  # FIXME
+                    contrast_limits[idx] = [start, end]
+
             metadata['colormap'] = colormaps
-            metadata['contrast_limits'] = [[ch['window']['start'], ch['window']['end']] for ch in channels]
-            metadata['name'] = [ch['label'] for ch in channels]
-            metadata['visible'] = [ch['active'] for ch in channels]
+            metadata['contrast_limits'] = contrast_limits
+            metadata['name'] = names
+            metadata['visible'] = visibles
         except Exception as e:
             LOGGER.error(f"failed to parse metadata: {e}")
 
