@@ -50,8 +50,8 @@ setup(
             'ome_zarr = ome_zarr',
         ],
     },
-    extra_require={
-        "napari": ["napari-plugin-engine"],
+    extras_require={
+        "napari": ["napari"],
     },
     tests_require=[
         'pytest',
