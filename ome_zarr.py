@@ -143,6 +143,7 @@ class BaseZarr:
                         return {}
             except:
                 LOGGER.warn(f"error counting channels: {channels}")
+                return {}
 
             colormaps = []
             contrast_limits = [None for x in channels]
