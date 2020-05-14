@@ -120,7 +120,7 @@ class BaseZarr:
             data = da.from_zarr(f"{self.zarr_path}")
             return [(data, {'channel_axis': 1})]
 
-    def load_omero_metadata(self):
+    def load_omero_metadata(self, assert_channel_count=None):
         """Load OMERO metadata as json and convert for napari"""
         metadata = {}
         try:
@@ -129,7 +129,20 @@ class BaseZarr:
             if rdefs:
                 model = rdefs.get('model', 'unset')
 
-            channels = self.image_data.get('channels', {})
+            channels = self.image_data.get('channels', None)
+            if channels is None:
+                return {}
+
+            count = None
+            try:
+                count = len(channels)
+                if assert_channel_count:
+                    if count != assert_channel_count:
+                        LOGGER.error((f"unexpected channel count: "
+                                      "{count}!={assert_channel_count}"))
+                        return {}
+            except:
+                LOGGER.warn(f"error counting channels: {channels}")
 
             colormaps = []
             contrast_limits = [None for x in channels]
@@ -192,7 +205,8 @@ class BaseZarr:
 
         if len(pyramid) == 1:
             pyramid = pyramid[0]
-        metadata = self.load_omero_metadata()
+
+        metadata = self.load_omero_metadata(data.shape[1])
         return (pyramid, {'channel_axis': 1, **metadata})
 
 
