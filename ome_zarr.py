@@ -30,6 +30,7 @@ import logging
 # DEBUG logging for s3fs so we can track remote calls
 logging.basicConfig(level=logging.INFO)
 logging.getLogger('s3fs').setLevel(logging.DEBUG)
+LOGGER = logging.getLogger("ome_zarr")
 
 # for optional type hints only, otherwise you can delete/ignore this stuff
 from typing import List, Optional, Union, Any, Tuple, Dict, Callable
@@ -119,24 +120,70 @@ class BaseZarr:
             data = da.from_zarr(f"{self.zarr_path}")
             return [(data, {'channel_axis': 1})]
 
-    def load_omero_metadata(self):
+    def load_omero_metadata(self, assert_channel_count=None):
         """Load OMERO metadata as json and convert for napari"""
         metadata = {}
         try:
-            channels = self.image_data['channels']
+            model = "unknown"
+            rdefs = self.image_data.get('rdefs', {})
+            if rdefs:
+                model = rdefs.get('model', 'unset')
+
+            channels = self.image_data.get('channels', None)
+            if channels is None:
+                return {}
+
+            count = None
+            try:
+                count = len(channels)
+                if assert_channel_count:
+                    if count != assert_channel_count:
+                        LOGGER.error((f"unexpected channel count: "
+                                      "{count}!={assert_channel_count}"))
+                        return {}
+            except:
+                LOGGER.warn(f"error counting channels: {channels}")
+                return {}
+
             colormaps = []
-            for ch in channels:
+            contrast_limits = [None for x in channels]
+            names = [("channel_%d" % idx) for idx, ch in enumerate(channels)]
+            visibles = [True for x in channels]
+
+            for idx, ch in enumerate(channels):
                 # 'FF0000' -> [1, 0, 0]
-                rgb = [(int(ch['color'][i:i+2], 16)/255) for i in range(0, 6, 2)]
-                if self.image_data['rdefs']['model'] == 'greyscale':
-                    rgb = [1, 1, 1]
-                colormaps.append(Colormap([[0, 0, 0], rgb]))
+
+                color = ch.get('color', None)
+                if color is not None:
+                    rgb = [(int(color[i:i+2], 16)/255) for i in range(0, 6, 2)]
+                    if model == 'greyscale':
+                        rgb = [1, 1, 1]
+                    colormaps.append(Colormap([[0, 0, 0], rgb]))
+
+                label = ch.get('label', None)
+                if label is not None:
+                    names[idx] = label
+
+                visible = ch.get('active', None)
+                if visible is not None:
+                    visibles[idx] = visible
+
+                window = ch.get('window', None)
+                if window is not None:
+                    start = window.get('start', None)
+                    end = window.get('end', None)
+                    if start is None or end is None:
+                        # Disable contrast limits settings if one is missing
+                        contrast_limits = None
+                    elif contrast_limits is not None:
+                        contrast_limits[idx] = [start, end]
+
             metadata['colormap'] = colormaps
-            metadata['contrast_limits'] = [[ch['window']['start'], ch['window']['end']] for ch in channels]
-            metadata['name'] = [ch['label'] for ch in channels]
-            metadata['visible'] = [ch['active'] for ch in channels]
+            metadata['contrast_limits'] = contrast_limits
+            metadata['name'] = names
+            metadata['visible'] = visibles
         except Exception as e:
-            print(e)
+            LOGGER.error(f"failed to parse metadata: {e}")
 
         return metadata
 
@@ -163,7 +210,8 @@ class BaseZarr:
 
         if len(pyramid) == 1:
             pyramid = pyramid[0]
-        metadata = self.load_omero_metadata()
+
+        metadata = self.load_omero_metadata(data.shape[1])
         return (pyramid, {'channel_axis': 1, **metadata})
 
 
@@ -183,13 +231,18 @@ class LocalZarr(BaseZarr):
 class RemoteZarr(BaseZarr):
 
     def get_json(self, subpath):
-        rsp = requests.get(f"{self.zarr_path}{subpath}")
+        url = f"{self.zarr_path}{subpath}"
+        try:
+            rsp = requests.get(url)
+        except:
+            LOGGER.warn(f"unreachable: {url}")
+            return {}
         try:
             if rsp.status_code in (403, 404):  # file doesn't exist
                 return {}
             return rsp.json()
         except:
-            print("FIXME", rsp.status_code, rsp.text)
+            LOGGER.error(f"({rsp.status_code}): {rsp.text}")
             return {}
 
 
