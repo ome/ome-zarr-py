@@ -24,7 +24,14 @@ from dask.diagnostics import ProgressBar
 from vispy.color import Colormap
 
 from urllib.parse import urlparse
-from pluggy import HookimplMarker
+
+
+try:
+    from napari_plugin_engine import napari_hook_implementation
+except ImportError:
+    def napari_hook_implementation(func, *args, **kwargs):
+        return func
+
 
 import logging
 # DEBUG logging for s3fs so we can track remote calls
@@ -39,9 +46,6 @@ LayerData = Union[Tuple[Any], Tuple[Any, Dict], Tuple[Any, Dict, str]]
 PathLike = Union[str, List[str]]
 ReaderFunction = Callable[[PathLike], List[LayerData]]
 # END type hint stuff.
-
-napari_hook_implementation = HookimplMarker("napari")
-
 
 
 @napari_hook_implementation

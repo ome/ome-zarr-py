@@ -19,7 +19,6 @@ install_requires += ['s3fs'],
 install_requires += ['requests'],
 install_requires += ['toolz'],
 install_requires += ['vispy'],
-install_requires += ['pluggy'],
 
 
 setup(
@@ -49,6 +48,9 @@ setup(
         'napari.plugin': [
             'ome_zarr = ome_zarr',
         ],
+    },
+    extras_require={
+        "napari": ["napari"],
     },
     tests_require=[
         'pytest',
