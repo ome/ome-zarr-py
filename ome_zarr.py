@@ -29,10 +29,8 @@ from urllib.parse import urlparse
 try:
     from napari_plugin_engine import napari_hook_implementation
 except ImportError:
-    def napari_hook_implementation(*args, **kwargs):
-        def noop(*args, **kwargs):
-            pass
-        return noop
+    def napari_hook_implementation(func, *args, **kwargs):
+        return func
 
 
 import logging
