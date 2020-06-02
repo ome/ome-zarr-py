@@ -122,7 +122,7 @@ class BaseZarr:
 
         elif self.zarray:
             data = da.from_zarr(f"{self.zarr_path}")
-            return [(data, {'channel_axis': 1})]
+            return [(data,)]
 
     def load_omero_metadata(self, assert_channel_count=None):
         """Load OMERO metadata as json and convert for napari"""
