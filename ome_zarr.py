@@ -125,7 +125,14 @@ class BaseZarr:
             # TODO: safe to ignore this path?
 
         if self.is_ome_zarr():
-            return [self.load_ome_zarr()]
+            layers = [self.load_ome_zarr()]
+            # If the Image contains masks...
+            if self.has_ome_masks():
+                mask_path = os.path.join(self.zarr_path, 'masks')
+                # Create a new OME Zarr Reader to load masks
+                masks = self.__class__(mask_path).reader_function(None)
+                layers.extend(masks)
+            return layers
 
         elif self.zarray:
             data = da.from_zarr(f"{self.zarr_path}")
@@ -259,9 +266,15 @@ class LocalZarr(BaseZarr):
         with open(filename) as f:
             return json.loads(f.read())
 
+    def has_ome_masks(self):
+        "Does the zarr Image also include /masks sub-dir"
+        mask_dir = os.path.join(self.zarr_path, 'masks')
+        return os.path.exists(mask_dir) and os.path.isdir(mask_dir) and self.get_json('masks/.zgroup')
+
     def get_mask_names(self):
         dirnames = os.listdir(self.zarr_path)
-        dirnames = [name for name in dirnames if os.path.isdir(os.path.join(self.zarr_path, name))]
+        dirnames = [name for name in dirnames if os.path.isdir(
+            os.path.join(self.zarr_path, name))]
         return dirnames
 
 class RemoteZarr(BaseZarr):
@@ -285,6 +298,9 @@ class RemoteZarr(BaseZarr):
         # TODO: find mask dirs remotely
         return []
 
+    def has_ome_masks(self):
+        # TODO: check for /masks/
+        return False
 
 def info(path):
     """
