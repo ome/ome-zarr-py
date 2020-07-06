@@ -295,12 +295,17 @@ class RemoteZarr(BaseZarr):
             return {}
 
     def get_mask_names(self):
-        # TODO: find mask dirs remotely
+        # If this is a mask, the names are in root .zattrs
+        masks = self.root_attrs.get('masks')
+        if masks is not None:
+            return masks
         return []
 
     def has_ome_masks(self):
-        # TODO: check for /masks/
-        return False
+        # check for /masks/.zattrs with 'masks' key
+        mask_attrs = self.get_json('masks/.zattrs')
+        masks = mask_attrs.get('masks')
+        return masks is not None and len(masks) > 0
 
 def info(path):
     """
