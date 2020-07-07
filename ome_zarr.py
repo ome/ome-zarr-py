@@ -102,8 +102,19 @@ class BaseZarr:
     def is_ome_zarr(self):
         return self.zgroup and "multiscales" in self.root_attrs
 
+    def has_ome_masks(self):
+        "Does the zarr Image also include /masks sub-dir"
+        return self.get_json('masks/.zgroup')
+
     def is_ome_mask(self):
         return self.zarr_path.endswith('masks/') and self.get_json('.zgroup')
+
+    def get_mask_names(self):
+        """
+        Called if is_ome_mask is true
+        """
+        # If this is a mask, the names are in root .zattrs
+        return self.root_attrs.get('masks', [])
 
     def get_json(self, subpath):
         raise NotImplementedError("unknown")
@@ -208,7 +219,6 @@ class BaseZarr:
 
         return metadata
 
-
     def load_ome_zarr(self):
 
         resolutions = ["0"]  # TODO: could be first alphanumeric dataset on err
@@ -266,17 +276,6 @@ class LocalZarr(BaseZarr):
         with open(filename) as f:
             return json.loads(f.read())
 
-    def has_ome_masks(self):
-        "Does the zarr Image also include /masks sub-dir"
-        mask_dir = os.path.join(self.zarr_path, 'masks')
-        return os.path.exists(mask_dir) and os.path.isdir(mask_dir) and self.get_json('masks/.zgroup')
-
-    def get_mask_names(self):
-        dirnames = os.listdir(self.zarr_path)
-        dirnames = [name for name in dirnames if os.path.isdir(
-            os.path.join(self.zarr_path, name))]
-        return dirnames
-
 class RemoteZarr(BaseZarr):
 
     def get_json(self, subpath):
@@ -293,19 +292,6 @@ class RemoteZarr(BaseZarr):
         except:
             LOGGER.error(f"({rsp.status_code}): {rsp.text}")
             return {}
-
-    def get_mask_names(self):
-        # If this is a mask, the names are in root .zattrs
-        masks = self.root_attrs.get('masks')
-        if masks is not None:
-            return masks
-        return []
-
-    def has_ome_masks(self):
-        # check for /masks/.zattrs with 'masks' key
-        mask_attrs = self.get_json('masks/.zattrs')
-        masks = mask_attrs.get('masks')
-        return masks is not None and len(masks) > 0
 
 def info(path):
     """
