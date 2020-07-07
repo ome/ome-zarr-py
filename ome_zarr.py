@@ -258,10 +258,11 @@ class BaseZarr:
                 color_dict = mask_attrs.get('color')
                 colors = {int(k):self.to_rgba(v) for (k, v) in color_dict.items()}
             data = da.from_zarr(mask_path)
-            # mask data is 5D (t, c, z, y, x) but each layer in napari is 4D (no C)
-            # NB: Assume we want 'first Channel'
-            data = data[:,0,:,:,:]
-            masks.append((data, {'name': name, 'color': colors}, 'labels'))
+            # Split masks into separate channels, 1 per layer
+            for n in range(data.shape[1]):
+                masks.append((data[:,n,:,:,:],
+                              {'name': name, 'color': colors},
+                              'labels'))
         return masks
 
 
