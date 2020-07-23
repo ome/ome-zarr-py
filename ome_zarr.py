@@ -47,7 +47,6 @@ PathLike = Union[str, List[str]]
 ReaderFunction = Callable[[PathLike], List[LayerData]]
 # END type hint stuff.
 
-
 @napari_hook_implementation
 def napari_get_reader(path: PathLike) -> Optional[ReaderFunction]:
     """
@@ -58,17 +57,21 @@ def napari_get_reader(path: PathLike) -> Optional[ReaderFunction]:
     if isinstance(path, list):
         path = path[0]
     instance = parse_url(path)
-    if instance.is_zarr():
+    if instance is not None and instance.is_zarr():
         return instance.get_reader_function()
 
 
 def parse_url(path):
-    result = urlparse(path)
-    if result.scheme in ("", "file"):
-        # Strips 'file://' if necessary
-        return LocalZarr(result.path)
+    # Check is path is local directory first
+    if os.path.isdir(path):
+        return LocalZarr(path)
     else:
-        return RemoteZarr(path)
+        result = urlparse(path)
+        if result.scheme in ("", "file"):
+            # Strips 'file://' if necessary
+            return LocalZarr(result.path)
+        else:
+            return RemoteZarr(path)
 
 
 class BaseZarr:
