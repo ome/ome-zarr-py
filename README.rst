@@ -34,6 +34,11 @@ Usage
 Open Zarr filesets containing images with associated OME metadata.
 The examples below use the image at http://idr.openmicroscopy.org/webclient/?show=image-6001240.
 
+All examples can be made more or less verbose by passing `-v` or `-q` one or more times::
+
+    # ome_zarr -vvv ...
+
+
 info
 ====
 

@@ -34,9 +34,6 @@ except ImportError:
 
 
 import logging
-# DEBUG logging for s3fs so we can track remote calls
-logging.basicConfig(level=logging.INFO)
-logging.getLogger('s3fs').setLevel(logging.DEBUG)
 LOGGER = logging.getLogger("ome_zarr")
 
 # for optional type hints only, otherwise you can delete/ignore this stuff
@@ -283,8 +280,9 @@ class RemoteZarr(BaseZarr):
         url = f"{self.zarr_path}{subpath}"
         try:
             rsp = requests.get(url)
-        except:
-            LOGGER.warn(f"unreachable: {url}")
+        except Exception as e:
+            LOGGER.warn(f"unreachable: {url} -- details logged at debug")
+            LOGGER.debug("exception details:", exc_info=True)
             return {}
         try:
             if rsp.status_code in (403, 404):  # file doesn't exist
