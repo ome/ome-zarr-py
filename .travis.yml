@@ -1,19 +1,45 @@
-# Config file for automatic testing at travis-ci.org
-
+dist: bionic
 language: python
-python:
-  - "3.6"
-# command to install dependencies
-install:
-  - pip install .[napari]
-  - pip install scikit-image  # only needed for tests
-# command to run tests
-script: pytest
+jobs:
+  include:
+    - name: Windows
+      os: windows
+      language: sh
+      before_install:
+        - choco install python3 --version 3.7.3
+        - export PATH="/c/Python37:/c/Python37/Scripts:$PATH"
+      install: python -m pip install --upgrade pip wheel pytest tox scikit-image .[napari]
+      script:
+        - pytest
+    - name: OS X
+      os: osx
+      osx_image: xcode11.2  # Python 3.7.4 running on macOS 10.14.4
+      language: shell       # 'language: python' is an error on Travis CI macOS
+    - name: Python37
+      python: "3.7"
+    - name: Python36
+      python: "3.6"
+    - name: Python38
+      python: "3.8"
+    - stage: deploy
+      python: "3.6"
+      if: tag IS present
+      script: skip
+      skip_cleanup: true
+      deploy:
+        provider: pypi
+        user: $PYPI_USER
+        password: $PYPI_PASSWORD
+        distributions: sdist bdist_wheel
+        on:
+          tags: true
 
-deploy:
-  provider: pypi
-  user: $PYPI_USER
-  password: $PYPI_PASSWORD
-  distributions: sdist bdist_wheel
-  on:
-    tags: true
+install: pip3 install --upgrade pip wheel pytest tox virtualenv scikit-image .[napari]
+
+script:
+  - ulimit -n 4096
+  - pytest
+
+cache:
+  directories:
+  - $HOME/.cache/pip
