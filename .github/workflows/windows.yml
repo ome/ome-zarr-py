@@ -1,0 +1,29 @@
+name: Build for Windows
+
+on:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Install Python
+        run: choco install python3 --version 3.7.3
+
+      - name: Prepare opengl install
+        run: git clone --depth 1 git://github.com/vtkiorg/gl-ci-helpers.git
+
+      - name: Import code signing certificate
+        shell: powershell
+        run: gl-ci-helpers/appveyor/install_opengl.ps1
+
+      - name: Test
+        shell: bash
+        run: >
+          export PATH="/c/Python37:/c/Python37/Scripts:$PATH"
+          python -m pip install --upgrade pip wheel pytest tox scikit-image .[napari]
+          pytest

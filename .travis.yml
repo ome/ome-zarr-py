@@ -2,18 +2,6 @@ dist: bionic
 language: python
 jobs:
   include:
-    - name: Windows
-      os: windows
-      language: sh
-      before_install:
-        - choco install python3 --version 3.7.3
-        - export PATH="/c/Python37:/c/Python37/Scripts:$PATH"
-        # Install opengl, from https://github.com/vispy/vispy/blob/master/appveyor.yml
-        - git clone --depth 1 git://github.com/vtkiorg/gl-ci-helpers.git
-        - powershell gl-ci-helpers/appveyor/install_opengl.ps1
-      install: python -m pip install --upgrade pip wheel pytest tox scikit-image .[napari]
-      script:
-        - pytest
     - name: OS X
       os: osx
       osx_image: xcode11.2  # Python 3.7.4 running on macOS 10.14.4
