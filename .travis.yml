@@ -8,11 +8,9 @@ jobs:
       before_install:
         - choco install python3 --version 3.7.3
         - export PATH="/c/Python37:/c/Python37/Scripts:$PATH"
-        - sudo powershell -Command 'Set-ExecutionPolicy -ExecutionPolicy Unrestricted -Scope LocalMachine'
-        # From napari/napari/.cirrus.yml
-        - powershell -Command 'Invoke-RestMethod -Uri https://raw.githubusercontent.com/vispy/vispy/v0.5.3/make/install_opengl.ps1 -Method Get -OutFile opengl.ps1'
-        - powershell ./opengl.ps1
-        - rm opengl.ps1
+        # Install opengl, from https://github.com/vispy/vispy/blob/master/appveyor.yml
+        - git clone --depth 1 git://github.com/vtkiorg/gl-ci-helpers.git
+        - powershell gl-ci-helpers/appveyor/install_opengl.ps1
       install: python -m pip install --upgrade pip wheel pytest tox scikit-image .[napari]
       script:
         - pytest
