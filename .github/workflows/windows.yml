@@ -15,14 +15,14 @@ jobs:
         with:
             python-version: 3.x
 
-      - name: Prepare opengl install
+      - name: Clone gl-ci-helpers
         run: git clone --depth 1 git://github.com/vtkiorg/gl-ci-helpers.git
 
-      - name: Import code signing certificate
+      - name: Install opengl
         shell: powershell
         run: gl-ci-helpers/appveyor/install_opengl.ps1
 
-      - name: Test
+      - name: Run pytest
         shell: bash
         run: >
           export PATH="/c/Python37:/c/Python37/Scripts:$PATH" &&
