@@ -1,6 +1,12 @@
+---
 repos:
-- repo: https://github.com/ambv/black
-  rev: 19.10b0
-  hooks:
-  - id: black
-    args: [--target-version=py36]
+  - repo: https://github.com/ambv/black
+    rev: 19.10b0
+    hooks:
+      - id: black
+        args: [--target-version=py36]
+  - repo: https://github.com/adrienverge/yamllint.git
+    rev: v1.24.2
+    hooks:
+      - id: yamllint
+        # args: [--config-data=relaxed]
