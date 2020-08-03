@@ -29,11 +29,13 @@ from urllib.parse import urlparse
 try:
     from napari_plugin_engine import napari_hook_implementation
 except ImportError:
+
     def napari_hook_implementation(func, *args, **kwargs):
         return func
 
 
 import logging
+
 LOGGER = logging.getLogger("ome_zarr")
 
 # for optional type hints only, otherwise you can delete/ignore this stuff
@@ -43,6 +45,7 @@ LayerData = Union[Tuple[Any], Tuple[Any, Dict], Tuple[Any, Dict, str]]
 PathLike = Union[str, List[str]]
 ReaderFunction = Callable[[PathLike], List[LayerData]]
 # END type hint stuff.
+
 
 @napari_hook_implementation
 def napari_get_reader(path: PathLike) -> Optional[ReaderFunction]:
@@ -72,7 +75,6 @@ def parse_url(path):
 
 
 class BaseZarr:
-
     def __init__(self, path):
         self.zarr_path = path.endswith("/") and path or f"{path}/"
         self.zarray = self.get_json(".zarray")
@@ -84,8 +86,7 @@ class BaseZarr:
                 # TODO: start checking metadata version
             else:
                 # Backup location that can be removed in the future.
-                warnings.warn("deprecated loading of omero.josn",
-                              DeprecationWarning)
+                warnings.warn("deprecated loading of omero.josn", DeprecationWarning)
                 self.image_data = self.get_json("omero.json")
 
     def __str__(self):
@@ -104,17 +105,17 @@ class BaseZarr:
 
     def has_ome_masks(self):
         "Does the zarr Image also include /masks sub-dir"
-        return self.get_json('masks/.zgroup')
+        return self.get_json("masks/.zgroup")
 
     def is_ome_mask(self):
-        return self.zarr_path.endswith('masks/') and self.get_json('.zgroup')
+        return self.zarr_path.endswith("masks/") and self.get_json(".zgroup")
 
     def get_mask_names(self):
         """
         Called if is_ome_mask is true
         """
         # If this is a mask, the names are in root .zattrs
-        return self.root_attrs.get('masks', [])
+        return self.root_attrs.get("masks", [])
 
     def get_json(self, subpath):
         raise NotImplementedError("unknown")
@@ -126,7 +127,7 @@ class BaseZarr:
 
     def to_rgba(self, v):
         """Get rgba (0-1) e.g. (1, 0.5, 0, 1) from integer"""
-        return [x/255 for x in v.to_bytes(4, signed=True, byteorder='big')]
+        return [x / 255 for x in v.to_bytes(4, signed=True, byteorder="big")]
 
     def reader_function(self, path: PathLike) -> List[LayerData]:
         """Take a path or list of paths and return a list of LayerData tuples."""
@@ -139,7 +140,7 @@ class BaseZarr:
             layers = [self.load_ome_zarr()]
             # If the Image contains masks...
             if self.has_ome_masks():
-                mask_path = os.path.join(self.zarr_path, 'masks')
+                mask_path = os.path.join(self.zarr_path, "masks")
                 # Create a new OME Zarr Reader to load masks
                 masks = self.__class__(mask_path).reader_function(None)
                 layers.extend(masks)
@@ -157,11 +158,11 @@ class BaseZarr:
         metadata = {}
         try:
             model = "unknown"
-            rdefs = self.image_data.get('rdefs', {})
+            rdefs = self.image_data.get("rdefs", {})
             if rdefs:
-                model = rdefs.get('model', 'unset')
+                model = rdefs.get("model", "unset")
 
-            channels = self.image_data.get('channels', None)
+            channels = self.image_data.get("channels", None)
             if channels is None:
                 return {}
 
@@ -170,8 +171,12 @@ class BaseZarr:
                 count = len(channels)
                 if assert_channel_count:
                     if count != assert_channel_count:
-                        LOGGER.error((f"unexpected channel count: "
-                                      "{count}!={assert_channel_count}"))
+                        LOGGER.error(
+                            (
+                                f"unexpected channel count: "
+                                "{count}!={assert_channel_count}"
+                            )
+                        )
                         return {}
             except:
                 LOGGER.warn(f"error counting channels: {channels}")
@@ -185,35 +190,35 @@ class BaseZarr:
             for idx, ch in enumerate(channels):
                 # 'FF0000' -> [1, 0, 0]
 
-                color = ch.get('color', None)
+                color = ch.get("color", None)
                 if color is not None:
-                    rgb = [(int(color[i:i+2], 16)/255) for i in range(0, 6, 2)]
-                    if model == 'greyscale':
+                    rgb = [(int(color[i : i + 2], 16) / 255) for i in range(0, 6, 2)]
+                    if model == "greyscale":
                         rgb = [1, 1, 1]
                     colormaps.append(Colormap([[0, 0, 0], rgb]))
 
-                label = ch.get('label', None)
+                label = ch.get("label", None)
                 if label is not None:
                     names[idx] = label
 
-                visible = ch.get('active', None)
+                visible = ch.get("active", None)
                 if visible is not None:
                     visibles[idx] = visible
 
-                window = ch.get('window', None)
+                window = ch.get("window", None)
                 if window is not None:
-                    start = window.get('start', None)
-                    end = window.get('end', None)
+                    start = window.get("start", None)
+                    end = window.get("end", None)
                     if start is None or end is None:
                         # Disable contrast limits settings if one is missing
                         contrast_limits = None
                     elif contrast_limits is not None:
                         contrast_limits[idx] = [start, end]
 
-            metadata['colormap'] = colormaps
-            metadata['contrast_limits'] = contrast_limits
-            metadata['name'] = names
-            metadata['visible'] = visibles
+            metadata["colormap"] = colormaps
+            metadata["contrast_limits"] = contrast_limits
+            metadata["name"] = names
+            metadata["visible"] = visibles
         except Exception as e:
             LOGGER.error(f"failed to parse metadata: {e}")
 
@@ -223,11 +228,11 @@ class BaseZarr:
 
         resolutions = ["0"]  # TODO: could be first alphanumeric dataset on err
         try:
-            print('root_attrs', self.root_attrs)
-            if 'multiscales' in self.root_attrs:
-                datasets = self.root_attrs['multiscales'][0]['datasets']
-                resolutions = [d['path'] for d in datasets]
-            print('resolutions', resolutions)
+            print("root_attrs", self.root_attrs)
+            if "multiscales" in self.root_attrs:
+                datasets = self.root_attrs["multiscales"][0]["datasets"]
+                resolutions = [d["path"] for d in datasets]
+            print("resolutions", resolutions)
         except Exception as e:
             raise e
 
@@ -235,16 +240,27 @@ class BaseZarr:
         for resolution in resolutions:
             # data.shape is (t, c, z, y, x) by convention
             data = da.from_zarr(f"{self.zarr_path}{resolution}")
-            chunk_sizes = [str(c[0]) + (" (+ %s)" % c[-1] if c[-1] != c[0] else '') for c in data.chunks]
-            print('resolution', resolution, 'shape (t, c, z, y, x)', data.shape, 'chunks', chunk_sizes, 'dtype', data.dtype)
+            chunk_sizes = [
+                str(c[0]) + (" (+ %s)" % c[-1] if c[-1] != c[0] else "")
+                for c in data.chunks
+            ]
+            print(
+                "resolution",
+                resolution,
+                "shape (t, c, z, y, x)",
+                data.shape,
+                "chunks",
+                chunk_sizes,
+                "dtype",
+                data.dtype,
+            )
             pyramid.append(data)
 
         if len(pyramid) == 1:
             pyramid = pyramid[0]
 
         metadata = self.load_omero_metadata(data.shape[1])
-        return (pyramid, {'channel_axis': 1, **metadata})
-
+        return (pyramid, {"channel_axis": 1, **metadata})
 
     def load_ome_masks(self):
         # look for masks in this dir...
@@ -252,22 +268,21 @@ class BaseZarr:
         masks = []
         for name in mask_names:
             mask_path = os.path.join(self.zarr_path, name)
-            mask_attrs = self.get_json(f'{name}/.zattrs')
+            mask_attrs = self.get_json(f"{name}/.zattrs")
             colors = {}
-            if 'color' in mask_attrs:
-                color_dict = mask_attrs.get('color')
-                colors = {int(k):self.to_rgba(v) for (k, v) in color_dict.items()}
+            if "color" in mask_attrs:
+                color_dict = mask_attrs.get("color")
+                colors = {int(k): self.to_rgba(v) for (k, v) in color_dict.items()}
             data = da.from_zarr(mask_path)
             # Split masks into separate channels, 1 per layer
             for n in range(data.shape[1]):
-                masks.append((data[:,n,:,:,:],
-                              {'name': name, 'color': colors},
-                              'labels'))
+                masks.append(
+                    (data[:, n, :, :, :], {"name": name, "color": colors}, "labels")
+                )
         return masks
 
 
 class LocalZarr(BaseZarr):
-
     def get_json(self, subpath):
         filename = os.path.join(self.zarr_path, subpath)
 
@@ -277,8 +292,8 @@ class LocalZarr(BaseZarr):
         with open(filename) as f:
             return json.loads(f.read())
 
-class RemoteZarr(BaseZarr):
 
+class RemoteZarr(BaseZarr):
     def get_json(self, subpath):
         url = f"{self.zarr_path}{subpath}"
         try:
@@ -295,6 +310,7 @@ class RemoteZarr(BaseZarr):
             LOGGER.error(f"({rsp.status_code}): {rsp.text}")
             return {}
 
+
 def info(path):
     """
     print information about the ome-zarr fileset
@@ -308,7 +324,7 @@ def info(path):
     print(data)
 
 
-def download(path, output_dir='.', zarr_name=''):
+def download(path, output_dir=".", zarr_name=""):
     """
     download zarr from URL
     """
@@ -317,32 +333,32 @@ def download(path, output_dir='.', zarr_name=''):
         print(f"not an ome-zarr: {path}")
         return
 
-    image_id = omezarr.image_data.get('id', 'unknown')
-    print('image_id', image_id)
+    image_id = omezarr.image_data.get("id", "unknown")
+    print("image_id", image_id)
     if not zarr_name:
-        zarr_name = f'{image_id}.zarr'
+        zarr_name = f"{image_id}.zarr"
 
     try:
-        datasets = [x['path'] for x in omezarr.root_attrs["multiscales"][0]["datasets"]]
+        datasets = [x["path"] for x in omezarr.root_attrs["multiscales"][0]["datasets"]]
     except KeyError:
         datasets = ["0"]
-    print('datasets', datasets)
+    print("datasets", datasets)
     resolutions = [da.from_zarr(path, component=str(i)) for i in datasets]
     # levels = list(range(len(resolutions)))
 
-    target_dir = os.path.join(output_dir, f'{zarr_name}')
+    target_dir = os.path.join(output_dir, f"{zarr_name}")
     if os.path.exists(target_dir):
-        print(f'{target_dir} already exists!')
+        print(f"{target_dir} already exists!")
         return
-    print(f'downloading to {target_dir}')
+    print(f"downloading to {target_dir}")
 
     pbar = ProgressBar()
     for dataset, data in reversed(list(zip(datasets, resolutions))):
-        print(f'resolution {dataset}...')
+        print(f"resolution {dataset}...")
         with pbar:
             data.to_zarr(os.path.join(target_dir, dataset))
 
-    with open(os.path.join(target_dir, '.zgroup'), 'w') as f:
+    with open(os.path.join(target_dir, ".zgroup"), "w") as f:
         f.write(json.dumps(omezarr.zgroup))
-    with open(os.path.join(target_dir, '.zattrs'), 'w') as f:
+    with open(os.path.join(target_dir, ".zattrs"), "w") as f:
         f.write(json.dumps(omezarr.root_attrs))
