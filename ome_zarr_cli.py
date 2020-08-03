@@ -7,11 +7,20 @@ from ome_zarr import info as zarr_info
 from ome_zarr import download as zarr_download
 
 
+def config_logging(loglevel, args):
+    loglevel = loglevel - (10 * args.verbose) + (10 * args.quiet)
+    logging.basicConfig(level=loglevel)
+    # DEBUG logging for s3fs so we can track remote calls
+    logging.getLogger('s3fs').setLevel(logging.DEBUG)
+
+
 def info(args):
+    config_logging(logging.INFO, args)
     zarr_info(args.path)
 
 
 def download(args):
+    config_logging(logging.WARN, args)
     zarr_download(args.path, args.output, args.name)
 
 
@@ -37,9 +46,4 @@ def main():
     parser_download.set_defaults(func=download)
 
     args = parser.parse_args()
-    loglevel = logging.INFO - (10 * args.verbose) + (10 * args.quiet)
-    logging.basicConfig(level=loglevel)
-    # DEBUG logging for s3fs so we can track remote calls
-    logging.getLogger('s3fs').setLevel(logging.DEBUG)
-
     args.func(args)
