@@ -23,7 +23,7 @@ install_requires += ['vispy'],
 
 setup(
     name='ome-zarr',
-    version='0.0.10',
+    version='0.0.11.dev0',
     author='The Open Microscopy Team',
     url='https://github.com/ome/ome-zarr-py',
     description='Implementation of images in Zarr files.',
