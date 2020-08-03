@@ -10,12 +10,8 @@ your plugin doesn't need to import, or even depend on napari at all!
 
 Replace code below accordingly.
 """
-import numpy as np
-import s3fs
 import os
-import re
 import json
-import zarr
 import requests
 import dask.array as da
 import warnings
@@ -36,10 +32,11 @@ except ImportError:
 
 import logging
 
-LOGGER = logging.getLogger("ome_zarr")
-
 # for optional type hints only, otherwise you can delete/ignore this stuff
 from typing import List, Optional, Union, Any, Tuple, Dict, Callable
+
+LOGGER = logging.getLogger("ome_zarr")
+
 
 LayerData = Union[Tuple[Any], Tuple[Any, Dict], Tuple[Any, Dict, str]]
 PathLike = Union[str, List[str]]
@@ -173,12 +170,12 @@ class BaseZarr:
                     if count != assert_channel_count:
                         LOGGER.error(
                             (
-                                f"unexpected channel count: "
-                                "{count}!={assert_channel_count}"
+                                "unexpected channel count: "
+                                f"{count}!={assert_channel_count}"
                             )
                         )
                         return {}
-            except:
+            except Exception:
                 LOGGER.warn(f"error counting channels: {channels}")
                 return {}
 
@@ -298,7 +295,7 @@ class RemoteZarr(BaseZarr):
         url = f"{self.zarr_path}{subpath}"
         try:
             rsp = requests.get(url)
-        except Exception as e:
+        except Exception:
             LOGGER.warn(f"unreachable: {url} -- details logged at debug")
             LOGGER.debug("exception details:", exc_info=True)
             return {}
@@ -306,7 +303,7 @@ class RemoteZarr(BaseZarr):
             if rsp.status_code in (403, 404):  # file doesn't exist
                 return {}
             return rsp.json()
-        except:
+        except Exception:
             LOGGER.error(f"({rsp.status_code}): {rsp.text}")
             return {}
 

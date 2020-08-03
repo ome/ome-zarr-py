@@ -5,6 +5,16 @@ repos:
     hooks:
       - id: black
         args: [--target-version=py36]
+  - repo: https://gitlab.com/pycqa/flake8
+    rev: 3.8.3
+    hooks:
+      - id: flake8
+        args: [
+          # default black line length is 88
+          --max-line-length=88,
+          # Conflicts with black: E203 whitespace before ':'
+          --ignore=E203,
+        ]
   - repo: https://github.com/adrienverge/yamllint.git
     rev: v1.24.2
     hooks:

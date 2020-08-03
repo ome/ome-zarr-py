@@ -42,9 +42,9 @@ setup(
         "License :: OSI Approved :: BSD License",
     ],
     entry_points={
-        "console_scripts": ["ome_zarr = ome_zarr_cli:main",],
-        "napari.plugin": ["ome_zarr = ome_zarr",],
+        "console_scripts": ["ome_zarr = ome_zarr_cli:main"],
+        "napari.plugin": ["ome_zarr = ome_zarr"],
     },
-    extras_require={"napari": ["napari"],},
-    tests_require=["pytest",],
+    extras_require={"napari": ["napari"]},
+    tests_require=["pytest"],
 )

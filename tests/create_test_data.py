@@ -1,11 +1,8 @@
 #!/usr/bin/env python
-import argparse
 import zarr
 import numpy as np
-import os
-import json
 from skimage import data
-from skimage.transform import pyramid_gaussian, pyramid_laplacian
+from skimage.transform import pyramid_gaussian
 
 
 def create_zarr(zarr_directory):
@@ -53,9 +50,9 @@ def create_zarr(zarr_directory):
                 "active": True,
             },
         ],
-        "rdefs": {"model": "color",},
+        "rdefs": {"model": "color"},
     }
 
-    multiscales = [{"version": "0.1", "datasets": paths,}]
+    multiscales = [{"version": "0.1", "datasets": paths}]
     grp.attrs["multiscales"] = multiscales
     grp.attrs["omero"] = image_data
