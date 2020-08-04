@@ -15,12 +15,11 @@ repos:
           # Conflicts with black: E203 whitespace before ':'
           --ignore=E203,
         ]
-  # ome_zarr.py contains some type hints but they're not validating
-  # - repo: https://github.com/pre-commit/mirrors-mypy
-  #   rev: v0.782
-  #   hooks:
-  #     - id: mypy
-  #       files: ome_zarr.py
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v0.782
+    hooks:
+      - id: mypy
+        files: ome_zarr.py
   - repo: https://github.com/adrienverge/yamllint.git
     rev: v1.24.2
     hooks:

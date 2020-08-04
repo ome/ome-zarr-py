@@ -56,6 +56,8 @@ def napari_get_reader(path: PathLike) -> Optional[ReaderFunction]:
     instance = parse_url(path)
     if instance is not None and instance.is_zarr():
         return instance.get_reader_function()
+    # Ignoring this path
+    return None
 
 
 def parse_url(path):
@@ -126,7 +128,7 @@ class BaseZarr:
         """Get rgba (0-1) e.g. (1, 0.5, 0, 1) from integer"""
         return [x / 255 for x in v.to_bytes(4, signed=True, byteorder="big")]
 
-    def reader_function(self, path: PathLike) -> List[LayerData]:
+    def reader_function(self, path: Optional[PathLike]) -> Optional[List[LayerData]]:
         """Take a path or list of paths and return a list of LayerData tuples."""
 
         if isinstance(path, list):
@@ -134,21 +136,29 @@ class BaseZarr:
             # TODO: safe to ignore this path?
 
         if self.is_ome_zarr():
+            LOGGER.debug(f"treating {path} as ome-zarr")
             layers = [self.load_ome_zarr()]
             # If the Image contains masks...
             if self.has_ome_masks():
                 mask_path = os.path.join(self.zarr_path, "masks")
                 # Create a new OME Zarr Reader to load masks
                 masks = self.__class__(mask_path).reader_function(None)
-                layers.extend(masks)
+                if masks:
+                    layers.extend(masks)
             return layers
 
         elif self.zarray:
+            LOGGER.debug(f"treating {path} as raw zarr")
             data = da.from_zarr(f"{self.zarr_path}")
             return [(data,)]
 
         elif self.is_ome_mask():
+            LOGGER.debug(f"treating {path} as masks")
             return self.load_ome_masks()
+
+        else:
+            LOGGER.debug(f"ignoring {path}")
+            return None
 
     def load_omero_metadata(self, assert_channel_count=None):
         """Load OMERO metadata as json and convert for napari"""
