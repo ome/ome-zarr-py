@@ -56,6 +56,8 @@ def napari_get_reader(path: PathLike) -> Optional[ReaderFunction]:
     instance = parse_url(path)
     if instance is not None and instance.is_zarr():
         return instance.get_reader_function()
+    # Ignoring this path
+    return None
 
 
 def parse_url(path):
@@ -126,7 +128,7 @@ class BaseZarr:
         """Get rgba (0-1) e.g. (1, 0.5, 0, 1) from integer"""
         return [x / 255 for x in v.to_bytes(4, signed=True, byteorder="big")]
 
-    def reader_function(self, path: PathLike) -> List[LayerData]:
+    def reader_function(self, path: Optional[PathLike]) -> Optional[List[LayerData]]:
         """Take a path or list of paths and return a list of LayerData tuples."""
 
         if isinstance(path, list):
@@ -134,21 +136,29 @@ class BaseZarr:
             # TODO: safe to ignore this path?
 
         if self.is_ome_zarr():
+            LOGGER.debug(f"treating {path} as ome-zarr")
             layers = [self.load_ome_zarr()]
             # If the Image contains masks...
             if self.has_ome_masks():
                 mask_path = os.path.join(self.zarr_path, "masks")
                 # Create a new OME Zarr Reader to load masks
                 masks = self.__class__(mask_path).reader_function(None)
-                layers.extend(masks)
+                if masks:
+                    layers.extend(masks)
             return layers
 
         elif self.zarray:
+            LOGGER.debug(f"treating {path} as raw zarr")
             data = da.from_zarr(f"{self.zarr_path}")
             return [(data,)]
 
         elif self.is_ome_mask():
+            LOGGER.debug(f"treating {path} as masks")
             return self.load_ome_masks()
+
+        else:
+            LOGGER.debug(f"ignoring {path}")
+            return None
 
     def load_omero_metadata(self, assert_channel_count=None):
         """Load OMERO metadata as json and convert for napari"""
@@ -225,11 +235,12 @@ class BaseZarr:
 
         resolutions = ["0"]  # TODO: could be first alphanumeric dataset on err
         try:
-            print("root_attrs", self.root_attrs)
+            for k, v in self.root_attrs.items():
+                LOGGER.info("root_attr: %s", k)
+                LOGGER.debug(v)
             if "multiscales" in self.root_attrs:
                 datasets = self.root_attrs["multiscales"][0]["datasets"]
                 resolutions = [d["path"] for d in datasets]
-            print("resolutions", resolutions)
         except Exception as e:
             raise e
 
@@ -241,16 +252,10 @@ class BaseZarr:
                 str(c[0]) + (" (+ %s)" % c[-1] if c[-1] != c[0] else "")
                 for c in data.chunks
             ]
-            print(
-                "resolution",
-                resolution,
-                "shape (t, c, z, y, x)",
-                data.shape,
-                "chunks",
-                chunk_sizes,
-                "dtype",
-                data.dtype,
-            )
+            LOGGER.info("resolution: %s", resolution)
+            LOGGER.info(" - shape (t, c, z, y, x) = %s", data.shape)
+            LOGGER.info(" - chunks =  %s", chunk_sizes)
+            LOGGER.info(" - dtype = %s", data.dtype)
             pyramid.append(data)
 
         if len(pyramid) == 1:
@@ -318,7 +323,7 @@ def info(path):
         return
     reader = zarr.get_reader_function()
     data = reader(path)
-    print(data)
+    LOGGER.debug(data)
 
 
 def download(path, output_dir=".", zarr_name=""):
@@ -331,7 +336,7 @@ def download(path, output_dir=".", zarr_name=""):
         return
 
     image_id = omezarr.image_data.get("id", "unknown")
-    print("image_id", image_id)
+    LOGGER.info("image_id %s", image_id)
     if not zarr_name:
         zarr_name = f"{image_id}.zarr"
 
@@ -339,7 +344,7 @@ def download(path, output_dir=".", zarr_name=""):
         datasets = [x["path"] for x in omezarr.root_attrs["multiscales"][0]["datasets"]]
     except KeyError:
         datasets = ["0"]
-    print("datasets", datasets)
+    LOGGER.info("datasets %s", datasets)
     resolutions = [da.from_zarr(path, component=str(i)) for i in datasets]
     # levels = list(range(len(resolutions)))
 
@@ -351,7 +356,7 @@ def download(path, output_dir=".", zarr_name=""):
 
     pbar = ProgressBar()
     for dataset, data in reversed(list(zip(datasets, resolutions))):
-        print(f"resolution {dataset}...")
+        LOGGER.info(f"resolution {dataset}...")
         with pbar:
             data.to_zarr(os.path.join(target_dir, dataset))
 
