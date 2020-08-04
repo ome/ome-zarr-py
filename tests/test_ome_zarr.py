@@ -4,6 +4,14 @@ from ome_zarr import napari_get_reader, info, download
 from .create_test_data import create_zarr
 import tempfile
 import os
+import logging
+
+
+def log_strings(idx, t, c, z, y, x, ct, cc, cz, cy, cx, dtype):
+    yield f"resolution: {idx}"
+    yield f" - shape (t, c, z, y, x) = ({t}, {c}, {z}, {y}, {x})"
+    yield f" - chunks =  ['{ct}', '{cc}', '{cz}', '{cx}', '{cy}']"
+    yield f" - dtype = {dtype}"
 
 
 class TestOmeZarr:
@@ -14,12 +22,6 @@ class TestOmeZarr:
         """
         cls.path = tempfile.TemporaryDirectory(suffix=".zarr").name
         create_zarr(cls.path)
-
-    # @classmethod
-    # def teardown_class(cls):
-    #     """ teardown any state that was previously setup with a call to
-    #     setup_class.
-    #     """
 
     def test_get_reader_hit(self):
         reader = napari_get_reader(self.path)
@@ -47,43 +49,31 @@ class TestOmeZarr:
         assert reader is None
 
     def check_info_stdout(self, out):
-        # from print statements in reader
-        assert (
-            "resolution 0 shape (t, c, z, y, x) (1, 3, 1, 1024, 1024)"
-            " chunks ['1', '1', '1', '256', '256'] dtype float64"
-        ) in out
-        assert (
-            "resolution 1 shape (t, c, z, y, x) (1, 3, 1, 512, 512)"
-            " chunks ['1', '1', '1', '256', '256'] dtype float64"
-        ) in out
-        # from info's print of dask array
-        assert (
-            "[dask.array<from-zarr, shape=(1, 3, 1, 1024, 1024), dtype=float64,"
-            " chunksize=(1, 1, 1, 256, 256), chunktype=numpy.ndarray>,"
-            " dask.array<from-zarr, shape=(1, 3, 1, 512, 512), dtype=float64,"
-            " chunksize=(1, 1, 1, 256, 256), chunktype=numpy.ndarray>,"
-            " dask.array<from-zarr, shape=(1, 3, 1, 256, 256), dtype=float64,"
-            " chunksize=(1, 2, 1, 128, 128), chunktype=numpy.ndarray>"
-        ) in out
+        for log in log_strings(0, 1, 3, 1, 1024, 1024, 1, 1, 1, 256, 256, "float64"):
+            assert log in out
+        for log in log_strings(1, 1, 3, 1, 512, 512, 1, 1, 1, 256, 256, "float64"):
+            assert log in out
+
         # from info's print of omero metadata
         assert "'channel_axis': 1" in out
         assert "'name': ['Red', 'Green', 'Blue']" in out
         assert "'contrast_limits': [[0, 1], [0, 1], [0, 1]]" in out
         assert "'visible': [True, True, True]" in out
 
-    def test_info(self, capsys):
-        info(self.path)
-        out = capsys.readouterr().out
-        self.check_info_stdout(out)
+    def test_info(self, capsys, caplog):
+        with caplog.at_level(logging.DEBUG):
+            info(self.path)
+        self.check_info_stdout(caplog.text)
 
-    def test_download(self, capsys):
+    def test_download(self, capsys, caplog):
         target = tempfile.TemporaryDirectory().name
         name = "test.zarr"
-        download(self.path, output_dir=target, zarr_name=name)
-        download_zarr = os.path.join(target, name)
-        assert os.path.exists(download_zarr)
-        info(download_zarr)
-        out = capsys.readouterr().out
-        self.check_info_stdout(out)
+        with caplog.at_level(logging.DEBUG):
+            download(self.path, output_dir=target, zarr_name=name)
+            download_zarr = os.path.join(target, name)
+            assert os.path.exists(download_zarr)
+            info(download_zarr)
+        self.check_info_stdout(caplog.text)
         # check download progress in stdout
+        out = capsys.readouterr().out
         assert "100% Completed" in out

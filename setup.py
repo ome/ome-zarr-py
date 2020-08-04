@@ -46,5 +46,5 @@ setup(
         "napari.plugin": ["ome_zarr = ome_zarr"],
     },
     extras_require={"napari": ["napari"]},
-    tests_require=["pytest"],
+    tests_require=["pytest", "pytest-capturelog"],
 )
