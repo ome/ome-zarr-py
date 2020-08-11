@@ -1,19 +1,36 @@
+---
 # Config file for automatic testing at travis-ci.org
-
+dist: bionic
 language: python
-python:
-  - "3.6"
+jobs:
+  include:
+    - name: Python36
+      python: "3.6"
+    - name: Python37
+      python: "3.7"
+    - name: Python38
+      python: "3.8"
+    - stage: deploy
+      python: "3.6"
+      if: tag IS present
+      script: skip
+      skip_cleanup: true
+      deploy:
+        provider: pypi
+        user: $PYPI_USER
+        password: $PYPI_PASSWORD
+        distributions: sdist bdist_wheel
+        on:
+          tags: true
+
 # command to install dependencies
 install:
   - pip install .[napari]
   - pip install scikit-image  # only needed for tests
+
 # command to run tests
 script: pytest
 
-deploy:
-  provider: pypi
-  user: $PYPI_USER
-  password: $PYPI_PASSWORD
-  distributions: sdist bdist_wheel
-  on:
-    tags: true
+cache:
+  directories:
+    - $HOME/.cache/pip
