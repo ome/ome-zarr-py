@@ -277,7 +277,11 @@ class BaseZarr:
                 colors = dict()
                 for k, v in color_dict.items():
                     try:
-                        colors[int(k)] = self.to_rgba(v)
+                        if k in ("true", "false"):
+                            k = bool(k)
+                        else:
+                            k = int(k)
+                        colors[k] = self.to_rgba(v)
                     except Exception as e:
                         LOGGER.error(f"invalid color - {k}={v}: {e}")
             data = da.from_zarr(mask_path)
