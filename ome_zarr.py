@@ -288,7 +288,11 @@ class BaseZarr:
             # Split masks into separate channels, 1 per layer
             for n in range(data.shape[1]):
                 masks.append(
-                    (data[:, n, :, :, :], {"name": name, "color": colors}, "labels")
+                    (
+                        data[:, n, :, :, :],
+                        {"visible": False, "name": name, "color": colors},
+                        "labels",
+                    )
                 )
         return masks
 
