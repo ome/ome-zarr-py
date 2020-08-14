@@ -274,12 +274,25 @@ class BaseZarr:
             colors = {}
             if "color" in mask_attrs:
                 color_dict = mask_attrs.get("color")
-                colors = {int(k): self.to_rgba(v) for (k, v) in color_dict.items()}
+                colors = dict()
+                for k, v in color_dict.items():
+                    try:
+                        if k in ("true", "false"):
+                            k = bool(k)
+                        else:
+                            k = int(k)
+                        colors[k] = self.to_rgba(v)
+                    except Exception as e:
+                        LOGGER.error(f"invalid color - {k}={v}: {e}")
             data = da.from_zarr(mask_path)
             # Split masks into separate channels, 1 per layer
             for n in range(data.shape[1]):
                 masks.append(
-                    (data[:, n, :, :, :], {"name": name, "color": colors}, "labels")
+                    (
+                        data[:, n, :, :, :],
+                        {"visible": False, "name": name, "color": colors},
+                        "labels",
+                    )
                 )
         return masks
 
