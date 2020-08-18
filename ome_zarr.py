@@ -102,19 +102,19 @@ class BaseZarr:
     def is_ome_zarr(self):
         return self.zgroup and "multiscales" in self.root_attrs
 
-    def has_ome_masks(self):
-        "Does the zarr Image also include /masks sub-dir"
-        return self.get_json("masks/.zgroup")
+    def has_ome_labels(self):
+        "Does the zarr Image also include /labels sub-dir"
+        return self.get_json("labels/.zgroup")
 
-    def is_ome_mask(self):
-        return self.zarr_path.endswith("masks/") and self.get_json(".zgroup")
+    def is_ome_label(self):
+        return self.zarr_path.endswith("labels/") and self.get_json(".zgroup")
 
-    def get_mask_names(self):
+    def get_label_names(self):
         """
-        Called if is_ome_mask is true
+        Called if is_ome_label is true
         """
-        # If this is a mask, the names are in root .zattrs
-        return self.root_attrs.get("masks", [])
+        # If this is a label, the names are in root .zattrs
+        return self.root_attrs.get("labels", [])
 
     def get_json(self, subpath):
         raise NotImplementedError("unknown")
@@ -138,13 +138,13 @@ class BaseZarr:
         if self.is_ome_zarr():
             LOGGER.debug(f"treating {path} as ome-zarr")
             layers = [self.load_ome_zarr()]
-            # If the Image contains masks...
-            if self.has_ome_masks():
-                mask_path = os.path.join(self.zarr_path, "masks")
-                # Create a new OME Zarr Reader to load masks
-                masks = self.__class__(mask_path).reader_function(None)
-                if masks:
-                    layers.extend(masks)
+            # If the Image contains labels...
+            if self.has_ome_labels():
+                label_path = os.path.join(self.zarr_path, "labels")
+                # Create a new OME Zarr Reader to load labels
+                labels = self.__class__(label_path).reader_function(None)
+                if labels:
+                    layers.extend(labels)
             return layers
 
         elif self.zarray:
@@ -152,9 +152,9 @@ class BaseZarr:
             data = da.from_zarr(f"{self.zarr_path}")
             return [(data,)]
 
-        elif self.is_ome_mask():
-            LOGGER.debug(f"treating {path} as masks")
-            return self.load_ome_masks()
+        elif self.is_ome_label():
+            LOGGER.debug(f"treating {path} as labels")
+            return self.load_ome_labels()
 
         else:
             LOGGER.debug(f"ignoring {path}")
@@ -264,16 +264,16 @@ class BaseZarr:
         metadata = self.load_omero_metadata(data.shape[1])
         return (pyramid, {"channel_axis": 1, **metadata})
 
-    def load_ome_masks(self):
-        # look for masks in this dir...
-        mask_names = self.get_mask_names()
-        masks = []
-        for name in mask_names:
-            mask_path = os.path.join(self.zarr_path, name)
-            mask_attrs = self.get_json(f"{name}/.zattrs")
+    def load_ome_labels(self):
+        # look for labels in this dir...
+        label_names = self.get_label_names()
+        labels = []
+        for name in label_names:
+            label_path = os.path.join(self.zarr_path, name)
+            label_attrs = self.get_json(f"{name}/.zattrs")
             colors = {}
-            if "color" in mask_attrs:
-                color_dict = mask_attrs.get("color")
+            if "color" in label_attrs:
+                color_dict = label_attrs.get("color")
                 colors = dict()
                 for k, v in color_dict.items():
                     try:
@@ -284,17 +284,17 @@ class BaseZarr:
                         colors[k] = self.to_rgba(v)
                     except Exception as e:
                         LOGGER.error(f"invalid color - {k}={v}: {e}")
-            data = da.from_zarr(mask_path)
-            # Split masks into separate channels, 1 per layer
+            data = da.from_zarr(label_path)
+            # Split labels into separate channels, 1 per layer
             for n in range(data.shape[1]):
-                masks.append(
+                labels.append(
                     (
                         data[:, n, :, :, :],
                         {"visible": False, "name": name, "color": colors},
                         "labels",
                     )
                 )
-        return masks
+        return labels
 
 
 class LocalZarr(BaseZarr):
