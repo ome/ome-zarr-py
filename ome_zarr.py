@@ -14,6 +14,7 @@ import os
 import json
 import requests
 import dask.array as da
+import posixpath
 import warnings
 
 from dask.diagnostics import ProgressBar
@@ -128,7 +129,10 @@ class BaseZarr:
         """Get rgba (0-1) e.g. (1, 0.5, 0, 1) from integer"""
         return [x / 255 for x in v.to_bytes(4, signed=True, byteorder="big")]
 
-    def reader_function(self, path: Optional[PathLike]) -> Optional[List[LayerData]]:
+    def reader_function(self,
+                        path: Optional[PathLike],
+                        recurse: bool = True,
+                        ) -> Optional[List[LayerData]]:
         """Take a path or list of paths and return a list of LayerData tuples."""
 
         if isinstance(path, list):
@@ -139,22 +143,47 @@ class BaseZarr:
             LOGGER.debug(f"treating {path} as ome-zarr")
             layers = [self.load_ome_zarr()]
             # If the Image contains labels...
-            if self.has_ome_labels():
+            if recurse and self.has_ome_labels():
                 label_path = os.path.join(self.zarr_path, "labels")
                 # Create a new OME Zarr Reader to load labels
-                labels = self.__class__(label_path).reader_function(None)
+                labels = self.__class__(label_path).reader_function(
+                    None, recurse=False)
                 if labels:
                     layers.extend(labels)
             return layers
+
+        elif self.is_ome_label():
+            LOGGER.debug(f"treating {path} as labels")
+            layers = self.load_ome_labels()
+            rv = []
+            try:
+                for layer in layers:
+                    metadata = layer[1].get("metadata", {})
+                    path = metadata.get("path", None)
+                    array = metadata.get("image", {}).get("array", None)
+                    if recurse and path and array:
+                        # This is an ome mask, load the image
+                        parent = posixpath.normpath(f"{path}/{array}")
+                        LOGGER.debug(f"delegating to parent image: {parent}")
+                        # Create a new OME Zarr Reader to load labels
+                        replace = self.__class__(parent).reader_function(
+                            None, recurse=False)
+                        for r in replace:
+                            r[1]["visible"] = False
+                        rv.extend(replace)
+                    layer[1]["visible"] = True
+                    rv.append(layer)
+                return rv
+            except Exception as e:
+                LOGGER.error(e)
+                return []
+
+        # TODO: might also be an individiaul mask
 
         elif self.zarray:
             LOGGER.debug(f"treating {path} as raw zarr")
             data = da.from_zarr(f"{self.zarr_path}")
             return [(data,)]
-
-        elif self.is_ome_label():
-            LOGGER.debug(f"treating {path} as labels")
-            return self.load_ome_labels()
 
         else:
             LOGGER.debug(f"ignoring {path}")
@@ -290,7 +319,14 @@ class BaseZarr:
                 labels.append(
                     (
                         data[:, n, :, :, :],
-                        {"visible": False, "name": name, "color": colors},
+                        {"visible": False,
+                         "name": name,
+                         "color": colors,
+                         "metadata": {
+                            "image": label_attrs.get("image", {}),
+                            "path": label_path,
+                         },
+                        },
                         "labels",
                     )
                 )
