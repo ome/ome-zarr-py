@@ -273,8 +273,10 @@ class BaseZarr:
         if color_dict:
             for k, v in color_dict.items():
                 try:
-                    if k in ("true", "false"):
-                        k = bool(k)
+                    if k.lower() == "true":
+                        k = True
+                    elif k.lower() == "false":
+                        k = False
                     else:
                         k = int(k)
                     colors[k] = self.to_rgba(v)
