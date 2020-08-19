@@ -6,27 +6,24 @@ a reader plugin).
 """
 
 
+import logging
+
+from typing import Any, Callable, Optional
+from .reader import PathLike, ReaderFunction
+from .utils import parse_url
+
+
 try:
     from napari_plugin_engine import napari_hook_implementation
 except ImportError:
 
-    def napari_hook_implementation(func, *args, **kwargs):
+    def napari_hook_implementation(
+        func: Callable, *args: Any, **kwargs: Any
+    ) -> Callable:
         return func
 
 
-import logging
-
-# for optional type hints only, otherwise you can delete/ignore this stuff
-from typing import List, Optional, Union, Any, Tuple, Dict, Callable
-
-from .utils import parse_url
-
 LOGGER = logging.getLogger("ome_zarr.napari")
-
-LayerData = Union[Tuple[Any], Tuple[Any, Dict], Tuple[Any, Dict, str]]
-PathLike = Union[str, List[str]]
-ReaderFunction = Callable[[PathLike], List[LayerData]]
-# END type hint stuff.
 
 
 @napari_hook_implementation

@@ -13,18 +13,19 @@ from vispy.color import Colormap
 import logging
 
 # for optional type hints only, otherwise you can delete/ignore this stuff
-from typing import List, Optional, Union, Any, Tuple, Dict, cast
+from typing import List, Optional, Union, Any, Tuple, Dict, Callable, cast
 
 LOGGER = logging.getLogger("ome_zarr.reader")
 
 # START type hint stuff
 LayerData = Union[Tuple[Any], Tuple[Any, Dict], Tuple[Any, Dict, str]]
 PathLike = Union[str, List[str]]
+ReaderFunction = Callable[[PathLike], List[LayerData]]
 # END type hint stuff.
 
 
 class BaseZarr:
-    def __init__(self, path):
+    def __init__(self, path: str) -> None:
         self.zarr_path = path.endswith("/") and path or f"{path}/"
         self.zarray = self.get_json(".zarray")
         self.zgroup = self.get_json(".zgroup")
@@ -38,7 +39,7 @@ class BaseZarr:
                 warnings.warn("deprecated loading of omero.josn", DeprecationWarning)
                 self.image_data = self.get_json("omero.json")
 
-    def __str__(self):
+    def __str__(self) -> str:
         suffix = ""
         if self.zgroup:
             suffix += " [zgroup]"
@@ -46,44 +47,44 @@ class BaseZarr:
             suffix += " [zarray]"
         return f"{self.zarr_path}{suffix}"
 
-    def is_zarr(self):
+    def is_zarr(self) -> Optional[Dict]:
         return self.zarray or self.zgroup
 
-    def is_ome_zarr(self):
-        return self.zgroup and "multiscales" in self.root_attrs
+    def is_ome_zarr(self) -> bool:
+        return bool(self.zgroup) and "multiscales" in self.root_attrs
 
-    def has_ome_labels(self):
+    def has_ome_labels(self) -> Dict:
         "Does the zarr Image also include /labels sub-dir"
         return self.get_json("labels/.zgroup")
 
-    def is_ome_labels_group(self):
+    def is_ome_labels_group(self) -> bool:
         # TODO: also check for "labels" entry and perhaps version?
-        return self.zarr_path.endswith("labels/") and self.get_json(".zgroup")
+        return self.zarr_path.endswith("labels/") and bool(self.get_json(".zgroup"))
 
-    def get_label_names(self):
+    def get_label_names(self) -> List[str]:
         """
         Called if is_ome_label is true
         """
         # If this is a label, the names are in root .zattrs
         return self.root_attrs.get("labels", [])
 
-    def get_json(self, subpath):
+    def get_json(self, subpath: str) -> Dict:
         raise NotImplementedError("unknown")
 
-    def get_reader_function(self):
+    def get_reader_function(self) -> Callable:
         if not self.is_zarr():
             raise Exception(f"not a zarr: {self}")
         return self.reader_function
 
-    def to_rgba(self, v):
+    def to_rgba(self, v: int) -> List[float]:
         """Get rgba (0-1) e.g. (1, 0.5, 0, 1) from integer"""
         return [x / 255 for x in v.to_bytes(4, signed=True, byteorder="big")]
 
-    def update_metadata(self, data: LayerData, **kwargs):
+    def update_metadata(self, data: LayerData, **kwargs: Any) -> LayerData:
         """Cast LayerData for setting metadata"""
         # Union[Tuple[Any], Tuple[Any, Dict], Tuple[Any, Dict, str]]
         if not data:
-            return ()
+            return None
         elif len(data) == 1:  # Tuple[Any]
             return (data[0], dict(kwargs))
         else:
@@ -160,9 +161,9 @@ class BaseZarr:
             LOGGER.debug(f"ignoring {path}")
             return None
 
-    def load_omero_metadata(self, assert_channel_count=None):
+    def load_omero_metadata(self, assert_channel_count: int = None) -> Dict:
         """Load OMERO metadata as json and convert for napari"""
-        metadata = {}
+        metadata: Dict[str, Any] = {}
         try:
             model = "unknown"
             rdefs = self.image_data.get("rdefs", {})
@@ -190,7 +191,7 @@ class BaseZarr:
                 return {}
 
             colormaps = []
-            contrast_limits = [None for x in channels]
+            contrast_limits: Optional[List[Optional[Any]]] = [None for x in channels]
             names = [("channel_%d" % idx) for idx, ch in enumerate(channels)]
             visibles = [True for x in channels]
 
@@ -231,7 +232,7 @@ class BaseZarr:
 
         return metadata
 
-    def load_ome_zarr(self):
+    def load_ome_zarr(self) -> LayerData:
 
         resolutions = ["0"]  # TODO: could be first alphanumeric dataset on err
         try:
@@ -264,12 +265,12 @@ class BaseZarr:
         metadata = self.load_omero_metadata(data.shape[1])
         return (pyramid, {"channel_axis": 1, **metadata})
 
-    def load_ome_label_metadata(self, name: str):
+    def load_ome_label_metadata(self, name: str) -> Dict:
         # Metadata: TODO move to a class
         label_attrs = self.get_json(f"{name}/.zattrs")
-        colors: Dict[Union[int, bool], str] = {}
-        if "color" in label_attrs:
-            color_dict = label_attrs.get("color")
+        colors: Dict[Union[int, bool], List[float]] = {}
+        color_dict = label_attrs.get("color", {})
+        if color_dict:
             for k, v in color_dict.items():
                 try:
                     if k in ("true", "false"):
@@ -288,7 +289,7 @@ class BaseZarr:
 
 
 class LocalZarr(BaseZarr):
-    def get_json(self, subpath):
+    def get_json(self, subpath: str) -> Dict:
         filename = os.path.join(self.zarr_path, subpath)
 
         if not os.path.exists(filename):
@@ -299,7 +300,7 @@ class LocalZarr(BaseZarr):
 
 
 class RemoteZarr(BaseZarr):
-    def get_json(self, subpath):
+    def get_json(self, subpath: str) -> Dict:
         url = f"{self.zarr_path}{subpath}"
         try:
             rsp = requests.get(url)

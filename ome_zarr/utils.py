@@ -13,6 +13,7 @@ from urllib.parse import urlparse
 import logging
 
 from .reader import (
+    BaseZarr,
     LocalZarr,
     RemoteZarr,
 )
@@ -21,7 +22,7 @@ from .reader import (
 LOGGER = logging.getLogger("ome_zarr.utils")
 
 
-def parse_url(path):
+def parse_url(path: str) -> BaseZarr:
     # Check is path is local directory first
     if os.path.isdir(path):
         return LocalZarr(path)
@@ -34,7 +35,7 @@ def parse_url(path):
             return RemoteZarr(path)
 
 
-def info(path):
+def info(path: str) -> None:
     """
     print information about the ome-zarr fileset
     """
@@ -47,7 +48,7 @@ def info(path):
     LOGGER.debug(data)
 
 
-def download(path, output_dir=".", zarr_name=""):
+def download(path: str, output_dir: str = ".", zarr_name: str = "") -> None:
     """
     download zarr from URL
     """
