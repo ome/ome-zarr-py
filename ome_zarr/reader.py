@@ -101,29 +101,29 @@ class BaseZarr:
         elif self.is_ome_label():
             LOGGER.debug(f"treating {path} as labels")
             layers = self.load_ome_labels()
-            rv = []
-            try:
-                for layer in layers:
-                    metadata = layer[1].get("metadata", {})
-                    path = metadata.get("path", None)
-                    array = metadata.get("image", {}).get("array", None)
-                    if recurse and path and array:
-                        # This is an ome mask, load the image
-                        parent = posixpath.normpath(f"{path}/{array}")
-                        LOGGER.debug(f"delegating to parent image: {parent}")
-                        # Create a new OME Zarr Reader to load labels
-                        replace = self.__class__(parent).reader_function(
-                            None, recurse=False
-                        )
+            rv: List[LayerData] = []
+
+            for layer in layers:
+                metadata = layer[1].get("metadata", {})
+                path = metadata.get("path", None)
+                array = metadata.get("image", {}).get("array", None)
+                if recurse and path and array:
+                    # This is an ome mask, load the image
+                    parent = posixpath.normpath(f"{path}/{array}")
+                    LOGGER.debug(f"delegating to parent image: {parent}")
+                    # Create a new OME Zarr Reader to load labels
+                    replace = self.__class__(parent).reader_function(
+                        None, recurse=False
+                    )
+                    if replace:
                         for r in replace:
-                            r[1]["visible"] = False
+                            if len(r) > 1:
+                                r = cast(Tuple[Any, Dict], r)
+                                r[1]["visible"] = False
                         rv.extend(replace)
                     layer[1]["visible"] = True
-                    rv.append(layer)
-                return rv
-            except Exception as e:
-                LOGGER.error(e)
-                return []
+                rv.append(layer)
+            return rv
 
         # TODO: might also be an individiaul mask
 

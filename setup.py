@@ -4,6 +4,7 @@
 import os
 import codecs
 from setuptools import setup
+from typing import List
 
 
 def read(fname):
@@ -11,7 +12,7 @@ def read(fname):
     return codecs.open(file_path, encoding="utf-8").read()
 
 
-install_requires = []
+install_requires: List[List[str]] = []
 install_requires += (["numpy"],)
 install_requires += (["dask"],)
 install_requires += (["zarr"],)

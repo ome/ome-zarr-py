@@ -19,7 +19,6 @@ repos:
     rev: v0.782
     hooks:
       - id: mypy
-        files: ome_zarr.py
   - repo: https://github.com/adrienverge/yamllint.git
     rev: v1.24.2
     hooks:
