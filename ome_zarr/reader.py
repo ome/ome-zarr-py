@@ -17,6 +17,7 @@ from typing import List, Optional, Union, Any, Tuple, Dict, cast
 
 LOGGER = logging.getLogger("ome_zarr.reader")
 
+# START type hint stuff
 LayerData = Union[Tuple[Any], Tuple[Any, Dict], Tuple[Any, Dict, str]]
 PathLike = Union[str, List[str]]
 # END type hint stuff.
@@ -55,7 +56,8 @@ class BaseZarr:
         "Does the zarr Image also include /labels sub-dir"
         return self.get_json("labels/.zgroup")
 
-    def is_ome_label(self):
+    def is_ome_labels_group(self):
+        # TODO: also check for "labels" entry and perhaps version?
         return self.zarr_path.endswith("labels/") and self.get_json(".zgroup")
 
     def get_label_names(self):
@@ -77,6 +79,22 @@ class BaseZarr:
         """Get rgba (0-1) e.g. (1, 0.5, 0, 1) from integer"""
         return [x / 255 for x in v.to_bytes(4, signed=True, byteorder="big")]
 
+    def update_metadata(self, data: LayerData, **kwargs):
+        """Cast LayerData for setting metadata"""
+        # Union[Tuple[Any], Tuple[Any, Dict], Tuple[Any, Dict, str]]
+        if not data:
+            return ()
+        elif len(data) == 1:  # Tuple[Any]
+            return (data[0], dict(kwargs))
+        else:
+            data = cast(Tuple[Any, Dict], data)
+            data[1].update(kwargs)
+        return data
+
+    def new_reader(self, path: str, recurse: bool = False) -> Optional[List[LayerData]]:
+        """Create a new reader for the given path"""
+        return self.__class__(path).reader_function(None, recurse=recurse)
+
     def reader_function(
         self, path: Optional[PathLike], recurse: bool = True,
     ) -> Optional[List[LayerData]]:
@@ -91,38 +109,44 @@ class BaseZarr:
             layers = [self.load_ome_zarr()]
             # If the Image contains labels...
             if recurse and self.has_ome_labels():
-                label_path = os.path.join(self.zarr_path, "labels")
+                labels_path = os.path.join(self.zarr_path, "labels")
                 # Create a new OME Zarr Reader to load labels
-                labels = self.__class__(label_path).reader_function(None, recurse=False)
+                labels = self.new_reader(labels_path)
                 if labels:
                     layers.extend(labels)
             return layers
 
-        elif self.is_ome_label():
-            LOGGER.debug(f"treating {path} as labels")
-            layers = self.load_ome_labels()
-            rv: List[LayerData] = []
+        elif self.is_ome_labels_group():
 
-            for layer in layers:
-                metadata = layer[1].get("metadata", {})
+            LOGGER.debug(f"treating {path} as labels")
+            label_names = self.get_label_names()
+            rv: List[LayerData] = []
+            for name in label_names:
+
+                # Load multiscale as well as label metadata
+                label_path: str = os.path.join(self.zarr_path, name)
+                multiscales: Optional[List[LayerData]] = self.new_reader(label_path)
+                if not multiscales:
+                    continue
+                metadata: Dict = self.load_ome_label_metadata(name)
+
+                # Look parent
                 path = metadata.get("path", None)
-                array = metadata.get("image", {}).get("array", None)
-                if recurse and path and array:
+                image = metadata.get("image", {}).get("array", None)
+                if recurse and path and image:
                     # This is an ome mask, load the image
-                    parent = posixpath.normpath(f"{path}/{array}")
+                    parent = posixpath.normpath(f"{path}/{image}")
                     LOGGER.debug(f"delegating to parent image: {parent}")
                     # Create a new OME Zarr Reader to load labels
-                    replace = self.__class__(parent).reader_function(
-                        None, recurse=False
-                    )
+                    replace = self.new_reader(parent)
                     if replace:
+                        # Set replacements to be invisible
                         for r in replace:
-                            if len(r) > 1:
-                                r = cast(Tuple[Any, Dict], r)
-                                r[1]["visible"] = False
+                            r = self.update_metadata(r, visible=False)
                         rv.extend(replace)
-                    layer[1]["visible"] = True
-                rv.append(layer)
+                for multiscale in multiscales:
+                    multiscale = self.update_metadata(multiscale, visible=True)
+                rv.extend(multiscales)
             return rv
 
         # TODO: might also be an individiaul mask
@@ -240,45 +264,27 @@ class BaseZarr:
         metadata = self.load_omero_metadata(data.shape[1])
         return (pyramid, {"channel_axis": 1, **metadata})
 
-    def load_ome_labels(self):
-        # look for labels in this dir...
-        label_names = self.get_label_names()
-        labels = []
-        for name in label_names:
-            label_path = os.path.join(self.zarr_path, name)
-            label_attrs = self.get_json(f"{name}/.zattrs")
-            colors = {}
-            if "color" in label_attrs:
-                color_dict = label_attrs.get("color")
-                colors = dict()
-                for k, v in color_dict.items():
-                    try:
-                        if k in ("true", "false"):
-                            k = bool(k)
-                        else:
-                            k = int(k)
-                        colors[k] = self.to_rgba(v)
-                    except Exception as e:
-                        LOGGER.error(f"invalid color - {k}={v}: {e}")
-            data = da.from_zarr(label_path)
-            # Split labels into separate channels, 1 per layer
-            for n in range(data.shape[1]):
-                labels.append(
-                    (
-                        data[:, n, :, :, :],
-                        {
-                            "visible": False,
-                            "name": name,
-                            "color": colors,
-                            "metadata": {
-                                "image": label_attrs.get("image", {}),
-                                "path": label_path,
-                            },
-                        },
-                        "labels",
-                    )
-                )
-        return labels
+    def load_ome_label_metadata(self, name: str):
+        # Metadata: TODO move to a class
+        label_attrs = self.get_json(f"{name}/.zattrs")
+        colors: Dict[Union[int, bool], str] = {}
+        if "color" in label_attrs:
+            color_dict = label_attrs.get("color")
+            for k, v in color_dict.items():
+                try:
+                    if k in ("true", "false"):
+                        k = bool(k)
+                    else:
+                        k = int(k)
+                    colors[k] = self.to_rgba(v)
+                except Exception as e:
+                    LOGGER.error(f"invalid color - {k}={v}: {e}")
+        return {
+            "visible": False,
+            "name": name,
+            "color": colors,
+            "metadata": {"image": label_attrs.get("image", {}), "path": name},
+        }
 
 
 class LocalZarr(BaseZarr):
