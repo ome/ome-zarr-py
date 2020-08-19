@@ -1,14 +1,5 @@
 """
-This module is a napari plugin.
-
-It implements the ``napari_get_reader`` hook specification, (to create
-a reader plugin).
-
-Type annotations here are OPTIONAL!
-If you don't care to annotate the return types of your functions
-your plugin doesn't need to import, or even depend on napari at all!
-
-Replace code below accordingly.
+Reading logic for ome-zarr
 """
 import os
 import json
@@ -17,61 +8,18 @@ import dask.array as da
 import posixpath
 import warnings
 
-from dask.diagnostics import ProgressBar
 from vispy.color import Colormap
-
-from urllib.parse import urlparse
-
-
-try:
-    from napari_plugin_engine import napari_hook_implementation
-except ImportError:
-
-    def napari_hook_implementation(func, *args, **kwargs):
-        return func
-
 
 import logging
 
 # for optional type hints only, otherwise you can delete/ignore this stuff
-from typing import List, Optional, Union, Any, Tuple, Dict, Callable
+from typing import List, Optional, Union, Any, Tuple, Dict, cast
 
-LOGGER = logging.getLogger("ome_zarr")
-
+LOGGER = logging.getLogger("ome_zarr.reader")
 
 LayerData = Union[Tuple[Any], Tuple[Any, Dict], Tuple[Any, Dict, str]]
 PathLike = Union[str, List[str]]
-ReaderFunction = Callable[[PathLike], List[LayerData]]
 # END type hint stuff.
-
-
-@napari_hook_implementation
-def napari_get_reader(path: PathLike) -> Optional[ReaderFunction]:
-    """
-    Returns a reader for supported paths that include IDR ID
-
-    - URL of the form: https://s3.embassy.ebi.ac.uk/idr/zarr/v0.1/ID.zarr/
-    """
-    if isinstance(path, list):
-        path = path[0]
-    instance = parse_url(path)
-    if instance is not None and instance.is_zarr():
-        return instance.get_reader_function()
-    # Ignoring this path
-    return None
-
-
-def parse_url(path):
-    # Check is path is local directory first
-    if os.path.isdir(path):
-        return LocalZarr(path)
-    else:
-        result = urlparse(path)
-        if result.scheme in ("", "file"):
-            # Strips 'file://' if necessary
-            return LocalZarr(result.path)
-        else:
-            return RemoteZarr(path)
 
 
 class BaseZarr:
@@ -129,10 +77,9 @@ class BaseZarr:
         """Get rgba (0-1) e.g. (1, 0.5, 0, 1) from integer"""
         return [x / 255 for x in v.to_bytes(4, signed=True, byteorder="big")]
 
-    def reader_function(self,
-                        path: Optional[PathLike],
-                        recurse: bool = True,
-                        ) -> Optional[List[LayerData]]:
+    def reader_function(
+        self, path: Optional[PathLike], recurse: bool = True,
+    ) -> Optional[List[LayerData]]:
         """Take a path or list of paths and return a list of LayerData tuples."""
 
         if isinstance(path, list):
@@ -146,8 +93,7 @@ class BaseZarr:
             if recurse and self.has_ome_labels():
                 label_path = os.path.join(self.zarr_path, "labels")
                 # Create a new OME Zarr Reader to load labels
-                labels = self.__class__(label_path).reader_function(
-                    None, recurse=False)
+                labels = self.__class__(label_path).reader_function(None, recurse=False)
                 if labels:
                     layers.extend(labels)
             return layers
@@ -167,7 +113,8 @@ class BaseZarr:
                         LOGGER.debug(f"delegating to parent image: {parent}")
                         # Create a new OME Zarr Reader to load labels
                         replace = self.__class__(parent).reader_function(
-                            None, recurse=False)
+                            None, recurse=False
+                        )
                         for r in replace:
                             r[1]["visible"] = False
                         rv.extend(replace)
@@ -319,13 +266,14 @@ class BaseZarr:
                 labels.append(
                     (
                         data[:, n, :, :, :],
-                        {"visible": False,
-                         "name": name,
-                         "color": colors,
-                         "metadata": {
-                            "image": label_attrs.get("image", {}),
-                            "path": label_path,
-                         },
+                        {
+                            "visible": False,
+                            "name": name,
+                            "color": colors,
+                            "metadata": {
+                                "image": label_attrs.get("image", {}),
+                                "path": label_path,
+                            },
                         },
                         "labels",
                     )
@@ -360,56 +308,3 @@ class RemoteZarr(BaseZarr):
         except Exception:
             LOGGER.error(f"({rsp.status_code}): {rsp.text}")
             return {}
-
-
-def info(path):
-    """
-    print information about the ome-zarr fileset
-    """
-    zarr = parse_url(path)
-    if not zarr.is_ome_zarr():
-        print(f"not an ome-zarr: {zarr}")
-        return
-    reader = zarr.get_reader_function()
-    data = reader(path)
-    LOGGER.debug(data)
-
-
-def download(path, output_dir=".", zarr_name=""):
-    """
-    download zarr from URL
-    """
-    omezarr = parse_url(path)
-    if not omezarr.is_ome_zarr():
-        print(f"not an ome-zarr: {path}")
-        return
-
-    image_id = omezarr.image_data.get("id", "unknown")
-    LOGGER.info("image_id %s", image_id)
-    if not zarr_name:
-        zarr_name = f"{image_id}.zarr"
-
-    try:
-        datasets = [x["path"] for x in omezarr.root_attrs["multiscales"][0]["datasets"]]
-    except KeyError:
-        datasets = ["0"]
-    LOGGER.info("datasets %s", datasets)
-    resolutions = [da.from_zarr(path, component=str(i)) for i in datasets]
-    # levels = list(range(len(resolutions)))
-
-    target_dir = os.path.join(output_dir, f"{zarr_name}")
-    if os.path.exists(target_dir):
-        print(f"{target_dir} already exists!")
-        return
-    print(f"downloading to {target_dir}")
-
-    pbar = ProgressBar()
-    for dataset, data in reversed(list(zip(datasets, resolutions))):
-        LOGGER.info(f"resolution {dataset}...")
-        with pbar:
-            data.to_zarr(os.path.join(target_dir, dataset))
-
-    with open(os.path.join(target_dir, ".zgroup"), "w") as f:
-        f.write(json.dumps(omezarr.zgroup))
-    with open(os.path.join(target_dir, ".zattrs"), "w") as f:
-        f.write(json.dumps(omezarr.root_attrs))

@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
-from ome_zarr import napari_get_reader, info, download
+from ome_zarr.napari import napari_get_reader
+from ome_zarr.utils import info, download
 from .create_test_data import create_zarr
 import tempfile
 import os

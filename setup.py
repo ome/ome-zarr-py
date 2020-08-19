@@ -29,7 +29,7 @@ setup(
     url="https://github.com/ome/ome-zarr-py",
     description="Implementation of images in Zarr files.",
     long_description=read("README.rst"),
-    py_modules=["ome_zarr", "ome_zarr_cli"],
+    py_modules=["ome_zarr"],
     python_requires=">=3.6",
     install_requires=install_requires,
     classifiers=[
@@ -43,8 +43,8 @@ setup(
         "License :: OSI Approved :: BSD License",
     ],
     entry_points={
-        "console_scripts": ["ome_zarr = ome_zarr_cli:main"],
-        "napari.plugin": ["ome_zarr = ome_zarr"],
+        "console_scripts": ["ome_zarr = ome_zarr.cli:main"],
+        "napari.plugin": ["ome_zarr = ome_zarr.napari"],
     },
     extras_require={"napari": ["napari"]},
     tests_require=["pytest", "pytest-capturelog"],

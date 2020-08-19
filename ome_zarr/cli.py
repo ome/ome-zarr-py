@@ -3,8 +3,8 @@
 import argparse
 import logging
 
-from ome_zarr import info as zarr_info
-from ome_zarr import download as zarr_download
+from .utils import info as zarr_info
+from .utils import download as zarr_download
 
 
 def config_logging(loglevel, args):
