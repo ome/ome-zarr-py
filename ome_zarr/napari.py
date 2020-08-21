@@ -7,11 +7,10 @@ a reader plugin).
 
 
 import logging
-
 from typing import Any, Callable, Optional
+
 from .reader import PathLike, ReaderFunction
 from .utils import parse_url
-
 
 try:
     from napari_plugin_engine import napari_hook_implementation

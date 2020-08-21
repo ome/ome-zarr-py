@@ -3,8 +3,8 @@
 import argparse
 import logging
 
-from .utils import info as zarr_info
 from .utils import download as zarr_download
+from .utils import info as zarr_info
 
 
 def config_logging(loglevel: int, args: argparse.Namespace) -> None:

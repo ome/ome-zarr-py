@@ -2,22 +2,15 @@
 Utility methods for ome_zarr access
 """
 
-import os
 import json
-import dask.array as da
-
-from dask.diagnostics import ProgressBar
-
+import logging
+import os
 from urllib.parse import urlparse
 
-import logging
+import dask.array as da
+from dask.diagnostics import ProgressBar
 
-from .reader import (
-    BaseZarr,
-    LocalZarr,
-    RemoteZarr,
-)
-
+from .reader import BaseZarr, LocalZarr, RemoteZarr
 
 LOGGER = logging.getLogger("ome_zarr.utils")
 

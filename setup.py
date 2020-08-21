@@ -1,10 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import os
 import codecs
-from setuptools import setup
+import os
 from typing import List
+
+from setuptools import setup
 
 
 def read(fname):

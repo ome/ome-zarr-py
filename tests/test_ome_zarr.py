@@ -1,11 +1,13 @@
 # -*- coding: utf-8 -*-
 
-from ome_zarr.napari import napari_get_reader
-from ome_zarr.utils import info, download
-from .create_test_data import create_zarr
-import tempfile
-import os
 import logging
+import os
+import tempfile
+
+from ome_zarr.napari import napari_get_reader
+from ome_zarr.utils import download, info
+
+from .create_test_data import create_zarr
 
 
 def log_strings(idx, t, c, z, y, x, ct, cc, cz, cy, cx, dtype):

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
-import zarr
 import numpy as np
+import zarr
 from skimage import data
 from skimage.transform import pyramid_gaussian
 

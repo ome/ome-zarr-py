@@ -1,19 +1,18 @@
 """
 Reading logic for ome-zarr
 """
-import os
 import json
-import requests
-import dask.array as da
+import logging
+import os
 import posixpath
 import warnings
 
-from vispy.color import Colormap
-
-import logging
-
 # for optional type hints only, otherwise you can delete/ignore this stuff
-from typing import List, Optional, Union, Any, Tuple, Dict, Callable, cast
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union, cast
+
+import dask.array as da
+import requests
+from vispy.color import Colormap
 
 LOGGER = logging.getLogger("ome_zarr.reader")
 
