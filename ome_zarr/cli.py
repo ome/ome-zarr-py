@@ -3,6 +3,7 @@
 import argparse
 import logging
 
+from .data import create_zarr as zarr_coins
 from .utils import download as zarr_download
 from .utils import info as zarr_info
 
@@ -24,6 +25,11 @@ def download(args: argparse.Namespace) -> None:
     zarr_download(args.path, args.output, args.name)
 
 
+def coins(args: argparse.Namespace) -> None:
+    config_logging(logging.INFO, args)
+    zarr_coins(args.path)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -43,7 +49,7 @@ def main() -> None:
     subparsers = parser.add_subparsers(dest="command")
     subparsers.required = True
 
-    # foo
+    # info
     parser_info = subparsers.add_parser("info")
     parser_info.add_argument("path")
     parser_info.set_defaults(func=info)
@@ -54,6 +60,11 @@ def main() -> None:
     parser_download.add_argument("--output", default="")
     parser_download.add_argument("--name", default="")
     parser_download.set_defaults(func=download)
+
+    # coin
+    parser_coins = subparsers.add_parser("coins")
+    parser_coins.add_argument("path")
+    parser_coins.set_defaults(func=coins)
 
     args = parser.parse_args()
     args.func(args)
