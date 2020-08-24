@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from typing import List, Tuple
+from typing import Callable, List, Tuple
 
 import numpy as np
 import zarr
@@ -9,6 +9,9 @@ from skimage.filters import threshold_otsu
 from skimage.measure import label
 from skimage.morphology import closing, remove_small_objects, square
 from skimage.segmentation import clear_border
+from skimage.transform import pyramid_gaussian
+
+from .conversions import rgba_to_int
 
 
 def coins() -> Tuple[List, List]:
@@ -22,13 +25,30 @@ def coins() -> Tuple[List, List]:
     bw = closing(image > thresh, square(4))
     cleared = remove_small_objects(clear_border(bw), 20)
     label_image = label(cleared)
+
     pyramid = list(reversed([zoom(image, 2 ** i, order=3) for i in range(4)]))
     labels = list(reversed([zoom(label_image, 2 ** i, order=0) for i in range(4)]))
+
+    pyramid = [rgb_to_5d(layer) for layer in pyramid]
+    labels = [rgb_to_5d(layer) for layer in labels]
     return pyramid, labels
 
 
-def rgba_to_int(r: int, g: int, b: int, a: int) -> int:
-    return int.from_bytes([r, g, b, a], byteorder="big", signed=True)
+def astronaut() -> Tuple[List, List]:
+    base = np.tile(data.astronaut(), (2, 2, 1))
+    gaussian = list(pyramid_gaussian(base, downscale=2, max_layer=4, multichannel=True))
+
+    pyramid = []
+    # convert each level of pyramid into 5D image (t, c, z, y, x)
+    for pixels in gaussian:
+        red = pixels[:, :, 0]
+        green = pixels[:, :, 1]
+        blue = pixels[:, :, 2]
+        # wrap to make 5D: (t, c, z, y, x)
+        pixels = np.array([np.array([red]), np.array([green]), np.array([blue])])
+        pixels = np.array([pixels])
+        pyramid.append(pixels)
+    return pyramid, []
 
 
 def rgb_to_5d(pixels: np.ndarray) -> List:
@@ -39,7 +59,7 @@ def rgb_to_5d(pixels: np.ndarray) -> List:
         size_c = pixels.shape(2)
         channels = [np.array(pixels[:, :, c]) for c in range(size_c)]
     else:
-        assert f"expecting 2 or 3d: ({pixels.shape})"
+        assert False, f"expecting 2 or 3d: ({pixels.shape})"
     return [np.array(channels)]
 
 
@@ -54,11 +74,11 @@ def write_multiscale(pyramid: List, group: zarr.Group) -> None:
     group.attrs["multiscales"] = multiscales
 
 
-def create_zarr(zarr_directory: str) -> None:
+def create_zarr(
+    zarr_directory: str, method: Callable[..., Tuple[List, List]] = coins
+) -> None:
 
-    pyramid, labels = coins()
-    pyramid = [rgb_to_5d(layer) for layer in pyramid]
-    labels = [rgb_to_5d(layer) for layer in labels]
+    pyramid, labels = method()
 
     store = zarr.DirectoryStore(zarr_directory)
     grp = zarr.group(store)
@@ -91,8 +111,7 @@ def create_zarr(zarr_directory: str) -> None:
         ],
         "rdefs": {"model": "color"},
     }
-    if False:  # FIXME
-        grp.attrs["omero"] = image_data
+    grp.attrs["omero"] = image_data
 
     coins_grp = labels_grp.create_group("coins")
     write_multiscale(labels, coins_grp)

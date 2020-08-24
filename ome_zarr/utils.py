@@ -5,64 +5,57 @@ Utility methods for ome_zarr access
 import json
 import logging
 import os
-from urllib.parse import urlparse
+from typing import List, Optional
 
 import dask.array as da
 from dask.diagnostics import ProgressBar
 
-from .reader import BaseZarr, LocalZarr, RemoteZarr
+from .io import parse_url
+from .reader import OMERO, Layer, Multiscales
+from .types import JSONDict
 
 LOGGER = logging.getLogger("ome_zarr.utils")
 
 
-def parse_url(path: str) -> BaseZarr:
-    # Check is path is local directory first
-    if os.path.isdir(path):
-        return LocalZarr(path)
-    else:
-        result = urlparse(path)
-        if result.scheme in ("", "file"):
-            # Strips 'file://' if necessary
-            return LocalZarr(result.path)
-        else:
-            return RemoteZarr(path)
-
-
-def info(path: str) -> None:
+def info(path: str) -> Optional[Layer]:
     """
     print information about the ome-zarr fileset
     """
     zarr = parse_url(path)
-    if not zarr.is_ome_zarr():
-        print(f"not an ome-zarr: {zarr}")
-        return
-    reader = zarr.get_reader_function()
-    data = reader(path)
-    LOGGER.debug(data)
+    if not zarr:
+        print(f"not a zarr: {zarr}")
+        return None
+    else:
+        layer = Layer(zarr)
+        if not layer.specs:
+            print(f"not an ome-zarr: {zarr}")
+        LOGGER.debug(layer.data)
+        return layer
 
 
 def download(path: str, output_dir: str = ".", zarr_name: str = "") -> None:
     """
     download zarr from URL
     """
-    omezarr = parse_url(path)
-    if not omezarr.is_ome_zarr():
-        print(f"not an ome-zarr: {path}")
+    layer = info(path)
+    if not layer:
         return
+    image_id = "unknown"
+    resolutions: List[da.core.Array] = []
+    datasets: List[str] = []
+    for spec in layer.specs:
+        if isinstance(spec, OMERO):
+            image_id = spec.image_data.get("id", image_id)
+        if isinstance(spec, Multiscales):
+            datasets = spec.datasets
+            resolutions = layer.data
+            if not datasets or not resolutions:
+                print("no multiscales data found")
+                return
 
-    image_id = omezarr.image_data.get("id", "unknown")
     LOGGER.info("image_id %s", image_id)
     if not zarr_name:
         zarr_name = f"{image_id}.zarr"
-
-    try:
-        datasets = omezarr.root_attrs["multiscales"][0]["datasets"]
-        datasets = [x["path"] for x in datasets]
-    except KeyError:
-        datasets = ["0"]
-    LOGGER.info("datasets %s", datasets)
-    resolutions = [da.from_zarr(path, component=str(i)) for i in datasets]
-    # levels = list(range(len(resolutions)))
 
     target_dir = os.path.join(output_dir, f"{zarr_name}")
     if os.path.exists(target_dir):
@@ -72,11 +65,14 @@ def download(path: str, output_dir: str = ".", zarr_name: str = "") -> None:
 
     pbar = ProgressBar()
     for dataset, data in reversed(list(zip(datasets, resolutions))):
+        print("X", layer, dataset, data)
         LOGGER.info(f"resolution {dataset}...")
         with pbar:
             data.to_zarr(os.path.join(target_dir, dataset))
 
     with open(os.path.join(target_dir, ".zgroup"), "w") as f:
-        f.write(json.dumps(omezarr.zgroup))
+        f.write(json.dumps(layer.zarr.zgroup))
     with open(os.path.join(target_dir, ".zattrs"), "w") as f:
-        f.write(json.dumps(omezarr.root_attrs))
+        metadata: JSONDict = {}
+        layer.write_metadata(metadata)
+        f.write(json.dumps(metadata))

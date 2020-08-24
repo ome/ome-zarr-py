@@ -1,168 +1,219 @@
 """
 Reading logic for ome-zarr
 """
-import json
-import logging
-import os
-import posixpath
-import warnings
 
-# for optional type hints only, otherwise you can delete/ignore this stuff
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union, cast
+import logging
+import posixpath
+from abc import ABC
+from typing import Any, Dict, Iterator, List, Optional, Union
 
 import dask.array as da
-import requests
 from vispy.color import Colormap
+
+from .conversions import int_to_rgba
+from .io import BaseZarrLocation
+from .types import JSONDict
 
 LOGGER = logging.getLogger("ome_zarr.reader")
 
-# START type hint stuff
-LayerData = Union[Tuple[Any], Tuple[Any, Dict], Tuple[Any, Dict, str]]
-PathLike = Union[str, List[str]]
-ReaderFunction = Callable[[PathLike], List[LayerData]]
-# END type hint stuff.
 
+class Layer:
+    """
+    Container for a representation of the binary data somewhere in
+    the data hierarchy.
+    """
 
-class BaseZarr:
-    def __init__(self, path: str) -> None:
-        self.zarr_path = path.endswith("/") and path or f"{path}/"
-        self.zarray = self.get_json(".zarray")
-        self.zgroup = self.get_json(".zgroup")
-        if self.zgroup:
-            self.root_attrs = self.get_json(".zattrs")
-            if "omero" in self.root_attrs:
-                self.image_data = self.root_attrs["omero"]
-                # TODO: start checking metadata version
-            else:
-                # Backup location that can be removed in the future.
-                warnings.warn("deprecated loading of omero.josn", DeprecationWarning)
-                self.image_data = self.get_json("omero.json")
+    def __init__(self, zarr: BaseZarrLocation):
+        self.zarr = zarr
+        self.visible = True
+
+        # Likely to be updated by specs
+        self.metadata: JSONDict = dict()
+        self.data: List[da.core.Array] = list()
+        self.specs: List[Spec] = []
+        self.pre_layers: List[Layer] = []
+        self.post_layers: List[Layer] = []
+
+        # TODO: this should be some form of plugin infra over subclasses
+        if Labels.matches(zarr):
+            self.specs.append(Labels(self))
+        if Label.matches(zarr):
+            self.specs.append(Label(self))
+        if Multiscales.matches(zarr):
+            self.specs.append(Multiscales(self))
+        if OMERO.matches(zarr):
+            self.specs.append(OMERO(self))
+
+    def write_metadata(self, metadata: JSONDict) -> None:
+        for spec in self.specs:
+            metadata.update(self.zarr.root_attrs)
 
     def __str__(self) -> str:
         suffix = ""
-        if self.zgroup:
+        if self.zarr.zgroup:
             suffix += " [zgroup]"
-        if self.zarray:
+        if self.zarr.zarray:
             suffix += " [zarray]"
-        return f"{self.zarr_path}{suffix}"
+        return f"{self.zarr.zarr_path}{suffix}"
 
-    def is_zarr(self) -> Optional[Dict]:
-        return self.zarray or self.zgroup
 
-    def is_ome_zarr(self) -> bool:
-        return bool(self.zgroup) and "multiscales" in self.root_attrs
+class Spec(ABC):
+    """
+    Base class for specifications that can be implemented by groups
+    or arrays within the hierarchy. Multiple subclasses may apply.
+    """
 
-    def has_ome_labels(self) -> Dict:
-        "Does the zarr Image also include /labels sub-dir"
-        return self.get_json("labels/.zgroup")
+    @staticmethod
+    def matches(zarr: BaseZarrLocation) -> bool:
+        raise NotImplementedError()
 
-    def is_ome_labels_group(self) -> bool:
+    def __init__(self, layer: Layer) -> None:
+        self.layer = layer
+        self.zarr = layer.zarr
+        LOGGER.debug(f"treating {self.zarr} as {self.__class__.__name__}")
+        for k, v in self.zarr.root_attrs.items():
+            LOGGER.info("root_attr: %s", k)
+            LOGGER.debug(v)
+
+    def lookup(self, key: str, default: Any) -> Any:
+        return self.zarr.root_attrs.get(key, default)
+
+
+class Labels(Spec):
+    """
+    Relatively small specification for the well-known "labels" group
+    which only contains the name of subgroups which should be loaded
+    an labeled images.
+    """
+
+    @staticmethod
+    def matches(zarr: BaseZarrLocation) -> bool:
+        """Does the Zarr Image group also include a /labels sub-group?"""
         # TODO: also check for "labels" entry and perhaps version?
-        return self.zarr_path.endswith("labels/") and bool(self.get_json(".zgroup"))
+        return bool("labels" in zarr.root_attrs)
 
-    def get_label_names(self) -> List[str]:
+    def __init__(self, layer: Layer) -> None:
+        super().__init__(layer)
+        label_names = self.lookup("labels", [])
+        for name in label_names:
+            child_zarr = self.zarr.open(name)
+            child_layer = Layer(child_zarr)
+            layer.post_layers.append(child_layer)
+
+
+class Label(Spec):
+    """
+    An additional aspect to a multiscale image is that it can be a labeled
+    image, in which each discrete pixel value represents a separate object.
+    """
+
+    @staticmethod
+    def matches(zarr: BaseZarrLocation) -> bool:
         """
-        Called if is_ome_label is true
+        If label-specific metadata is present, then return true.
         """
-        # If this is a label, the names are in root .zattrs
-        return self.root_attrs.get("labels", [])
+        # FIXME: this should be the "label" metadata soon
+        return bool("colors" in zarr.root_attrs or "image" in zarr.root_attrs)
 
-    def get_json(self, subpath: str) -> Dict:
-        raise NotImplementedError("unknown")
+    def __init__(self, layer: Layer) -> None:
+        super().__init__(layer)
+        layer.visible = True
 
-    def get_reader_function(self) -> Callable:
-        if not self.is_zarr():
-            raise Exception(f"not a zarr: {self}")
-        return self.reader_function
+        path = self.lookup("path", None)
+        image = self.lookup("image", {}).get("array", None)
+        if path and image:
+            # This is an ome mask, load the image
+            parent = posixpath.normpath(f"{path}/{image}")
+            LOGGER.debug(f"delegating to parent image: {parent}")
+            parent_zarr = self.zarr.open(parent)
+            if parent_zarr.exists():
+                parent_layer = Layer(parent_zarr)
+                layer.pre_layers.append(parent_layer)
+                layer.visible = False
 
-    def to_rgba(self, v: int) -> List[float]:
-        """Get rgba (0-1) e.g. (1, 0.5, 0, 1) from integer"""
-        return [x / 255 for x in v.to_bytes(4, signed=True, byteorder="big")]
+        # Metadata: TODO move to a class
+        colors: Dict[Union[int, bool], List[float]] = {}
+        color_dict = self.lookup("color", {})
+        if color_dict:
+            for k, v in color_dict.items():
+                try:
+                    if k.lower() == "true":
+                        k = True
+                    elif k.lower() == "false":
+                        k = False
+                    else:
+                        k = int(k)
+                    colors[k] = int_to_rgba(v)
+                except Exception as e:
+                    LOGGER.error(f"invalid color - {k}={v}: {e}")
 
-    def update_metadata(self, data: LayerData, **kwargs: Any) -> LayerData:
-        """Cast LayerData for setting metadata"""
-        # Union[Tuple[Any], Tuple[Any, Dict], Tuple[Any, Dict, str]]
-        if not data:
-            return None
-        elif len(data) == 1:  # Tuple[Any]
-            return (data[0], dict(kwargs))
-        else:
-            data = cast(Tuple[Any, Dict], data)
-            data[1].update(kwargs)
-        return data
+        # TODO: a metadata transform should be provided by specific impls.
+        name = self.zarr.zarr_path.split("/")[-1]
+        layer.metadata.update(
+            {
+                "visible": False,
+                "name": name,
+                # "colormap": colors,
+                "metadata": {"image": self.lookup("image", {}), "path": name},
+            }
+        )
 
-    def new_reader(self, path: str, recurse: bool = False) -> Optional[List[LayerData]]:
-        """Create a new reader for the given path"""
-        return self.__class__(path).reader_function(None, recurse=recurse)
 
-    def reader_function(
-        self, path: Optional[PathLike], recurse: bool = True,
-    ) -> Optional[List[LayerData]]:
-        """Take a path or list of paths and return a list of LayerData tuples."""
+class Multiscales(Spec):
+    @staticmethod
+    def matches(zarr: BaseZarrLocation) -> bool:
+        """is multiscales metadata present?"""
+        if zarr.zgroup:
+            if "multiscales" in zarr.root_attrs:
+                return True
+        return False
 
-        if isinstance(path, list):
-            path = path[0]
-            # TODO: safe to ignore this path?
+    def __init__(self, layer: Layer) -> None:
+        super().__init__(layer)
 
-        if self.is_ome_zarr():
-            LOGGER.debug(f"treating {path} as ome-zarr")
-            layers = [self.load_ome_zarr()]
-            # If the Image contains labels...
-            if recurse and self.has_ome_labels():
-                labels_path = os.path.join(self.zarr_path, "labels")
-                # Create a new OME Zarr Reader to load labels
-                labels = self.new_reader(labels_path)
-                if labels:
-                    layers.extend(labels)
-            return layers
+        try:
+            datasets = self.lookup("multiscales", [])[0]["datasets"]
+            datasets = [d["path"] for d in datasets]
+            self.datasets: List[str] = datasets
+            LOGGER.info("datasets %s", datasets)
+        except Exception as e:
+            LOGGER.error(f"failed to parse multiscale metadata: {e}")
+            return  # EARLY EXIT
 
-        elif self.is_ome_labels_group():
+        for resolution in self.datasets:
+            # data.shape is (t, c, z, y, x) by convention
+            data: da.core.Array = self.zarr.load(resolution)
+            chunk_sizes = [
+                str(c[0]) + (" (+ %s)" % c[-1] if c[-1] != c[0] else "")
+                for c in data.chunks
+            ]
+            LOGGER.info("resolution: %s", resolution)
+            LOGGER.info(" - shape (t, c, z, y, x) = %s", data.shape)
+            LOGGER.info(" - chunks =  %s", chunk_sizes)
+            LOGGER.info(" - dtype = %s", data.dtype)
+            layer.data.append(data)
 
-            LOGGER.debug(f"treating {path} as labels")
-            label_names = self.get_label_names()
-            rv: List[LayerData] = []
-            for name in label_names:
+        # TODO: test removal
+        if len(layer.data) == 1:
+            layer.data = layer.data[0]
 
-                # Load multiscale as well as label metadata
-                label_path: str = os.path.join(self.zarr_path, name)
-                multiscales: Optional[List[LayerData]] = self.new_reader(label_path)
-                if not multiscales:
-                    continue
-                metadata: Dict = self.load_ome_label_metadata(name)
+        # Load possible layer data
+        child_zarr = self.zarr.open("labels")
+        # Creating a layer propagates to sub-specs, but the layer itself
+        # should not be registered.
+        Layer(child_zarr)
 
-                # Look parent
-                path = metadata.get("path", None)
-                image = metadata.get("image", {}).get("array", None)
-                if recurse and path and image:
-                    # This is an ome mask, load the image
-                    parent = posixpath.normpath(f"{path}/{image}")
-                    LOGGER.debug(f"delegating to parent image: {parent}")
-                    # Create a new OME Zarr Reader to load labels
-                    replace = self.new_reader(parent)
-                    if replace:
-                        # Set replacements to be invisible
-                        for r in replace:
-                            r = self.update_metadata(r, visible=False)
-                        rv.extend(replace)
-                for multiscale in multiscales:
-                    multiscale = self.update_metadata(multiscale, visible=True)
-                rv.extend(multiscales)
-            return rv
 
-        # TODO: might also be an individiaul mask
+class OMERO(Spec):
+    @staticmethod
+    def matches(zarr: BaseZarrLocation) -> bool:
+        return bool("omero" in zarr.root_attrs)
 
-        elif self.zarray:
-            LOGGER.debug(f"treating {path} as raw zarr")
-            data = da.from_zarr(f"{self.zarr_path}")
-            return [(data,)]
+    def __init__(self, layer: Layer) -> None:
+        super().__init__(layer)
+        # TODO: start checking metadata version
+        self.image_data = self.lookup("omero", {})
 
-        else:
-            LOGGER.debug(f"ignoring {path}")
-            return None
-
-    def load_omero_metadata(self, assert_channel_count: int = None) -> Dict:
-        """Load OMERO metadata as json and convert for napari"""
-        metadata: Dict[str, Any] = {}
         try:
             model = "unknown"
             rdefs = self.image_data.get("rdefs", {})
@@ -171,23 +222,13 @@ class BaseZarr:
 
             channels = self.image_data.get("channels", None)
             if channels is None:
-                return {}
+                return  # EARLY EXIT
 
-            count = None
             try:
-                count = len(channels)
-                if assert_channel_count:
-                    if count != assert_channel_count:
-                        LOGGER.error(
-                            (
-                                "unexpected channel count: "
-                                f"{count}!={assert_channel_count}"
-                            )
-                        )
-                        return {}
+                len(channels)
             except Exception:
                 LOGGER.warn(f"error counting channels: {channels}")
-                return {}
+                return  # EARLY EXIT
 
             colormaps = []
             contrast_limits: Optional[List[Optional[Any]]] = [None for x in channels]
@@ -222,97 +263,50 @@ class BaseZarr:
                     elif contrast_limits is not None:
                         contrast_limits[idx] = [start, end]
 
-            metadata["colormap"] = colormaps
-            metadata["contrast_limits"] = contrast_limits
-            metadata["name"] = names
-            metadata["visible"] = visibles
+            layer.metadata["colormap"] = colormaps
+            layer.metadata["contrast_limits"] = contrast_limits
+            layer.metadata["name"] = names
+            layer.metadata["visible"] = visibles
         except Exception as e:
             LOGGER.error(f"failed to parse metadata: {e}")
 
-        return metadata
 
-    def load_ome_zarr(self) -> LayerData:
+class Reader:
+    """
+    Parses the given Zarr instance into a collection of Layers properly
+    ordered depending on context. Depending on the starting point, metadata
+    may be followed up or down the Zarr hierarchy.
+    """
 
-        resolutions = ["0"]  # TODO: could be first alphanumeric dataset on err
-        try:
-            for k, v in self.root_attrs.items():
-                LOGGER.info("root_attr: %s", k)
-                LOGGER.debug(v)
-            if "multiscales" in self.root_attrs:
-                datasets = self.root_attrs["multiscales"][0]["datasets"]
-                resolutions = [d["path"] for d in datasets]
-        except Exception as e:
-            raise e
+    def __init__(self, zarr: BaseZarrLocation) -> None:
+        assert zarr.is_zarr()
+        self.zarr = zarr
 
-        pyramid = []
-        for resolution in resolutions:
-            # data.shape is (t, c, z, y, x) by convention
-            data = da.from_zarr(f"{self.zarr_path}{resolution}")
-            chunk_sizes = [
-                str(c[0]) + (" (+ %s)" % c[-1] if c[-1] != c[0] else "")
-                for c in data.chunks
-            ]
-            LOGGER.info("resolution: %s", resolution)
-            LOGGER.info(" - shape (t, c, z, y, x) = %s", data.shape)
-            LOGGER.info(" - chunks =  %s", chunk_sizes)
-            LOGGER.info(" - dtype = %s", data.dtype)
-            pyramid.append(data)
+    def __call__(self) -> Iterator[Layer]:
+        layer = Layer(self.zarr)
+        if layer.specs:  # Something has matched
+            LOGGER.debug(f"treating {self.zarr} as ome-zarr")
 
-        if len(pyramid) == 1:
-            pyramid = pyramid[0]
+            # FIXME -- this will need recursion
+            for pre_layer in layer.pre_layers:
+                yield pre_layer
+            if layer.data:
+                yield layer
+            for post_layer in layer.post_layers:
+                yield post_layer
 
-        metadata = self.load_omero_metadata(data.shape[1])
-        return (pyramid, {"channel_axis": 1, **metadata})
+            # TODO: API thoughts for the Spec type
+            # - ask for earlier_layers, later_layers (i.e. priorities)
+            # - ask for recursion or not
+            # - ask for visible or invisible (?)
+            # - ask for "provides data", "overrides data"
 
-    def load_ome_label_metadata(self, name: str) -> Dict:
-        # Metadata: TODO move to a class
-        label_attrs = self.get_json(f"{name}/.zattrs")
-        colors: Dict[Union[int, bool], List[float]] = {}
-        color_dict = label_attrs.get("color", {})
-        if color_dict:
-            for k, v in color_dict.items():
-                try:
-                    if k.lower() == "true":
-                        k = True
-                    elif k.lower() == "false":
-                        k = False
-                    else:
-                        k = int(k)
-                    colors[k] = self.to_rgba(v)
-                except Exception as e:
-                    LOGGER.error(f"invalid color - {k}={v}: {e}")
-        return {
-            "visible": False,
-            "name": name,
-            "color": colors,
-            "metadata": {"image": label_attrs.get("image", {}), "path": name},
-        }
+        elif self.zarr.zarray:  # Nothing has matched
+            LOGGER.debug(f"treating {self.zarr} as raw zarr")
+            data = da.from_zarr(f"{self.zarr.zarr_path}")
+            layer.data.append(data)
+            yield layer
 
-
-class LocalZarr(BaseZarr):
-    def get_json(self, subpath: str) -> Dict:
-        filename = os.path.join(self.zarr_path, subpath)
-
-        if not os.path.exists(filename):
-            return {}
-
-        with open(filename) as f:
-            return json.loads(f.read())
-
-
-class RemoteZarr(BaseZarr):
-    def get_json(self, subpath: str) -> Dict:
-        url = f"{self.zarr_path}{subpath}"
-        try:
-            rsp = requests.get(url)
-        except Exception:
-            LOGGER.warn(f"unreachable: {url} -- details logged at debug")
-            LOGGER.debug("exception details:", exc_info=True)
-            return {}
-        try:
-            if rsp.status_code in (403, 404):  # file doesn't exist
-                return {}
-            return rsp.json()
-        except Exception:
-            LOGGER.error(f"({rsp.status_code}): {rsp.text}")
-            return {}
+        else:
+            LOGGER.debug(f"ignoring {self.zarr}")
+            # yield nothing

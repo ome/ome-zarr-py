@@ -4,10 +4,9 @@ import logging
 import os
 import tempfile
 
+from ome_zarr.data import astronaut, create_zarr
 from ome_zarr.napari import napari_get_reader
 from ome_zarr.utils import download, info
-
-from .create_test_data import create_zarr
 
 
 def log_strings(idx, t, c, z, y, x, ct, cc, cz, cy, cx, dtype):
@@ -24,7 +23,7 @@ class TestOmeZarr:
         usually contains tests).
         """
         cls.path = tempfile.TemporaryDirectory(suffix=".zarr").name
-        create_zarr(cls.path)
+        create_zarr(cls.path, method=astronaut)
 
     def test_get_reader_hit(self):
         reader = napari_get_reader(self.path)
@@ -58,10 +57,8 @@ class TestOmeZarr:
             assert log in out
 
         # from info's print of omero metadata
-        assert "'channel_axis': 1" in out
-        assert "'name': ['Red', 'Green', 'Blue']" in out
-        assert "'contrast_limits': [[0, 1], [0, 1], [0, 1]]" in out
-        assert "'visible': [True, True, True]" in out
+        # note: some metadata is no longer handled by info but rather
+        #       in the ome_zarr.napari.transform method
 
     def test_info(self, capsys, caplog):
         with caplog.at_level(logging.DEBUG):

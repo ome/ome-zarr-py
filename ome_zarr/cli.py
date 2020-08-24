@@ -2,6 +2,8 @@
 
 import argparse
 import logging
+import sys
+from typing import List
 
 from .data import create_zarr as zarr_coins
 from .utils import download as zarr_download
@@ -30,7 +32,8 @@ def coins(args: argparse.Namespace) -> None:
     zarr_coins(args.path)
 
 
-def main() -> None:
+def main(args: List[str] = None) -> None:
+
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "-v",
@@ -66,5 +69,8 @@ def main() -> None:
     parser_coins.add_argument("path")
     parser_coins.set_defaults(func=coins)
 
-    args = parser.parse_args()
-    args.func(args)
+    if args is None:
+        ns = parser.parse_args(sys.argv)
+    else:
+        ns = parser.parse_args(args)
+    ns.func(ns)
