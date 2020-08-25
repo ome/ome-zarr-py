@@ -51,6 +51,7 @@ def transform(layers: Iterator[Layer]) -> Optional[ReaderFunction]:
         results: List[LayerData] = list()
 
         for layer in layers:
+            LOGGER.debug(f"transforming {layer}")
             data = layer.data
             metadata = layer.metadata
             results.append((data, {"channel_axis": 1, **metadata}))

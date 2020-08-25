@@ -1,17 +1,21 @@
 # -*- coding: utf-8 -*-
 
-import os
-import tempfile
+import pytest
 
 from ome_zarr.cli import main
 
 
 class TestCli:
-    @classmethod
-    def setup_class(cls):
-        cls.path = tempfile.TemporaryDirectory().name
+    @pytest.fixture(autouse=True)
+    def initdir(self, tmpdir):
+        self.path = tmpdir.mkdir("data")
 
     def test_coins(self):
-        filename = os.path.join(self.path, "coins")
-        main(["coins", filename])
+        filename = str(self.path)
+        main(["create", "--method=coins", filename])
+        main(["info", filename])
+
+    def test_astronaut(self):
+        filename = str(self.path)
+        main(["create", "--method=astronaut", filename])
         main(["info", filename])

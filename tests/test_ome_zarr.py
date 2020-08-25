@@ -2,7 +2,8 @@
 
 import logging
 import os
-import tempfile
+
+import pytest
 
 from ome_zarr.data import astronaut, create_zarr
 from ome_zarr.napari import napari_get_reader
@@ -17,22 +18,19 @@ def log_strings(idx, t, c, z, y, x, ct, cc, cz, cy, cx, dtype):
 
 
 class TestOmeZarr:
-    @classmethod
-    def setup_class(cls):
-        """ setup any state specific to the execution of the given class (which
-        usually contains tests).
-        """
-        cls.path = tempfile.TemporaryDirectory(suffix=".zarr").name
-        create_zarr(cls.path, method=astronaut)
+    @pytest.fixture(autouse=True)
+    def initdir(self, tmpdir):
+        self.path = tmpdir.mkdir("data")
+        create_zarr(str(self.path), method=astronaut)
 
     def test_get_reader_hit(self):
-        reader = napari_get_reader(self.path)
+        reader = napari_get_reader(str(self.path))
         assert reader is not None
         assert callable(reader)
 
     def test_reader(self):
-        reader = napari_get_reader(self.path)
-        results = reader(self.path)
+        reader = napari_get_reader(str(self.path))
+        results = reader(str(self.path))
         assert results is not None and len(results) == 1
         result = results[0]
         assert isinstance(result[0], list)
@@ -42,7 +40,7 @@ class TestOmeZarr:
 
     def test_get_reader_with_list(self):
         # a better test here would use real data
-        reader = napari_get_reader([self.path])
+        reader = napari_get_reader([str(self.path)])
         assert reader is not None
         assert callable(reader)
 
@@ -62,14 +60,14 @@ class TestOmeZarr:
 
     def test_info(self, capsys, caplog):
         with caplog.at_level(logging.DEBUG):
-            info(self.path)
+            info(str(self.path))
         self.check_info_stdout(caplog.text)
 
-    def test_download(self, capsys, caplog):
-        target = tempfile.TemporaryDirectory().name
+    def test_download(self, capsys, caplog, tmpdir):
+        target = tmpdir.mkdir("out")
         name = "test.zarr"
         with caplog.at_level(logging.DEBUG):
-            download(self.path, output_dir=target, zarr_name=name)
+            download(str(self.path), output_dir=target, zarr_name=name)
             download_zarr = os.path.join(target, name)
             assert os.path.exists(download_zarr)
             info(download_zarr)

@@ -56,7 +56,10 @@ class BaseZarrLocation(ABC):
     # TODO: update to from __future__ import annotations with 3.7+
     def open(self, path: str) -> "BaseZarrLocation":
         """Create a new zarr for the given path"""
-        return self.__class__(posixpath.normpath(f"{self.zarr_path}/{path}"))
+        subpath = posixpath.join(self.zarr_path, path)
+        subpath = posixpath.normpath(subpath)
+        LOGGER.debug(f"open({self.__class__.__name__}({subpath}))")
+        return self.__class__(posixpath.normpath(f"{subpath}"))
 
 
 class LocalZarrLocation(BaseZarrLocation):

@@ -153,7 +153,7 @@ class Label(Spec):
             {
                 "visible": False,
                 "name": name,
-                # "colormap": colors,
+                "colormap": colors,
                 "metadata": {"image": self.lookup("image", {}), "path": name},
             }
         )

@@ -5,7 +5,7 @@ import logging
 import sys
 from typing import List
 
-from .data import create_zarr as zarr_coins
+from .data import astronaut, coins, create_zarr
 from .utils import download as zarr_download
 from .utils import info as zarr_info
 
@@ -27,9 +27,15 @@ def download(args: argparse.Namespace) -> None:
     zarr_download(args.path, args.output, args.name)
 
 
-def coins(args: argparse.Namespace) -> None:
+def create(args: argparse.Namespace) -> None:
     config_logging(logging.INFO, args)
-    zarr_coins(args.path)
+    if args.method == "coins":
+        method = coins
+    elif args.method == "astronaut":
+        method = astronaut
+    else:
+        raise Exception(f"unknown method: {args.method}")
+    create_zarr(args.path, method=method)
 
 
 def main(args: List[str] = None) -> None:
@@ -65,12 +71,15 @@ def main(args: List[str] = None) -> None:
     parser_download.set_defaults(func=download)
 
     # coin
-    parser_coins = subparsers.add_parser("coins")
-    parser_coins.add_argument("path")
-    parser_coins.set_defaults(func=coins)
+    parser_create = subparsers.add_parser("create")
+    parser_create.add_argument(
+        "--method", choices=("coins", "astronaut"), default="coins"
+    )
+    parser_create.add_argument("path")
+    parser_create.set_defaults(func=create)
 
     if args is None:
-        ns = parser.parse_args(sys.argv)
+        ns = parser.parse_args(sys.argv[1:])
     else:
         ns = parser.parse_args(args)
     ns.func(ns)
