@@ -19,17 +19,17 @@ def config_logging(loglevel: int, args: argparse.Namespace) -> None:
 
 
 def info(args: argparse.Namespace) -> None:
-    config_logging(logging.INFO, args)
-    zarr_info(args.path)
+    config_logging(logging.WARN, args)
+    list(zarr_info(args.path))
 
 
 def download(args: argparse.Namespace) -> None:
     config_logging(logging.WARN, args)
-    zarr_download(args.path, args.output, args.name)
+    zarr_download(args.path, args.output)
 
 
 def create(args: argparse.Namespace) -> None:
-    config_logging(logging.INFO, args)
+    config_logging(logging.WARN, args)
     if args.method == "coins":
         method = coins
         label_name = "coins"
@@ -82,7 +82,6 @@ def main(args: List[str] = None) -> None:
     parser_download = subparsers.add_parser("download")
     parser_download.add_argument("path")
     parser_download.add_argument("--output", default="")
-    parser_download.add_argument("--name", default="")
     parser_download.set_defaults(func=download)
 
     # create

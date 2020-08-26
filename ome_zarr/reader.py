@@ -3,7 +3,6 @@ Reading logic for ome-zarr
 """
 
 import logging
-import posixpath
 from abc import ABC
 from typing import Any, Dict, Iterator, List, Optional, Union
 
@@ -23,8 +22,10 @@ class Layer:
     the data hierarchy.
     """
 
-    def __init__(self, zarr: BaseZarrLocation):
+    def __init__(self, zarr: BaseZarrLocation, root: Union["Layer", "Reader"]):
         self.zarr = zarr
+        self.root = root
+        self.seen: List[str] = root.seen
         self.visible = True
 
         # Likely to be updated by specs
@@ -44,11 +45,30 @@ class Layer:
         if OMERO.matches(zarr):
             self.specs.append(OMERO(self))
 
+    def add(self, zarr: BaseZarrLocation, prepend: bool = False,) -> "Optional[Layer]":
+        """
+        Create a child layer if this location has not yet been seen;
+        otherwise return None
+        """
+
+        if zarr.zarr_path in self.seen:
+            LOGGER.debug(f"already seen {zarr}; stopping recursion")
+            return None
+
+        self.seen.append(zarr.zarr_path)
+        layer = Layer(zarr, self)
+        if prepend:
+            self.pre_layers.append(layer)
+        else:
+            self.post_layers.append(layer)
+
+        return layer
+
     def write_metadata(self, metadata: JSONDict) -> None:
         for spec in self.specs:
             metadata.update(self.zarr.root_attrs)
 
-    def __str__(self) -> str:
+    def __repr__(self) -> str:
         suffix = ""
         if self.zarr.zgroup:
             suffix += " [zgroup]"
@@ -97,8 +117,8 @@ class Labels(Spec):
         label_names = self.lookup("labels", [])
         for name in label_names:
             child_zarr = self.zarr.open(name)
-            child_layer = Layer(child_zarr)
-            layer.post_layers.append(child_layer)
+            if child_zarr.exists():
+                layer.add(child_zarr)
 
 
 class Label(Spec):
@@ -119,17 +139,20 @@ class Label(Spec):
         super().__init__(layer)
         layer.visible = True
 
-        path = self.lookup("path", None)
         image = self.lookup("image", {}).get("array", None)
-        if path and image:
+        parent_zarr = None
+        if image:
             # This is an ome mask, load the image
-            parent = posixpath.normpath(f"{path}/{image}")
-            LOGGER.debug(f"delegating to parent image: {parent}")
-            parent_zarr = self.zarr.open(parent)
+            parent_zarr = self.zarr.open(image)
             if parent_zarr.exists():
-                parent_layer = Layer(parent_zarr)
-                layer.pre_layers.append(parent_layer)
-                layer.visible = False
+                LOGGER.debug(f"delegating to parent image: {parent_zarr}")
+                parent_layer = layer.add(parent_zarr, prepend=True)
+                if parent_layer is not None:
+                    layer.visible = False
+            else:
+                parent_zarr = None
+        if parent_zarr is None:
+            LOGGER.warn(f"no parent found for {self}: {image}")
 
         # Metadata: TODO move to a class
         colors: Dict[Union[int, bool], List[float]] = {}
@@ -199,9 +222,8 @@ class Multiscales(Spec):
 
         # Load possible layer data
         child_zarr = self.zarr.open("labels")
-        # Creating a layer propagates to sub-specs, but the layer itself
-        # should not be registered.
-        Layer(child_zarr)
+        if child_zarr.exists():
+            layer.add(child_zarr)
 
 
 class OMERO(Spec):
@@ -281,19 +303,14 @@ class Reader:
     def __init__(self, zarr: BaseZarrLocation) -> None:
         assert zarr.is_zarr()
         self.zarr = zarr
+        self.seen: List[str] = [zarr.zarr_path]
 
     def __call__(self) -> Iterator[Layer]:
-        layer = Layer(self.zarr)
+        layer = Layer(self.zarr, self)
         if layer.specs:  # Something has matched
-            LOGGER.debug(f"treating {self.zarr} as ome-zarr")
 
-            # FIXME -- this will need recursion
-            for pre_layer in layer.pre_layers:
-                yield pre_layer
-            if layer.data:
-                yield layer
-            for post_layer in layer.post_layers:
-                yield post_layer
+            LOGGER.debug(f"treating {self.zarr} as ome-zarr")
+            yield from self.descend(layer)
 
             # TODO: API thoughts for the Spec type
             # - ask for earlier_layers, later_layers (i.e. priorities)
@@ -310,3 +327,14 @@ class Reader:
         else:
             LOGGER.debug(f"ignoring {self.zarr}")
             # yield nothing
+
+    def descend(self, layer: Layer, depth: int = 0) -> Iterator[Layer]:
+
+        for pre_layer in layer.pre_layers:
+            yield from self.descend(pre_layer, depth + 1)
+
+        LOGGER.debug(f"returning {layer}")
+        yield layer
+
+        for post_layer in layer.post_layers:
+            yield from self.descend(post_layer, depth + 1)
