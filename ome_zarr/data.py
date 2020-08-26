@@ -13,6 +13,8 @@ from skimage.segmentation import clear_border
 from .conversions import rgba_to_int
 from .scale import Scaler
 
+CHANNEL_DIMENSION = 1
+
 
 def coins() -> Tuple[List, List]:
     """
@@ -98,30 +100,35 @@ def create_zarr(
     grp = zarr.group(store)
     write_multiscale(pyramid, grp)
 
-    image_data = {
-        "id": 1,
-        "channels": [
-            {
-                "color": "FF0000",
-                "window": {"start": 0, "end": 1},
-                "label": "Red",
-                "active": True,
-            },
-            {
-                "color": "00FF00",
-                "window": {"start": 0, "end": 1},
-                "label": "Green",
-                "active": True,
-            },
-            {
-                "color": "0000FF",
-                "window": {"start": 0, "end": 1},
-                "label": "Blue",
-                "active": True,
-            },
-        ],
-        "rdefs": {"model": "color"},
-    }
+    if pyramid[0].shape[CHANNEL_DIMENSION] == 1:
+        image_data = {
+            "channels": [{"window": {"start": 0, "end": 1}}],
+            "rdefs": {"model": "grayscale"},
+        }
+    else:
+        image_data = {
+            "channels": [
+                {
+                    "color": "FF0000",
+                    "window": {"start": 0, "end": 1},
+                    "label": "Red",
+                    "active": True,
+                },
+                {
+                    "color": "00FF00",
+                    "window": {"start": 0, "end": 1},
+                    "label": "Green",
+                    "active": True,
+                },
+                {
+                    "color": "0000FF",
+                    "window": {"start": 0, "end": 1},
+                    "label": "Blue",
+                    "active": True,
+                },
+            ],
+            "rdefs": {"model": "color"},
+        }
     grp.attrs["omero"] = image_data
 
     if labels:
