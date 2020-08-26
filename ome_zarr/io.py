@@ -23,11 +23,11 @@ class BaseZarrLocation(ABC):
         self.zarr_path: str = path.endswith("/") and path or f"{path}/"
         self.zarray: JSONDict = self.get_json(".zarray")
         self.zgroup: JSONDict = self.get_json(".zgroup")
-        self.root_attrs: JSONDict = {}
+        self.__metadata: JSONDict = {}
         if self.zgroup:
-            self.root_attrs = self.get_json(".zattrs")
+            self.__metadata = self.get_json(".zattrs")
         elif self.zarray:
-            self.root_attrs = self.get_json(".zattrs")
+            self.__metadata = self.get_json(".zattrs")
 
     def __repr__(self) -> str:
         suffix = ""
@@ -42,6 +42,10 @@ class BaseZarrLocation(ABC):
 
     def is_zarr(self) -> Optional[JSONDict]:
         return self.zarray or self.zgroup
+
+    @property
+    def root_attrs(self) -> JSONDict:
+        return dict(self.__metadata)
 
     @abstractmethod
     def get_json(self, subpath: str) -> JSONDict:

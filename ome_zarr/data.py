@@ -64,7 +64,6 @@ def rgb_to_5d(pixels: np.ndarray) -> List:
 
 
 def write_multiscale(pyramid: List, group: zarr.Group) -> None:
-
     paths = []
     for path, dataset in enumerate(pyramid):
         group.create_dataset(str(path), data=pyramid[path])
@@ -75,7 +74,9 @@ def write_multiscale(pyramid: List, group: zarr.Group) -> None:
 
 
 def create_zarr(
-    zarr_directory: str, method: Callable[..., Tuple[List, List]] = coins
+    zarr_directory: str,
+    method: Callable[..., Tuple[List, List]] = coins,
+    label_name: str = "coins",
 ) -> None:
 
     pyramid, labels = method()
@@ -83,9 +84,6 @@ def create_zarr(
     store = zarr.DirectoryStore(zarr_directory)
     grp = zarr.group(store)
     write_multiscale(pyramid, grp)
-
-    labels_grp = grp.create_group("labels")
-    labels_grp.attrs["labels"] = ["coins"]
 
     image_data = {
         "id": 1,
@@ -113,16 +111,21 @@ def create_zarr(
     }
     grp.attrs["omero"] = image_data
 
-    coins_grp = labels_grp.create_group("coins")
-    write_multiscale(labels, coins_grp)
-    coins_grp.attrs["color"] = {
-        "1": rgba_to_int(50, 0, 0, 0),
-        "2": rgba_to_int(0, 50, 0, 0),
-        "3": rgba_to_int(0, 0, 50, 0),
-        "4": rgba_to_int(100, 0, 0, 0),
-        "5": rgba_to_int(0, 100, 0, 0),
-        "6": rgba_to_int(0, 0, 100, 0),
-        "7": rgba_to_int(50, 50, 50, 0),
-        "8": rgba_to_int(100, 100, 100, 0),
-    }
-    coins_grp.attrs["image"] = {"array": "../../", "source": {}}
+    if labels:
+
+        labels_grp = grp.create_group("labels")
+        labels_grp.attrs["labels"] = [label_name]
+
+        label_grp = labels_grp.create_group(label_name)
+        write_multiscale(labels, label_grp)
+        label_grp.attrs["color"] = {
+            "1": rgba_to_int(50, 0, 0, 0),
+            "2": rgba_to_int(0, 50, 0, 0),
+            "3": rgba_to_int(0, 0, 50, 0),
+            "4": rgba_to_int(100, 0, 0, 0),
+            "5": rgba_to_int(0, 100, 0, 0),
+            "6": rgba_to_int(0, 0, 100, 0),
+            "7": rgba_to_int(50, 50, 50, 0),
+            "8": rgba_to_int(100, 100, 100, 0),
+        }
+        label_grp.attrs["image"] = {"array": "../../", "source": {}}

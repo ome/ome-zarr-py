@@ -10,7 +10,7 @@ class TestNapari:
     @pytest.fixture(autouse=True)
     def initdir(self, tmpdir):
         self.path = tmpdir.mkdir("data")
-        create_zarr(str(self.path), astronaut)
+        create_zarr(str(self.path), astronaut, "astronaut")
 
     def assert_layer(self, layer_data):
         data, metadata = layer_data
@@ -36,14 +36,14 @@ class TestNapari:
             data, metadata = self.assert_layer(layer_data)
 
     def test_label(self):
-        filename = str(self.path.join("labels", "coins"))
+        filename = str(self.path.join("labels", "astronaut"))
         layers = napari_get_reader(filename)()
         assert layers
         for layer_data in layers:
             data, metadata = self.assert_layer(layer_data)
 
     def test_layers(self):
-        filename = str(self.path.join("labels", "coins"))
+        filename = str(self.path.join("labels", "astronaut"))
         layers = napari_get_reader(filename)()
         assert layers
         # check order
