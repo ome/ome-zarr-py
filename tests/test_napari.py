@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+import numpy as np
 import pytest
 
 from ome_zarr.data import astronaut, create_zarr
@@ -49,3 +50,21 @@ class TestNapari:
         # check order
         # check name
         # check visibility
+
+    def test_viewer(self, make_test_viewer):
+        """example of testing the viewer"""
+        viewer = make_test_viewer()
+
+        shapes = [(4000, 3000), (2000, 1500), (1000, 750), (500, 375)]
+        np.random.seed(0)
+        data = [np.random.random(s) for s in shapes]
+        _ = viewer.add_image(data, multiscale=True, contrast_limits=[0, 1])
+        layer = viewer.layers[0]
+
+        # Set canvas size to target amount
+        viewer.window.qt_viewer.view.canvas.size = (800, 600)
+        list(viewer.window.qt_viewer.layer_to_visual.values())[0].on_draw(None)
+
+        # Check that current level is first large enough to fill the canvas with
+        # a greater than one pixel depth
+        assert layer.data_level == 2

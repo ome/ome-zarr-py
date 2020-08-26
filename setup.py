@@ -47,6 +47,7 @@ setup(
     entry_points={
         "console_scripts": ["ome_zarr = ome_zarr.cli:main"],
         "napari.plugin": ["ome_zarr = ome_zarr.napari"],
+        "pytest11": ["napari-conftest = napari.conftest"],
     },
     extras_require={"napari": ["napari"]},
     tests_require=["pytest", "pytest-capturelog"],
