@@ -6,6 +6,7 @@ import sys
 from typing import List
 
 from .data import astronaut, coins, create_zarr
+from .scale import Scaler
 from .utils import download as zarr_download
 from .utils import info as zarr_info
 
@@ -31,11 +32,25 @@ def create(args: argparse.Namespace) -> None:
     config_logging(logging.INFO, args)
     if args.method == "coins":
         method = coins
+        label_name = "coins"
     elif args.method == "astronaut":
         method = astronaut
+        label_name = "circles"
     else:
         raise Exception(f"unknown method: {args.method}")
-    create_zarr(args.path, method=method)
+    create_zarr(args.path, method=method, label_name=label_name)
+
+
+def scale(args: argparse.Namespace) -> None:
+    scaler = Scaler(
+        copy_metadata=args.copy_metadata,
+        downscale=args.downscale,
+        in_place=args.in_place,
+        labeled=args.labeled,
+        max_layer=args.max_layer,
+        method=args.method,
+    )
+    scaler.scale(args.input_array, args.output_directory)
 
 
 def main(args: List[str] = None) -> None:
@@ -70,13 +85,38 @@ def main(args: List[str] = None) -> None:
     parser_download.add_argument("--name", default="")
     parser_download.set_defaults(func=download)
 
-    # coin
+    # create
     parser_create = subparsers.add_parser("create")
     parser_create.add_argument(
         "--method", choices=("coins", "astronaut"), default="coins"
     )
     parser_create.add_argument("path")
     parser_create.set_defaults(func=create)
+
+    parser_scale = subparsers.add_parser("scale")
+    parser_scale.add_argument("input_array")
+    parser_scale.add_argument("output_directory")
+    parser_scale.add_argument(
+        "--labeled",
+        action="store_true",
+        help="assert that the list of unique pixel values doesn't change",
+    )
+    parser_scale.add_argument(
+        "--copy-metadata",
+        action="store_true",
+        help="copies the array metadata to the new group",
+    )
+    parser_scale.add_argument(
+        "--method", choices=list(Scaler.methods()), default="nearest"
+    )
+    parser_scale.add_argument(
+        "--in-place", action="store_true", help="if true, don't write the base array"
+    )
+    parser_scale.add_argument("--downscale", type=int, default=2)
+    parser_scale.add_argument("--max_layer", type=int, default=4)
+    parser_scale.set_defaults(func=scale)
+
+    ns = parser.parse_args()
 
     if args is None:
         ns = parser.parse_args(sys.argv[1:])

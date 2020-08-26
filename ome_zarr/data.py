@@ -9,9 +9,9 @@ from skimage.filters import threshold_otsu
 from skimage.measure import label
 from skimage.morphology import closing, remove_small_objects, square
 from skimage.segmentation import clear_border
-from skimage.transform import pyramid_gaussian
 
 from .conversions import rgba_to_int
+from .scale import Scaler
 
 
 def coins() -> Tuple[List, List]:
@@ -35,32 +35,45 @@ def coins() -> Tuple[List, List]:
 
 
 def astronaut() -> Tuple[List, List]:
-    base = np.tile(data.astronaut(), (2, 2, 1))
-    gaussian = list(pyramid_gaussian(base, downscale=2, max_layer=4, multichannel=True))
+    scaler = Scaler()
 
-    pyramid = []
-    # convert each level of pyramid into 5D image (t, c, z, y, x)
-    for pixels in gaussian:
-        red = pixels[:, :, 0]
-        green = pixels[:, :, 1]
-        blue = pixels[:, :, 2]
-        # wrap to make 5D: (t, c, z, y, x)
-        pixels = np.array([np.array([red]), np.array([green]), np.array([blue])])
-        pixels = np.array([pixels])
-        pyramid.append(pixels)
-    return pyramid, []
+    pixels = rgb_to_5d(np.tile(data.astronaut(), (2, 2, 1)))
+    pyramid = scaler.nearest(pixels)
+
+    shape = list(pyramid[0].shape)
+    shape[1] = 1
+    label = np.zeros(shape)
+    make_circle(100, 100, 1, label[0, 0, 0, 200:300, 200:300])
+    make_circle(150, 150, 2, label[0, 0, 0, 250:400, 250:400])
+    labels = scaler.nearest(label)
+
+    return pyramid, labels
+
+
+def make_circle(h: int, w: int, value: int, target: np.ndarray) -> None:
+    x = np.arange(0, w)
+    y = np.arange(0, h)
+
+    cx = w // 2
+    cy = h // 2
+    r = min(w, h) // 2
+
+    mask = (x[np.newaxis, :] - cx) ** 2 + (y[:, np.newaxis] - cy) ** 2 < r ** 2
+    target[mask] = value
 
 
 def rgb_to_5d(pixels: np.ndarray) -> List:
     """convert an RGB image into 5D image (t, c, z, y, x)"""
     if len(pixels.shape) == 2:
-        channels = [[np.array(pixels)]]
+        stack = np.array([pixels])
+        channels = np.array([stack])
     elif len(pixels.shape) == 3:
-        size_c = pixels.shape(2)
-        channels = [np.array(pixels[:, :, c]) for c in range(size_c)]
+        size_c = pixels.shape[2]
+        channels = [np.array([pixels[:, :, c]]) for c in range(size_c)]
     else:
         assert False, f"expecting 2 or 3d: ({pixels.shape})"
-    return [np.array(channels)]
+    video = np.array([channels])
+    return video
 
 
 def write_multiscale(pyramid: List, group: zarr.Group) -> None:
