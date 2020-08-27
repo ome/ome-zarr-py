@@ -37,21 +37,21 @@ class TestStartingPoints:
     def test_top_level(self):
         zarr = parse_url(str(self.path))
         assert zarr is not None
-        layer = Layer(zarr)
-        self.matches(layer, set([Multiscales, OMERO]))
+        layer = Layer(zarr, list())
+        self.matches(layer, {Multiscales, OMERO})
         multiscales = self.get_spec(layer, Multiscales)
         assert multiscales.lookup("multiscales", [])
 
     def test_labels(self):
         zarr = parse_url(str(self.path + "/labels"))
         assert zarr is not None
-        layer = Layer(zarr)
+        layer = Layer(zarr, list())
         self.matches(layer, set([Labels]))
 
     def test_label(self):
         zarr = parse_url(str(self.path + "/labels/coins"))
         assert zarr is not None
-        layer = Layer(zarr)
+        layer = Layer(zarr, list())
         self.matches(layer, set([Label, Multiscales]))
         multiscales = self.get_spec(layer, Multiscales)
         assert multiscales.lookup("multiscales", [])

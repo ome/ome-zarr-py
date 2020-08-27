@@ -14,22 +14,19 @@ class TestReader:
         create_zarr(str(self.path))
 
     def assert_layer(self, layer: Layer):
-        if not layer.data or not layer.metadata:
+        if not layer.data and not layer.metadata:
             assert False, f"Empty layer received: {layer}"
 
     def test_image(self):
         reader = Reader(parse_url(str(self.path)))
-        for layer in reader():
-            self.assert_layer(layer)
+        assert len(list(reader())) == 3
 
     def test_labels(self):
         filename = str(self.path.join("labels"))
         reader = Reader(parse_url(filename))
-        for layer in reader():
-            self.assert_layer(layer)
+        assert len(list(reader())) == 3
 
     def test_label(self):
         filename = str(self.path.join("labels", "coins"))
         reader = Reader(parse_url(filename))
-        for layer in reader():
-            self.assert_layer(layer)
+        assert len(list(reader())) == 3

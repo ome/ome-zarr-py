@@ -23,62 +23,50 @@ def info(path: str) -> Iterator[Layer]:
     print information about the ome-zarr fileset
     """
     zarr = parse_url(path)
-    if not zarr:
-        print(f"not a zarr: {zarr}")
-    else:
-        reader = Reader(zarr)
-        for layer in reader():
-            if not layer.specs:
-                print(f"not an ome-zarr: {zarr}")
-            print(layer)
-            print(" - metadata")
-            for spec in layer.specs:
-                print(f"   - {spec.__class__.__name__}")
-            print(" - data")
-            for array in layer.data:
-                print(f"   - {array.shape}")
-            LOGGER.debug(layer.data)
-            yield layer
+    assert zarr, f"not a zarr: {zarr}"
+    reader = Reader(zarr)
+    for layer in reader():
+
+        if not layer.specs:
+            print(f"not an ome-zarr: {zarr}")
+            continue
+
+        print(layer)
+        print(" - metadata")
+        for spec in layer.specs:
+            print(f"   - {spec.__class__.__name__}")
+        print(" - data")
+        for array in layer.data:
+            print(f"   - {array.shape}")
+        LOGGER.debug(layer.data)
+        yield layer
 
 
-def download(path: str, output_dir: str = ".") -> None:
+def download(input_path: str, output_dir: str = ".") -> None:
     """
     download zarr from URL
     """
 
-    location = parse_url(path)
-    if not location:
-        print(f"not a zarr: {location}")
-    else:
-        reader = Reader(location)
-        layers: List[Layer] = list()
-        paths: List[str] = list()
-        for layer in reader():
-            layers.append(layer)
-            paths.append(layer.zarr.zarr_path)
+    location = parse_url(input_path)
+    assert location, f"not a zarr: {location}"
 
-        first_mismatch = -1
-        min_length = min([len(x) for x in paths])
-        for idx in range(min_length):
-            if len(set([x[idx] for x in paths])) == 1:
-                first_mismatch += 1
-            else:
-                break
+    reader = Reader(location)
+    layers: List[Layer] = list()
+    paths: List[str] = list()
+    for layer in reader():
+        layers.append(layer)
+        paths.append(layer.zarr.zarr_path)
 
-        if first_mismatch <= 0:
-            raise Exception("No common prefix")
-        print("downloading...")
-        for path in paths:
-            print("  ", path[first_mismatch - 1 :])
+    strip_common_prefix(paths)
 
-    for layer, path in zip(layers, paths):
+    assert not os.path.exists(output_dir), f"{output_dir} already exists!"
+    print("downloading...")
+    for path in paths:
+        print("  ", path)
+    print(f"to {output_dir}")
 
+    for path, layer in sorted(zip(paths, layers)):
         target_dir = os.path.join(output_dir, f"{path}")
-        if os.path.exists(target_dir):
-            print(f"{target_dir} already exists!")
-            return
-        print(f"to {target_dir}")
-
         resolutions: List[da.core.Array] = []
         datasets: List[str] = []
         for spec in layer.specs:
@@ -101,3 +89,26 @@ def download(path: str, output_dir: str = ".") -> None:
             metadata: JSONDict = {}
             layer.write_metadata(metadata)
             f.write(json.dumps(metadata))
+
+
+def strip_common_prefix(paths: List[str]) -> None:
+    parts: List[List[str]] = [x.split(os.path.sep) for x in paths]
+
+    first_mismatch = 0
+    min_length = min([len(x) for x in parts])
+
+    for idx in range(min_length):
+        if len(set([x[idx] for x in parts])) == 1:
+            first_mismatch += 1
+        else:
+            break
+
+    if first_mismatch <= 0:
+        msg = "No common prefix:\n"
+        for path in parts:
+            msg += f"{path}\n"
+        raise Exception(msg)
+
+    for idx, path in enumerate(parts):
+        base = os.path.sep.join(path[first_mismatch - 1 :])
+        paths[idx] = base

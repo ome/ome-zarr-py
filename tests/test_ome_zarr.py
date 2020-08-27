@@ -31,12 +31,12 @@ class TestOmeZarr:
     def test_reader(self):
         reader = napari_get_reader(str(self.path))
         results = reader(str(self.path))
-        assert results is not None and len(results) == 1
-        result = results[0]
-        assert isinstance(result[0], list)
-        assert isinstance(result[1], dict)
-        assert result[1]["channel_axis"] == 1
-        assert result[1]["name"] == ["Red", "Green", "Blue"]
+        assert len(results) == 2
+        image, label = results
+        assert isinstance(image[0], list)
+        assert isinstance(image[1], dict)
+        assert image[1]["channel_axis"] == 1
+        assert image[1]["name"] == ["Red", "Green", "Blue"]
 
     def test_get_reader_with_list(self):
         # a better test here would use real data
@@ -58,17 +58,16 @@ class TestOmeZarr:
         # note: some metadata is no longer handled by info but rather
         #       in the ome_zarr.napari.transform method
 
-    def test_info(self, capsys, caplog):
+    def test_info(self, caplog):
         with caplog.at_level(logging.DEBUG):
-            info(str(self.path))
+            list(info(str(self.path)))
         self.check_info_stdout(caplog.text)
 
     def test_download(self, capsys, caplog, tmpdir):
-        target = tmpdir.mkdir("out")
-        name = "test.zarr"
+        target = str(tmpdir / "out")
         with caplog.at_level(logging.DEBUG):
-            download(str(self.path), output_dir=target, zarr_name=name)
-            download_zarr = os.path.join(target, name)
+            download(str(self.path), output_dir=target)
+            download_zarr = os.path.join(target, "data")
             assert os.path.exists(download_zarr)
             info(download_zarr)
         self.check_info_stdout(caplog.text)

@@ -81,7 +81,7 @@ def main(args: List[str] = None) -> None:
     # download
     parser_download = subparsers.add_parser("download")
     parser_download.add_argument("path")
-    parser_download.add_argument("--output", default="")
+    parser_download.add_argument("--output", default=".")
     parser_download.set_defaults(func=download)
 
     # create
@@ -115,10 +115,15 @@ def main(args: List[str] = None) -> None:
     parser_scale.add_argument("--max_layer", type=int, default=4)
     parser_scale.set_defaults(func=scale)
 
-    ns = parser.parse_args()
+    ns = parser.parse_args(args)
 
     if args is None:
         ns = parser.parse_args(sys.argv[1:])
     else:
         ns = parser.parse_args(args)
-    ns.func(ns)
+
+    try:
+        ns.func(ns)
+    except AssertionError as error:
+        logging.getLogger("ome_zarr.cli").error(error)
+        sys.exit(2)

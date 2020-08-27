@@ -4,7 +4,7 @@ Reading logic for ome-zarr
 
 import logging
 from abc import ABC
-from typing import Any, Dict, Iterator, List, Optional, Union
+from typing import Any, Dict, Iterator, List, Optional, Union, cast
 
 import dask.array as da
 from vispy.color import Colormap
@@ -22,10 +22,16 @@ class Layer:
     the data hierarchy.
     """
 
-    def __init__(self, zarr: BaseZarrLocation, root: Union["Layer", "Reader"]):
+    def __init__(
+        self, zarr: BaseZarrLocation, root: Union["Layer", "Reader", List[str]]
+    ):
         self.zarr = zarr
         self.root = root
-        self.seen: List[str] = root.seen
+        self.seen: List[str] = []
+        if isinstance(root, Layer) or isinstance(root, Reader):
+            self.seen = root.seen
+        else:
+            self.seen = cast(List[str], root)
         self.visible = True
 
         # Likely to be updated by specs

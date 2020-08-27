@@ -21,13 +21,16 @@ class TestNapari:
 
     def test_image(self):
         layers = napari_get_reader(str(self.path))()
-        assert layers
-        for layer_data in layers:
-            data, metadata = self.assert_layer(layer_data)
-            assert 1 == metadata["channel_axis"]
-            assert ["Red", "Green", "Blue"] == metadata["name"]
-            assert [[0, 1], [0, 1], [0, 1]] == metadata["contrast_limits"]
-            assert [True, True, True] == metadata["visible"]
+        assert len(layers) == 2
+        image, label = layers
+
+        data, metadata = self.assert_layer(image)
+        assert 1 == metadata["channel_axis"]
+        assert ["Red", "Green", "Blue"] == metadata["name"]
+        assert [[0, 1], [0, 1], [0, 1]] == metadata["contrast_limits"]
+        assert [True, True, True] == metadata["visible"]
+
+        data, metadata = self.assert_layer(label)
 
     def test_labels(self):
         filename = str(self.path.join("labels"))
