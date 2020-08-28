@@ -1,3 +1,7 @@
+"""Module for downsampling numpy arrays via various methods.
+
+See the :class:`~ome_zarr.scale.Scaler` class for details.
+"""
 import inspect
 import logging
 import os
@@ -16,6 +20,25 @@ LOGGER = logging.getLogger("ome_zarr.scale")
 
 @dataclass
 class Scaler:
+    """Helper class for performing various types of downsampling.
+
+    A method can be chosen by name such as "nearest". All methods on this
+    that do not begin with "_" and not either "methods" or "scale" are valid
+    choices. These values can be returned by the
+    :func:`~ome_zarr.scale.Scaler.methods` method.
+
+    >>> import numpy as np
+    >>> data = np.zeros((1, 1, 1, 64, 64))
+    >>> scaler = Scaler()
+    >>> downsampling = scaler.nearest(data)
+    >>> for x in downsampling:
+    ...     print(x.shape)
+    (1, 1, 1, 64, 64)
+    (1, 1, 1, 32, 32)
+    (1, 1, 1, 16, 16)
+    (1, 1, 1, 8, 8)
+    (1, 1, 1, 4, 4)
+    """
 
     copy_metadata: bool = False
     downscale: int = 2
@@ -26,6 +49,12 @@ class Scaler:
 
     @staticmethod
     def methods() -> Iterator[str]:
+        """Return the name of all methods which define a downsampling.
+
+        Any of the returned values can be used as the `methods`
+        argument to the
+        :func:`Scaler constructor <ome_zarr.scale.Scaler._init__>`
+        """
         funcs = inspect.getmembers(Scaler, predicate=inspect.isfunction)
         for name, func in funcs:
             if name in ("methods", "scale"):
@@ -35,29 +64,31 @@ class Scaler:
             yield name
 
     def scale(self, input_array: str, output_directory: str) -> None:
-
+        """Perform downsampling to disk."""
         func = getattr(self, self.method, None)
         if not func:
             raise Exception
 
-        store = self._check_store(output_directory)
+        store = self.__check_store(output_directory)
         base = zarr.open_array(input_array)
         pyramid = func(base)
 
         if self.labeled:
-            self._assert_values(pyramid)
+            self.__assert_values(pyramid)
 
-        grp = self._create_group(store, base, pyramid)
+        grp = self.__create_group(store, base, pyramid)
 
         if self.copy_metadata:
             print(f"copying attribute keys: {list(base.attrs.keys())}")
             grp.attrs.update(base.attrs)
 
-    def _check_store(self, output_directory: str) -> MutableMapping:
+    def __check_store(self, output_directory: str) -> MutableMapping:
+        """Return a Zarr store if it doesn't not already exist."""
         assert not os.path.exists(output_directory)
         return zarr.DirectoryStore(output_directory)
 
-    def _assert_values(self, pyramid: List[np.ndarray]) -> None:
+    def __assert_values(self, pyramid: List[np.ndarray]) -> None:
+        """Check for a single unique set of values for all pyramid levels."""
         expected = set(np.unique(pyramid[0]))
         print(f"level 0 {pyramid[0].shape} = {len(expected)} labels")
         for i in range(1, len(pyramid)):
@@ -70,9 +101,10 @@ class Scaler:
                     "a subset of {len(expected)} values"
                 )
 
-    def _create_group(
+    def __create_group(
         self, store: MutableMapping, base: np.ndarray, pyramid: List[np.ndarray]
     ) -> zarr.hierarchy.Group:
+        """Create group and datasets."""
         grp = zarr.group(store)
         grp.create_dataset("base", data=base)
         series = []
@@ -85,21 +117,24 @@ class Scaler:
             series.append({"path": path})
         return grp
 
-    #
-    # Scaling methods
-    #
-
     def nearest(self, base: np.ndarray) -> List[np.ndarray]:
-        def func(plane: np.ndarray, sizeY: int, sizeX: int) -> np.ndarray:
-            return cv2.resize(
-                plane,
-                dsize=(sizeY // self.downscale, sizeX // self.downscale),
-                interpolation=cv2.INTER_NEAREST,
-            )
+        """
+        Downsample using :func:`cv2.resize`.
 
-        return self._by_plane(base, func)
+        The :const:`cvs2.INTER_NEAREST` interpolation method is used.
+        """
+        return self._by_plane(base, self.__nearest)
+
+    def __nearest(self, plane: np.ndarray, sizeY: int, sizeX: int) -> np.ndarray:
+        """Apply the 2-dimensional transformation."""
+        return cv2.resize(
+            plane,
+            dsize=(sizeY // self.downscale, sizeX // self.downscale),
+            interpolation=cv2.INTER_NEAREST,
+        )
 
     def gaussian(self, base: np.ndarray) -> List[np.ndarray]:
+        """Downsample using :func:`skimage.transform.pyramid_gaussian`."""
         return list(
             pyramid_gaussian(
                 base,
@@ -110,6 +145,7 @@ class Scaler:
         )
 
     def laplacian(self, base: np.ndarray) -> List[np.ndarray]:
+        """Downsample using :func:`skimage.transform.pyramid_laplacian`."""
         return list(
             pyramid_laplacian(
                 base,
@@ -120,6 +156,8 @@ class Scaler:
         )
 
     def local_mean(self, base: np.ndarray) -> List[np.ndarray]:
+        """Downsample using :func:`skimage.transform.downscale_local_mean`."""
+        rv = [base]
         # FIXME: fix hard-coding
         rv = [base]
         for i in range(self.max_layer):
@@ -131,6 +169,7 @@ class Scaler:
         return rv
 
     def zoom(self, base: np.ndarray) -> List[np.ndarray]:
+        """Downsample using :func:`scipy.ndimage.zoom`."""
         rv = [base]
         print(base.shape)
         for i in range(self.max_layer):
@@ -146,7 +185,7 @@ class Scaler:
     def _by_plane(
         self, base: np.ndarray, func: Callable[[np.ndarray, int, int], np.ndarray],
     ) -> np.ndarray:
-
+        """Loop over 3 of the 5 dimensions of and apply the func transform."""
         assert 5 == len(base.shape)
 
         rv = [base]

@@ -8,11 +8,8 @@ from ome_zarr.reader import OMERO, Label, Labels, Layer, Multiscales, Spec
 
 
 class TestStartingPoints:
-    """
-    Creates a small but complete OME-Zarr file and tests that
-    readers will detect the correct type when starting at all
-    the various levels.
-    """
+    """Creates a small but complete OME-Zarr file and tests that readers will detect the
+    correct type when starting at all the various levels."""
 
     @pytest.fixture(autouse=True)
     def initdir(self, tmpdir):
@@ -46,12 +43,12 @@ class TestStartingPoints:
         zarr = parse_url(str(self.path + "/labels"))
         assert zarr is not None
         layer = Layer(zarr, list())
-        self.matches(layer, set([Labels]))
+        self.matches(layer, {Labels})
 
     def test_label(self):
         zarr = parse_url(str(self.path + "/labels/coins"))
         assert zarr is not None
         layer = Layer(zarr, list())
-        self.matches(layer, set([Label, Multiscales]))
+        self.matches(layer, {Label, Multiscales})
         multiscales = self.get_spec(layer, Multiscales)
         assert multiscales.lookup("multiscales", [])

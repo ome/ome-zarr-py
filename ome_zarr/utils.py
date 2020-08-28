@@ -1,6 +1,4 @@
-"""
-Utility methods for ome_zarr access
-"""
+"""Utility methods for ome_zarr access."""
 
 import json
 import logging
@@ -19,8 +17,10 @@ LOGGER = logging.getLogger("ome_zarr.utils")
 
 
 def info(path: str) -> Iterator[Layer]:
-    """
-    print information about the ome-zarr fileset
+    """Print information about an OME-Zarr fileset.
+
+    All :class:`Layers <ome_utils.reader.Layer>` that are found from the given path will
+    be visited recursively.
     """
     zarr = parse_url(path)
     assert zarr, f"not a zarr: {zarr}"
@@ -43,10 +43,11 @@ def info(path: str) -> Iterator[Layer]:
 
 
 def download(input_path: str, output_dir: str = ".") -> None:
-    """
-    download zarr from URL
-    """
+    """Download an OME-Zarr from the given path.
 
+    All :class:`Layers <ome_utils.reader.Layer>` that are found from the given path will
+    be included in the download.
+    """
     location = parse_url(input_path)
     assert location, f"not a zarr: {location}"
 
@@ -92,13 +93,22 @@ def download(input_path: str, output_dir: str = ".") -> None:
 
 
 def strip_common_prefix(paths: List[str]) -> None:
+    """Find and remove the prefix common to all strings.
+
+    An exception is thrown if no common prefix exists.
+
+    >>> paths = ["a/b", "a/b/c"]
+    >>> strip_common_prefix(paths)
+    >>> paths
+    ['b', 'b/c']
+    """
     parts: List[List[str]] = [x.split(os.path.sep) for x in paths]
 
     first_mismatch = 0
     min_length = min([len(x) for x in parts])
 
     for idx in range(min_length):
-        if len(set([x[idx] for x in parts])) == 1:
+        if len({x[idx] for x in parts}) == 1:
             first_mismatch += 1
         else:
             break

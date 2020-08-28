@@ -1,6 +1,4 @@
-"""
-Definition of complex types for use elsewhere
-"""
+"""Definition of complex types for use elsewhere."""
 
 from typing import Any, Callable, Dict, List, Tuple, Union
 

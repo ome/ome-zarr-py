@@ -1,6 +1,4 @@
-"""
-Reading logic for ome-zarr
-"""
+"""Reading logic for ome-zarr."""
 
 import logging
 from abc import ABC
@@ -17,10 +15,8 @@ LOGGER = logging.getLogger("ome_zarr.reader")
 
 
 class Layer:
-    """
-    Container for a representation of the binary data somewhere in
-    the data hierarchy.
-    """
+    """Container for a representation of the binary data somewhere in the data
+    hierarchy."""
 
     def __init__(
         self, zarr: BaseZarrLocation, root: Union["Layer", "Reader", List[str]]
@@ -52,10 +48,8 @@ class Layer:
             self.specs.append(OMERO(self))
 
     def add(self, zarr: BaseZarrLocation, prepend: bool = False,) -> "Optional[Layer]":
-        """
-        Create a child layer if this location has not yet been seen;
-        otherwise return None
-        """
+        """Create a child layer if this location has not yet been seen; otherwise return
+        None."""
 
         if zarr.zarr_path in self.seen:
             LOGGER.debug(f"already seen {zarr}; stopping recursion")
@@ -84,9 +78,10 @@ class Layer:
 
 
 class Spec(ABC):
-    """
-    Base class for specifications that can be implemented by groups
-    or arrays within the hierarchy. Multiple subclasses may apply.
+    """Base class for specifications that can be implemented by groups or arrays within
+    the hierarchy.
+
+    Multiple subclasses may apply.
     """
 
     @staticmethod
@@ -106,11 +101,8 @@ class Spec(ABC):
 
 
 class Labels(Spec):
-    """
-    Relatively small specification for the well-known "labels" group
-    which only contains the name of subgroups which should be loaded
-    an labeled images.
-    """
+    """Relatively small specification for the well-known "labels" group which only
+    contains the name of subgroups which should be loaded an labeled images."""
 
     @staticmethod
     def matches(zarr: BaseZarrLocation) -> bool:
@@ -122,22 +114,18 @@ class Labels(Spec):
         super().__init__(layer)
         label_names = self.lookup("labels", [])
         for name in label_names:
-            child_zarr = self.zarr.open(name)
+            child_zarr = self.zarr.create(name)
             if child_zarr.exists():
                 layer.add(child_zarr)
 
 
 class Label(Spec):
-    """
-    An additional aspect to a multiscale image is that it can be a labeled
-    image, in which each discrete pixel value represents a separate object.
-    """
+    """An additional aspect to a multiscale image is that it can be a labeled image, in
+    which each discrete pixel value represents a separate object."""
 
     @staticmethod
     def matches(zarr: BaseZarrLocation) -> bool:
-        """
-        If label-specific metadata is present, then return true.
-        """
+        """If label-specific metadata is present, then return true."""
         # FIXME: this should be the "label" metadata soon
         return bool("colors" in zarr.root_attrs or "image" in zarr.root_attrs)
 
@@ -149,7 +137,7 @@ class Label(Spec):
         parent_zarr = None
         if image:
             # This is an ome mask, load the image
-            parent_zarr = self.zarr.open(image)
+            parent_zarr = self.zarr.create(image)
             if parent_zarr.exists():
                 LOGGER.debug(f"delegating to parent image: {parent_zarr}")
                 parent_layer = layer.add(parent_zarr, prepend=True)
@@ -227,7 +215,7 @@ class Multiscales(Spec):
             layer.data = layer.data[0]
 
         # Load possible layer data
-        child_zarr = self.zarr.open("labels")
+        child_zarr = self.zarr.create("labels")
         if child_zarr.exists():
             layer.add(child_zarr)
 
@@ -300,10 +288,11 @@ class OMERO(Spec):
 
 
 class Reader:
-    """
-    Parses the given Zarr instance into a collection of Layers properly
-    ordered depending on context. Depending on the starting point, metadata
-    may be followed up or down the Zarr hierarchy.
+    """Parses the given Zarr instance into a collection of Layers properly ordered
+    depending on context.
+
+    Depending on the starting point, metadata may be followed up or down the Zarr
+    hierarchy.
     """
 
     def __init__(self, zarr: BaseZarrLocation) -> None:

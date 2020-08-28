@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+"""Functions for generating synthetic data."""
 from typing import Callable, List, Tuple
 
 import numpy as np
@@ -17,9 +17,7 @@ CHANNEL_DIMENSION = 1
 
 
 def coins() -> Tuple[List, List]:
-    """
-    Sample data from skimage
-    """
+    """Sample data from skimage."""
     # Thanks to Juan
     # https://gist.github.com/jni/62e07ddd135dbb107278bc04c0f9a8e7
     image = data.coins()[50:-50, 50:-50]
@@ -37,6 +35,7 @@ def coins() -> Tuple[List, List]:
 
 
 def astronaut() -> Tuple[List, List]:
+    """Sample data from skimage."""
     scaler = Scaler()
 
     pixels = rgb_to_5d(np.tile(data.astronaut(), (2, 2, 1)))
@@ -53,6 +52,21 @@ def astronaut() -> Tuple[List, List]:
 
 
 def make_circle(h: int, w: int, value: int, target: np.ndarray) -> None:
+    """Apply a 2D circular mask to the given array.
+
+    >>> import numpy as np
+    >>> example = np.zeros((8, 8))
+    >>> make_circle(8, 8, 1, example)
+    >>> print(example)
+    [[0. 0. 0. 0. 0. 0. 0. 0.]
+     [0. 0. 1. 1. 1. 1. 1. 0.]
+     [0. 1. 1. 1. 1. 1. 1. 1.]
+     [0. 1. 1. 1. 1. 1. 1. 1.]
+     [0. 1. 1. 1. 1. 1. 1. 1.]
+     [0. 1. 1. 1. 1. 1. 1. 1.]
+     [0. 1. 1. 1. 1. 1. 1. 1.]
+     [0. 0. 1. 1. 1. 1. 1. 0.]]
+    """
     x = np.arange(0, w)
     y = np.arange(0, h)
 
@@ -65,7 +79,7 @@ def make_circle(h: int, w: int, value: int, target: np.ndarray) -> None:
 
 
 def rgb_to_5d(pixels: np.ndarray) -> List:
-    """convert an RGB image into 5D image (t, c, z, y, x)"""
+    """Convert an RGB image into 5D image (t, c, z, y, x)."""
     if len(pixels.shape) == 2:
         stack = np.array([pixels])
         channels = np.array([stack])
@@ -79,6 +93,7 @@ def rgb_to_5d(pixels: np.ndarray) -> List:
 
 
 def write_multiscale(pyramid: List, group: zarr.Group) -> None:
+    """Write a pyramid with multiscale metadata to disk."""
     paths = []
     for path, dataset in enumerate(pyramid):
         group.create_dataset(str(path), data=pyramid[path])
@@ -93,7 +108,7 @@ def create_zarr(
     method: Callable[..., Tuple[List, List]] = coins,
     label_name: str = "coins",
 ) -> None:
-
+    """Generate a synthetic image pyramid with labels."""
     pyramid, labels = method()
 
     store = zarr.DirectoryStore(zarr_directory)

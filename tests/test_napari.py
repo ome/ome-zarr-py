@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 import numpy as np
 import pytest
 
@@ -55,7 +53,7 @@ class TestNapari:
         # check visibility
 
     def test_viewer(self, make_test_viewer):
-        """example of testing the viewer"""
+        """example of testing the viewer."""
         viewer = make_test_viewer()
 
         shapes = [(4000, 3000), (2000, 1500), (1000, 750), (500, 375)]

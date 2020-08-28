@@ -1,8 +1,6 @@
-"""
-This module is a napari plugin.
+"""This module is a napari plugin.
 
-It implements the ``napari_get_reader`` hook specification, (to create
-a reader plugin).
+It implements the ``napari_get_reader`` hook specification, (to create a reader plugin).
 """
 
 
@@ -29,8 +27,7 @@ LOGGER = logging.getLogger("ome_zarr.napari")
 
 @napari_hook_implementation
 def napari_get_reader(path: PathLike) -> Optional[ReaderFunction]:
-    """
-    Returns a reader for supported paths that include IDR ID
+    """Returns a reader for supported paths that include IDR ID.
 
     - URL of the form: https://s3.embassy.ebi.ac.uk/idr/zarr/v0.1/ID.zarr/
     """

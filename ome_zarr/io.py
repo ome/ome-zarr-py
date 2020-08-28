@@ -1,5 +1,6 @@
-"""
-Reading logic for ome-zarr
+"""Reading logic for ome-zarr.
+
+Primary entry point is the :func:`~ome_zarr.io.parse_url` method.
 """
 
 import json
@@ -19,17 +20,28 @@ LOGGER = logging.getLogger("ome_zarr.io")
 
 
 class BaseZarrLocation(ABC):
+    """
+    Base IO primitive for reading Zarr data.
+
+    No assumptions about the existence of the given path string are made.
+    Attempts are made to load various metadata files and cache them internally.
+    """
+
     def __init__(self, path: str) -> None:
         self.zarr_path: str = path.endswith("/") and path or f"{path}/"
         self.zarray: JSONDict = self.get_json(".zarray")
         self.zgroup: JSONDict = self.get_json(".zgroup")
         self.__metadata: JSONDict = {}
+        self.__exists: bool = True
         if self.zgroup:
             self.__metadata = self.get_json(".zattrs")
         elif self.zarray:
             self.__metadata = self.get_json(".zattrs")
+        else:
+            self.__exists = False
 
     def __repr__(self) -> str:
+        """Print the path as well as whether this is a group or an array."""
         suffix = ""
         if self.zgroup:
             suffix += " [zgroup]"
@@ -38,28 +50,30 @@ class BaseZarrLocation(ABC):
         return f"{self.zarr_path}{suffix}"
 
     def exists(self) -> bool:
-        return os.path.exists(self.zarr_path)
+        """Return true if zgroup or zarray metadata exists."""
+        return self.__exists
 
     def is_zarr(self) -> Optional[JSONDict]:
+        """Return true if either zarray or zgroup metadata exists."""
         return self.zarray or self.zgroup
 
     @property
     def root_attrs(self) -> JSONDict:
+        """Return the contents of the zattrs file."""
         return dict(self.__metadata)
 
     @abstractmethod
     def get_json(self, subpath: str) -> JSONDict:
+        """Must be implemented by subclasses."""
         raise NotImplementedError("unknown")
 
     def load(self, subpath: str) -> da.core.Array:
-        """
-        Use dask.array.from_zarr to load the subpath
-        """
+        """Use dask.array.from_zarr to load the subpath."""
         return da.from_zarr(f"{self.zarr_path}{subpath}")
 
     # TODO: update to from __future__ import annotations with 3.7+
-    def open(self, path: str) -> "BaseZarrLocation":
-        """Create a new zarr for the given path"""
+    def create(self, path: str) -> "BaseZarrLocation":
+        """Create a new Zarr location for the given path."""
         subpath = posixpath.join(self.zarr_path, path)
         subpath = posixpath.normpath(subpath)
         LOGGER.debug(f"open({self.__class__.__name__}({subpath}))")
@@ -67,10 +81,21 @@ class BaseZarrLocation(ABC):
 
 
 class LocalZarrLocation(BaseZarrLocation):
+    """
+    Uses the :module:`json` library for loading JSON from disk.
+    """
+
     def get_json(self, subpath: str) -> JSONDict:
+        """
+        Load and return a given subpath of self.zarr_path as JSON.
+
+        If a file does not exist, an empty response is returned rather
+        than an exception.
+        """
         filename = os.path.join(self.zarr_path, subpath)
 
         if not os.path.exists(filename):
+            LOGGER.debug(f"{filename} does not exist")
             return {}
 
         with open(filename) as f:
@@ -78,7 +103,16 @@ class LocalZarrLocation(BaseZarrLocation):
 
 
 class RemoteZarrLocation(BaseZarrLocation):
+    """ Uses the :module:`requests` library for accessing Zarr metadata files. """
+
     def get_json(self, subpath: str) -> JSONDict:
+        """
+        Load and return a given subpath of self.zarr_path as JSON.
+
+        HTTP 403 and 404 responses are treated as if the file does not exist.
+        Exceptions during the remote connection are logged at the WARN level.
+        All other exceptions log at the ERROR level.
+        """
         url = f"{self.zarr_path}{subpath}"
         try:
             rsp = requests.get(url)
@@ -96,7 +130,8 @@ class RemoteZarrLocation(BaseZarrLocation):
 
 
 def parse_url(path: str) -> Optional[BaseZarrLocation]:
-    """ convert a path string or URL to a BaseZarrLocation instance
+    """Convert a path string or URL to a BaseZarrLocation subclass.
+
     >>> parse_url('does-not-exist')
     """
     # Check is path is local directory first
