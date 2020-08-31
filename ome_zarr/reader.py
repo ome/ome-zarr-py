@@ -176,7 +176,7 @@ class Label(Spec):
             {
                 "visible": False,
                 "name": name,
-                "colormap": colors,
+                "color": colors,
                 "metadata": {"image": self.lookup("image", {}), "path": name},
             }
         )
