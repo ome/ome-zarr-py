@@ -14,7 +14,6 @@ dependencies:
   - pip
   - py-opencv
   - pytest
-  - python.app
   - requests
   - s3fs
   - scikit-image
@@ -24,3 +23,5 @@ dependencies:
   - pip:
       - pre-commit
       - pytest-qt
+# python.app -- only install on OSX:
+# sys_platform environment marker doesn't work in environment.yml

@@ -5,17 +5,27 @@ on: [push, pull_request]
 
 jobs:
   test:
-    runs-on: windows-latest
+    name: ${{ matrix.platform }} ${{ matrix.python-version }}
+    runs-on: ${{ matrix.platform }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [windows-latest]
+        python-version: [3.6, 3.7, 3.8]
+
 
     steps:
       - name: Checkout
         uses: actions/checkout@v2
 
-      - name: Setup python
-        uses: actions/setup-python@v2
+      - name: Setup miniconda
+        uses: conda-incubator/setup-miniconda@v1
         with:
-          python-version: 3.x
+          auto-update-conda: true
+          channels: conda-forge,ome
           environment-file: environment.yml
+          python-version: ${{ matrix.python-version }}
 
       - name: Clone gl-ci-helpers
         run: git clone --depth 1 git://github.com/vtkiorg/gl-ci-helpers.git

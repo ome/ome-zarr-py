@@ -13,6 +13,7 @@ def read(fname):
 
 
 install_requires: List[List[str]] = []
+install_requires += (["dataclasses;python_version<'3.7'"],)
 install_requires += (["numpy"],)
 install_requires += (["dask"],)
 install_requires += (["zarr"],)
@@ -21,6 +22,7 @@ install_requires += (["aiohttp"],)
 install_requires += (["requests"],)
 install_requires += (["toolz"],)
 install_requires += (["vispy"],)
+install_requires += (["opencv-contrib-python-headless"],)
 
 
 setup(
