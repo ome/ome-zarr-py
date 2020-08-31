@@ -102,7 +102,7 @@ class Spec(ABC):
 
 class Labels(Spec):
     """Relatively small specification for the well-known "labels" group which only
-    contains the name of subgroups which should be loaded an labeled images."""
+    contains the name of subgroups which should be loaded as labeled images."""
 
     @staticmethod
     def matches(zarr: BaseZarrLocation) -> bool:
