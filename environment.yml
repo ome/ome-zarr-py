@@ -4,7 +4,7 @@ channels:
   - ome
   - conda-forge
 dependencies:
-  - pyqt >=5.12.3
+  - pyside2
   - napari
   - flake8
   - ipython
