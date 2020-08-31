@@ -15,6 +15,7 @@ jobs:
         uses: actions/setup-python@v2
         with:
           python-version: 3.x
+          environment-file: environment.yml
 
       - name: Clone gl-ci-helpers
         run: git clone --depth 1 git://github.com/vtkiorg/gl-ci-helpers.git
@@ -27,6 +28,5 @@ jobs:
         shell: bash
         run: >
           export PATH="/c/Python37:/c/Python37/Scripts:$PATH" &&
-          python -m pip install --upgrade pip wheel pytest tox scikit-image
-          .[napari] &&
+          python -m pip install --upgrade pip wheel pytest tox .[napari] &&
           pytest

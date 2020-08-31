@@ -1,0 +1,26 @@
+#name: z
+channels:
+  - defaults
+  - ome
+  - conda-forge
+dependencies:
+  - pyqt >=5.12.3
+  - napari
+  - flake8
+  - ipython
+  - mypy
+  - omero-py
+  - opencv
+  - pip
+  - py-opencv
+  - pytest
+  - python.app
+  - requests
+  - s3fs
+  - scikit-image
+  - scipy
+  - xarray
+  - zarr >= 2.4.0
+  - pip:
+      - pre-commit
+      - pytest-qt

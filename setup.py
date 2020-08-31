@@ -49,5 +49,5 @@ setup(
         "pytest11": ["napari-conftest = napari.conftest"],
     },
     extras_require={"napari": ["napari"]},
-    tests_require=["pytest", "pytest-capturelog"],
+    tests_require=["pytest"],
 )
