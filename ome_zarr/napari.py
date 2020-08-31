@@ -6,10 +6,11 @@ It implements the ``napari_get_reader`` hook specification, (to create a reader 
 
 import logging
 import warnings
-from typing import Any, Callable, Iterator, List, Optional
+from typing import Any, Callable, Dict, Iterator, List, Optional
 
+from .data import CHANNEL_DIMENSION
 from .io import parse_url
-from .reader import Layer, Reader
+from .reader import Label, Layer, Reader
 from .types import LayerData, PathLike, ReaderFunction
 
 try:
@@ -48,13 +49,34 @@ def transform(layers: Iterator[Layer]) -> Optional[ReaderFunction]:
         results: List[LayerData] = list()
 
         for layer in layers:
-            data = layer.data
-            metadata = layer.metadata
-            if not data:
+            data: List[Any] = layer.data
+            metadata: Dict[str, Any] = layer.metadata
+            if data is None or len(data) < 1:
                 LOGGER.debug(f"skipping non-data {layer}")
             else:
                 LOGGER.debug(f"transforming {layer}")
-                results.append((data, {"channel_axis": 1, **metadata}))
+                shape = data[0].shape
+
+                layer_type: str = "image"
+                if layer.load(Label):
+                    layer_type = "labels"
+                    if "colormaps" in metadata:
+                        del metadata["colormaps"]
+
+                if shape[CHANNEL_DIMENSION] > 1:
+                    metadata["channel_axis"] = CHANNEL_DIMENSION
+                else:
+                    for x in ("name", "visible", "contrast_limits", "colormaps"):
+                        if x in metadata:
+                            try:
+                                metadata[x] = metadata[x][0]
+                            except Exception:
+                                del metadata[x]
+
+                rv: LayerData = (data, metadata, layer_type)
+                LOGGER.debug(f"Transformed: {rv}")
+                results.append(rv)
+
         return results
 
     return f

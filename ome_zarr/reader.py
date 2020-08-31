@@ -2,7 +2,7 @@
 
 import logging
 from abc import ABC
-from typing import Any, Dict, Iterator, List, Optional, Union, cast
+from typing import Any, Dict, Iterator, List, Optional, Type, Union, cast
 
 import dask.array as da
 from vispy.color import Colormap
@@ -46,6 +46,12 @@ class Layer:
             self.specs.append(Multiscales(self))
         if OMERO.matches(zarr):
             self.specs.append(OMERO(self))
+
+    def load(self, spec_type: Type["Spec"]) -> Optional["Spec"]:
+        for spec in self.specs:
+            if isinstance(spec, spec_type):
+                return spec
+        return None
 
     def add(self, zarr: BaseZarrLocation, prepend: bool = False,) -> "Optional[Layer]":
         """Create a child layer if this location has not yet been seen; otherwise return
@@ -248,8 +254,8 @@ class OMERO(Spec):
 
             colormaps = []
             contrast_limits: Optional[List[Optional[Any]]] = [None for x in channels]
-            names = [("channel_%d" % idx) for idx, ch in enumerate(channels)]
-            visibles = [True for x in channels]
+            names: List[str] = [("channel_%d" % idx) for idx, ch in enumerate(channels)]
+            visibles: List[bool] = [True for x in channels]
 
             for idx, ch in enumerate(channels):
                 # 'FF0000' -> [1, 0, 0]
@@ -279,10 +285,10 @@ class OMERO(Spec):
                     elif contrast_limits is not None:
                         contrast_limits[idx] = [start, end]
 
-            layer.metadata["colormap"] = colormaps
-            layer.metadata["contrast_limits"] = contrast_limits
             layer.metadata["name"] = names
             layer.metadata["visible"] = visibles
+            layer.metadata["contrast_limits"] = contrast_limits
+            layer.metadata["colormap"] = colormaps
         except Exception as e:
             LOGGER.error(f"failed to parse metadata: {e}")
 
