@@ -1,4 +1,5 @@
 """Functions for generating synthetic data."""
+from random import randrange
 from typing import Callable, List, Tuple
 
 import numpy as np
@@ -10,7 +11,6 @@ from skimage.measure import label
 from skimage.morphology import closing, remove_small_objects, square
 from skimage.segmentation import clear_border
 
-from .conversions import rgba_to_int
 from .scale import Scaler
 
 CHANNEL_DIMENSION = 1
@@ -153,14 +153,13 @@ def create_zarr(
 
         label_grp = labels_grp.create_group(label_name)
         write_multiscale(labels, label_grp)
-        label_grp.attrs["color"] = {
-            "1": rgba_to_int(50, 0, 0, 0),
-            "2": rgba_to_int(0, 50, 0, 0),
-            "3": rgba_to_int(0, 0, 50, 0),
-            "4": rgba_to_int(100, 0, 0, 0),
-            "5": rgba_to_int(0, 100, 0, 0),
-            "6": rgba_to_int(0, 0, 100, 0),
-            "7": rgba_to_int(50, 50, 50, 0),
-            "8": rgba_to_int(100, 100, 100, 0),
+
+        colors = []
+        for x in range(1, 9):
+            rgba = [randrange(0, 256) for i in range(4)]
+            colors.append({"label-value": x, "rgba": rgba})
+        label_grp.attrs["image-label"] = {
+            "version": "0.1",
+            "colors": colors,
+            "source": {"image": "../../"},
         }
-        label_grp.attrs["image"] = {"array": "../../", "source": {}}

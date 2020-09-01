@@ -7,7 +7,6 @@ from typing import Any, Dict, Iterator, List, Optional, Type, Union, cast
 import dask.array as da
 from vispy.color import Colormap
 
-from .conversions import int_to_rgba
 from .io import BaseZarrLocation
 from .types import JSONDict
 
@@ -178,13 +177,14 @@ class Label(Spec):
     @staticmethod
     def matches(zarr: BaseZarrLocation) -> bool:
         """If label-specific metadata is present, then return true."""
-        # FIXME: this should be the "label" metadata soon
-        return bool("colors" in zarr.root_attrs or "image" in zarr.root_attrs)
+        return bool("image-label" in zarr.root_attrs)
 
     def __init__(self, node: Node) -> None:
         super().__init__(node)
 
-        image = self.lookup("image", {}).get("array", None)
+        image_label = self.lookup("image-label", {})
+
+        image = image_label.get("source", {}).get("image", None)
         parent_zarr = None
         if image:
             # This is an ome mask, load the image
@@ -199,19 +199,22 @@ class Label(Spec):
 
         # Metadata: TODO move to a class
         colors: Dict[Union[int, bool], List[float]] = {}
-        color_dict = self.lookup("color", {})
-        if color_dict:
-            for k, v in color_dict.items():
+        color_list = image_label.get("colors", [])
+        if color_list:
+            for color in color_list:
                 try:
-                    if k.lower() == "true":
-                        k = True
-                    elif k.lower() == "false":
-                        k = False
+                    label_value = color["label-value"]
+                    rgba = color.get("rgba", None)
+                    if rgba:
+                        rgba = [x / 255 for x in rgba]
+
+                    if isinstance(label_value, bool) or isinstance(label_value, int):
+                        colors[label_value] = rgba
                     else:
-                        k = int(k)
-                    colors[k] = int_to_rgba(v)
+                        raise Exception("not bool or int")
+
                 except Exception as e:
-                    LOGGER.error(f"invalid color - {k}={v}: {e}")
+                    LOGGER.error(f"invalid color - {color}: {e}")
 
         # TODO: a metadata transform should be provided by specific impls.
         name = self.zarr.basename()
