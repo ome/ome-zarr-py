@@ -216,10 +216,6 @@ class Multiscales(Spec):
             LOGGER.info(" - dtype = %s", data.dtype)
             layer.data.append(data)
 
-        # TODO: test removal
-        if len(layer.data) == 1:
-            layer.data = layer.data[0]
-
         # Load possible layer data
         child_zarr = self.zarr.create("labels")
         if child_zarr.exists():
