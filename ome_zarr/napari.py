@@ -60,13 +60,13 @@ def transform(layers: Iterator[Layer]) -> Optional[ReaderFunction]:
                 layer_type: str = "image"
                 if layer.load(Label):
                     layer_type = "labels"
-                    if "colormaps" in metadata:
-                        del metadata["colormaps"]
+                    if "colormap" in metadata:
+                        del metadata["colormap"]
 
                 if shape[CHANNEL_DIMENSION] > 1:
                     metadata["channel_axis"] = CHANNEL_DIMENSION
                 else:
-                    for x in ("name", "visible", "contrast_limits", "colormaps"):
+                    for x in ("name", "visible", "contrast_limits", "colormap"):
                         if x in metadata:
                             try:
                                 metadata[x] = metadata[x][0]
