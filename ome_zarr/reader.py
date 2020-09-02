@@ -14,17 +14,17 @@ from .types import JSONDict
 LOGGER = logging.getLogger("ome_zarr.reader")
 
 
-class Layer:
+class Node:
     """Container for a representation of the binary data somewhere in the data
     hierarchy."""
 
     def __init__(
-        self, zarr: BaseZarrLocation, root: Union["Layer", "Reader", List[str]]
+        self, zarr: BaseZarrLocation, root: Union["Node", "Reader", List[str]]
     ):
         self.zarr = zarr
         self.root = root
         self.seen: List[str] = []
-        if isinstance(root, Layer) or isinstance(root, Reader):
+        if isinstance(root, Node) or isinstance(root, Reader):
             self.seen = root.seen
         else:
             self.seen = cast(List[str], root)
@@ -34,8 +34,8 @@ class Layer:
         self.metadata: JSONDict = dict()
         self.data: List[da.core.Array] = list()
         self.specs: List[Spec] = []
-        self.pre_layers: List[Layer] = []
-        self.post_layers: List[Layer] = []
+        self.pre_nodes: List[Node] = []
+        self.post_nodes: List[Node] = []
 
         # TODO: this should be some form of plugin infra over subclasses
         if Labels.matches(zarr):
@@ -53,8 +53,8 @@ class Layer:
                 return spec
         return None
 
-    def add(self, zarr: BaseZarrLocation, prepend: bool = False,) -> "Optional[Layer]":
-        """Create a child layer if this location has not yet been seen; otherwise return
+    def add(self, zarr: BaseZarrLocation, prepend: bool = False,) -> "Optional[Node]":
+        """Create a child node if this location has not yet been seen; otherwise return
         None."""
 
         if zarr.zarr_path in self.seen:
@@ -62,13 +62,13 @@ class Layer:
             return None
 
         self.seen.append(zarr.zarr_path)
-        layer = Layer(zarr, self)
+        node = Node(zarr, self)
         if prepend:
-            self.pre_layers.append(layer)
+            self.pre_nodes.append(node)
         else:
-            self.post_layers.append(layer)
+            self.post_nodes.append(node)
 
-        return layer
+        return node
 
     def write_metadata(self, metadata: JSONDict) -> None:
         for spec in self.specs:
@@ -94,9 +94,9 @@ class Spec(ABC):
     def matches(zarr: BaseZarrLocation) -> bool:
         raise NotImplementedError()
 
-    def __init__(self, layer: Layer) -> None:
-        self.layer = layer
-        self.zarr = layer.zarr
+    def __init__(self, node: Node) -> None:
+        self.node = node
+        self.zarr = node.zarr
         LOGGER.debug(f"treating {self.zarr} as {self.__class__.__name__}")
         for k, v in self.zarr.root_attrs.items():
             LOGGER.info("root_attr: %s", k)
@@ -116,13 +116,13 @@ class Labels(Spec):
         # TODO: also check for "labels" entry and perhaps version?
         return bool("labels" in zarr.root_attrs)
 
-    def __init__(self, layer: Layer) -> None:
-        super().__init__(layer)
+    def __init__(self, node: Node) -> None:
+        super().__init__(node)
         label_names = self.lookup("labels", [])
         for name in label_names:
             child_zarr = self.zarr.create(name)
             if child_zarr.exists():
-                layer.add(child_zarr)
+                node.add(child_zarr)
 
 
 class Label(Spec):
@@ -135,9 +135,9 @@ class Label(Spec):
         # FIXME: this should be the "label" metadata soon
         return bool("colors" in zarr.root_attrs or "image" in zarr.root_attrs)
 
-    def __init__(self, layer: Layer) -> None:
-        super().__init__(layer)
-        layer.visible = True
+    def __init__(self, node: Node) -> None:
+        super().__init__(node)
+        node.visible = True
 
         image = self.lookup("image", {}).get("array", None)
         parent_zarr = None
@@ -146,9 +146,9 @@ class Label(Spec):
             parent_zarr = self.zarr.create(image)
             if parent_zarr.exists():
                 LOGGER.debug(f"delegating to parent image: {parent_zarr}")
-                parent_layer = layer.add(parent_zarr, prepend=True)
-                if parent_layer is not None:
-                    layer.visible = False
+                parent_node = node.add(parent_zarr, prepend=True)
+                if parent_node is not None:
+                    node.visible = False
             else:
                 parent_zarr = None
         if parent_zarr is None:
@@ -172,7 +172,7 @@ class Label(Spec):
 
         # TODO: a metadata transform should be provided by specific impls.
         name = self.zarr.zarr_path.split("/")[-1]
-        layer.metadata.update(
+        node.metadata.update(
             {
                 "visible": False,
                 "name": name,
@@ -191,8 +191,8 @@ class Multiscales(Spec):
                 return True
         return False
 
-    def __init__(self, layer: Layer) -> None:
-        super().__init__(layer)
+    def __init__(self, node: Node) -> None:
+        super().__init__(node)
 
         try:
             datasets = self.lookup("multiscales", [])[0]["datasets"]
@@ -214,12 +214,12 @@ class Multiscales(Spec):
             LOGGER.info(" - shape (t, c, z, y, x) = %s", data.shape)
             LOGGER.info(" - chunks =  %s", chunk_sizes)
             LOGGER.info(" - dtype = %s", data.dtype)
-            layer.data.append(data)
+            node.data.append(data)
 
-        # Load possible layer data
+        # Load possible node data
         child_zarr = self.zarr.create("labels")
         if child_zarr.exists():
-            layer.add(child_zarr)
+            node.add(child_zarr)
 
 
 class OMERO(Spec):
@@ -227,8 +227,8 @@ class OMERO(Spec):
     def matches(zarr: BaseZarrLocation) -> bool:
         return bool("omero" in zarr.root_attrs)
 
-    def __init__(self, layer: Layer) -> None:
-        super().__init__(layer)
+    def __init__(self, node: Node) -> None:
+        super().__init__(node)
         # TODO: start checking metadata version
         self.image_data = self.lookup("omero", {})
 
@@ -281,16 +281,16 @@ class OMERO(Spec):
                     elif contrast_limits is not None:
                         contrast_limits[idx] = [start, end]
 
-            layer.metadata["name"] = names
-            layer.metadata["visible"] = visibles
-            layer.metadata["contrast_limits"] = contrast_limits
-            layer.metadata["colormap"] = colormaps
+            node.metadata["name"] = names
+            node.metadata["visible"] = visibles
+            node.metadata["contrast_limits"] = contrast_limits
+            node.metadata["colormap"] = colormaps
         except Exception as e:
             LOGGER.error(f"failed to parse metadata: {e}")
 
 
 class Reader:
-    """Parses the given Zarr instance into a collection of Layers properly ordered
+    """Parses the given Zarr instance into a collection of Nodes properly ordered
     depending on context.
 
     Depending on the starting point, metadata may be followed up or down the Zarr
@@ -302,15 +302,14 @@ class Reader:
         self.zarr = zarr
         self.seen: List[str] = [zarr.zarr_path]
 
-    def __call__(self) -> Iterator[Layer]:
-        layer = Layer(self.zarr, self)
-        if layer.specs:  # Something has matched
+    def __call__(self) -> Iterator[Node]:
+        node = Node(self.zarr, self)
+        if node.specs:  # Something has matched
 
             LOGGER.debug(f"treating {self.zarr} as ome-zarr")
-            yield from self.descend(layer)
+            yield from self.descend(node)
 
             # TODO: API thoughts for the Spec type
-            # - ask for earlier_layers, later_layers (i.e. priorities)
             # - ask for recursion or not
             # - ask for visible or invisible (?)
             # - ask for "provides data", "overrides data"
@@ -318,20 +317,20 @@ class Reader:
         elif self.zarr.zarray:  # Nothing has matched
             LOGGER.debug(f"treating {self.zarr} as raw zarr")
             data = da.from_zarr(f"{self.zarr.zarr_path}")
-            layer.data.append(data)
-            yield layer
+            node.data.append(data)
+            yield node
 
         else:
             LOGGER.debug(f"ignoring {self.zarr}")
             # yield nothing
 
-    def descend(self, layer: Layer, depth: int = 0) -> Iterator[Layer]:
+    def descend(self, node: Node, depth: int = 0) -> Iterator[Node]:
 
-        for pre_layer in layer.pre_layers:
-            yield from self.descend(pre_layer, depth + 1)
+        for pre_node in node.pre_nodes:
+            yield from self.descend(pre_node, depth + 1)
 
-        LOGGER.debug(f"returning {layer}")
-        yield layer
+        LOGGER.debug(f"returning {node}")
+        yield node
 
-        for post_layer in layer.post_layers:
-            yield from self.descend(post_layer, depth + 1)
+        for post_node in node.post_nodes:
+            yield from self.descend(post_node, depth + 1)

@@ -10,7 +10,7 @@ from typing import Any, Callable, Dict, Iterator, List, Optional
 
 from .data import CHANNEL_DIMENSION
 from .io import parse_url
-from .reader import Label, Layer, Reader
+from .reader import Label, Node, Reader
 from .types import LayerData, PathLike, ReaderFunction
 
 try:
@@ -44,21 +44,21 @@ def napari_get_reader(path: PathLike) -> Optional[ReaderFunction]:
     return None
 
 
-def transform(layers: Iterator[Layer]) -> Optional[ReaderFunction]:
+def transform(nodes: Iterator[Node]) -> Optional[ReaderFunction]:
     def f(*args: Any, **kwargs: Any) -> List[LayerData]:
         results: List[LayerData] = list()
 
-        for layer in layers:
-            data: List[Any] = layer.data
-            metadata: Dict[str, Any] = layer.metadata
+        for node in nodes:
+            data: List[Any] = node.data
+            metadata: Dict[str, Any] = node.metadata
             if data is None or len(data) < 1:
-                LOGGER.debug(f"skipping non-data {layer}")
+                LOGGER.debug(f"skipping non-data {node}")
             else:
-                LOGGER.debug(f"transforming {layer}")
+                LOGGER.debug(f"transforming {node}")
                 shape = data[0].shape
 
                 layer_type: str = "image"
-                if layer.load(Label):
+                if node.load(Label):
                     layer_type = "labels"
                     if "colormap" in metadata:
                         del metadata["colormap"]

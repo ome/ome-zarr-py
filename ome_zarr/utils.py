@@ -10,53 +10,53 @@ import zarr
 from dask.diagnostics import ProgressBar
 
 from .io import parse_url
-from .reader import Layer, Multiscales, Reader
+from .reader import Multiscales, Node, Reader
 from .types import JSONDict
 
 LOGGER = logging.getLogger("ome_zarr.utils")
 
 
-def info(path: str) -> Iterator[Layer]:
+def info(path: str) -> Iterator[Node]:
     """Print information about an OME-Zarr fileset.
 
-    All :class:`Layers <ome_utils.reader.Layer>` that are found from the given path will
+    All :class:`Nodes <ome_utils.reader.Node>` that are found from the given path will
     be visited recursively.
     """
     zarr = parse_url(path)
     assert zarr, f"not a zarr: {zarr}"
     reader = Reader(zarr)
-    for layer in reader():
+    for node in reader():
 
-        if not layer.specs:
+        if not node.specs:
             print(f"not an ome-zarr: {zarr}")
             continue
 
-        print(layer)
+        print(node)
         print(" - metadata")
-        for spec in layer.specs:
+        for spec in node.specs:
             print(f"   - {spec.__class__.__name__}")
         print(" - data")
-        for array in layer.data:
+        for array in node.data:
             print(f"   - {array.shape}")
-        LOGGER.debug(layer.data)
-        yield layer
+        LOGGER.debug(node.data)
+        yield node
 
 
 def download(input_path: str, output_dir: str = ".") -> None:
     """Download an OME-Zarr from the given path.
 
-    All :class:`Layers <ome_utils.reader.Layer>` that are found from the given path will
+    All :class:`Nodes <ome_utils.reader.Node>` that are found from the given path will
     be included in the download.
     """
     location = parse_url(input_path)
     assert location, f"not a zarr: {location}"
 
     reader = Reader(location)
-    layers: List[Layer] = list()
+    nodes: List[Node] = list()
     paths: List[str] = list()
-    for layer in reader():
-        layers.append(layer)
-        paths.append(layer.zarr.zarr_path)
+    for node in reader():
+        nodes.append(node)
+        paths.append(node.zarr.zarr_path)
 
     strip_common_prefix(paths)
 
@@ -66,14 +66,14 @@ def download(input_path: str, output_dir: str = ".") -> None:
         print("  ", path)
     print(f"to {output_dir}")
 
-    for path, layer in sorted(zip(paths, layers)):
+    for path, node in sorted(zip(paths, nodes)):
         target_dir = os.path.join(output_dir, f"{path}")
         resolutions: List[da.core.Array] = []
         datasets: List[str] = []
-        for spec in layer.specs:
+        for spec in node.specs:
             if isinstance(spec, Multiscales):
                 datasets = spec.datasets
-                resolutions = layer.data
+                resolutions = node.data
                 if datasets and resolutions:
                     pbar = ProgressBar()
                     for dataset, data in reversed(list(zip(datasets, resolutions))):
@@ -85,10 +85,10 @@ def download(input_path: str, output_dir: str = ".") -> None:
                 zarr.group(target_dir)
 
         with open(os.path.join(target_dir, ".zgroup"), "w") as f:
-            f.write(json.dumps(layer.zarr.zgroup))
+            f.write(json.dumps(node.zarr.zgroup))
         with open(os.path.join(target_dir, ".zattrs"), "w") as f:
             metadata: JSONDict = {}
-            layer.write_metadata(metadata)
+            node.write_metadata(metadata)
             f.write(json.dumps(metadata))
 
 
