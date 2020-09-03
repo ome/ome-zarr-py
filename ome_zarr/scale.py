@@ -185,7 +185,7 @@ class Scaler:
     def _by_plane(
         self, base: np.ndarray, func: Callable[[np.ndarray, int, int], np.ndarray],
     ) -> np.ndarray:
-        """Loop over 3 of the 5 dimensions of and apply the func transform."""
+        """Loop over 3 of the 5 dimensions and apply the func transform."""
         assert 5 == len(base.shape)
 
         rv = [base]
