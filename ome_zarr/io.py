@@ -50,12 +50,8 @@ class BaseZarrLocation(ABC):
         return f"{self.zarr_path}{suffix}"
 
     def exists(self) -> bool:
-        """Return true if zgroup or zarray metadata exists."""
+        """Return true if either zgroup or zarray metadata exists."""
         return self.__exists
-
-    def is_zarr(self) -> Optional[JSONDict]:
-        """Return true if either zarray or zgroup metadata exists."""
-        return self.zarray or self.zgroup
 
     @property
     def root_attrs(self) -> JSONDict:
@@ -145,6 +141,6 @@ def parse_url(path: str) -> Optional[BaseZarrLocation]:
             zarr = LocalZarrLocation(result.path)
         else:
             zarr = RemoteZarrLocation(path)
-        if zarr.is_zarr():
+        if zarr.exists():
             return zarr
     return None

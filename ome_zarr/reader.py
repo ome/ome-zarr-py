@@ -298,7 +298,7 @@ class Reader:
     """
 
     def __init__(self, zarr: BaseZarrLocation) -> None:
-        assert zarr.is_zarr()
+        assert zarr.exists()
         self.zarr = zarr
         self.seen: List[str] = [zarr.zarr_path]
 
