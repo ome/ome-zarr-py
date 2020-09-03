@@ -83,7 +83,7 @@ class Scaler:
             grp.attrs.update(base.attrs)
 
     def __check_store(self, output_directory: str) -> MutableMapping:
-        """Return a Zarr store if it doesn't not already exist."""
+        """Return a Zarr store if it doesn't already exist."""
         assert not os.path.exists(output_directory)
         return zarr.DirectoryStore(output_directory)
 
