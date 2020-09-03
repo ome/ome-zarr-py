@@ -63,7 +63,7 @@ def transform(nodes: Iterator[Node]) -> Optional[ReaderFunction]:
                     if "colormap" in metadata:
                         del metadata["colormap"]
 
-                if shape[CHANNEL_DIMENSION] > 1:
+                elif shape[CHANNEL_DIMENSION] > 1:
                     metadata["channel_axis"] = CHANNEL_DIMENSION
                 else:
                     for x in ("name", "visible", "contrast_limits", "colormap"):

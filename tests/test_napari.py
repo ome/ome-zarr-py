@@ -11,6 +11,21 @@ class TestNapari:
         self.path = tmpdir.mkdir("data")
         create_zarr(str(self.path), astronaut, "astronaut")
 
+    def assert_layers(self, layers, visible_1, visible_2):
+        # TODO: check name
+
+        assert len(layers) == 2
+        image, label = layers
+
+        data, metadata, layer_type = self.assert_layer(image)
+        assert 1 == metadata["channel_axis"]
+        assert ["Red", "Green", "Blue"] == metadata["name"]
+        assert [[0, 1]] * 3 == metadata["contrast_limits"]
+        assert [visible_1] * 3 == metadata["visible"]
+
+        data, metadata, layer_type = self.assert_layer(label)
+        assert visible_2 == metadata["visible"]
+
     def assert_layer(self, layer_data):
         data, metadata, layer_type = layer_data
         if not data or not metadata:
@@ -20,38 +35,17 @@ class TestNapari:
 
     def test_image(self):
         layers = napari_get_reader(str(self.path))()
-        assert len(layers) == 2
-        image, label = layers
-
-        data, metadata, layer_type = self.assert_layer(image)
-        assert 1 == metadata["channel_axis"]
-        assert ["Red", "Green", "Blue"] == metadata["name"]
-        assert [[0, 1], [0, 1], [0, 1]] == metadata["contrast_limits"]
-        assert [True, True, True] == metadata["visible"]
-
-        data, metadata, layer_type = self.assert_layer(label)
+        self.assert_layers(layers, True, False)
 
     def test_labels(self):
         filename = str(self.path.join("labels"))
         layers = napari_get_reader(filename)()
-        assert layers
-        for layer_data in layers:
-            data, metadata, layer_type = self.assert_layer(layer_data)
+        self.assert_layers(layers, False, True)
 
     def test_label(self):
         filename = str(self.path.join("labels", "astronaut"))
         layers = napari_get_reader(filename)()
-        assert layers
-        for layer_data in layers:
-            data, metadata, layer_type = self.assert_layer(layer_data)
-
-    def test_layers(self):
-        filename = str(self.path.join("labels", "astronaut"))
-        layers = napari_get_reader(filename)()
-        assert layers
-        # check order
-        # check name
-        # check visibility
+        self.assert_layers(layers, False, True)
 
     def test_viewer(self, make_test_viewer):
         """example of testing the viewer."""

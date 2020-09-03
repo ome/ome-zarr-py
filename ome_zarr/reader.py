@@ -19,7 +19,10 @@ class Node:
     hierarchy."""
 
     def __init__(
-        self, zarr: BaseZarrLocation, root: Union["Node", "Reader", List[str]]
+        self,
+        zarr: BaseZarrLocation,
+        root: Union["Node", "Reader", List[str]],
+        visibility: bool = True,
     ):
         self.zarr = zarr
         self.root = root
@@ -28,7 +31,7 @@ class Node:
             self.seen = root.seen
         else:
             self.seen = cast(List[str], root)
-        self.visible = True
+        self.__visible = visibility
 
         # Likely to be updated by specs
         self.metadata: JSONDict = dict()
@@ -47,22 +50,64 @@ class Node:
         if OMERO.matches(zarr):
             self.specs.append(OMERO(self))
 
+    @property
+    def visible(self) -> bool:
+        """True if this node should be displayed by default.
+
+        An invisible node may have been requested by the instrument, by the
+        user, or by the ome_zarr library after determining that this node
+        is lower priority, e.g. to prevent too many nodes from being shown
+        at once.
+        """
+        return self.__visible
+
+    @visible.setter
+    def visible(self, visibility: bool) -> bool:
+        """
+        Set the visibility for this node, returning the previous value.
+
+        A change of the visibility will propagate to all subnodes.
+        """
+        old = self.__visible
+        if old != visibility:
+            self.__visible = visibility
+            for node in self.pre_nodes + self.post_nodes:
+                node.visible = visibility
+        return old
+
     def load(self, spec_type: Type["Spec"]) -> Optional["Spec"]:
         for spec in self.specs:
             if isinstance(spec, spec_type):
                 return spec
         return None
 
-    def add(self, zarr: BaseZarrLocation, prepend: bool = False,) -> "Optional[Node]":
-        """Create a child node if this location has not yet been seen; otherwise return
-        None."""
+    def add(
+        self,
+        zarr: BaseZarrLocation,
+        prepend: bool = False,
+        visibility: Optional[bool] = None,
+    ) -> "Optional[Node]":
+        """Create a child node if this location has not yet been seen.
+
+        Returns None if the node has already been processed.
+
+        By setting prepend, the addition will be considered as higher priority
+        node which will likely be turned into a lower layer for display.
+
+        By unsetting visible, the node (and in turn the layer) can be
+        deactivated for initial display. By default, the value of the current
+        node will be propagated.
+        """
 
         if zarr.zarr_path in self.seen:
             LOGGER.debug(f"already seen {zarr}; stopping recursion")
             return None
 
+        if visibility is None:
+            visibility = self.visible
+
         self.seen.append(zarr.zarr_path)
-        node = Node(zarr, self)
+        node = Node(zarr, self, visibility=visibility)
         if prepend:
             self.pre_nodes.append(node)
         else:
@@ -80,6 +125,8 @@ class Node:
             suffix += " [zgroup]"
         if self.zarr.zarray:
             suffix += " [zarray]"
+        if not self.visible:
+            suffix += " (hidden)"
         return f"{self.zarr.zarr_path}{suffix}"
 
 
@@ -137,7 +184,6 @@ class Label(Spec):
 
     def __init__(self, node: Node) -> None:
         super().__init__(node)
-        node.visible = True
 
         image = self.lookup("image", {}).get("array", None)
         parent_zarr = None
@@ -146,9 +192,7 @@ class Label(Spec):
             parent_zarr = self.zarr.create(image)
             if parent_zarr.exists():
                 LOGGER.debug(f"delegating to parent image: {parent_zarr}")
-                parent_node = node.add(parent_zarr, prepend=True)
-                if parent_node is not None:
-                    node.visible = False
+                node.add(parent_zarr, prepend=True, visibility=False)
             else:
                 parent_zarr = None
         if parent_zarr is None:
@@ -174,7 +218,7 @@ class Label(Spec):
         name = self.zarr.zarr_path.split("/")[-1]
         node.metadata.update(
             {
-                "visible": False,
+                "visible": node.visible,
                 "name": name,
                 "color": colors,
                 "metadata": {"image": self.lookup("image", {}), "path": name},
@@ -219,7 +263,7 @@ class Multiscales(Spec):
         # Load possible node data
         child_zarr = self.zarr.create("labels")
         if child_zarr.exists():
-            node.add(child_zarr)
+            node.add(child_zarr, visibility=False)
 
 
 class OMERO(Spec):
@@ -269,7 +313,7 @@ class OMERO(Spec):
 
                 visible = ch.get("active", None)
                 if visible is not None:
-                    visibles[idx] = visible
+                    visibles[idx] = visible and node.visible
 
                 window = ch.get("window", None)
                 if window is not None:
@@ -311,7 +355,6 @@ class Reader:
 
             # TODO: API thoughts for the Spec type
             # - ask for recursion or not
-            # - ask for visible or invisible (?)
             # - ask for "provides data", "overrides data"
 
         elif self.zarr.zarray:  # Nothing has matched
