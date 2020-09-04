@@ -58,9 +58,10 @@ def download(input_path: str, output_dir: str = ".") -> None:
         nodes.append(node)
         paths.append(node.zarr.zarr_path)
 
-    strip_common_prefix(paths)
+    common = strip_common_prefix(paths)
+    root = os.path.join(output_dir, common)
 
-    assert not os.path.exists(output_dir), f"{output_dir} already exists!"
+    assert not os.path.exists(root), f"{root} already exists!"
     print("downloading...")
     for path in paths:
         print("  ", path)
@@ -92,13 +93,15 @@ def download(input_path: str, output_dir: str = ".") -> None:
             f.write(json.dumps(metadata))
 
 
-def strip_common_prefix(paths: List[str]) -> None:
+def strip_common_prefix(paths: List[str]) -> str:
     """Find and remove the prefix common to all strings.
 
+    Returns the last element of the common prefix.
     An exception is thrown if no common prefix exists.
 
     >>> paths = ["a/b", "a/b/c"]
     >>> strip_common_prefix(paths)
+    'b'
     >>> paths
     ['b', 'b/c']
     """
@@ -118,7 +121,11 @@ def strip_common_prefix(paths: List[str]) -> None:
         for path in parts:
             msg += f"{path}\n"
         raise Exception(msg)
+    else:
+        common = parts[0][first_mismatch - 1]
 
     for idx, path in enumerate(parts):
         base = os.path.sep.join(path[first_mismatch - 1 :])
         paths[idx] = base
+
+    return common

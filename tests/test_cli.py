@@ -55,7 +55,8 @@ class TestCli:
             firstpass.rotate(1)
 
             copy = [str(x) for x in firstpass]
-            strip_common_prefix(copy)
+            common = strip_common_prefix(copy)
+            assert "d" == common
             assert set(copy) == set(results)
 
         if reverse:
