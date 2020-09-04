@@ -35,8 +35,7 @@ jobs:
         run: gl-ci-helpers/appveyor/install_opengl.ps1
 
       - name: Run pytest
-        shell: bash
+        shell: bash -l {0}
         run: >
-          export PATH="/c/Python37:/c/Python37/Scripts:$PATH" &&
           python -m pip install --upgrade pip wheel pytest tox .[napari] &&
           pytest
