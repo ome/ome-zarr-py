@@ -1,0 +1,27 @@
+#name: z
+channels:
+  - defaults
+  - ome
+  - conda-forge
+dependencies:
+  - pyside2
+  - napari
+  - flake8
+  - ipython
+  - mypy
+  - omero-py
+  - opencv
+  - pip
+  - py-opencv
+  - pytest
+  - requests
+  - s3fs
+  - scikit-image
+  - scipy
+  - xarray
+  - zarr >= 2.4.0
+  - pip:
+      - pre-commit
+      - pytest-qt
+# python.app -- only install on OSX:
+# sys_platform environment marker doesn't work in environment.yml
