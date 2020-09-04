@@ -32,7 +32,9 @@ jobs:
           GIT_CURL_VERBOSE: 1
           GIT_TRACE: 1
           GIT_TRACE_PACKET: 1
-        run: git clone --depth 1 git://github.com/vtkiorg/gl-ci-helpers.git
+        run: >
+            git clone --depth 1 git://github.com/vtkiorg/gl-ci-helpers.git ||
+            git clone --depth 1 git://github.com/vtkiorg/gl-ci-helpers.git
 
       - name: Install opengl
         shell: powershell
