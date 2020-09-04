@@ -89,14 +89,17 @@ class Node:
     ) -> "Optional[Node]":
         """Create a child node if this location has not yet been seen.
 
-        Returns None if the node has already been processed.
+        Newly created nodes may be considered higher or lower priority than
+        the current node, and may be set to invisible if necessary.
 
-        By setting prepend, the addition will be considered as higher priority
-        node which will likely be turned into a lower layer for display.
-
-        By unsetting visible, the node (and in turn the layer) can be
-        deactivated for initial display. By default, the value of the current
-        node will be propagated.
+        :param zarr: Location in the node hierarchy to be added
+        :param prepend: Whether the newly created node should be given higher
+            priority than the current node, defaults to False
+        :param visibility: Allows setting the node (and therefore layer)
+            as deactivated for initial display or if None the value of the
+            current node will be propagated to the new node,  defaults to None
+        :return: Newly created node if this is the first time it has been
+            encountered; None if the node has already been processed.
         """
 
         if zarr.zarr_path in self.seen:
