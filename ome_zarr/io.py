@@ -6,9 +6,9 @@ Primary entry point is the :func:`~ome_zarr.io.parse_url` method.
 import json
 import logging
 import os
-import posixpath
 from abc import ABC, abstractmethod
-from typing import Optional
+from pathlib import Path
+from typing import List, Optional
 from urllib.parse import urlparse
 
 import dask.array as da
@@ -27,8 +27,7 @@ class BaseZarrLocation(ABC):
     Attempts are made to load various metadata files and cache them internally.
     """
 
-    def __init__(self, path: str) -> None:
-        self.zarr_path: str = path.endswith("/") and path or f"{path}/"
+    def __init__(self) -> None:
         self.zarray: JSONDict = self.get_json(".zarray")
         self.zgroup: JSONDict = self.get_json(".zgroup")
         self.__metadata: JSONDict = {}
@@ -47,7 +46,7 @@ class BaseZarrLocation(ABC):
             suffix += " [zgroup]"
         if self.zarray:
             suffix += " [zarray]"
-        return f"{self.zarr_path}{suffix}"
+        return f"{self.subpath('')}{suffix}"
 
     def exists(self) -> bool:
         """Return true if either zgroup or zarray metadata exists."""
@@ -58,22 +57,48 @@ class BaseZarrLocation(ABC):
         """Return the contents of the zattrs file."""
         return dict(self.__metadata)
 
+    def load(self, subpath: str = "") -> da.core.Array:
+        """Use dask.array.from_zarr to load the subpath."""
+        return da.from_zarr(f"{self.subpath(subpath)}")
+
+    def __eq__(self, rhs: object) -> bool:
+        if type(self) != type(rhs):
+            return False
+        if not isinstance(rhs, BaseZarrLocation):
+            return False
+        return self.subpath() == rhs.subpath()
+
+    # Abstract methods to be implemented by subclasses
+
+    @abstractmethod
+    def basename(self) -> str:
+        """Return the last element of the underlying location.
+
+        >>> RemoteZarrLocation("https://example.com/foo").basename()
+        'foo'
+        """
+        raise NotImplementedError("unknown")
+
+    # TODO: update to from __future__ import annotations with 3.7+
+    @abstractmethod
+    def create(self, path: str) -> "BaseZarrLocation":
+        """Must be implemented by subclasses."""
+        raise NotImplementedError("unknown")
+
     @abstractmethod
     def get_json(self, subpath: str) -> JSONDict:
         """Must be implemented by subclasses."""
         raise NotImplementedError("unknown")
 
-    def load(self, subpath: str) -> da.core.Array:
-        """Use dask.array.from_zarr to load the subpath."""
-        return da.from_zarr(f"{self.zarr_path}{subpath}")
+    @abstractmethod
+    def parts(self) -> List[str]:
+        """Must be implemented by subclasses."""
+        raise NotImplementedError("unknown")
 
-    # TODO: update to from __future__ import annotations with 3.7+
-    def create(self, path: str) -> "BaseZarrLocation":
-        """Create a new Zarr location for the given path."""
-        subpath = posixpath.join(self.zarr_path, path)
-        subpath = posixpath.normpath(subpath)
-        LOGGER.debug(f"open({self.__class__.__name__}({subpath}))")
-        return self.__class__(posixpath.normpath(f"{subpath}"))
+    @abstractmethod
+    def subpath(self, subpath: str = "") -> str:
+        """Must be implemented by subclasses."""
+        raise NotImplementedError("unknown")
 
 
 class LocalZarrLocation(BaseZarrLocation):
@@ -81,14 +106,33 @@ class LocalZarrLocation(BaseZarrLocation):
     Uses the :module:`json` library for loading JSON from disk.
     """
 
+    def __init__(self, path: Path) -> None:
+        self.__path: Path = path
+        super().__init__()
+
+    def basename(self) -> str:
+        return self.__path.name
+
+    def subpath(self, subpath: str = "") -> str:
+        return str((self.__path / subpath).resolve())
+
+    def parts(self) -> List[str]:
+        return list(self.__path.parts)
+
+    def create(self, path: str) -> "LocalZarrLocation":
+        """Create a new Zarr location for the given path."""
+        subpath = (self.__path / path).resolve()
+        LOGGER.debug(f"open({self.__class__.__name__}({subpath}))")
+        return self.__class__(subpath)
+
     def get_json(self, subpath: str) -> JSONDict:
         """
-        Load and return a given subpath of self.zarr_path as JSON.
+        Load and return a given subpath of self.__path as JSON.
 
         If a file does not exist, an empty response is returned rather
         than an exception.
         """
-        filename = os.path.join(self.zarr_path, subpath)
+        filename = self.__path / subpath
 
         if not os.path.exists(filename):
             LOGGER.debug(f"{filename} does not exist")
@@ -101,15 +145,35 @@ class LocalZarrLocation(BaseZarrLocation):
 class RemoteZarrLocation(BaseZarrLocation):
     """ Uses the :module:`requests` library for accessing Zarr metadata files. """
 
+    def __init__(self, url: str) -> None:
+        self.__url: str = url.endswith("/") and url or f"{url}/"
+        super().__init__()
+
+    def basename(self) -> str:
+        url = self.__url.endswith("/") and self.__url[0:-1] or self.__url
+        return url.split("/")[-1]
+
+    def subpath(self, path: str = "") -> str:
+        return f"{self.__url}{path}"
+
+    def parts(self) -> List[str]:
+        return self.__url.split("/")
+
+    def create(self, path: str) -> "RemoteZarrLocation":
+        """Create a new Zarr location for the given path."""
+        subpath = self.subpath(path)
+        LOGGER.debug(f"open({self.__class__.__name__}({subpath}))")
+        return self.__class__(f"{subpath}")
+
     def get_json(self, subpath: str) -> JSONDict:
         """
-        Load and return a given subpath of self.zarr_path as JSON.
+        Load and return a given subpath of self.__url as JSON.
 
         HTTP 403 and 404 responses are treated as if the file does not exist.
         Exceptions during the remote connection are logged at the WARN level.
         All other exceptions log at the ERROR level.
         """
-        url = f"{self.zarr_path}{subpath}"
+        url = f"{self.__url}{subpath}"
         try:
             rsp = requests.get(url)
         except Exception:
@@ -132,13 +196,13 @@ def parse_url(path: str) -> Optional[BaseZarrLocation]:
     """
     # Check is path is local directory first
     if os.path.isdir(path):
-        return LocalZarrLocation(path)
+        return LocalZarrLocation(Path(path))
     else:
         result = urlparse(path)
         zarr: Optional[BaseZarrLocation] = None
         if result.scheme in ("", "file"):
             # Strips 'file://' if necessary
-            zarr = LocalZarrLocation(result.path)
+            zarr = LocalZarrLocation(Path(result.path))
         else:
             zarr = RemoteZarrLocation(path)
         if zarr.exists():
