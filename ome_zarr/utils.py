@@ -2,7 +2,7 @@
 
 import json
 import logging
-import os
+from pathlib import Path
 from typing import Iterator, List
 
 import dask.array as da
@@ -53,22 +53,23 @@ def download(input_path: str, output_dir: str = ".") -> None:
 
     reader = Reader(location)
     nodes: List[Node] = list()
-    paths: List[str] = list()
+    paths: List[List[str]] = list()
     for node in reader():
         nodes.append(node)
-        paths.append(node.zarr.zarr_path)
+        paths.append(node.zarr.parts())
 
     common = strip_common_prefix(paths)
-    root = os.path.join(output_dir, common)
+    output_path = Path(output_dir)
+    root_path = output_path / common
 
-    assert not os.path.exists(root), f"{root} already exists!"
+    assert not root_path.exists(), f"{root_path} already exists!"
     print("downloading...")
     for path in paths:
-        print("  ", path)
+        print("  ", Path(*path))
     print(f"to {output_dir}")
 
     for path, node in sorted(zip(paths, nodes)):
-        target_dir = os.path.join(output_dir, f"{path}")
+        target_path = output_path / Path(*path)
         resolutions: List[da.core.Array] = []
         datasets: List[str] = []
         for spec in node.specs:
@@ -80,33 +81,31 @@ def download(input_path: str, output_dir: str = ".") -> None:
                     for dataset, data in reversed(list(zip(datasets, resolutions))):
                         LOGGER.info(f"resolution {dataset}...")
                         with pbar:
-                            data.to_zarr(os.path.join(target_dir, dataset))
+                            data.to_zarr(str(target_path / dataset))
             else:
                 # Assume a group that needs metadata, like labels
-                zarr.group(target_dir)
+                zarr.group(str(target_path))
 
-        with open(os.path.join(target_dir, ".zgroup"), "w") as f:
+        with (target_path / ".zgroup").open("w") as f:
             f.write(json.dumps(node.zarr.zgroup))
-        with open(os.path.join(target_dir, ".zattrs"), "w") as f:
+        with (target_path / ".zattrs").open("w") as f:
             metadata: JSONDict = {}
             node.write_metadata(metadata)
             f.write(json.dumps(metadata))
 
 
-def strip_common_prefix(paths: List[str]) -> str:
+def strip_common_prefix(parts: List[List[str]]) -> str:
     """Find and remove the prefix common to all strings.
 
     Returns the last element of the common prefix.
     An exception is thrown if no common prefix exists.
 
-    >>> paths = ["a/b", "a/b/c"]
+    >>> paths = [["a", "b"], ["a", "b", "c"]]
     >>> strip_common_prefix(paths)
     'b'
     >>> paths
-    ['b', 'b/c']
+    [['b'], ['b', 'c']]
     """
-    parts: List[List[str]] = [x.split(os.path.sep) for x in paths]
-
     first_mismatch = 0
     min_length = min([len(x) for x in parts])
 
@@ -125,7 +124,6 @@ def strip_common_prefix(paths: List[str]) -> str:
         common = parts[0][first_mismatch - 1]
 
     for idx, path in enumerate(parts):
-        base = os.path.sep.join(path[first_mismatch - 1 :])
-        paths[idx] = base
+        parts[idx] = parts[idx][first_mismatch - 1 :]
 
     return common

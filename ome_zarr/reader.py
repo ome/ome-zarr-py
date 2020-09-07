@@ -21,16 +21,16 @@ class Node:
     def __init__(
         self,
         zarr: BaseZarrLocation,
-        root: Union["Node", "Reader", List[str]],
+        root: Union["Node", "Reader", List[BaseZarrLocation]],
         visibility: bool = True,
     ):
         self.zarr = zarr
         self.root = root
-        self.seen: List[str] = []
+        self.seen: List[BaseZarrLocation] = []
         if isinstance(root, Node) or isinstance(root, Reader):
             self.seen = root.seen
         else:
-            self.seen = cast(List[str], root)
+            self.seen = cast(List[BaseZarrLocation], root)
         self.__visible = visibility
 
         # Likely to be updated by specs
@@ -102,14 +102,14 @@ class Node:
             encountered; None if the node has already been processed.
         """
 
-        if zarr.zarr_path in self.seen:
+        if zarr in self.seen:
             LOGGER.debug(f"already seen {zarr}; stopping recursion")
             return None
 
         if visibility is None:
             visibility = self.visible
 
-        self.seen.append(zarr.zarr_path)
+        self.seen.append(zarr)
         node = Node(zarr, self, visibility=visibility)
         if prepend:
             self.pre_nodes.append(node)
@@ -124,13 +124,9 @@ class Node:
 
     def __repr__(self) -> str:
         suffix = ""
-        if self.zarr.zgroup:
-            suffix += " [zgroup]"
-        if self.zarr.zarray:
-            suffix += " [zarray]"
         if not self.visible:
             suffix += " (hidden)"
-        return f"{self.zarr.zarr_path}{suffix}"
+        return f"{self.zarr}{suffix}"
 
 
 class Spec(ABC):
@@ -218,7 +214,7 @@ class Label(Spec):
                     LOGGER.error(f"invalid color - {k}={v}: {e}")
 
         # TODO: a metadata transform should be provided by specific impls.
-        name = self.zarr.zarr_path.split("/")[-1]
+        name = self.zarr.basename()
         node.metadata.update(
             {
                 "visible": node.visible,
@@ -348,7 +344,7 @@ class Reader:
     def __init__(self, zarr: BaseZarrLocation) -> None:
         assert zarr.exists()
         self.zarr = zarr
-        self.seen: List[str] = [zarr.zarr_path]
+        self.seen: List[BaseZarrLocation] = [zarr]
 
     def __call__(self) -> Iterator[Node]:
         node = Node(self.zarr, self)
@@ -363,8 +359,7 @@ class Reader:
 
         elif self.zarr.zarray:  # Nothing has matched
             LOGGER.debug(f"treating {self.zarr} as raw zarr")
-            data = da.from_zarr(f"{self.zarr.zarr_path}")
-            node.data.append(data)
+            node.data.append(self.zarr.load())
             yield node
 
         else:
