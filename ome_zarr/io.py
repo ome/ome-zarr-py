@@ -9,7 +9,7 @@ import os
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import List, Optional
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 
 import dask.array as da
 import requests
@@ -154,7 +154,7 @@ class RemoteZarrLocation(BaseZarrLocation):
         return url.split("/")[-1]
 
     def subpath(self, path: str = "") -> str:
-        return f"{self.__url}{path}"
+        return urljoin(self.__url, path)
 
     def parts(self) -> List[str]:
         return self.__url.split("/")
