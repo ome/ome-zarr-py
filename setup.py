@@ -32,6 +32,7 @@ setup(
     url="https://github.com/ome/ome-zarr-py",
     description="Implementation of images in Zarr files.",
     long_description=read("README.rst"),
+    packages=["ome_zarr"],
     py_modules=["ome_zarr"],
     python_requires=">=3.6",
     install_requires=install_requires,
