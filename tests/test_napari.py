@@ -7,6 +7,13 @@ from ome_zarr.data import astronaut, create_zarr
 from ome_zarr.napari import napari_get_reader
 
 
+@pytest.fixture(autouse=True, scope="session")
+def load_napari_conftest(pytestconfig):
+    from napari import conftest
+
+    pytestconfig.pluginmanager.register(conftest, "napari-conftest")
+
+
 class TestNapari:
     @pytest.fixture(autouse=True)
     def initdir(self, tmpdir):
