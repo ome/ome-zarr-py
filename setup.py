@@ -51,5 +51,5 @@ setup(
         "napari.plugin": ["ome_zarr = ome_zarr.napari"],
     },
     extras_require={"napari": ["napari"]},
-    tests_require=["pytest", "napari"],
+    tests_require=["pytest", "napari[pyqt5]"],
 )
