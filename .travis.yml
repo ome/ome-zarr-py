@@ -5,7 +5,7 @@ language: python
 jobs:
   include:
     - stage: deploy
-      python: "3.7"
+      python: "3.6"
       if: tag IS present
       install: skip
       script: skip
