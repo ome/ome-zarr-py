@@ -69,7 +69,17 @@ def download(input_path: str, output_dir: str = ".") -> None:
     print(f"to {output_dir}")
 
     for path, node in sorted(zip(paths, nodes)):
+
         target_path = output_path / Path(*path)
+        target_path.mkdir(parents=True)
+
+        with (target_path / ".zgroup").open("w") as f:
+            f.write(json.dumps(node.zarr.zgroup))
+        with (target_path / ".zattrs").open("w") as f:
+            metadata: JSONDict = {}
+            node.write_metadata(metadata)
+            f.write(json.dumps(metadata))
+
         resolutions: List[da.core.Array] = []
         datasets: List[str] = []
         for spec in node.specs:
@@ -85,13 +95,6 @@ def download(input_path: str, output_dir: str = ".") -> None:
             else:
                 # Assume a group that needs metadata, like labels
                 zarr.group(str(target_path))
-
-        with (target_path / ".zgroup").open("w") as f:
-            f.write(json.dumps(node.zarr.zgroup))
-        with (target_path / ".zattrs").open("w") as f:
-            metadata: JSONDict = {}
-            node.write_metadata(metadata)
-            f.write(json.dumps(metadata))
 
 
 def strip_common_prefix(parts: List[List[str]]) -> str:
