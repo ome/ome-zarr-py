@@ -2,6 +2,7 @@
 
 import logging
 from abc import ABC
+from string import ascii_uppercase
 from typing import Any, Dict, Iterator, List, Optional, Type, Union, cast
 
 import dask.array as da
@@ -48,6 +49,8 @@ class Node:
             self.specs.append(Multiscales(self))
         if OMERO.matches(zarr):
             self.specs.append(OMERO(self))
+        if Plate.matches(zarr):
+            self.specs.append(Plate(self))
 
     @property
     def visible(self) -> bool:
@@ -334,6 +337,34 @@ class OMERO(Spec):
             node.metadata["colormap"] = colormaps
         except Exception as e:
             LOGGER.error(f"failed to parse metadata: {e}")
+
+
+class Plate(Spec):
+    @staticmethod
+    def matches(zarr: BaseZarrLocation) -> bool:
+        return bool("plate" in zarr.root_attrs)
+
+    def __init__(self, node: Node) -> None:
+        super().__init__(node)
+        # TODO: start checking metadata version
+        self.plate_data = self.lookup("plate", {})
+        self.rows = self.plate_data.get("rows", 0)
+        self.cols = self.plate_data.get("columns", 0)
+
+        # FIXME: shouldn't hard code
+        self.acquisitions = ["PlateAcquisition Name 0"]
+        self.fields = ["Field_1"]
+        self.row_labels = ascii_uppercase[0 : self.rows]
+        self.col_labels = range(1, self.cols + 1)
+
+        for acq in self.acquisitions:
+            for row in self.row_labels:
+                for col in self.col_labels:
+                    for field in self.fields:
+                        path = f"{acq}/{row}/{col}/{field}"
+                        child_zarr = self.zarr.create(path)
+                        if child_zarr.exists():
+                            node.add(child_zarr, visibility=True)
 
 
 class Reader:
