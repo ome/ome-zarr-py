@@ -29,7 +29,7 @@ install_requires += (["opencv-contrib-python-headless"],)
 
 setup(
     name="ome-zarr",
-    version="0.0.15",
+    version="0.0.16.dev0",
     author="The Open Microscopy Team",
     url="https://github.com/ome/ome-zarr-py",
     description="Implementation of images in Zarr files.",
