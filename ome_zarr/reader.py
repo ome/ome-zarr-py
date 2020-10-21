@@ -353,10 +353,11 @@ class Plate(Spec):
 
         # FIXME: shouldn't hard code
         self.acquisitions = ["PlateAcquisition Name 0"]
-        self.fields = ["Field_1"]
+        self.fields = ["Field_1", "Field_2", "Field_3", "Field_4"]
         self.row_labels = ascii_uppercase[0 : self.rows]
         self.col_labels = range(1, self.cols + 1)
 
+        visibility = True
         for acq in self.acquisitions:
             for row in self.row_labels:
                 for col in self.col_labels:
@@ -364,7 +365,8 @@ class Plate(Spec):
                         path = f"{acq}/{row}/{col}/{field}"
                         child_zarr = self.zarr.create(path)
                         if child_zarr.exists():
-                            node.add(child_zarr, visibility=True)
+                            node.add(child_zarr, visibility=visibility)
+                            visibility = False
 
 
 class Reader:
