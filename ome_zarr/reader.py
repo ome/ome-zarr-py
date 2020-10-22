@@ -5,8 +5,9 @@ from abc import ABC
 from string import ascii_uppercase
 from typing import Any, Dict, Iterator, List, Optional, Type, Union, cast
 
-from dask import delayed
 import dask.array as da
+import numpy as np
+from dask import delayed
 from vispy.color import Colormap
 
 from .io import BaseZarrLocation
@@ -353,32 +354,20 @@ class Plate(Spec):
         self.cols = self.plate_data.get("columns", 0)
 
         # FIXME: shouldn't hard code
-        self.acquisitions = ["0"]
-        self.fields = ["Field_1",]
+        self.acquisitions = ["PlateAcquisition Name 0", "0"]
+        self.fields = ["Field_1", "Field_2", "Field_3", "Field_4"]
         self.row_labels = ascii_uppercase[0 : self.rows]
         self.col_labels = range(1, self.cols + 1)
 
-        # visibility = True
-        # for acq in self.acquisitions:
-        #     for row in self.row_labels:
-        #         for col in self.col_labels:
-        #             for field in self.fields:
-        #                 path = f"{acq}/{row}/{col}/{field}"
-        #                 child_zarr = self.zarr.create(path)
-        #                 if child_zarr.exists():
-        #                     node.add(child_zarr, visibility=visibility)
-        #                     visibility = False
-
         self.get_pyramid_lazy(node)
 
-
-    def get_pyramid_lazy(self, node):
+    def get_pyramid_lazy(self, node: Node) -> None:
         """
         Return a pyramid of dask data, where the highest resolution is the
         stitched full-resolution images.
         """
 
-        run = '0'
+        run = "0"
         rows = self.rows
         cols = self.cols
         row_labels = self.row_labels
@@ -400,38 +389,39 @@ class Plate(Spec):
         # Assume this matches the sizes of the downsampled images in each field
         # Probably better to look it up - Assumed to be same for every image
         tile_sizes = []
-        for l in range(5):
+        for _level in range(5):
             tile_sizes.append((size_x, size_y))
             size_x = size_x // 2
             size_y = size_y // 2
 
-        def get_tile(tile_name):
+        def get_tile(tile_name: str) -> np.ndarray:
             """ tile_name is 'level,z,c,t,row,col' """
             level, z, c, t, row, col = [int(n) for n in tile_name.split(",")]
-            path = f'{run}/{row_labels[row]}/{col + 1}/Field_1/{level}'
-            print('get_tile', path)
+            path = f"{run}/{row_labels[row]}/{col + 1}/Field_1/{level}"
+            print("get_tile", path)
 
             data = self.zarr.load(path)
             tile = data[z, c, t]
-            print('data.shape', data.shape, tile.shape)
+            print("data.shape", data.shape, tile.shape)
             return tile
 
         lazy_reader = delayed(get_tile)
 
-        def get_lazy_plane(level, z, c, t):
+        def get_lazy_plane(level: int, z: int, c: int, t: int) -> da.Array:
             lazy_rows = []
             # For level 0, return whole image for each tile
             for row in range(rows):
-                lazy_row = []
+                lazy_row: List[da.Array] = []
                 for col in range(cols):
-                    tile_name = "%s,%s,%s,%s,%s,%s" % (level, z, c, t, row, col)
-                    print('tile_name', tile_name)
+                    tile_name = f"{level},{z},{c},{t},{row},{col}"
+                    print("tile_name", tile_name)
                     tile_size = tile_sizes[level]
-                    lazy_tile = da.from_delayed(lazy_reader(tile_name), shape=tile_size, dtype=numpy_type)
+                    lazy_tile = da.from_delayed(
+                        lazy_reader(tile_name), shape=tile_size, dtype=numpy_type
+                    )
                     lazy_row.append(lazy_tile)
-                lazy_row = da.concatenate(lazy_row, axis=1)
-                print('lazy_row.shape', lazy_row.shape)
-                lazy_rows.append(lazy_row)
+                lazy_rows.append(da.concatenate(lazy_row, axis=1))
+                print("lazy_row.shape", lazy_rows[-1].shape)
             return da.concatenate(lazy_rows, axis=0)
 
         pyramid = []
@@ -439,7 +429,7 @@ class Plate(Spec):
         # This should create a pyramid of levels, but causes seg faults!
         # for level in range(5):
         for level in [0]:
-            print('level', level)
+            print("level", level)
             t_stacks = []
             for t in range(size_t):
                 c_stacks = []
@@ -447,19 +437,29 @@ class Plate(Spec):
                     z_stack = []
                     for z in range(size_z):
                         lazy_plane = get_lazy_plane(level, z, c, t)
-                        print('lazy_plane', lazy_plane.shape)
+                        print("lazy_plane", lazy_plane.shape)
                         z_stack.append(lazy_plane)
                     c_stacks.append(da.stack(z_stack))
                 t_stacks.append(da.stack(c_stacks))
             pyramid.append(da.stack(t_stacks))
         print("pyramid shape...")
-        for l in pyramid:
-            print(l.shape)
+        for stack in pyramid:
+            print(stack.shape)
 
         # Set the node.data to be pyramid view of the plate
         node.data = pyramid
         # Use the first image's metadata for viewing the whole Plate
         node.metadata = image_node.metadata
+        visibility = True
+        for acq in self.acquisitions:
+            for row in self.row_labels:
+                for col in self.col_labels:
+                    for field in self.fields:
+                        path = f"{acq}/{row}/{col}/{field}"
+                        child_zarr = self.zarr.create(path)
+                        if child_zarr.exists():
+                            node.add(child_zarr, visibility=visibility)
+                            visibility = False
 
 
 class Reader:
