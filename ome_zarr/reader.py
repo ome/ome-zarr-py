@@ -356,13 +356,15 @@ class Plate(Spec):
         stitched full-resolution images.
         """
         self.plate_data = self.lookup("plate", {})
-        print('self.plate_data', self.plate_data)
+        print("self.plate_data", self.plate_data)
         self.rows = self.plate_data.get("rows", 0)
         self.cols = self.plate_data.get("columns", 0)
 
         # FIXME: shouldn't hard code
         self.acquisitions = ["0"]
-        self.fields = ["Field_1",]
+        self.fields = [
+            "Field_1",
+        ]
         self.row_labels = ascii_uppercase[0 : self.rows]
         self.col_labels = range(1, self.cols + 1)
 
@@ -398,7 +400,7 @@ class Plate(Spec):
             longest_side = longest_side // 2
             target_level += 1
 
-        print('target_level', target_level)
+        print("target_level", target_level)
         # Assume this matches the sizes of the downsampled images in each field
         # Probably better to look it up - Assumed to be same for every image
         tile_sizes = []
@@ -443,7 +445,7 @@ class Plate(Spec):
         # for level in range(5):
 
         for level in [target_level]:
-            print('level', level)
+            print("level", level)
             t_stacks = []
             for t in range(size_t):
                 c_stacks = []
@@ -465,14 +467,7 @@ class Plate(Spec):
         # Use the first image's metadata for viewing the whole Plate
         node.metadata = image_node.metadata
 
-        node.metadata.update({
-            "metadata": {
-                "plate": {
-                    "rows": rows,
-                    "columns": cols,
-                }
-            }
-        })
+        node.metadata.update({"metadata": {"plate": {"rows": rows, "columns": cols,}}})
 
 
 class Reader:
