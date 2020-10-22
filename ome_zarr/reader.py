@@ -348,20 +348,6 @@ class Plate(Spec):
 
     def __init__(self, node: Node) -> None:
         super().__init__(node)
-        # TODO: start checking metadata version
-<<<<<<< HEAD
-        self.plate_data = self.lookup("plate", {})
-        self.rows = self.plate_data.get("rows", 0)
-        self.cols = self.plate_data.get("columns", 0)
-
-        # FIXME: shouldn't hard code
-        self.acquisitions = ["PlateAcquisition Name 0", "0"]
-        self.fields = ["Field_1", "Field_2", "Field_3", "Field_4"]
-        self.row_labels = ascii_uppercase[0 : self.rows]
-        self.col_labels = range(1, self.cols + 1)
-=======
->>>>>>> f316d76... Calculate optimal resolution level so stitched plate < 3000 pixels
-
         self.get_pyramid_lazy(node)
 
     def get_pyramid_lazy(self, node: Node) -> None:
@@ -374,9 +360,6 @@ class Plate(Spec):
         self.rows = self.plate_data.get("rows", 0)
         self.cols = self.plate_data.get("columns", 0)
 
-<<<<<<< HEAD
-        run = "0"
-=======
         # FIXME: shouldn't hard code
         self.acquisitions = ["0"]
         self.fields = ["Field_1",]
@@ -385,7 +368,6 @@ class Plate(Spec):
 
         # TODO: support more Acquisitions - just 1st for now
         run = self.acquisitions[0]
->>>>>>> f316d76... Calculate optimal resolution level so stitched plate < 3000 pixels
         rows = self.rows
         cols = self.cols
         row_labels = self.row_labels
@@ -482,16 +464,15 @@ class Plate(Spec):
         node.data = pyramid
         # Use the first image's metadata for viewing the whole Plate
         node.metadata = image_node.metadata
-        visibility = True
-        for acq in self.acquisitions:
-            for row in self.row_labels:
-                for col in self.col_labels:
-                    for field in self.fields:
-                        path = f"{acq}/{row}/{col}/{field}"
-                        child_zarr = self.zarr.create(path)
-                        if child_zarr.exists():
-                            node.add(child_zarr, visibility=visibility)
-                            visibility = False
+
+        node.metadata.update({
+            "metadata": {
+                "plate": {
+                    "rows": rows,
+                    "columns": cols,
+                }
+            }
+        })
 
 
 class Reader:
