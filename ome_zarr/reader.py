@@ -349,6 +349,7 @@ class Plate(Spec):
     def __init__(self, node: Node) -> None:
         super().__init__(node)
         # TODO: start checking metadata version
+<<<<<<< HEAD
         self.plate_data = self.lookup("plate", {})
         self.rows = self.plate_data.get("rows", 0)
         self.cols = self.plate_data.get("columns", 0)
@@ -358,6 +359,8 @@ class Plate(Spec):
         self.fields = ["Field_1", "Field_2", "Field_3", "Field_4"]
         self.row_labels = ascii_uppercase[0 : self.rows]
         self.col_labels = range(1, self.cols + 1)
+=======
+>>>>>>> f316d76... Calculate optimal resolution level so stitched plate < 3000 pixels
 
         self.get_pyramid_lazy(node)
 
@@ -366,14 +369,29 @@ class Plate(Spec):
         Return a pyramid of dask data, where the highest resolution is the
         stitched full-resolution images.
         """
+        self.plate_data = self.lookup("plate", {})
+        print('self.plate_data', self.plate_data)
+        self.rows = self.plate_data.get("rows", 0)
+        self.cols = self.plate_data.get("columns", 0)
 
+<<<<<<< HEAD
         run = "0"
+=======
+        # FIXME: shouldn't hard code
+        self.acquisitions = ["0"]
+        self.fields = ["Field_1",]
+        self.row_labels = ascii_uppercase[0 : self.rows]
+        self.col_labels = range(1, self.cols + 1)
+
+        # TODO: support more Acquisitions - just 1st for now
+        run = self.acquisitions[0]
+>>>>>>> f316d76... Calculate optimal resolution level so stitched plate < 3000 pixels
         rows = self.rows
         cols = self.cols
         row_labels = self.row_labels
 
         # Get the first image...
-        path = f"{run}/A/1/Field_1"
+        path = f"{run}/{row_labels[0]}/{self.col_labels[0]}/{self.fields[0]}"
         image_zarr = self.zarr.create(path)
         image_node = Node(image_zarr, node)
 
@@ -386,6 +404,19 @@ class Plate(Spec):
 
         size_x = img_shape[3]
         size_y = img_shape[4]
+
+        # FIXME - if only returning a single stiched plate (not a pyramid)
+        # need to decide optimal size. E.g. longest side < 3000
+        TARGET_SIZE = 3000
+        plate_width = cols * size_x
+        plate_height = cols * size_y
+        longest_side = max(plate_width, plate_height)
+        target_level = 0
+        while longest_side > TARGET_SIZE:
+            longest_side = longest_side // 2
+            target_level += 1
+
+        print('target_level', target_level)
         # Assume this matches the sizes of the downsampled images in each field
         # Probably better to look it up - Assumed to be same for every image
         tile_sizes = []
@@ -428,8 +459,9 @@ class Plate(Spec):
 
         # This should create a pyramid of levels, but causes seg faults!
         # for level in range(5):
-        for level in [0]:
-            print("level", level)
+
+        for level in [target_level]:
+            print('level', level)
             t_stacks = []
             for t in range(size_t):
                 c_stacks = []
