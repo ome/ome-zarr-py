@@ -47,6 +47,7 @@ setup(
         "Programming Language :: Python :: 3",
         "Operating System :: OS Independent",
         "License :: OSI Approved :: BSD License",
+        "Framework :: napari",
     ],
     entry_points={
         "console_scripts": ["ome_zarr = ome_zarr.cli:main"],
