@@ -7,6 +7,7 @@ It implements the ``napari_get_reader`` hook specification, (to create a reader 
 import logging
 import warnings
 from typing import Any, Callable, Dict, Iterator, List, Optional
+from string import ascii_uppercase
 
 from .data import CHANNEL_DIMENSION
 from .io import parse_url
@@ -76,6 +77,54 @@ def transform(nodes: Iterator[Node]) -> Optional[ReaderFunction]:
                 rv: LayerData = (data, metadata, layer_type)
                 LOGGER.debug(f"Transformed: {rv}")
                 results.append(rv)
+
+                # the 'metadata' dict takes any extra info, not supported
+                # by napari. If we have 'plate' info, add a shapes layer
+                if "metadata" in metadata:
+                    if "plate" in metadata["metadata"]:
+                        plate_info = metadata["metadata"]["plate"]
+                        plate_width = shape[-1]
+                        plate_height = shape[-2]
+                        rows = plate_info['rows']
+                        columns = plate_info['columns']
+                        well_width = plate_width / columns
+                        well_height = plate_height / rows
+                        labels = []
+                        outlines = []
+                        for row in range(rows):
+                            for column in range(columns):
+                                x1 = int(column * well_width)
+                                x2 = int((column + 1) * well_width)
+                                y1 = int(row * well_height)
+                                y2 = int((row + 1) * well_height)
+                                # Since napari will only place labels 'outside' a bounding box
+                                # we have a line along top of Well, with label below
+                                outlines.append([[y1,  x1], [y1,  x2]])
+                                label = f'{ascii_uppercase[row]}{column + 1}'
+                                labels.append(label)
+                                # Well bounding box, with no label
+                                outlines.append([
+                                    [ y1,  x1],
+                                    [ y2,  x1],
+                                    [ y2,  x2],
+                                    [ y1,  x2],
+                                ])
+                                labels.append('')
+                        text_parameters = {
+                            'text': '{well}',
+                            'size': 12,
+                            'color': 'white',
+                            'anchor': 'lower_left',
+                            'translation': [5, 5],
+                        }
+                        rv: LayerData = (outlines,{
+                            'edge_color': 'white',
+                            'face_color': 'transparent',
+                            'name': 'Well Labels',
+                            'text': text_parameters,
+                            'properties': {'well' : labels}
+                        }, "shapes")
+                        results.append(rv)
 
         return results
 
