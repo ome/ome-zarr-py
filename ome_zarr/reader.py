@@ -359,9 +359,8 @@ class Plate(Spec):
         print("self.plate_data", self.plate_data)
         self.rows = self.plate_data.get("rows", 0)
         self.cols = self.plate_data.get("columns", 0)
+        self.acquisitions = self.plate_data.get('plateAcquisitions', [{"path": "0"}])
 
-        # FIXME: shouldn't hard code
-        self.acquisitions = ["0"]
         self.fields = [
             "Field_1",
         ]
@@ -369,7 +368,7 @@ class Plate(Spec):
         self.col_labels = range(1, self.cols + 1)
 
         # TODO: support more Acquisitions - just 1st for now
-        run = self.acquisitions[0]
+        run = self.acquisitions[0]['path']
         rows = self.rows
         cols = self.cols
         row_labels = self.row_labels
