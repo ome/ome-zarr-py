@@ -382,6 +382,8 @@ class Plate(Spec):
         numpy_type = image_node.data[0].dtype
         img_shape = image_node.data[0].shape
 
+        img_pyramid_shapes = [d.shape for d in image_node.data]
+        print('img_pyramid_shapes', img_pyramid_shapes)
         size_t = img_shape[0]
         size_c = img_shape[1]
         size_z = img_shape[2]
@@ -391,14 +393,18 @@ class Plate(Spec):
 
         # FIXME - if only returning a single stiched plate (not a pyramid)
         # need to decide optimal size. E.g. longest side < 3000
-        TARGET_SIZE = 3000
+        TARGET_SIZE = 1500
         plate_width = cols * size_x
         plate_height = cols * size_y
         longest_side = max(plate_width, plate_height)
         target_level = 0
-        while longest_side > TARGET_SIZE:
-            longest_side = longest_side // 2
-            target_level += 1
+        for level, shape in enumerate(img_pyramid_shapes):
+            plate_width = cols * shape[-1]
+            plate_height = rows * shape[-2]
+            longest_side = max(plate_width, plate_height)
+            target_level = level
+            if longest_side <= TARGET_SIZE:
+                break
 
         print("target_level", target_level)
         # Assume this matches the sizes of the downsampled images in each field
@@ -413,10 +419,10 @@ class Plate(Spec):
             """ tile_name is 'level,z,c,t,row,col' """
             level, z, c, t, row, col = [int(n) for n in tile_name.split(",")]
             path = f"{run}/{row_labels[row]}/{col + 1}/Field_1/{level}"
-            print("get_tile", path)
+            print(f"LOADING tile... {path} for t:{t} c:{c} z:{z}")
 
             data = self.zarr.load(path)
-            tile = data[z, c, t]
+            tile = data[t, c, z]
             print("data.shape", data.shape, tile.shape)
             return tile
 
@@ -429,7 +435,7 @@ class Plate(Spec):
                 lazy_row: List[da.Array] = []
                 for col in range(cols):
                     tile_name = f"{level},{z},{c},{t},{row},{col}"
-                    print("tile_name", tile_name)
+                    print(f"creating lazy_reader. level:{level} Z:{z} c:{c} t:{t} row:{row} col:{col}")
                     tile_size = tile_sizes[level]
                     lazy_tile = da.from_delayed(
                         lazy_reader(tile_name), shape=tile_size, dtype=numpy_type
@@ -443,9 +449,7 @@ class Plate(Spec):
 
         # This should create a pyramid of levels, but causes seg faults!
         # for level in range(5):
-
         for level in [target_level]:
-            print("level", level)
             t_stacks = []
             for t in range(size_t):
                 c_stacks = []
