@@ -448,7 +448,7 @@ class Plate(Spec):
         # Use the first image's metadata for viewing the whole Plate
         node.metadata = image_node.metadata
 
-        node.metadata.update({"metadata": {"plate": {"rows": rows, "columns": cols,}}})
+        node.metadata.update({"metadata": {"plate": {"rows": rows, "columns": cols}}})
 
 
 class Reader:

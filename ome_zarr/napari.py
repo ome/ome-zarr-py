@@ -97,14 +97,15 @@ def transform(nodes: Iterator[Node]) -> Optional[ReaderFunction]:
                                 x2 = int((column + 1) * well_width)
                                 y1 = int(row * well_height)
                                 y2 = int((row + 1) * well_height)
-                                # Since napari will only place labels 'outside' a bounding box
-                                # we have a line along top of Well, with label below
+                                # Since napari will only place labels 'outside' a
+                                # bounding box we have a line
+                                # along top of Well, with label below
                                 outlines.append([[y1, x1], [y1, x2]])
                                 label = f"{ascii_uppercase[row]}{column + 1}"
                                 labels.append(label)
                                 # Well bounding box, with no label
                                 outlines.append(
-                                    [[y1, x1], [y2, x1], [y2, x2], [y1, x2],]
+                                    [[y1, x1], [y2, x1], [y2, x2], [y1, x2]]
                                 )
                                 labels.append("")
                         text_parameters = {
