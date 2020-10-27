@@ -448,6 +448,7 @@ class Plate(Spec):
         # Use the first image's metadata for viewing the whole Plate
         node.metadata = image_node.metadata
 
+        # "metadata" dict gets added to each 'plate' layer in napari
         node.metadata.update({"metadata": {"plate": {"rows": rows, "columns": cols}}})
 
 
