@@ -85,8 +85,8 @@ def transform(nodes: Iterator[Node]) -> Optional[ReaderFunction]:
                         plate_info = metadata["metadata"]["plate"]
                         plate_width = shape[-1]
                         plate_height = shape[-2]
-                        rows = plate_info['rows']
-                        columns = plate_info['columns']
+                        rows = plate_info["rows"]
+                        columns = plate_info["columns"]
                         well_width = plate_width / columns
                         well_height = plate_height / rows
                         labels = []
@@ -99,31 +99,32 @@ def transform(nodes: Iterator[Node]) -> Optional[ReaderFunction]:
                                 y2 = int((row + 1) * well_height)
                                 # Since napari will only place labels 'outside' a bounding box
                                 # we have a line along top of Well, with label below
-                                outlines.append([[y1,  x1], [y1,  x2]])
-                                label = f'{ascii_uppercase[row]}{column + 1}'
+                                outlines.append([[y1, x1], [y1, x2]])
+                                label = f"{ascii_uppercase[row]}{column + 1}"
                                 labels.append(label)
                                 # Well bounding box, with no label
-                                outlines.append([
-                                    [ y1,  x1],
-                                    [ y2,  x1],
-                                    [ y2,  x2],
-                                    [ y1,  x2],
-                                ])
-                                labels.append('')
+                                outlines.append(
+                                    [[y1, x1], [y2, x1], [y2, x2], [y1, x2],]
+                                )
+                                labels.append("")
                         text_parameters = {
-                            'text': '{well}',
-                            'size': 12,
-                            'color': 'white',
-                            'anchor': 'lower_left',
-                            'translation': [5, 5],
+                            "text": "{well}",
+                            "size": 12,
+                            "color": "white",
+                            "anchor": "lower_left",
+                            "translation": [5, 5],
                         }
-                        rv: LayerData = (outlines,{
-                            'edge_color': 'white',
-                            'face_color': 'transparent',
-                            'name': 'Well Labels',
-                            'text': text_parameters,
-                            'properties': {'well' : labels}
-                        }, "shapes")
+                        rv: LayerData = (
+                            outlines,
+                            {
+                                "edge_color": "white",
+                                "face_color": "transparent",
+                                "name": "Well Labels",
+                                "text": text_parameters,
+                                "properties": {"well": labels},
+                            },
+                            "shapes",
+                        )
                         results.append(rv)
 
         return results
