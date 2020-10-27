@@ -6,8 +6,8 @@ It implements the ``napari_get_reader`` hook specification, (to create a reader 
 
 import logging
 import warnings
-from typing import Any, Callable, Dict, Iterator, List, Optional
 from string import ascii_uppercase
+from typing import Any, Callable, Dict, Iterator, List, Optional
 
 from .data import CHANNEL_DIMENSION
 from .io import parse_url
@@ -115,7 +115,7 @@ def transform(nodes: Iterator[Node]) -> Optional[ReaderFunction]:
                             "anchor": "lower_left",
                             "translation": [5, 5],
                         }
-                        rv: LayerData = (
+                        shapes: LayerData = (
                             outlines,
                             {
                                 "edge_color": "white",
@@ -126,7 +126,7 @@ def transform(nodes: Iterator[Node]) -> Optional[ReaderFunction]:
                             },
                             "shapes",
                         )
-                        results.append(rv)
+                        results.append(shapes)
 
         return results
 
