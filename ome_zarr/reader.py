@@ -359,7 +359,7 @@ class Plate(Spec):
         print("self.plate_data", self.plate_data)
         self.rows = self.plate_data.get("rows", 0)
         self.cols = self.plate_data.get("columns", 0)
-        self.acquisitions = self.plate_data.get('plateAcquisitions', [{"path": "0"}])
+        self.acquisitions = self.plate_data.get("plateAcquisitions", [{"path": "0"}])
 
         self.fields = [
             "Field_1",
@@ -368,7 +368,7 @@ class Plate(Spec):
         self.col_labels = range(1, self.cols + 1)
 
         # TODO: support more Acquisitions - just 1st for now
-        run = self.acquisitions[0]['path']
+        run = self.acquisitions[0]["path"]
         rows = self.rows
         cols = self.cols
         row_labels = self.row_labels
@@ -383,10 +383,7 @@ class Plate(Spec):
 
         img_pyramid_shapes = [d.shape for d in image_node.data]
 
-        print('img_pyramid_shapes', img_pyramid_shapes)
-        size_t = img_shape[0]
-        size_c = img_shape[1]
-        size_z = img_shape[2]
+        print("img_pyramid_shapes", img_pyramid_shapes)
 
         size_y = img_shape[3]
         size_x = img_shape[4]
