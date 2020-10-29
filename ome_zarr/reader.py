@@ -449,7 +449,7 @@ class Plate(Spec):
         node.metadata = image_node.metadata
 
         # "metadata" dict gets added to each 'plate' layer in napari
-        node.metadata.update({"metadata": {"plate": {"rows": rows, "columns": cols}}})
+        node.metadata.update({"metadata": {"plate": self.plate_data}})
 
 
 class Reader:
