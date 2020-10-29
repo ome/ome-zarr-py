@@ -54,6 +54,9 @@ setup(
         "napari.plugin": ["ome_zarr = ome_zarr.napari"],
         "pytest11": ["napari-conftest = napari.conftest"],
     },
-    extras_require={"napari": ["napari"]},
+    extras_require={
+        "napari:python_version>='3.7'": ["napari"],
+        "napari:python_version<'3.7'": ["napari<0.4.0"],
+    },
     tests_require=["pytest"],
 )
