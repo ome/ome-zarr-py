@@ -50,7 +50,7 @@ class TestNapari:
         self.assert_layers(layers, False, True)
 
     @pytest.mark.skipif(
-        not sys.platform.startswith("darwin"),
+        not sys.platform.startswith("darwin") or sys.version_info < (3, 7),
         reason="Qt builds are failing on Windows and Ubuntu",
     )
     def test_viewer(self, make_test_viewer):
@@ -65,7 +65,7 @@ class TestNapari:
 
         # Set canvas size to target amount
         viewer.window.qt_viewer.view.canvas.size = (800, 600)
-        list(viewer.window.qt_viewer.layer_to_visual.values())[0].on_draw(None)
+        viewer.window.qt_viewer.on_draw(None)
 
         # Check that current level is first large enough to fill the canvas with
         # a greater than one pixel depth
