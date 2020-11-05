@@ -1,6 +1,7 @@
 """Reading logic for ome-zarr."""
 
 import logging
+import math
 from abc import ABC
 from typing import Any, Dict, Iterator, List, Optional, Type, Union, cast
 
@@ -52,6 +53,8 @@ class Node:
             self.specs.append(OMERO(self))
         if Plate.matches(zarr):
             self.specs.append(Plate(self))
+        if Well.matches(zarr):
+            self.specs.append(Well(self))
 
     @property
     def visible(self) -> bool:
@@ -338,6 +341,68 @@ class OMERO(Spec):
             node.metadata["colormap"] = colormaps
         except Exception as e:
             LOGGER.error(f"failed to parse metadata: {e}")
+
+
+class Well(Spec):
+    @staticmethod
+    def matches(zarr: BaseZarrLocation) -> bool:
+        return bool("well" in zarr.root_attrs)
+
+    def __init__(self, node: Node) -> None:
+        super().__init__(node)
+        self.well_data = self.lookup("well", {})
+        print("well_data", self.well_data)
+
+        image_paths = [image["path"] for image in self.well_data.get("images")]
+        field_count = len(image_paths)
+        column_count = math.ceil(math.sqrt(field_count))
+        row_count = math.ceil(field_count / column_count)
+        print("column_count", column_count, "row_count", row_count)
+
+        # Use first Field for rendering settings, shape etc.
+        image_zarr = self.zarr.create(image_paths[0])
+        image_node = Node(image_zarr, node)
+        print("image_node", image_node.metadata)
+        level = 0  # load full resolution image
+        numpy_type = image_node.data[level].dtype
+        img_shape = image_node.data[level].shape
+
+        # stitch full-resolution images into a grid
+        def get_field(tile_name: str) -> np.ndarray:
+            """ tile_name is 'row,col' """
+            row, col = [int(n) for n in tile_name.split(",")]
+            field_index = (column_count * row) + col
+            path = f"{field_index}/{level}"
+            print(f"LOADING tile... {path}")
+            try:
+                data = self.zarr.load(path)
+                print("...data.shape", data.shape)
+            except ValueError:
+                print(f"Failed to load {path}")
+                data = np.zeros(img_shape, dtype=numpy_type)
+            return data
+
+        lazy_reader = delayed(get_field)
+
+        def get_lazy_well() -> da.Array:
+            lazy_rows = []
+            # For level 0, return whole image for each tile
+            for row in range(row_count):
+                lazy_row: List[da.Array] = []
+                for col in range(column_count):
+                    tile_name = f"{row},{col}"
+                    print(f"creating lazy_reader. row:{row} col:{col}")
+                    lazy_tile = da.from_delayed(
+                        lazy_reader(tile_name), shape=img_shape, dtype=numpy_type
+                    )
+                    lazy_row.append(lazy_tile)
+                lazy_rows.append(da.concatenate(lazy_row, axis=4))
+                print("lazy_row.shape", lazy_rows[-1].shape)
+            return da.concatenate(lazy_rows, axis=3)
+
+        node.data = [get_lazy_well()]
+        print("node.data.shape", node.data[0].shape)
+        node.metadata = image_node.metadata
 
 
 class Plate(Spec):
