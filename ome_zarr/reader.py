@@ -2,7 +2,6 @@
 
 import logging
 from abc import ABC
-from string import ascii_uppercase
 from typing import Any, Dict, Iterator, List, Optional, Type, Union, cast
 
 import dask.array as da
@@ -356,25 +355,23 @@ class Plate(Spec):
         stitched full-resolution images.
         """
         self.plate_data = self.lookup("plate", {})
-        print("self.plate_data", self.plate_data)
-        self.rows = self.plate_data.get("rows", 0)
-        self.cols = self.plate_data.get("columns", 0)
-        self.acquisitions = self.plate_data.get("plateAcquisitions", [{"path": "0"}])
+        print("plate_data", self.plate_data)
+        self.rows = self.plate_data.get("rows")
+        self.columns = self.plate_data.get("columns")
+        self.acquisitions = self.plate_data.get("acquisitions", [{"path": "0"}])
+        first_field = "0"
+        row_names = [row["name"] for row in self.rows]
+        col_names = [col["name"] for col in self.columns]
 
-        self.fields = [
-            "Field_1",
-        ]
-        self.row_labels = ascii_uppercase[0 : self.rows]
-        self.col_labels = range(1, self.cols + 1)
+        well_paths = [well["path"] for well in self.plate_data.get("wells")]
+        well_paths.sort()
 
         # TODO: support more Acquisitions - just 1st for now
-        run = self.acquisitions[0]["path"]
-        rows = self.rows
-        cols = self.cols
-        row_labels = self.row_labels
-
+        run = self.acquisitions[0]["path"].strip("/")
+        row_count = len(self.rows)
+        column_count = len(self.columns)
         # Get the first image...
-        path = f"{run}/{row_labels[0]}/{self.col_labels[0]}/{self.fields[0]}"
+        path = f"{well_paths[0]}/{first_field}"
         image_zarr = self.zarr.create(path)
         image_node = Node(image_zarr, node)
 
@@ -389,15 +386,15 @@ class Plate(Spec):
         size_x = img_shape[4]
 
         # FIXME - if only returning a single stiched plate (not a pyramid)
-        # need to decide optimal size. E.g. longest side < 3000
+        # need to decide optimal size. E.g. longest side < 1500
         TARGET_SIZE = 1500
-        plate_width = cols * size_x
-        plate_height = cols * size_y
+        plate_width = column_count * size_x
+        plate_height = row_count * size_y
         longest_side = max(plate_width, plate_height)
         target_level = 0
         for level, shape in enumerate(img_pyramid_shapes):
-            plate_width = cols * shape[-1]
-            plate_height = rows * shape[-2]
+            plate_width = column_count * shape[-1]
+            plate_height = row_count * shape[-2]
             longest_side = max(plate_width, plate_height)
             target_level = level
             if longest_side <= TARGET_SIZE:
@@ -408,11 +405,15 @@ class Plate(Spec):
         def get_tile(tile_name: str) -> np.ndarray:
             """ tile_name is 'level,z,c,t,row,col' """
             level, row, col = [int(n) for n in tile_name.split(",")]
-            path = f"{run}/{row_labels[row]}/{col + 1}/Field_1/{level}"
+            path = f"{run}/{row_names[row]}/{col_names[col]}/{first_field}/{level}"
             print(f"LOADING tile... {path}")
 
-            data = self.zarr.load(path)
-            print("...data.shape", data.shape)
+            try:
+                data = self.zarr.load(path)
+                print("...data.shape", data.shape)
+            except ValueError:
+                print(f"Failed to load {path}")
+                data = np.zeros(img_pyramid_shapes[level], dtype=numpy_type)
             return data
 
         lazy_reader = delayed(get_tile)
@@ -420,9 +421,9 @@ class Plate(Spec):
         def get_lazy_plate(level: int) -> da.Array:
             lazy_rows = []
             # For level 0, return whole image for each tile
-            for row in range(rows):
+            for row in range(row_count):
                 lazy_row: List[da.Array] = []
-                for col in range(cols):
+                for col in range(column_count):
                     tile_name = f"{level},{row},{col}"
                     print(f"creating lazy_reader. level:{level} row:{row} col:{col}")
                     tile_size = img_pyramid_shapes[level]

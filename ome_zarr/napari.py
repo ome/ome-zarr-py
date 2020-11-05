@@ -6,7 +6,6 @@ It implements the ``napari_get_reader`` hook specification, (to create a reader 
 
 import logging
 import warnings
-from string import ascii_uppercase
 from typing import Any, Callable, Dict, Iterator, List, Optional
 
 from .data import CHANNEL_DIMENSION
@@ -85,8 +84,8 @@ def transform(nodes: Iterator[Node]) -> Optional[ReaderFunction]:
                         plate_info = metadata["metadata"]["plate"]
                         plate_width = shape[-1]
                         plate_height = shape[-2]
-                        rows = plate_info["rows"]
-                        columns = plate_info["columns"]
+                        rows = len(plate_info["rows"])
+                        columns = len(plate_info["columns"])
                         well_width = plate_width / columns
                         well_height = plate_height / rows
                         labels = []
@@ -101,7 +100,9 @@ def transform(nodes: Iterator[Node]) -> Optional[ReaderFunction]:
                                 # bounding box we have a line
                                 # along top of Well, with label below
                                 outlines.append([[y1, x1], [y1, x2]])
-                                label = f"{ascii_uppercase[row]}{column + 1}"
+                                row_name = plate_info["rows"][row]["name"]
+                                col_name = plate_info["columns"][column]["name"]
+                                label = f"{row_name}{col_name}"
                                 labels.append(label)
                                 # Well bounding box, with no label
                                 outlines.append(
