@@ -423,7 +423,7 @@ class Plate(Spec):
         print("plate_data", self.plate_data)
         self.rows = self.plate_data.get("rows")
         self.columns = self.plate_data.get("columns")
-        self.acquisitions = self.plate_data.get("acquisitions", [{"path": "0"}])
+        self.acquisitions = self.plate_data.get("acquisitions")
         first_field = "0"
         row_names = [row["name"] for row in self.rows]
         col_names = [col["name"] for col in self.columns]
@@ -431,8 +431,14 @@ class Plate(Spec):
         well_paths = [well["path"] for well in self.plate_data.get("wells")]
         well_paths.sort()
 
-        # TODO: support more Acquisitions - just 1st for now
-        run = self.acquisitions[0]["path"].strip("/")
+        run = ""
+        # TEMP - support acquisition path in plate/acq/row/col hierarchy
+        # remove when we don't want to support dev versions of ome-zarr plate data
+        if len(self.acquisitions) > 0:
+            run = self.acquisitions[0].get("path", "")
+            if len(run) > 0 and not run.endswith("/"):
+                run = run + "/"
+
         row_count = len(self.rows)
         column_count = len(self.columns)
         # Get the first image...
@@ -470,7 +476,7 @@ class Plate(Spec):
         def get_tile(tile_name: str) -> np.ndarray:
             """ tile_name is 'level,z,c,t,row,col' """
             level, row, col = [int(n) for n in tile_name.split(",")]
-            path = f"{run}/{row_names[row]}/{col_names[col]}/{first_field}/{level}"
+            path = f"{run}{row_names[row]}/{col_names[col]}/{first_field}/{level}"
             print(f"LOADING tile... {path}")
 
             try:
