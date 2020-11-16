@@ -351,18 +351,16 @@ class Well(Spec):
     def __init__(self, node: Node) -> None:
         super().__init__(node)
         self.well_data = self.lookup("well", {})
-        print("well_data", self.well_data)
+        LOGGER.info("well_data: %s", self.well_data)
 
         image_paths = [image["path"] for image in self.well_data.get("images")]
         field_count = len(image_paths)
         column_count = math.ceil(math.sqrt(field_count))
         row_count = math.ceil(field_count / column_count)
-        print("column_count", column_count, "row_count", row_count)
 
         # Use first Field for rendering settings, shape etc.
         image_zarr = self.zarr.create(image_paths[0])
         image_node = Node(image_zarr, node)
-        print("image_node", image_node.metadata)
         level = 0  # load full resolution image
         numpy_type = image_node.data[level].dtype
         img_shape = image_node.data[level].shape
@@ -373,12 +371,11 @@ class Well(Spec):
             row, col = [int(n) for n in tile_name.split(",")]
             field_index = (column_count * row) + col
             path = f"{field_index}/{level}"
-            print(f"LOADING tile... {path}")
+            LOGGER.debug(f"LOADING tile... {path}")
             try:
                 data = self.zarr.load(path)
-                print("...data.shape", data.shape)
             except ValueError:
-                print(f"Failed to load {path}")
+                LOGGER.error(f"Failed to load {path}")
                 data = np.zeros(img_shape, dtype=numpy_type)
             return data
 
@@ -391,17 +388,15 @@ class Well(Spec):
                 lazy_row: List[da.Array] = []
                 for col in range(column_count):
                     tile_name = f"{row},{col}"
-                    print(f"creating lazy_reader. row:{row} col:{col}")
+                    LOGGER.debug(f"creating lazy_reader. row:{row} col:{col}")
                     lazy_tile = da.from_delayed(
                         lazy_reader(tile_name), shape=img_shape, dtype=numpy_type
                     )
                     lazy_row.append(lazy_tile)
                 lazy_rows.append(da.concatenate(lazy_row, axis=4))
-                print("lazy_row.shape", lazy_rows[-1].shape)
             return da.concatenate(lazy_rows, axis=3)
 
         node.data = [get_lazy_well()]
-        print("node.data.shape", node.data[0].shape)
         node.metadata = image_node.metadata
 
 
@@ -420,7 +415,7 @@ class Plate(Spec):
         stitched full-resolution images.
         """
         self.plate_data = self.lookup("plate", {})
-        print("plate_data", self.plate_data)
+        LOGGER.info("plate_data", self.plate_data)
         self.rows = self.plate_data.get("rows")
         self.columns = self.plate_data.get("columns")
         self.acquisitions = self.plate_data.get("acquisitions")
@@ -451,7 +446,7 @@ class Plate(Spec):
 
         img_pyramid_shapes = [d.shape for d in image_node.data]
 
-        print("img_pyramid_shapes", img_pyramid_shapes)
+        LOGGER.debug("img_pyramid_shapes", img_pyramid_shapes)
 
         size_y = img_shape[3]
         size_x = img_shape[4]
@@ -471,19 +466,18 @@ class Plate(Spec):
             if longest_side <= TARGET_SIZE:
                 break
 
-        print("target_level", target_level)
+        LOGGER.debug("target_level", target_level)
 
         def get_tile(tile_name: str) -> np.ndarray:
             """ tile_name is 'level,z,c,t,row,col' """
             level, row, col = [int(n) for n in tile_name.split(",")]
             path = f"{run}{row_names[row]}/{col_names[col]}/{first_field}/{level}"
-            print(f"LOADING tile... {path}")
+            LOGGER.debug(f"LOADING tile... {path}")
 
             try:
                 data = self.zarr.load(path)
-                print("...data.shape", data.shape)
             except ValueError:
-                print(f"Failed to load {path}")
+                LOGGER.error(f"Failed to load {path}")
                 data = np.zeros(img_pyramid_shapes[level], dtype=numpy_type)
             return data
 
@@ -496,14 +490,15 @@ class Plate(Spec):
                 lazy_row: List[da.Array] = []
                 for col in range(column_count):
                     tile_name = f"{level},{row},{col}"
-                    print(f"creating lazy_reader. level:{level} row:{row} col:{col}")
+                    LOGGER.debug(
+                        f"creating lazy_reader. level:{level} row:{row} col:{col}"
+                    )
                     tile_size = img_pyramid_shapes[level]
                     lazy_tile = da.from_delayed(
                         lazy_reader(tile_name), shape=tile_size, dtype=numpy_type
                     )
                     lazy_row.append(lazy_tile)
                 lazy_rows.append(da.concatenate(lazy_row, axis=4))
-                print("lazy_row.shape", lazy_rows[-1].shape)
             return da.concatenate(lazy_rows, axis=3)
 
         pyramid = []
@@ -512,7 +507,7 @@ class Plate(Spec):
         # for level in range(5):
         for level in [target_level]:
             lazy_plate = get_lazy_plate(level)
-            print("lazy_plate", lazy_plate.shape)
+            LOGGER.debug("lazy_plate", lazy_plate.shape)
             pyramid.append(lazy_plate)
 
         # Set the node.data to be pyramid view of the plate
