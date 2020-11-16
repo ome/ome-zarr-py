@@ -62,6 +62,24 @@ def transform(nodes: Iterator[Node]) -> Optional[ReaderFunction]:
                     layer_type = "labels"
                     if "colormap" in metadata:
                         del metadata["colormap"]
+                    if "properties" in metadata:
+                        props = metadata["properties"]
+                        reader_props = {}
+                        label_indices = list(props.keys())
+                        reader_props["index"] = label_indices
+
+                        # properties may be ragged, so we need to know all possible properties
+                        all_keys = set()
+                        for index in label_indices:
+                            all_keys = all_keys.union(set(props[index].keys()))
+
+                        # napari expects lists of equal length so we must fill with None
+                        for prop_key in all_keys:
+                            reader_props[prop_key] = [
+                                props[i][prop_key] if prop_key in props[i] else "None"
+                                for i in label_indices
+                            ]
+                        metadata['properties'] = reader_props
 
                 elif shape[CHANNEL_DIMENSION] > 1:
                     metadata["channel_axis"] = CHANNEL_DIMENSION

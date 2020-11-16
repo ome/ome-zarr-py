@@ -216,6 +216,14 @@ class Label(Spec):
                 except Exception as e:
                     LOGGER.error(f"invalid color - {color}: {e}")
 
+        properties: Dict[int, Dict[str, str]] = {}
+        props_list = image_label.get('properties', [])
+        if props_list:
+            for props in props_list:
+                label_val = props['label-value']
+                del props['label-value']
+                properties[label_val] =  props
+
         # TODO: a metadata transform should be provided by specific impls.
         name = self.zarr.basename()
         node.metadata.update(
@@ -223,6 +231,7 @@ class Label(Spec):
                 "visible": node.visible,
                 "name": name,
                 "color": colors,
+                "properties": properties,
                 "metadata": {"image": self.lookup("image", {}), "path": name},
             }
         )
