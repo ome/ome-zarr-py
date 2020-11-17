@@ -242,7 +242,6 @@ class Label(Spec):
                 }
             )
 
-
 class Multiscales(Spec):
     @staticmethod
     def matches(zarr: BaseZarrLocation) -> bool:
