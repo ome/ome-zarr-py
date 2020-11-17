@@ -76,7 +76,7 @@ def transform(nodes: Iterator[Node]) -> Optional[ReaderFunction]:
                         # napari expects lists of equal length so we must fill with None
                         for prop_key in all_keys:
                             reader_props[prop_key] = [
-                                props[i][prop_key] if prop_key in props[i] else "None"
+                                props[i][prop_key] if prop_key in props[i] else None
                                 for i in label_indices
                             ]
                         metadata['properties'] = reader_props

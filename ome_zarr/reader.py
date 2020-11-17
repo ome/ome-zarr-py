@@ -221,8 +221,8 @@ class Label(Spec):
         if props_list:
             for props in props_list:
                 label_val = props['label-value']
-                del props['label-value']
-                properties[label_val] =  props
+                properties[label_val] = dict(props)
+                del properties[label_val]['label-value']
 
         # TODO: a metadata transform should be provided by specific impls.
         name = self.zarr.basename()
@@ -231,10 +231,16 @@ class Label(Spec):
                 "visible": node.visible,
                 "name": name,
                 "color": colors,
-                "properties": properties,
                 "metadata": {"image": self.lookup("image", {}), "path": name},
             }
         )
+        if properties:
+            node.metadata.update(
+                {
+                    "properties": properties
+
+                }
+            )
 
 
 class Multiscales(Spec):
