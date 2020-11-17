@@ -217,12 +217,12 @@ class Label(Spec):
                     LOGGER.error(f"invalid color - {color}: {e}")
 
         properties: Dict[int, Dict[str, str]] = {}
-        props_list = image_label.get('properties', [])
+        props_list = image_label.get("properties", [])
         if props_list:
             for props in props_list:
-                label_val = props['label-value']
+                label_val = props["label-value"]
                 properties[label_val] = dict(props)
-                del properties[label_val]['label-value']
+                del properties[label_val]["label-value"]
 
         # TODO: a metadata transform should be provided by specific impls.
         name = self.zarr.basename()
@@ -235,12 +235,8 @@ class Label(Spec):
             }
         )
         if properties:
-            node.metadata.update(
-                {
-                    "properties": properties
+            node.metadata.update({"properties": properties})
 
-                }
-            )
 
 class Multiscales(Spec):
     @staticmethod
