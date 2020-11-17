@@ -6,7 +6,7 @@ It implements the ``napari_get_reader`` hook specification, (to create a reader 
 
 import logging
 import warnings
-from typing import Any, Callable, Dict, Iterator, List, Optional
+from typing import Any, Callable, Dict, Iterator, List, Optional, Set
 
 from .data import CHANNEL_DIMENSION
 from .io import parse_url
@@ -68,7 +68,8 @@ def transform(nodes: Iterator[Node]) -> Optional[ReaderFunction]:
                         label_indices = list(props.keys())
                         reader_props["index"] = label_indices
 
-                        # properties may be ragged, so we need to know all possible properties
+                        # properties may be ragged, so we need all possible properties
+                        all_keys: Set[str]
                         all_keys = set()
                         for index in label_indices:
                             all_keys = all_keys.union(set(props[index].keys()))
@@ -79,7 +80,7 @@ def transform(nodes: Iterator[Node]) -> Optional[ReaderFunction]:
                                 props[i][prop_key] if prop_key in props[i] else None
                                 for i in label_indices
                             ]
-                        metadata['properties'] = reader_props
+                        metadata["properties"] = reader_props
 
                 elif shape[CHANNEL_DIMENSION] > 1:
                     metadata["channel_axis"] = CHANNEL_DIMENSION
