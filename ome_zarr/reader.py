@@ -547,6 +547,22 @@ class PlateLabels(Plate):
         # remove image metadata
         node.metadata = {}
 
+        # combine 'properties' from each image
+        # from https://github.com/ome/ome-zarr-py/pull/61/
+        properties: Dict[int, Dict[str, Any]] = {}
+        for row in self.row_names:
+            for col in self.col_names:
+                path = f"{row}/{col}/{self.first_field}/labels/0/.zattrs"
+                labels_json = self.zarr.get_json(path).get("image-label", {})
+                # NB: assume that 'label_val' is unique across all images
+                props_list = labels_json.get("properties", [])
+                if props_list:
+                    for props in props_list:
+                        label_val = props["label-value"]
+                        properties[label_val] = dict(props)
+                        del properties[label_val]["label-value"]
+        node.metadata["properties"] = properties
+
     def get_numpy_type(self, image_node: Node) -> np.dtype:
         # FIXME - don't assume Well A1 is valid
         path = self.get_tile_path(0, 0, 0)
