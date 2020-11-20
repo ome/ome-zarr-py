@@ -13,7 +13,7 @@ class TestNapari:
         self.path = tmpdir.mkdir("data")
         create_zarr(str(self.path), astronaut, "astronaut")
 
-    def assert_layers(self, layers, visible_1, visible_2):
+    def assert_layers(self, layers, visible_1, visible_2, label_props=None):
         # TODO: check name
 
         assert len(layers) == 2
@@ -27,6 +27,8 @@ class TestNapari:
 
         data, metadata, layer_type = self.assert_layer(label)
         assert visible_2 == metadata["visible"]
+        if label_props:
+            assert label_props == metadata["properties"]
 
     def assert_layer(self, layer_data):
         data, metadata, layer_type = layer_data
@@ -47,7 +49,11 @@ class TestNapari:
     def test_label(self):
         filename = str(self.path.join("labels", "astronaut"))
         layers = napari_get_reader(filename)()
-        self.assert_layers(layers, False, True)
+        properties = {
+            "index": [i for i in range(1, 9)],
+            "class": [f"class {i}" for i in range(1, 9)],
+        }
+        self.assert_layers(layers, False, True, properties)
 
     @pytest.mark.skipif(
         not sys.platform.startswith("darwin") or sys.version_info < (3, 7),
