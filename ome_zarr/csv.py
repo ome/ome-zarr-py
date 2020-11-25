@@ -32,11 +32,11 @@ def csv_to_zarr(
     csv_path: str, csv_id: str, csv_keys: str, zarr_path: str, zarr_id: str
 ) -> None:
     """
-    Add keys:values from a CSV file to the label properties of a Plate.
+    Add keys:values from a CSV file to the label properties of a Plate or Image
 
-    For each labels properties dict in the Plate at zarr_path, we pick the value
-    of the property named zarr_id. This value should match a value from a row of the
-    CSV table, with the column name given by csv_id. The row values under columns
+    For each labels properties dict in the Plate or Image at zarr_path, we pick the
+    value of the property named zarr_id. This value should match a value from a row of
+    the CSV table, with the column name given by csv_id. The row values under columns
     given by csv_keys (e.g. "col1,col2,col5") will be added to the label properties.
     Column types can be specified with #d (float), #l (int) or #b (boolean)
     e.g. "col1#d,col2#l,col5"
@@ -93,11 +93,12 @@ def dict_to_zarr(
     props_to_add: Dict[Union[str, int], Dict], zarr_path: str, zarr_id: str
 ) -> None:
     """
-    Add keys:values to the label properties of a Plate.
+    Add keys:values to the label properties of a ome-zarr Plate or Image.
 
-    For each labels properties dict in the Plate at zarr_path, we pick the value of
-    the property named zarr_id. This value should match a key of the props_to_add
-    Dict to find a Dict who's keys and values are added to the label properties.
+    For each labels properties dict in the Plate or Image at zarr_path, we pick the
+    value of the property named zarr_id. This value should match a key of the
+    props_to_add Dict to find a Dict who's keys and values are added to the label
+    properties.
 
     @param props_to_add     Dict of id: {key:value}. id matches values of zarr_id prop
     @param zarr_path        Path to the ome-zarr that has labels with properties
@@ -109,16 +110,22 @@ def dict_to_zarr(
         raise Exception(f"No zarr found at {zarr_path}")
 
     plate_attrs = zarr.root_attrs.get("plate", None)
-    if plate_attrs is None:
-        raise Exception(
-            f"zarr_path must be to plate.zarr. No 'plate' in {zarr_path}.zattrs"
-        )
-    well_paths = [w["path"] for w in plate_attrs.get("wells", [])]
+    multiscales = "multiscales" in zarr.root_attrs
+    if plate_attrs is None and not multiscales:
+        raise Exception("zarr_path must be to plate.zarr or image.zarr")
 
-    # look for 'label/0' under the first field of each Well
-    field = "0"
-    for well in well_paths:
-        path_to_labels = os.path.join(zarr_path, well, field, "labels", "0")
+    labels_paths = []
+    if plate_attrs is not None:
+        # look for 'label/0' under the first field of each Well
+        field = "0"
+        for w in plate_attrs.get("wells", []):
+            labels_paths.append(
+                os.path.join(zarr_path, w["path"], field, "labels", "0")
+            )
+    else:
+        labels_paths.append(os.path.join(zarr_path, "labels", "0"))
+
+    for path_to_labels in labels_paths:
 
         label_group = zarr_open(path_to_labels)
         attrs = label_group.attrs.asdict()
