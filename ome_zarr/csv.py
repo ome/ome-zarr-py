@@ -32,7 +32,20 @@ def csv_to_zarr(
     csv_path: str, csv_id: str, csv_keys: str, zarr_path: str, zarr_id: str
 ) -> None:
     """
-    - URL of the form: path/to/ID.zarr/
+    Add keys:values from a CSV file to the label properties of a Plate.
+
+    For each labels properties dict in the Plate at zarr_path, we pick the value
+    of the property named zarr_id. This value should match a value from a row of the
+    CSV table, with the column name given by csv_id. The row values under columns
+    given by csv_keys (e.g. "col1,col2,col5") will be added to the label properties.
+    Column types can be specified with #d (float), #l (int) or #b (boolean)
+    e.g. "col1#d,col2#l,col5"
+
+    @param csv_path         Path to the CSV file
+    @param csv_id           Name of the CSV column to use as a row ID
+    @param csv_keys         Names of the columns to add to properties.
+    @param zarr_path        Path to the ome-zarr Plate that has labels with properties
+    @param zarr_id          Key of the label property to use for picking csv row
     """
 
     # Use #d to denote double etc.
@@ -49,7 +62,7 @@ def csv_to_zarr(
     csv_columns = None
     id_column = None
 
-    props_by_id: Dict[str, Dict] = {}
+    props_by_id: Dict[Union[str, int], Dict] = {}
 
     with open(csv_path, newline="") as csvfile:
         row_reader = csv.reader(csvfile, delimiter=",")
@@ -76,7 +89,20 @@ def csv_to_zarr(
     dict_to_zarr(props_by_id, zarr_path, zarr_id)
 
 
-def dict_to_zarr(props_to_add: Dict, zarr_path: str, zarr_id: str) -> None:
+def dict_to_zarr(
+    props_to_add: Dict[Union[str, int], Dict], zarr_path: str, zarr_id: str
+) -> None:
+    """
+    Add keys:values to the label properties of a Plate.
+
+    For each labels properties dict in the Plate at zarr_path, we pick the value of
+    the property named zarr_id. This value should match a key of the props_to_add
+    Dict to find a Dict who's keys and values are added to the label properties.
+
+    @param props_to_add     Dict of id: {key:value}. id matches values of zarr_id prop
+    @param zarr_path        Path to the ome-zarr that has labels with properties
+    @param zarr_id          Key of label property, where value is key of props_to_add
+    """
 
     zarr = parse_url(zarr_path)
     if not zarr:
