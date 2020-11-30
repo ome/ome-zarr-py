@@ -4,6 +4,7 @@ import logging
 import sys
 from typing import List
 
+from .csv import csv_to_zarr
 from .data import astronaut, coins, create_zarr
 from .scale import Scaler
 from .utils import download as zarr_download
@@ -62,6 +63,14 @@ def scale(args: argparse.Namespace) -> None:
         method=args.method,
     )
     scaler.scale(args.input_array, args.output_directory)
+
+
+def csv_to_labels(args: argparse.Namespace) -> None:
+    """Adds csv data to labels properties"""
+
+    print("csv_to_labels", args.csv_path, args.zarr_path)
+
+    csv_to_zarr(args.csv_path, args.csv_id, args.csv_keys, args.zarr_path, args.zarr_id)
 
 
 def main(args: List[str] = None) -> None:
@@ -125,6 +134,25 @@ def main(args: List[str] = None) -> None:
     parser_scale.add_argument("--downscale", type=int, default=2)
     parser_scale.add_argument("--max_layer", type=int, default=4)
     parser_scale.set_defaults(func=scale)
+
+    # csv to label properties
+    parser_csv_to_labels = subparsers.add_parser("csv_to_labels")
+    parser_csv_to_labels.add_argument("csv_path", help="path to csv file")
+    parser_csv_to_labels.add_argument(
+        "csv_id",
+        help="csv column name containing ID for identifying label properties to update",
+    )
+    parser_csv_to_labels.add_argument(
+        "csv_keys", help="Comma-separated list of columns to read from csv to zarr"
+    )
+    parser_csv_to_labels.add_argument(
+        "zarr_path", help="path to local zarr plate or image"
+    )
+    parser_csv_to_labels.add_argument(
+        "zarr_id",
+        help="Labels properties key. Values should match csv_id column values",
+    )
+    parser_csv_to_labels.set_defaults(func=csv_to_labels)
 
     ns = parser.parse_args(args)
 
