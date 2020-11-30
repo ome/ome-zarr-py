@@ -10,7 +10,7 @@ from typing import Any, Callable, Dict, Iterator, List, Optional, Set
 
 from .data import CHANNEL_DIMENSION
 from .io import parse_url
-from .reader import Label, Node, Reader
+from .reader import Label, Node, PlateLabels, Reader
 from .types import LayerData, PathLike, ReaderFunction
 
 try:
@@ -58,7 +58,7 @@ def transform(nodes: Iterator[Node]) -> Optional[ReaderFunction]:
                 shape = data[0].shape
 
                 layer_type: str = "image"
-                if node.load(Label):
+                if node.load(Label) or node.load(PlateLabels):
                     layer_type = "labels"
                     if "colormap" in metadata:
                         del metadata["colormap"]

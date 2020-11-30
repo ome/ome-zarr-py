@@ -25,6 +25,7 @@ class Node:
         zarr: BaseZarrLocation,
         root: Union["Node", "Reader", List[BaseZarrLocation]],
         visibility: bool = True,
+        plate_labels: bool = False,
     ):
         self.zarr = zarr
         self.root = root
@@ -51,8 +52,11 @@ class Node:
             self.specs.append(Multiscales(self))
         if OMERO.matches(zarr):
             self.specs.append(OMERO(self))
-        if Plate.matches(zarr):
+        if plate_labels:
+            self.specs.append(PlateLabels(self))
+        elif Plate.matches(zarr):
             self.specs.append(Plate(self))
+            self.add(zarr, plate_labels=True)
         if Well.matches(zarr):
             self.specs.append(Well(self))
 
@@ -92,6 +96,7 @@ class Node:
         zarr: BaseZarrLocation,
         prepend: bool = False,
         visibility: Optional[bool] = None,
+        plate_labels: bool = False,
     ) -> "Optional[Node]":
         """Create a child node if this location has not yet been seen.
 
@@ -108,7 +113,7 @@ class Node:
             encountered; None if the node has already been processed.
         """
 
-        if zarr in self.seen:
+        if zarr in self.seen and not plate_labels:
             LOGGER.debug(f"already seen {zarr}; stopping recursion")
             return None
 
@@ -116,7 +121,7 @@ class Node:
             visibility = self.visible
 
         self.seen.append(zarr)
-        node = Node(zarr, self, visibility=visibility)
+        node = Node(zarr, self, visibility=visibility, plate_labels=plate_labels)
         if prepend:
             self.pre_nodes.append(node)
         else:
@@ -429,29 +434,29 @@ class Plate(Spec):
         self.rows = self.plate_data.get("rows")
         self.columns = self.plate_data.get("columns")
         self.acquisitions = self.plate_data.get("acquisitions")
-        first_field = "0"
-        row_names = [row["name"] for row in self.rows]
-        col_names = [col["name"] for col in self.columns]
+        self.first_field = "0"
+        self.row_names = [row["name"] for row in self.rows]
+        self.col_names = [col["name"] for col in self.columns]
 
-        well_paths = [well["path"] for well in self.plate_data.get("wells")]
-        well_paths.sort()
+        self.well_paths = [well["path"] for well in self.plate_data.get("wells")]
+        self.well_paths.sort()
 
-        run = ""
+        self.run = ""
         # TEMP - support acquisition path in plate/acq/row/col hierarchy
         # remove when we don't want to support dev versions of ome-zarr plate data
         if len(self.acquisitions) > 0:
-            run = self.acquisitions[0].get("path", "")
-            if len(run) > 0 and not run.endswith("/"):
-                run = run + "/"
+            self.run = self.acquisitions[0].get("path", "")
+            if len(self.run) > 0 and not self.run.endswith("/"):
+                self.run = self.run + "/"
 
-        row_count = len(self.rows)
-        column_count = len(self.columns)
+        self.row_count = len(self.rows)
+        self.column_count = len(self.columns)
         # Get the first image...
-        path = f"{well_paths[0]}/{first_field}"
+        path = f"{self.well_paths[0]}/{self.first_field}"
         image_zarr = self.zarr.create(path)
         image_node = Node(image_zarr, node)
 
-        numpy_type = image_node.data[0].dtype
+        self.numpy_type = self.get_numpy_type(image_node)
         img_shape = image_node.data[0].shape
 
         img_pyramid_shapes = [d.shape for d in image_node.data]
@@ -464,13 +469,13 @@ class Plate(Spec):
         # FIXME - if only returning a single stiched plate (not a pyramid)
         # need to decide optimal size. E.g. longest side < 1500
         TARGET_SIZE = 1500
-        plate_width = column_count * size_x
-        plate_height = row_count * size_y
+        plate_width = self.column_count * size_x
+        plate_height = self.row_count * size_y
         longest_side = max(plate_width, plate_height)
         target_level = 0
         for level, shape in enumerate(img_pyramid_shapes):
-            plate_width = column_count * shape[-1]
-            plate_height = row_count * shape[-2]
+            plate_width = self.column_count * shape[-1]
+            plate_height = self.row_count * shape[-2]
             longest_side = max(plate_width, plate_height)
             target_level = level
             if longest_side <= TARGET_SIZE:
@@ -478,46 +483,14 @@ class Plate(Spec):
 
         LOGGER.debug("target_level", target_level)
 
-        def get_tile(tile_name: str) -> np.ndarray:
-            """ tile_name is 'level,z,c,t,row,col' """
-            level, row, col = [int(n) for n in tile_name.split(",")]
-            path = f"{run}{row_names[row]}/{col_names[col]}/{first_field}/{level}"
-            LOGGER.debug(f"LOADING tile... {path}")
-
-            try:
-                data = self.zarr.load(path)
-            except ValueError:
-                LOGGER.error(f"Failed to load {path}")
-                data = np.zeros(img_pyramid_shapes[level], dtype=numpy_type)
-            return data
-
-        lazy_reader = delayed(get_tile)
-
-        def get_lazy_plate(level: int) -> da.Array:
-            lazy_rows = []
-            # For level 0, return whole image for each tile
-            for row in range(row_count):
-                lazy_row: List[da.Array] = []
-                for col in range(column_count):
-                    tile_name = f"{level},{row},{col}"
-                    LOGGER.debug(
-                        f"creating lazy_reader. level:{level} row:{row} col:{col}"
-                    )
-                    tile_size = img_pyramid_shapes[level]
-                    lazy_tile = da.from_delayed(
-                        lazy_reader(tile_name), shape=tile_size, dtype=numpy_type
-                    )
-                    lazy_row.append(lazy_tile)
-                lazy_rows.append(da.concatenate(lazy_row, axis=4))
-            return da.concatenate(lazy_rows, axis=3)
-
         pyramid = []
 
         # This should create a pyramid of levels, but causes seg faults!
         # for level in range(5):
         for level in [target_level]:
-            lazy_plate = get_lazy_plate(level)
-            LOGGER.debug("lazy_plate", lazy_plate.shape)
+
+            tile_shape = img_pyramid_shapes[level]
+            lazy_plate = self.get_stitched_grid(level, tile_shape)
             pyramid.append(lazy_plate)
 
         # Set the node.data to be pyramid view of the plate
@@ -527,6 +500,83 @@ class Plate(Spec):
 
         # "metadata" dict gets added to each 'plate' layer in napari
         node.metadata.update({"metadata": {"plate": self.plate_data}})
+
+    def get_numpy_type(self, image_node: Node) -> np.dtype:
+        return image_node.data[0].dtype
+
+    def get_tile_path(self, level: int, row: int, col: int) -> str:
+        return (
+            f"{self.run}{self.row_names[row]}/"
+            f"{self.col_names[col]}/{self.first_field}/{level}"
+        )
+
+    def get_stitched_grid(self, level: int, tile_shape: tuple) -> da.core.Array:
+        def get_tile(tile_name: str) -> np.ndarray:
+            """ tile_name is 'level,z,c,t,row,col' """
+            row, col = [int(n) for n in tile_name.split(",")]
+            path = self.get_tile_path(level, row, col)
+            LOGGER.debug(f"LOADING tile... {path}")
+
+            try:
+                data = self.zarr.load(path)
+            except ValueError:
+                LOGGER.error(f"Failed to load {path}")
+                data = np.zeros(tile_shape, dtype=self.numpy_type)
+            return data
+
+        lazy_reader = delayed(get_tile)
+
+        lazy_rows = []
+        # For level 0, return whole image for each tile
+        for row in range(self.row_count):
+            lazy_row: List[da.Array] = []
+            for col in range(self.column_count):
+                tile_name = f"{row},{col}"
+                lazy_tile = da.from_delayed(
+                    lazy_reader(tile_name), shape=tile_shape, dtype=self.numpy_type
+                )
+                lazy_row.append(lazy_tile)
+            lazy_rows.append(da.concatenate(lazy_row, axis=4))
+        return da.concatenate(lazy_rows, axis=3)
+
+
+class PlateLabels(Plate):
+    def get_tile_path(self, level: int, row: int, col: int) -> str:
+        """251.zarr/A/1/0/labels/0/3/"""
+        path = (
+            f"{self.row_names[row]}/{self.col_names[col]}/"
+            f"{self.first_field}/labels/0/{level}"
+        )
+        return path
+
+    def get_pyramid_lazy(self, node: Node) -> None:
+        super().get_pyramid_lazy(node)
+        # pyramid data may be multi-channel, but we only have 1 labels channel
+        node.data[0] = node.data[0][:, 0:1, :, :, :]
+        # remove image metadata
+        node.metadata = {}
+
+        # combine 'properties' from each image
+        # from https://github.com/ome/ome-zarr-py/pull/61/
+        properties: Dict[int, Dict[str, Any]] = {}
+        for row in self.row_names:
+            for col in self.col_names:
+                path = f"{row}/{col}/{self.first_field}/labels/0/.zattrs"
+                labels_json = self.zarr.get_json(path).get("image-label", {})
+                # NB: assume that 'label_val' is unique across all images
+                props_list = labels_json.get("properties", [])
+                if props_list:
+                    for props in props_list:
+                        label_val = props["label-value"]
+                        properties[label_val] = dict(props)
+                        del properties[label_val]["label-value"]
+        node.metadata["properties"] = properties
+
+    def get_numpy_type(self, image_node: Node) -> np.dtype:
+        # FIXME - don't assume Well A1 is valid
+        path = self.get_tile_path(0, 0, 0)
+        label_zarr = self.zarr.load(path)
+        return label_zarr.dtype
 
 
 class Reader:
