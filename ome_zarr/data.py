@@ -155,11 +155,14 @@ def create_zarr(
         write_multiscale(labels, label_grp)
 
         colors = []
+        properties = []
         for x in range(1, 9):
             rgba = [randrange(0, 256) for i in range(4)]
             colors.append({"label-value": x, "rgba": rgba})
+            properties.append({"label-value": x, "class": f"class {x}"})
         label_grp.attrs["image-label"] = {
             "version": "0.1",
             "colors": colors,
+            "properties": properties,
             "source": {"image": "../../"},
         }
