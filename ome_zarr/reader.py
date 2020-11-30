@@ -492,7 +492,6 @@ class Plate(Spec):
         node.metadata.update({"metadata": {"plate": self.plate_data}})
 
     def get_numpy_type(self, image_node: Node) -> np.dtype:
-        print(type(image_node.data[0].dtype))
         return image_node.data[0].dtype
 
     def get_tile_path(self, level: int, row: int, col: int) -> str:
