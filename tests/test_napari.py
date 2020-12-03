@@ -1,5 +1,3 @@
-import sys
-
 import numpy as np
 import pytest
 
@@ -55,10 +53,6 @@ class TestNapari:
         }
         self.assert_layers(layers, False, True, properties)
 
-    @pytest.mark.skipif(
-        not sys.platform.startswith("darwin") or sys.version_info < (3, 7),
-        reason="Qt builds are failing on Windows and Ubuntu",
-    )
     def test_viewer(self, make_test_viewer):
         """example of testing the viewer."""
         viewer = make_test_viewer()
