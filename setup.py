@@ -29,7 +29,7 @@ install_requires += (["opencv-contrib-python-headless"],)
 
 setup(
     name="ome-zarr",
-    version="0.0.16.dev0",
+    version="0.0.17.dev0",
     author="The Open Microscopy Team",
     url="https://github.com/ome/ome-zarr-py",
     description="Implementation of images in Zarr files.",
@@ -47,11 +47,15 @@ setup(
         "Programming Language :: Python :: 3",
         "Operating System :: OS Independent",
         "License :: OSI Approved :: BSD License",
+        "Framework :: napari",
     ],
     entry_points={
         "console_scripts": ["ome_zarr = ome_zarr.cli:main"],
         "napari.plugin": ["ome_zarr = ome_zarr.napari"],
     },
-    extras_require={"napari": ["napari"]},
+    extras_require={
+        "napari:python_version>='3.7'": ["napari"],
+        "napari:python_version<'3.7'": ["napari<0.4.0"],
+    },
     tests_require=["pytest", "napari"],
 )
