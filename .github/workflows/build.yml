@@ -19,7 +19,7 @@ jobs:
           - python_version: '3.8'
             toxenv: 'py38-PyQt5,py38-PySide2'
           - python_version: '3.9'
-            toxenv: 'py38-PyQt5,py38-PySide2'
+            toxenv: 'py39-PyQt5,py39-PySide2'
 
     steps:
       - uses: actions/checkout@v1
