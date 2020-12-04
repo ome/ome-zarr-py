@@ -9,17 +9,32 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, macos-latest, ubuntu-latest]
-        python_version: ['3.6', '3.7', '3.8', '3.9']
         include:
-          - python_version: '3.6'
-            toxenv: 'py36-PyQt5,py36-PySide2'
-          - python_version: '3.7'
-            toxenv: 'py37-PyQt5,py37-PySide2'
-          - python_version: '3.8'
-            toxenv: 'py38-PyQt5,py38-PySide2'
-          - python_version: '3.9'
-            toxenv: 'py39-PyQt5,py39-PySide2'
+
+          - {os: windows-latest, python_Version: '3.6', toxenv: 'py36-PyQt5'}
+          - {os: windows-latest, python_Version: '3.6', toxenv: 'py36-PySide2'}
+          - {os: windows-latest, python_Version: '3.7', toxenv: 'py37-PyQt5'}
+          - {os: windows-latest, python_Version: '3.7', toxenv: 'py37-PySide2'}
+          - {os: windows-latest, python_Version: '3.8', toxenv: 'py38-PyQt5'}
+          - {os: windows-latest, python_Version: '3.8', toxenv: 'py38-PySide2'}
+          - {os: windows-latest, python_Version: '3.9', toxenv: 'py39-PyQt5'}
+          - {os: windows-latest, python_Version: '3.9', toxenv: 'py39-PySide2'}
+
+          # No Python 3.6
+          - {os: linux-latest, python_Version: '3.7', toxenv: 'py37-PyQt5'}
+          # {os: linux-latest, python_Version: '3.7', toxenv: 'py37-PySide2'}
+          - {os: linux-latest, python_Version: '3.8', toxenv: 'py38-PyQt5'}
+          - {os: linux-latest, python_Version: '3.8', toxenv: 'py38-PySide2'}
+          - {os: linux-latest, python_Version: '3.9', toxenv: 'py39-PyQt5'}
+          - {os: linux-latest, python_Version: '3.9', toxenv: 'py39-PySide2'}
+
+          # No Python 3.6
+          - {os: macos-latest, python_Version: '3.7', toxenv: 'py37-PyQt5'}
+          - {os: macos-latest, python_Version: '3.7', toxenv: 'py37-PySide2'}
+          - {os: macos-latest, python_Version: '3.8', toxenv: 'py38-PyQt5'}
+          - {os: macos-latest, python_Version: '3.8', toxenv: 'py38-PySide2'}
+          - {os: macos-latest, python_Version: '3.9', toxenv: 'py39-PyQt5'}
+          - {os: macos-latest, python_Version: '3.9', toxenv: 'py39-PySide2'}
 
     steps:
       - uses: actions/checkout@v1
@@ -39,8 +54,6 @@ jobs:
             libxcb-xinput0 libxcb-xfixes0"
 
       - name: Install & test
-        if: |
-          ${{ matrix.python_version}} != '3.6' || startsWith(matrix.os, 'win')
         run: |
           python -m pip install -r requirements/requirements-dev.txt
           tox -e ${{ matrix.toxenv }}
