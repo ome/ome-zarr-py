@@ -1,8 +1,16 @@
 import numpy as np
 import pytest
+from napari.conftest import make_test_viewer  # noqa
 
 from ome_zarr.data import astronaut, create_zarr
 from ome_zarr.napari import napari_get_reader
+
+
+@pytest.fixture(autouse=True, scope="session")
+def load_napari_conftest(pytestconfig):
+    from napari import conftest
+
+    pytestconfig.pluginmanager.register(conftest, "napari-conftest")
 
 
 class TestNapari:
@@ -53,7 +61,7 @@ class TestNapari:
         }
         self.assert_layers(layers, False, True, properties)
 
-    def test_viewer(self, make_test_viewer):
+    def test_viewer(self, make_test_viewer):  # noqa
         """example of testing the viewer."""
         viewer = make_test_viewer()
 
