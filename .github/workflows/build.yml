@@ -21,20 +21,22 @@ jobs:
           - {os: windows-latest, python_Version: '3.9', toxenv: 'py39-PySide2'}
 
           # No Python 3.6
-          - {os: linux-latest, python_Version: '3.7', toxenv: 'py37-PyQt5'}
+          # Linux all failing on GHA
+          # {os: linux-latest, python_Version: '3.7', toxenv: 'py37-PyQt5'}
           # {os: linux-latest, python_Version: '3.7', toxenv: 'py37-PySide2'}
-          - {os: linux-latest, python_Version: '3.8', toxenv: 'py38-PyQt5'}
-          - {os: linux-latest, python_Version: '3.8', toxenv: 'py38-PySide2'}
-          - {os: linux-latest, python_Version: '3.9', toxenv: 'py39-PyQt5'}
-          - {os: linux-latest, python_Version: '3.9', toxenv: 'py39-PySide2'}
+          # {os: linux-latest, python_Version: '3.8', toxenv: 'py38-PyQt5'}
+          # {os: linux-latest, python_Version: '3.8', toxenv: 'py38-PySide2'}
+          # {os: linux-latest, python_Version: '3.9', toxenv: 'py39-PyQt5'}
+          # {os: linux-latest, python_Version: '3.9', toxenv: 'py39-PySide2'}
 
           # No Python 3.6
           - {os: macos-latest, python_Version: '3.7', toxenv: 'py37-PyQt5'}
           - {os: macos-latest, python_Version: '3.7', toxenv: 'py37-PySide2'}
           - {os: macos-latest, python_Version: '3.8', toxenv: 'py38-PyQt5'}
           - {os: macos-latest, python_Version: '3.8', toxenv: 'py38-PySide2'}
-          - {os: macos-latest, python_Version: '3.9', toxenv: 'py39-PyQt5'}
-          - {os: macos-latest, python_Version: '3.9', toxenv: 'py39-PySide2'}
+          # missing numcodecs wheels on 3.9. conda not yet an option. see gh-51
+          # {os: macos-latest, python_Version: '3.9', toxenv: 'py39-PyQt5'}
+          # {os: macos-latest, python_Version: '3.9', toxenv: 'py39-PySide2'}
 
     steps:
       - uses: actions/checkout@v1
