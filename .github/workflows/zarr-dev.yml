@@ -1,5 +1,5 @@
 ---
-name: Build for Linux
+name: Build using Zarr development branch
 
 on: [push, pull_request]
 
@@ -9,10 +9,10 @@ jobs:
     runs-on: ${{ matrix.platform }}
 
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix:
-        platform: [ubuntu-latest, macos-latest]
-        python-version: [3.6, 3.7, 3.8]
+        platform: [ubuntu-latest]
+        python-version: [3.8]
 
     steps:
       - name: Checkout
@@ -39,6 +39,8 @@ jobs:
         shell: bash -l {0}
         run: |
           python -m pip install --upgrade pip wheel pytest tox .[napari]
+          python -m pip install \
+          git+https://github.com/zarr-developers/zarr-python.git@master
 
       - name: Run pytest
         shell: bash -l {0}

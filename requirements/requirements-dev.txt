@@ -1,0 +1,8 @@
+black
+napari
+cython >= 0.29.16
+numpy >= 1.16.0
+pre-commit
+tox
+wheel
+-r requirements-test.txt

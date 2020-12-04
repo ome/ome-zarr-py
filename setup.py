@@ -52,11 +52,10 @@ setup(
     entry_points={
         "console_scripts": ["ome_zarr = ome_zarr.cli:main"],
         "napari.plugin": ["ome_zarr = ome_zarr.napari"],
-        "pytest11": ["napari-conftest = napari.conftest"],
     },
     extras_require={
         "napari:python_version>='3.7'": ["napari"],
         "napari:python_version<'3.7'": ["napari<0.4.0"],
     },
-    tests_require=["pytest"],
+    tests_require=["pytest", "napari"],
 )
