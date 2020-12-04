@@ -63,6 +63,7 @@ class TestNapari:
         }
         self.assert_layers(layers, False, True, properties)
 
+    @pytest.mark.qt
     @pytest.mark.skipif(
         sys.version_info < (3, 7), reason="on_draw is missing in napari < 0.4.0",
     )
