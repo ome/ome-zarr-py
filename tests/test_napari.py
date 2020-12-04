@@ -1,3 +1,5 @@
+import sys
+
 import numpy as np
 import pytest
 from napari.conftest import make_test_viewer  # noqa
@@ -61,6 +63,9 @@ class TestNapari:
         }
         self.assert_layers(layers, False, True, properties)
 
+    @pytest.mark.skipif(
+        sys.version_info < (3, 7), reason="on_draw is missing in napari < 0.4.0",
+    )
     def test_viewer(self, make_test_viewer):  # noqa
         """example of testing the viewer."""
         viewer = make_test_viewer()
