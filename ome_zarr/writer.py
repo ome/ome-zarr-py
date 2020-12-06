@@ -2,26 +2,25 @@
 
 """
 import logging
-
-from typing import Any, Dict, Iterator, List, Optional, Type, Union, Tuple, cast
-import zarr
+from typing import List, Tuple, Union
 
 import numpy as np
+import zarr
 
-from .io import parse_url
-from .reader import Node
-
+from .types import JSONDict
 
 LOGGER = logging.getLogger("ome_zarr.writer")
 
+
 def write_image(
-        path: str,
-        image: np.ndarray,
-        name: str = "0",
-        group: str = None,
-        chunks: Union[Tuple[int], int] = None,
-        byte_order: Union[str, List[str]] = "tczyx",
-        **metadata):
+    path: str,
+    image: np.ndarray,
+    name: str = "0",
+    group: str = None,
+    chunks: Union[Tuple[int], int] = None,
+    byte_order: Union[str, List[str]] = "tczyx",
+    **metadata: JSONDict,
+) -> zarr.hierarchy.Group:
     """Writes an image to the zarr store according to ome-zarr specification
 
     Parameters
@@ -37,11 +36,15 @@ def write_image(
     byte_order: str or list of str, default "tczyx"
       combination of the letters defining the order
       in which the dimensions are saved
-    """
-    zarr_location = parse_url(path)
 
-    ## I assume this should be dealt with in
-    ## the ZarrLocation classes
+    Return
+    ------
+    Zarr Group which contains the image.
+    """
+
+    # FIXME:
+    # I assume this should be dealt with in
+    # the ZarrLocation classes
     store = zarr.DirectoryStore(path)
     image = np.asarray(image)
 
@@ -49,18 +52,18 @@ def write_image(
         # Maybe we can split the more than 5D images in subroups?
         raise ValueError("Only images of 5D or less are supported")
 
-    shape_5d = (*(1,)*(5 - image.ndim), *image.shape)
+    shape_5d = (*(1,) * (5 - image.ndim), *image.shape)
     image = image.reshape(shape_5d)
     omero = metadata.get("omero", {})
 
     # Update the size entry anyway
-    omero["size"]= {
-            "t": image.shape[0],
-            "c": image.shape[1],
-            "z": image.shape[2],
-            "height": image.shape[3],
-            "width": image.shape[4],
-            }
+    omero["size"] = {
+        "t": image.shape[0],
+        "c": image.shape[1],
+        "z": image.shape[2],
+        "height": image.shape[3],
+        "width": image.shape[4],
+    }
 
     metadata["omero"] = omero
 
@@ -74,3 +77,5 @@ def write_image(
 
     for entry, value in metadata.items():
         grp.attrs[entry] = value
+
+    return grp

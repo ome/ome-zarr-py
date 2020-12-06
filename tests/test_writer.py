@@ -1,9 +1,8 @@
-import pytest
 import numpy as np
+import pytest
 
-from ome_zarr.writer import write_image
-from ome_zarr.io import parse_url
 from ome_zarr.reader import Reader
+from ome_zarr.writer import write_image
 
 
 class TestWriter:
