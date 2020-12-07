@@ -5,7 +5,6 @@ import json
 import logging
 from pathlib import Path
 from typing import List, Tuple, Union
-from urllib.parse import urljoin
 
 import dask.array as da
 import numpy as np

@@ -9,7 +9,7 @@ import os
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import List, Optional
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urlparse
 
 import dask.array as da
 import requests

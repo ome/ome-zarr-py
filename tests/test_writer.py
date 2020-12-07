@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from ome_zarr.io import parse_url
-from ome_zarr.reader import Reader, OMERO
+from ome_zarr.reader import OMERO, Reader
 from ome_zarr.writer import write_image
 
 
