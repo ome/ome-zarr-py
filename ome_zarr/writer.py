@@ -4,7 +4,7 @@
 import json
 import logging
 from pathlib import Path
-from typing import List, Tuple, Union
+from typing import Any, List, Tuple, Union
 
 import dask.array as da
 import numpy as np
@@ -48,21 +48,22 @@ def write_image(
     """
 
     zarr_location = parse_url(path, "w")
+    if zarr_location is None:
+        raise ValueError
+
     node = Node(zarr=zarr_location, root=[])
 
     if image.ndim > 5:
         raise ValueError("Only images of 5D or less are supported")
 
-    shape_5d = (*(1,) * (5 - image.ndim), *image.shape)
+    shape_5d: Tuple[Any, ...] = (*(1,) * (5 - image.ndim), *image.shape)
     image = image.reshape(shape_5d)
 
     if chunks is None:
         image = da.from_array(image)
     else:
-        if isinstance(chunks, int):
-            chunks = (chunks,)
-        chunks = (*shape_5d[: (5 - len(chunks))], *chunks)
-        image = da.from_array(image, chunks=chunks)
+        _chunks = _retuple(chunks, shape_5d)
+        image = da.from_array(image, chunks=_chunks)
 
     omero = metadata.get("omero", {})
 
@@ -81,3 +82,14 @@ def write_image(
         json.dump(metadata, za)
 
     return node
+
+
+def _retuple(chunks: Union[Tuple[int], int], shape: Tuple[Any, ...]) -> Tuple[int, ...]:
+
+    _chunks: Tuple[int]
+    if isinstance(chunks, int):
+        _chunks = (chunks,)
+    else:
+        _chunks = chunks
+
+    return (*shape[: (5 - len(_chunks))], *_chunks)
