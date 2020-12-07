@@ -9,7 +9,7 @@ import os
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import List, Optional
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 
 import dask.array as da
 import requests
@@ -111,7 +111,7 @@ class LocalZarrLocation(BaseZarrLocation):
         self.__path: Path = path
         self.mode = mode
         if mode in ("w", "a") and not self.__path.exists():
-            store = zarr.DirectoryStore(self.basename())
+            _ = zarr.DirectoryStore(self.basename())
             LOGGER.debug("Created DirectoryStore %s", self.basename())
         super().__init__()
 
