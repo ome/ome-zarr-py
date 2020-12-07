@@ -3,6 +3,7 @@ import pytest
 
 from ome_zarr.reader import Reader
 from ome_zarr.writer import write_image
+from ome_zarr.io import parse_url
 
 
 class TestWriter:
@@ -17,6 +18,6 @@ class TestWriter:
     def test_writer(self):
 
         data = self.create_data((1, 2, 1, 256, 256), np.uint8)
-        write_image(self.path, data)
-        reader = Reader(self.path)
-        assert len(list(reader())) == 3
+        write_image(self.path, data, name="test")
+        reader = Reader(parse_url(self.path))
+        assert list(reader())
