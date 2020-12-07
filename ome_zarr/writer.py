@@ -1,12 +1,18 @@
 """Image writer utility
 
 """
+import json
 import logging
+from pathlib import Path
 from typing import List, Tuple, Union
+from urllib.parse import urljoin
 
+import dask.array as da
 import numpy as np
 import zarr
 
+from .io import parse_url
+from .reader import Node
 from .types import JSONDict
 
 LOGGER = logging.getLogger("ome_zarr.writer")
@@ -42,18 +48,23 @@ def write_image(
     Zarr Group which contains the image.
     """
 
-    # FIXME:
-    # I assume this should be dealt with in
-    # the ZarrLocation classes
-    store = zarr.DirectoryStore(path)
-    image = np.asarray(image)
+    zarr_location = parse_url(path, "w")
+    node = Node(zarr=zarr_location, root=[])
 
     if image.ndim > 5:
-        # Maybe we can split the more than 5D images in subroups?
         raise ValueError("Only images of 5D or less are supported")
 
     shape_5d = (*(1,) * (5 - image.ndim), *image.shape)
     image = image.reshape(shape_5d)
+
+    if chunks is None:
+        image = da.from_array(image)
+    else:
+        if isinstance(chunks, int):
+            chunks = (chunks,)
+        chunks = (*shape_5d[: (5 - len(chunks))], *chunks)
+        image = da.from_array(image, chunks=chunks)
+
     omero = metadata.get("omero", {})
 
     # Update the size entry anyway
@@ -66,16 +77,8 @@ def write_image(
     }
 
     metadata["omero"] = omero
+    da.to_zarr(arr=image, url=node.zarr.subpath(name))
+    with open(Path(node.zarr.subpath(name)) / ".zattrs", "w") as za:
+        json.dump(metadata, za)
 
-    root = zarr.group(store)
-    if group is not None:
-        grp = root.create_group(group)
-    else:
-        grp = root
-
-    grp.create_dataset(name, data=image, chunks=chunks)
-
-    for entry, value in metadata.items():
-        grp.attrs[entry] = value
-
-    return grp
+    return node

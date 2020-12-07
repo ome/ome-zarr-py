@@ -13,6 +13,7 @@ from urllib.parse import urljoin, urlparse
 
 import dask.array as da
 import requests
+import zarr
 
 from .types import JSONDict
 
@@ -106,8 +107,12 @@ class LocalZarrLocation(BaseZarrLocation):
     Uses the :module:`json` library for loading JSON from disk.
     """
 
-    def __init__(self, path: Path) -> None:
+    def __init__(self, path: Path, mode: str = "r") -> None:
         self.__path: Path = path
+        self.mode = mode
+        if mode in ("w", "a") and not self.__path.exists():
+            store = zarr.DirectoryStore(self.basename())
+            LOGGER.debug("Created DirectoryStore %s", self.basename())
         super().__init__()
 
     def basename(self) -> str:
@@ -132,8 +137,7 @@ class LocalZarrLocation(BaseZarrLocation):
         If a file does not exist, an empty response is returned rather
         than an exception.
         """
-        filename = self.__path / subpath
-
+        filename = self.subpath(subpath)
         if not os.path.exists(filename):
             LOGGER.debug(f"{filename} does not exist")
             return {}
@@ -189,7 +193,7 @@ class RemoteZarrLocation(BaseZarrLocation):
             return {}
 
 
-def parse_url(path: str) -> Optional[BaseZarrLocation]:
+def parse_url(path: str, mode: str = "r") -> Optional[BaseZarrLocation]:
     """Convert a path string or URL to a BaseZarrLocation subclass.
 
     >>> parse_url('does-not-exist')
@@ -199,12 +203,15 @@ def parse_url(path: str) -> Optional[BaseZarrLocation]:
         return LocalZarrLocation(Path(path))
     else:
         result = urlparse(path)
-        zarr: Optional[BaseZarrLocation] = None
+        zarr_loc: Optional[BaseZarrLocation] = None
         if result.scheme in ("", "file"):
             # Strips 'file://' if necessary
-            zarr = LocalZarrLocation(Path(result.path))
+            zarr_loc = LocalZarrLocation(Path(result.path), mode=mode)
+
         else:
-            zarr = RemoteZarrLocation(path)
-        if zarr.exists():
-            return zarr
+            if mode != "r":
+                raise ValueError("Remote locations are read only")
+            zarr_loc = RemoteZarrLocation(path)
+        if zarr_loc.exists() or (mode in ("a", "w")):
+            return zarr_loc
     return None
