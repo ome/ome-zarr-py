@@ -42,6 +42,7 @@ class Scaler:
 
     copy_metadata: bool = False
     downscale: int = 2
+    downsample_z: bool = False
     in_place: bool = False
     labeled: bool = False
     max_layer: int = 4
@@ -129,7 +130,7 @@ class Scaler:
         """Apply the 2-dimensional transformation."""
         return cv2.resize(
             plane,
-            dsize=(sizeY // self.downscale, sizeX // self.downscale),
+            dsize=(sizeX // self.downscale, sizeY // self.downscale),
             interpolation=cv2.INTER_NEAREST,
         )
 
@@ -197,12 +198,39 @@ class Scaler:
             smaller = None
             for t in range(T):
                 for c in range(C):
+                    z_stack = []
                     for z in range(Z):
-                        out = func(fiveD[t][c][z][:], Y, X)
-                        if smaller is None:
-                            smaller = np.zeros(
-                                (T, C, Z, out.shape[0], out.shape[1]), dtype=base.dtype
-                            )
-                        smaller[t][c][z] = out
+                        orig = fiveD[t][c][z][:]
+                        p = func(orig, Y, X)
+                        z_stack.append(p)
+                    temp_arr = np.stack(z_stack)
+                    # temp_arr (236, 137, 135)
+
+                    if self.downsample_z:
+                        final_scaled_slices = []
+                        # Resample xz plane at each y
+                        for y in range(temp_arr.shape[1]):
+                            xz_pane = temp_arr[:, y, :]
+                            size_z = xz_pane.shape[0]
+                            size_x = xz_pane.shape[1]
+                            # To prevent downsampling of X again, multiply by downscale
+                            scaled_xz = func(xz_pane, size_z, size_x * self.downscale)
+                            final_scaled_slices.append(scaled_xz)
+                        temp_arr = np.stack(final_scaled_slices, axis=1)
+
+                    if smaller is None:
+                        smaller = np.zeros(
+                            (
+                                T,
+                                C,
+                                temp_arr.shape[0],
+                                temp_arr.shape[1],
+                                temp_arr.shape[2],
+                            ),
+                            dtype=base.dtype,
+                        )
+
+                    smaller[t][c] = temp_arr
+
             rv.append(smaller)
         return rv

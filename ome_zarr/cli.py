@@ -57,6 +57,7 @@ def scale(args: argparse.Namespace) -> None:
     scaler = Scaler(
         copy_metadata=args.copy_metadata,
         downscale=args.downscale,
+        downsample_z=args.downsample_z,
         in_place=args.in_place,
         labeled=args.labeled,
         max_layer=args.max_layer,
@@ -112,6 +113,7 @@ def main(args: List[str] = None) -> None:
     parser_create.add_argument("path")
     parser_create.set_defaults(func=create)
 
+    # scale
     parser_scale = subparsers.add_parser("scale")
     parser_scale.add_argument("input_array")
     parser_scale.add_argument("output_directory")
@@ -132,6 +134,11 @@ def main(args: List[str] = None) -> None:
         "--in-place", action="store_true", help="if true, don't write the base array"
     )
     parser_scale.add_argument("--downscale", type=int, default=2)
+    parser_scale.add_argument(
+        "--downsample_z",
+        action="store_true",
+        help="If True, downsample in Z axis (not just X and Y)",
+    )
     parser_scale.add_argument("--max_layer", type=int, default=4)
     parser_scale.set_defaults(func=scale)
 
