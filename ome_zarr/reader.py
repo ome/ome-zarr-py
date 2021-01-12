@@ -354,9 +354,6 @@ class OMERO(Spec):
             node.metadata["visible"] = visibles
             node.metadata["contrast_limits"] = contrast_limits
             node.metadata["colormap"] = colormaps
-            if not node.data:
-                data: da.core.Array = self.zarr.load()
-                node.data.append(data)
 
         except Exception as e:
             raise e
