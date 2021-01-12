@@ -4,7 +4,6 @@
 import logging
 from typing import Any, List, Tuple, Union
 
-import dask.array as da
 import numpy as np
 import zarr
 
@@ -14,7 +13,7 @@ LOGGER = logging.getLogger("ome_zarr.writer")
 
 
 def write_multiscale(
-    pyramid: List, group: zarr.Group, chunks: Union[Tuple[int], int] = None,
+    pyramid: List, group: zarr.Group, chunks: Union[Tuple[Any, ...], int] = None,
 ) -> None:
     """Write a pyramid with multiscale metadata to disk."""
     paths = []
@@ -30,7 +29,7 @@ def write_multiscale(
 def write_image(
     image: np.ndarray,
     group: zarr.Group,
-    chunks: Union[Tuple[int], int] = None,
+    chunks: Union[Tuple[Any, ...], int] = None,
     byte_order: Union[str, List[str]] = "tczyx",
     **metadata: JSONDict,
 ) -> None:
@@ -56,11 +55,8 @@ def write_image(
     image = image.reshape(shape_5d)
 
     if chunks is not None:
-        _chunks = _retuple(chunks, shape_5d)
-        image = da.from_array(image, chunks=_chunks)
-
+        chunks = _retuple(chunks, shape_5d)
     omero = metadata.get("omero", {})
-
     # Update the size entry anyway
     omero["size"] = {
         "t": image.shape[0],
@@ -88,13 +84,15 @@ def write_image(
             omero["rdefs"] = {"model": "color"}
 
     metadata["omero"] = omero
-    write_multiscale([image], group)  # TODO: downsample
+    write_multiscale([image], group, chunks=chunks)  # TODO: downsample
     group.attrs.update(metadata)
 
 
-def _retuple(chunks: Union[Tuple[int], int], shape: Tuple[Any, ...]) -> Tuple[int, ...]:
+def _retuple(
+    chunks: Union[Tuple[Any, ...], int], shape: Tuple[Any, ...]
+) -> Tuple[Any, ...]:
 
-    _chunks: Tuple[int]
+    _chunks: Tuple[Any, ...]
     if isinstance(chunks, int):
         _chunks = (chunks,)
     else:
