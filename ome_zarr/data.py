@@ -12,6 +12,7 @@ from skimage.morphology import closing, remove_small_objects, square
 from skimage.segmentation import clear_border
 
 from .scale import Scaler
+from .writer import write_multiscale
 
 CHANNEL_DIMENSION = 1
 
@@ -90,17 +91,6 @@ def rgb_to_5d(pixels: np.ndarray) -> List:
         assert False, f"expecting 2 or 3d: ({pixels.shape})"
     video = np.array([channels])
     return video
-
-
-def write_multiscale(pyramid: List, group: zarr.Group) -> None:
-    """Write a pyramid with multiscale metadata to disk."""
-    paths = []
-    for path, dataset in enumerate(pyramid):
-        group.create_dataset(str(path), data=pyramid[path])
-        paths.append({"path": str(path)})
-
-    multiscales = [{"version": "0.1", "datasets": paths}]
-    group.attrs["multiscales"] = multiscales
 
 
 def create_zarr(
