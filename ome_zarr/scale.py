@@ -83,6 +83,17 @@ class Scaler:
             print(f"copying attribute keys: {list(base.attrs.keys())}")
             grp.attrs.update(base.attrs)
 
+    def z_scale_array(self, input_array: str, output_directory: str) -> None:
+        """Downsample a SINGLE 5D array in Z and write to output_directory"""
+
+        base = zarr.open_array(input_array)
+        # only support nearest
+        smaller = self._z_by_plane(base, self.__nearest)
+        # output_directory may already exist
+        store = zarr.DirectoryStore(output_directory)
+        grp = zarr.group(store)
+        grp.create_dataset(input_array, data=smaller)
+
     def __check_store(self, output_directory: str) -> MutableMapping:
         """Return a Zarr store if it doesn't already exist."""
         assert not os.path.exists(output_directory)
@@ -182,6 +193,48 @@ class Scaler:
     #
     # Helpers
     #
+
+    def _z_by_plane(
+        self, base: np.ndarray, func: Callable[[np.ndarray, int, int], np.ndarray],
+    ) -> np.ndarray:
+        """Loop over 2 of the 5 dimensions and apply the func transform to Z only"""
+        assert 5 == len(base.shape)
+
+        fiveD = base
+        # FIXME: fix hard-coding of dimensions
+        T, C, Z, Y, X = fiveD.shape
+
+        smaller = None
+        for t in range(T):
+            for c in range(C):
+                temp_arr = fiveD[t][c][:]
+                print("c", c)
+                final_scaled_slices = []
+                # Resample xz plane at each y
+                size_y = temp_arr.shape[1]
+                for y in range(size_y):
+                    print("  y", y, size_y)
+                    xz_pane = temp_arr[:, y, :]
+                    size_z = xz_pane.shape[0]
+                    size_x = xz_pane.shape[1]
+                    # To prevent downsampling of X again, multiply by downscale
+                    scaled_xz = func(xz_pane, size_z, size_x * self.downscale)
+                    final_scaled_slices.append(scaled_xz)
+                temp_arr = np.stack(final_scaled_slices, axis=1)
+
+                if smaller is None:
+                    smaller = np.zeros(
+                        (
+                            T,
+                            C,
+                            temp_arr.shape[0],
+                            temp_arr.shape[1],
+                            temp_arr.shape[2],
+                        ),
+                        dtype=base.dtype,
+                    )
+                smaller[t][c] = temp_arr
+        return smaller
 
     def _by_plane(
         self, base: np.ndarray, func: Callable[[np.ndarray, int, int], np.ndarray],
