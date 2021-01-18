@@ -5,15 +5,19 @@ See the :class:`~ome_zarr.scale.Scaler` class for details.
 import inspect
 import logging
 import os
+import shutil
 from collections.abc import MutableMapping
 from dataclasses import dataclass
-from typing import Callable, Iterator, List
+from typing import Callable, Iterator, List, Optional, Tuple
 
 import cv2
+import dask.array as da
 import numpy as np
 import zarr
 from scipy.ndimage import zoom
-from skimage.transform import downscale_local_mean, pyramid_gaussian, pyramid_laplacian
+from skimage.transform import downscale_local_mean, pyramid_gaussian
+from skimage.transform import pyramid_laplacian, rescale
+
 
 LOGGER = logging.getLogger("ome_zarr.scale")
 
@@ -47,6 +51,9 @@ class Scaler:
     labeled: bool = False
     max_layer: int = 4
     method: str = "nearest"
+    output_directory: Optional[str] = None
+    shape: Optional[Tuple[int, int, int]] = None
+    dtype: Optional[np.dtype] = None
 
     @staticmethod
     def methods() -> Iterator[str]:
@@ -63,6 +70,74 @@ class Scaler:
             if name.startswith("_"):
                 continue
             yield name
+
+    def add_plane_to_pyramid(
+        self,
+        plane: np.ndarray,
+        indices: Tuple[int, int, int],
+        func: Optional[Callable] = None,
+        get_level_name: Optional[Callable] = None,
+    ) -> None:
+        """
+        Adds a 2D numpy plane to each level of a pyramid, at (t, c, z) indices.
+
+        If no downsample function is provided, use cv2.resize() with
+        self.downsample factor (default is 2) and interpolation=cv2.INTER_NEAREST
+
+        Usage:
+        # pyramid shape can be (t, c, z, y, x) or (t, c, z)
+        scaler = Scaler(output_dir, shape, dtype, level_count)
+        scaler.add_plane_to_pyramid(plane_2d, (t, c, z), func=scale_2d)
+        scaler.add_plane_to_pyramid(plane_2d, (t, c, z), get_level_name=name_func)
+        """
+
+        output_directory = self.output_directory
+        shape = self.shape
+        dtype = self.dtype
+        level_count = self.max_layer
+
+        assert output_directory is not None
+        assert shape is not None
+        assert dtype is not None
+        assert level_count is not None
+
+        # pyramid shape could be given by (t, c, z, y, x) or (t, c, z)
+        assert len(shape) > 2
+        store = zarr.DirectoryStore(output_directory)
+        parent = zarr.group(store)
+
+        size_t: int = shape[0]
+        size_c: int = shape[1]
+        size_z: int = shape[2]
+
+        t, c, z = indices
+
+        if func is None:
+
+            def func(plane_2d: np.ndarray) -> np.ndarray:
+                size_x = plane_2d.shape[-1] // self.downscale
+                size_y = plane_2d.shape[-2] // self.downscale
+                return cv2.resize(
+                    plane_2d, dsize=(size_x, size_y), interpolation=cv2.INTER_NEAREST,
+                )
+
+        assert func is not None
+
+        for level in range(level_count):
+            if level > 0:
+                # downsample
+                plane = func(plane)
+            # size x and y change with each level. z, c, t don't change
+            size_y = plane.shape[0]
+            size_x = plane.shape[1]
+            dataset = parent.require_dataset(
+                get_level_name(level) if get_level_name is not None else str(level),
+                shape=(size_t, size_c, size_z, size_y, size_x),
+                chunks=(1, 1, 1, size_y, size_x),
+                dtype=dtype,
+            )
+
+            dataset[t, c, z, :, :] = plane
 
     def scale(self, input_array: str, output_directory: str) -> None:
         """Perform downsampling to disk."""
@@ -83,16 +158,109 @@ class Scaler:
             print(f"copying attribute keys: {list(base.attrs.keys())}")
             grp.attrs.update(base.attrs)
 
-    def z_scale_array(self, input_array: str, output_directory: str) -> None:
-        """Downsample a SINGLE 5D array in Z and write to output_directory"""
+    def scale_arrays_3d(
+        self,
+        input_group: str,
+        output_group: str,
+        func3d: Callable[[np.ndarray, str], np.ndarray],
+        input_arrays: Optional[List[str]] = None,
+        output_arrays: Optional[List[str]] = None,
+        overwrite: bool = False,
+    ) -> None:
+        """
+        Process 1 or more arrays within an input_group, applying a func3d transform.
 
-        base = zarr.open_array(input_array)
-        # only support nearest
-        smaller = self._z_by_plane(base, self.__nearest)
+        Output arrays will be created in the output_group, with the same names as the
+        input arrays by default.
+        """
+
+        if overwrite is False:
+            if output_group is None and output_arrays is None:
+                # make sure we don't accidentally overwrite
+                raise TypeError(
+                    """Need to set overwrite=True, or specify
+                    output_group or output_arrays"""
+                )
+
+        if input_arrays is None:
+            input_store = zarr.DirectoryStore(input_group)
+            input_grp = zarr.group(input_store)
+            input_arrays = list(input_grp.array_keys())
+
+        # write output to new arrays in the same group, or overwrite arrays
+        # if same level names
+        if output_group is None:
+            output_group = input_group
+
+        # create arrays named the same as input arrays, or overwrite arrays
+        # if same group
+        if output_arrays is None:
+            output_arrays = input_arrays
+
         # output_directory may already exist
-        store = zarr.DirectoryStore(output_directory)
+        store = zarr.DirectoryStore(output_group)
         grp = zarr.group(store)
-        grp.create_dataset(input_array, data=smaller)
+
+        for input_level, output_level in zip(input_arrays, output_arrays):
+            if input_group is not None:
+                input_path = os.path.join(input_group, input_level)
+            else:
+                input_path = input_level
+            base = da.from_zarr(input_path)
+
+            size_t = base.shape[0]
+            size_c = base.shape[1]
+            for t in range(size_t):
+                for c in range(size_c):
+                    data_3d = base[t, c, :, :, :]
+                    resized = func3d(data_3d, input_level)
+                    size_z, size_y, size_x = resized.shape
+                    dataset = grp.require_dataset(
+                        output_level,
+                        shape=(size_t, size_c, size_z, size_y, size_x),
+                        chunks=(1, 1, 1, size_y, size_x),
+                        dtype=resized.dtype,
+                    )
+                    dataset[t, c, :, :, :] = resized
+
+    def z_scale_array(self, input_group: str, output_group: str) -> None:
+        """Downsample a SINGLE 5D array in Z and write to output_group"""
+
+        # Copy level '0' and '.zattrs' to new dir
+        if not os.path.exists(os.path.join(output_group, "0")):
+            shutil.copytree(
+                os.path.join(input_group, "0"), os.path.join(output_group, "0")
+            )
+        if not os.path.exists(os.path.join(output_group, ".zattrs")):
+            shutil.copyfile(
+                os.path.join(input_group, ".zattrs"),
+                os.path.join(output_group, ".zattrs"),
+            )
+
+        def doscale(array_3d: np.ndarray, array_name: str) -> np.ndarray:
+            # Assume input pyramid levels are named '0', '1', '2' etc.
+            input_level = int(array_name)
+            factor = (1 / self.downscale) ** input_level
+            rescaled = rescale(array_3d, (factor, 1, 1), preserve_range=True)
+            # preserve input dtype
+            return rescaled.astype(array_3d.dtype)
+
+        input_store = zarr.DirectoryStore(input_group)
+        input_grp = zarr.group(input_store)
+        # Don't process level 0
+        input_arrays = [arr for arr in input_grp.array_keys() if arr != "0"]
+        output_arrays = None
+        # If creating arrays in the *same* group as input arrays, rename:
+        if input_group == output_group:
+            output_arrays = ["z%s" % arr for arr in input_arrays]
+
+        self.scale_arrays_3d(
+            input_group,
+            output_group,
+            doscale,
+            input_arrays=input_arrays,
+            output_arrays=output_arrays,
+        )
 
     def __check_store(self, output_directory: str) -> MutableMapping:
         """Return a Zarr store if it doesn't already exist."""
