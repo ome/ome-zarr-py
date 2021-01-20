@@ -63,11 +63,7 @@ def scale(args: argparse.Namespace) -> None:
         max_layer=args.max_layer,
         method=args.method,
     )
-    # TODO - add option to downsample Z-only, or scale() with downsample_z
-    if args.downsample_z:
-        scaler.z_scale_array(args.input_array, args.output_directory)
-    else:
-        scaler.scale(args.input_array, args.output_directory)
+    scaler.scale(args.input_array, args.output_directory, args.downsample_z)
 
 
 def csv_to_labels(args: argparse.Namespace) -> None:

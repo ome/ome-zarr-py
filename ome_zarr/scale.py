@@ -18,7 +18,6 @@ from scipy.ndimage import zoom
 from skimage.transform import downscale_local_mean, pyramid_gaussian
 from skimage.transform import pyramid_laplacian, rescale
 
-
 LOGGER = logging.getLogger("ome_zarr.scale")
 
 
@@ -139,24 +138,71 @@ class Scaler:
 
             dataset[t, c, z, :, :] = plane
 
-    def scale(self, input_array: str, output_directory: str) -> None:
-        """Perform downsampling to disk."""
-        func = getattr(self, self.method, None)
-        if not func:
-            raise Exception
+    def scale(
+        self,
+        input_array_or_group: str,
+        output_directory: str,
+        downsample_z: bool = False,
+    ) -> None:
+        """
+        Perform downsampling to disk.
 
-        store = self.__check_store(output_directory)
-        base = zarr.open_array(input_array)
-        pyramid = func(base)
+        If input_array_or_group is a path/to/array (contains .zarray) then this creates
+        a pyramid of resolution levels (arrays in the output_directory),
+        downsampling X and Y.
+        If downsample_z is True, then we subsequently downsample the pyramid in Z.
 
-        if self.labeled:
-            self.__assert_values(pyramid)
+        If input_array_or_group is a path/to/group (contains .zgroup) and
+        downsample_z is True, this creates a new pyramid, in the output_directory,
+        downsampling Z only.
+        """
 
-        grp = self.__create_group(store, base, pyramid)
+        # If input is array, first downsample XY to create pyramid
+        pyramid_dir = None
+        if os.path.exists(os.path.join(input_array_or_group, ".zarray")):
+            print("downsampling in X and Y to create pyramid...")
+            if downsample_z:
+                # will delete this once downsample_z is done
+                pyramid_dir = "%s_temp" % output_directory
+            else:
+                pyramid_dir = output_directory
+            func = getattr(self, self.method, None)
+            if not func:
+                raise Exception
 
-        if self.copy_metadata:
-            print(f"copying attribute keys: {list(base.attrs.keys())}")
-            grp.attrs.update(base.attrs)
+            store = self.__check_store(pyramid_dir)
+            base = zarr.open_array(input_array_or_group)
+            pyramid = func(base)
+
+            if self.labeled:
+                self.__assert_values(pyramid)
+
+            grp = self.__create_group(store, base, pyramid)
+
+            if self.copy_metadata:
+                print(f"copying attribute keys: {list(base.attrs.keys())}")
+                grp.attrs.update(base.attrs)
+
+        elif os.path.exists(os.path.join(input_array_or_group, ".zgroup")):
+            # if input is a .zgroup
+            if not downsample_z:
+                raise ValueError(
+                    "If input is a pyramid, use" " --downsample_z to downsample"
+                )
+        else:
+            raise ValueError("input is not a zarr array or group")
+
+        if downsample_z:
+            print("downsampling pyramid in Z...")
+            zscale_input = input_array_or_group
+            if pyramid_dir is not None:
+                zscale_input = pyramid_dir
+
+            self.z_scale_pyramid(zscale_input, output_directory)
+
+            if pyramid_dir is not None:
+                print("Deleting temp ", pyramid_dir)
+                shutil.rmtree(pyramid_dir)
 
     def scale_arrays_3d(
         self,
@@ -223,15 +269,19 @@ class Scaler:
                     )
                     dataset[t, c, :, :, :] = resized
 
-    def z_scale_array(self, input_group: str, output_group: str) -> None:
+    def z_scale_pyramid(self, input_group: str, output_group: str) -> None:
         """Downsample a SINGLE 5D array in Z and write to output_group"""
 
         # Copy level '0' and '.zattrs' to new dir
-        if not os.path.exists(os.path.join(output_group, "0")):
+        if os.path.exists(os.path.join(input_group, "0")) and not os.path.exists(
+            os.path.join(output_group, "0")
+        ):
             shutil.copytree(
                 os.path.join(input_group, "0"), os.path.join(output_group, "0")
             )
-        if not os.path.exists(os.path.join(output_group, ".zattrs")):
+        if os.path.exists(os.path.join(input_group, ".zattrs")) and not os.path.exists(
+            os.path.join(output_group, ".zattrs")
+        ):
             shutil.copyfile(
                 os.path.join(input_group, ".zattrs"),
                 os.path.join(output_group, ".zattrs"),
@@ -286,14 +336,10 @@ class Scaler:
     ) -> zarr.hierarchy.Group:
         """Create group and datasets."""
         grp = zarr.group(store)
-        grp.create_dataset("base", data=base)
         series = []
         for i, dataset in enumerate(pyramid):
-            if i == 0:
-                path = "base"
-            else:
-                path = "%s" % i
-                grp.create_dataset(path, data=pyramid[i])
+            path = "%s" % i
+            grp.create_dataset(path, data=pyramid[i])
             series.append({"path": path})
         return grp
 
@@ -362,48 +408,6 @@ class Scaler:
     # Helpers
     #
 
-    def _z_by_plane(
-        self, base: np.ndarray, func: Callable[[np.ndarray, int, int], np.ndarray],
-    ) -> np.ndarray:
-        """Loop over 2 of the 5 dimensions and apply the func transform to Z only"""
-        assert 5 == len(base.shape)
-
-        fiveD = base
-        # FIXME: fix hard-coding of dimensions
-        T, C, Z, Y, X = fiveD.shape
-
-        smaller = None
-        for t in range(T):
-            for c in range(C):
-                temp_arr = fiveD[t][c][:]
-                print("c", c)
-                final_scaled_slices = []
-                # Resample xz plane at each y
-                size_y = temp_arr.shape[1]
-                for y in range(size_y):
-                    print("  y", y, size_y)
-                    xz_pane = temp_arr[:, y, :]
-                    size_z = xz_pane.shape[0]
-                    size_x = xz_pane.shape[1]
-                    # To prevent downsampling of X again, multiply by downscale
-                    scaled_xz = func(xz_pane, size_z, size_x * self.downscale)
-                    final_scaled_slices.append(scaled_xz)
-                temp_arr = np.stack(final_scaled_slices, axis=1)
-
-                if smaller is None:
-                    smaller = np.zeros(
-                        (
-                            T,
-                            C,
-                            temp_arr.shape[0],
-                            temp_arr.shape[1],
-                            temp_arr.shape[2],
-                        ),
-                        dtype=base.dtype,
-                    )
-                smaller[t][c] = temp_arr
-        return smaller
-
     def _by_plane(
         self, base: np.ndarray, func: Callable[[np.ndarray, int, int], np.ndarray],
     ) -> np.ndarray:
@@ -425,19 +429,6 @@ class Scaler:
                         p = func(orig, Y, X)
                         z_stack.append(p)
                     temp_arr = np.stack(z_stack)
-                    # temp_arr (236, 137, 135)
-
-                    if self.downsample_z:
-                        final_scaled_slices = []
-                        # Resample xz plane at each y
-                        for y in range(temp_arr.shape[1]):
-                            xz_pane = temp_arr[:, y, :]
-                            size_z = xz_pane.shape[0]
-                            size_x = xz_pane.shape[1]
-                            # To prevent downsampling of X again, multiply by downscale
-                            scaled_xz = func(xz_pane, size_z, size_x * self.downscale)
-                            final_scaled_slices.append(scaled_xz)
-                        temp_arr = np.stack(final_scaled_slices, axis=1)
 
                     if smaller is None:
                         smaller = np.zeros(
