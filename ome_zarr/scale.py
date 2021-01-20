@@ -138,6 +138,28 @@ class Scaler:
 
             dataset[t, c, z, :, :] = plane
 
+    def scale_array_xy_to_pyramid(
+        self, input_array: str, output_directory: str
+    ) -> None:
+        """
+        Scales the array to create a pyramid in output_directory.
+
+        Process the T/C/Z planes one at a time, writing them to the
+        pyramid on disk in turn.
+        """
+        base = da.from_zarr(input_array)
+        self.dtype = base.dtype
+        self.output_directory = output_directory
+        size_t, size_c, size_z, size_y, size_x = base.shape
+        self.shape = (size_t, size_c, size_z)
+
+        for t in range(size_t):
+            for c in range(size_c):
+                for z in range(size_z):
+                    plane_2d = base[t, c, z, :, :]
+                    plane_2d = plane_2d.compute()
+                    self.add_plane_to_pyramid(plane_2d, (t, c, z))
+
     def scale(
         self,
         input_array_or_group: str,
@@ -166,18 +188,23 @@ class Scaler:
                 pyramid_dir = "%s_temp" % output_directory
             else:
                 pyramid_dir = output_directory
-            func = getattr(self, self.method, None)
-            if not func:
-                raise Exception
 
-            store = self.__check_store(pyramid_dir)
-            base = zarr.open_array(input_array_or_group)
-            pyramid = func(base)
+            if self.method == "nearest":
+                # Writes each plane to disk in turn
+                self.scale_array_xy_to_pyramid(input_array_or_group, pyramid_dir)
+            else:
+                func = getattr(self, self.method, None)
+                if not func:
+                    raise Exception
 
-            if self.labeled:
-                self.__assert_values(pyramid)
+                store = self.__check_store(pyramid_dir)
+                base = zarr.open_array(input_array_or_group)
+                pyramid = func(base)
 
-            grp = self.__create_group(store, base, pyramid)
+                if self.labeled:
+                    self.__assert_values(pyramid)
+
+                grp = self.__create_group(store, base, pyramid)
 
             if self.copy_metadata:
                 print(f"copying attribute keys: {list(base.attrs.keys())}")
@@ -328,7 +355,7 @@ class Scaler:
             if not expected.issuperset(found):
                 raise Exception(
                     f"{len(found)} found values are not "
-                    "a subset of {len(expected)} values"
+                    f"a subset of {len(expected)} values"
                 )
 
     def __create_group(
@@ -342,22 +369,6 @@ class Scaler:
             grp.create_dataset(path, data=pyramid[i])
             series.append({"path": path})
         return grp
-
-    def nearest(self, base: np.ndarray) -> List[np.ndarray]:
-        """
-        Downsample using :func:`cv2.resize`.
-
-        The :const:`cvs2.INTER_NEAREST` interpolation method is used.
-        """
-        return self._by_plane(base, self.__nearest)
-
-    def __nearest(self, plane: np.ndarray, sizeY: int, sizeX: int) -> np.ndarray:
-        """Apply the 2-dimensional transformation."""
-        return cv2.resize(
-            plane,
-            dsize=(sizeX // self.downscale, sizeY // self.downscale),
-            interpolation=cv2.INTER_NEAREST,
-        )
 
     def gaussian(self, base: np.ndarray) -> List[np.ndarray]:
         """Downsample using :func:`skimage.transform.pyramid_gaussian`."""
@@ -403,46 +414,3 @@ class Scaler:
             rv.append(zoom(base, self.downscale ** i))
             print(rv[-1].shape)
         return list(reversed(rv))
-
-    #
-    # Helpers
-    #
-
-    def _by_plane(
-        self, base: np.ndarray, func: Callable[[np.ndarray, int, int], np.ndarray],
-    ) -> np.ndarray:
-        """Loop over 3 of the 5 dimensions and apply the func transform."""
-        assert 5 == len(base.shape)
-
-        rv = [base]
-        for i in range(self.max_layer):
-            fiveD = rv[-1]
-            # FIXME: fix hard-coding of dimensions
-            T, C, Z, Y, X = fiveD.shape
-
-            smaller = None
-            for t in range(T):
-                for c in range(C):
-                    z_stack = []
-                    for z in range(Z):
-                        orig = fiveD[t][c][z][:]
-                        p = func(orig, Y, X)
-                        z_stack.append(p)
-                    temp_arr = np.stack(z_stack)
-
-                    if smaller is None:
-                        smaller = np.zeros(
-                            (
-                                T,
-                                C,
-                                temp_arr.shape[0],
-                                temp_arr.shape[1],
-                                temp_arr.shape[2],
-                            ),
-                            dtype=base.dtype,
-                        )
-
-                    smaller[t][c] = temp_arr
-
-            rv.append(smaller)
-        return rv
