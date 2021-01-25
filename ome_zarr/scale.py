@@ -64,11 +64,89 @@ class Scaler:
         """
         funcs = inspect.getmembers(Scaler, predicate=inspect.isfunction)
         for name, func in funcs:
-            if name in ("methods", "scale"):
+            if name in (
+                "methods",
+                "scale",
+                "z_scale_pyramid",
+                "add_plane_to_pyramid",
+                "scale_arrays_3d",
+                "scale_array_xy_to_pyramid",
+            ):
                 continue
             if name.startswith("_"):
                 continue
             yield name
+
+    def scale(
+        self,
+        input_array_or_group: str,
+        output_directory: str,
+        downsample_z: bool = False,
+    ) -> None:
+        """
+        Perform downsampling to disk.
+
+        If input_array_or_group is a path/to/array (contains .zarray) then this creates
+        a pyramid of resolution levels (arrays in the output_directory),
+        downsampling X and Y.
+        If downsample_z is True, then we subsequently downsample the pyramid in Z.
+
+        If input_array_or_group is a path/to/group (contains .zgroup) and
+        downsample_z is True, this creates a new pyramid, in the output_directory,
+        downsampling Z only.
+        """
+
+        # If input is array, first downsample XY to create pyramid
+        pyramid_dir = None
+        if os.path.exists(os.path.join(input_array_or_group, ".zarray")):
+            print("downsampling in X and Y to create pyramid...")
+            if downsample_z:
+                # will delete this once downsample_z is done
+                pyramid_dir = "%s_temp" % output_directory
+            else:
+                pyramid_dir = output_directory
+
+            if self.method == "nearest":
+                # Writes each plane to disk in turn
+                self.scale_array_xy_to_pyramid(input_array_or_group, pyramid_dir)
+            else:
+                func = getattr(self, self.method, None)
+                if not func:
+                    raise Exception
+
+                store = self.__check_store(pyramid_dir)
+                base = zarr.open_array(input_array_or_group)
+                pyramid = func(base)
+
+                if self.labeled:
+                    self.__assert_values(pyramid)
+
+                grp = self.__create_group(store, base, pyramid)
+
+            if self.copy_metadata:
+                print(f"copying attribute keys: {list(base.attrs.keys())}")
+                grp.attrs.update(base.attrs)
+
+        elif os.path.exists(os.path.join(input_array_or_group, ".zgroup")):
+            # if input is a .zgroup
+            if not downsample_z:
+                raise ValueError(
+                    "If input is a pyramid, use" " --downsample_z to downsample"
+                )
+        else:
+            raise ValueError("input is not a zarr array or group")
+
+        if downsample_z:
+            print("downsampling pyramid in Z...")
+            zscale_input = input_array_or_group
+            if pyramid_dir is not None:
+                zscale_input = pyramid_dir
+
+            self.z_scale_pyramid(zscale_input, output_directory)
+
+            if pyramid_dir is not None:
+                print("Deleting temp ", pyramid_dir)
+                shutil.rmtree(pyramid_dir)
 
     def add_plane_to_pyramid(
         self,
@@ -159,77 +237,6 @@ class Scaler:
                     plane_2d = base[t, c, z, :, :]
                     plane_2d = plane_2d.compute()
                     self.add_plane_to_pyramid(plane_2d, (t, c, z))
-
-    def scale(
-        self,
-        input_array_or_group: str,
-        output_directory: str,
-        downsample_z: bool = False,
-    ) -> None:
-        """
-        Perform downsampling to disk.
-
-        If input_array_or_group is a path/to/array (contains .zarray) then this creates
-        a pyramid of resolution levels (arrays in the output_directory),
-        downsampling X and Y.
-        If downsample_z is True, then we subsequently downsample the pyramid in Z.
-
-        If input_array_or_group is a path/to/group (contains .zgroup) and
-        downsample_z is True, this creates a new pyramid, in the output_directory,
-        downsampling Z only.
-        """
-
-        # If input is array, first downsample XY to create pyramid
-        pyramid_dir = None
-        if os.path.exists(os.path.join(input_array_or_group, ".zarray")):
-            print("downsampling in X and Y to create pyramid...")
-            if downsample_z:
-                # will delete this once downsample_z is done
-                pyramid_dir = "%s_temp" % output_directory
-            else:
-                pyramid_dir = output_directory
-
-            if self.method == "nearest":
-                # Writes each plane to disk in turn
-                self.scale_array_xy_to_pyramid(input_array_or_group, pyramid_dir)
-            else:
-                func = getattr(self, self.method, None)
-                if not func:
-                    raise Exception
-
-                store = self.__check_store(pyramid_dir)
-                base = zarr.open_array(input_array_or_group)
-                pyramid = func(base)
-
-                if self.labeled:
-                    self.__assert_values(pyramid)
-
-                grp = self.__create_group(store, base, pyramid)
-
-            if self.copy_metadata:
-                print(f"copying attribute keys: {list(base.attrs.keys())}")
-                grp.attrs.update(base.attrs)
-
-        elif os.path.exists(os.path.join(input_array_or_group, ".zgroup")):
-            # if input is a .zgroup
-            if not downsample_z:
-                raise ValueError(
-                    "If input is a pyramid, use" " --downsample_z to downsample"
-                )
-        else:
-            raise ValueError("input is not a zarr array or group")
-
-        if downsample_z:
-            print("downsampling pyramid in Z...")
-            zscale_input = input_array_or_group
-            if pyramid_dir is not None:
-                zscale_input = pyramid_dir
-
-            self.z_scale_pyramid(zscale_input, output_directory)
-
-            if pyramid_dir is not None:
-                print("Deleting temp ", pyramid_dir)
-                shutil.rmtree(pyramid_dir)
 
     def scale_arrays_3d(
         self,
