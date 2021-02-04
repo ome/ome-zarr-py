@@ -200,7 +200,9 @@ class Scaler:
                     for z in range(Z):
                         out = func(fiveD[t][c][z][:], Y, X)
                         if smaller is None:
-                            smaller = np.zeros((T, C, Z, out.shape[0], out.shape[1]))
+                            smaller = np.zeros(
+                                (T, C, Z, out.shape[0], out.shape[1]), dtype=base.dtype
+                            )
                         smaller[t][c][z] = out
             rv.append(smaller)
         return rv
