@@ -1,11 +1,10 @@
 name: z
 channels:
-  - defaults
   - ome
   - conda-forge
+  - defaults
 dependencies:
-  - pyside2
-  - napari
+  - pyqt
   - flake8
   - ipython
   - mypy
@@ -21,6 +20,7 @@ dependencies:
   - xarray
   - zarr >= 2.4.0
   - pip:
+      - napari
       - pre-commit
       - pytest-qt
 # python.app -- only install on OSX:
