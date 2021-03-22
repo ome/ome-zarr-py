@@ -7,6 +7,7 @@ from typing import Any, List, Tuple, Union
 import numpy as np
 import zarr
 
+from .scale import Scaler
 from .types import JSONDict
 
 LOGGER = logging.getLogger("ome_zarr.writer")
@@ -31,6 +32,7 @@ def write_image(
     group: zarr.Group,
     chunks: Union[Tuple[Any, ...], int] = None,
     byte_order: Union[str, List[str]] = "tczyx",
+    scaler: Scaler = None,
     **metadata: JSONDict,
 ) -> None:
     """Writes an image to the zarr store according to ome-zarr specification
@@ -84,7 +86,12 @@ def write_image(
             omero["rdefs"] = {"model": "color"}
 
     metadata["omero"] = omero
-    write_multiscale([image], group, chunks=chunks)  # TODO: downsample
+
+    if scaler is None:
+        scaler = Scaler()
+
+    pyramid = scaler.nearest(image)
+    write_multiscale(pyramid, group, chunks=chunks)
     group.attrs.update(metadata)
 
 
