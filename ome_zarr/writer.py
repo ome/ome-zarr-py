@@ -20,7 +20,7 @@ def write_multiscale(
     paths = []
     for path, dataset in enumerate(pyramid):
         # TODO: chunks here could be different per layer
-        group.create_dataset(str(path), data=pyramid[path], chunks=chunks)
+        group.create_dataset(str(path), data=dataset, chunks=chunks)
         paths.append({"path": str(path)})
 
     multiscales = [{"version": "0.1", "datasets": paths}]
