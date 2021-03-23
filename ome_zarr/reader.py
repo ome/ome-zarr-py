@@ -356,7 +356,6 @@ class OMERO(Spec):
             node.metadata["colormap"] = colormaps
 
         except Exception as e:
-            raise e
             LOGGER.error(f"failed to parse metadata: {e}")
 
 
