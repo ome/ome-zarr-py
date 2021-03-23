@@ -58,34 +58,6 @@ def write_image(
 
     if chunks is not None:
         chunks = _retuple(chunks, shape_5d)
-    omero = metadata.get("omero", {})
-    # Update the size entry anyway
-    omero["size"] = {
-        "t": image.shape[0],
-        "c": image.shape[1],
-        "z": image.shape[2],
-        "height": image.shape[3],
-        "width": image.shape[4],
-    }
-    if omero.get("channels") is None:
-        size_c = image.shape[1]
-        if size_c == 1:
-            omero["channels"] = [{"window": {"start": 0, "end": 1}}]
-            omero["rdefs"] = {"model": "greyscale"}
-        else:
-            rng = np.random.default_rng(0)
-            colors = rng.integers(0, high=2 ** 8, size=(image.shape[1], 3))
-            omero["channels"] = [
-                {
-                    "color": "".join(f"{i:02x}" for i in color),
-                    "window": {"start": 0, "end": 1},
-                    "active": True,
-                }
-                for color in colors
-            ]
-            omero["rdefs"] = {"model": "color"}
-
-    metadata["omero"] = omero
 
     if scaler is None:
         scaler = Scaler()
