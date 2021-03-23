@@ -24,14 +24,6 @@ class TestWriter:
     def shape(self, request):
         return request.param
 
-    @pytest.fixture(params=[True, False], ids=["flat", "list"])
-    def data(self, shape, request):
-        rv = self.create_data(shape)
-        if request.param:
-            return rv
-        else:
-            return [rv]
-
     @pytest.fixture(params=[True, False], ids=["scale", "noop"])
     def scaler(self, request):
         if request.param:
@@ -39,8 +31,9 @@ class TestWriter:
         else:
             return None
 
-    def test_writer(self, shape, data, scaler):
+    def test_writer(self, shape, scaler):
 
+        data = self.create_data(shape)
         write_image(image=data, group=self.group, chunks=(128, 128), scaler=scaler)
 
         # Verify

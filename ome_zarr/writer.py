@@ -28,7 +28,7 @@ def write_multiscale(
 
 
 def write_image(
-    image: Union[np.ndarray, List[np.ndarray]],
+    image: np.ndarray,
     group: zarr.Group,
     chunks: Union[Tuple[Any, ...], int] = None,
     byte_order: Union[str, List[str]] = "tczyx",
@@ -39,9 +39,9 @@ def write_image(
 
     Parameters
     ----------
-    image: np.ndarray or list of np.ndarrays
-      the image data to save. A downsampling of the data can be pre-computed
-      in which case the scaler argument will be ignored.
+    image: np.ndarray
+      the image data to save. A downsampling of the data will be computed
+      if the scaler argument is non-None.
     group: zarr.Group
       the group within the zarr store to store the data in
     chunks: int or tuple of ints,
@@ -51,8 +51,7 @@ def write_image(
       in which the dimensions are saved
     scaler: Scaler
       Scaler implementation for downsampling the image argument. If None,
-      no downsampling will be performed and the image argument will be passed
-      directly to the write_multiscale method.
+      no downsampling will be performed.
     """
 
     if image.ndim > 5:
@@ -64,19 +63,11 @@ def write_image(
     if chunks is not None:
         chunks = _retuple(chunks, shape_5d)
 
-    needs_scaling = True
-    if isinstance(image, list):
-        needs_scaling = True
-
     if scaler is not None:
-        if not needs_scaling:
-            LOGGER.debug("skipping scaling")
-        else:
-            image = scaler.nearest(image)
+        image = scaler.nearest(image)
     else:
-        if needs_scaling:
-            LOGGER.debug("disabling pyramid")
-            image = [image]
+        LOGGER.debug("disabling pyramid")
+        image = [image]
 
     write_multiscale(image, group, chunks=chunks)
     group.attrs.update(metadata)
