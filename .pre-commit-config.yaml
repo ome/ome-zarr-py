@@ -44,11 +44,11 @@ repos:
           - --autofix
 
   - repo: https://gitlab.com/pycqa/flake8
-    rev: 3.8.3
+    rev: 3.8.4
     hooks:
       - id: flake8
         additional_dependencies: [
-          flake8-blind-except,
+          # flake8-blind-except, FIXME
           flake8-builtins,
           flake8-rst-docstrings,
           flake8-logging-format,
@@ -74,7 +74,7 @@ repos:
           --disallow-untyped-defs,
           --ignore-missing-imports,
         ]
-        exclude: tests/*|setup.py
+        exclude: tests/|setup.py
 
   - repo: https://github.com/adrienverge/yamllint.git
     rev: v1.24.2

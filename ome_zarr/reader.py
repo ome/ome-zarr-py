@@ -354,6 +354,7 @@ class OMERO(Spec):
             node.metadata["visible"] = visibles
             node.metadata["contrast_limits"] = contrast_limits
             node.metadata["colormap"] = colormaps
+
         except Exception as e:
             LOGGER.error(f"failed to parse metadata: {e}")
 
