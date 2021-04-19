@@ -263,7 +263,9 @@ class Multiscales(Spec):
         super().__init__(node)
 
         try:
-            datasets = self.lookup("multiscales", [])[0]["datasets"]
+            multiscales = self.lookup("multiscales", [])
+            version = multiscales[0].get("version", "0.1")
+            datasets = multiscales[0]["datasets"]
             datasets = [d["path"] for d in datasets]
             self.datasets: List[str] = datasets
             LOGGER.info("datasets %s", datasets)
@@ -273,7 +275,7 @@ class Multiscales(Spec):
 
         for resolution in self.datasets:
             # data.shape is (t, c, z, y, x) by convention
-            data: da.core.Array = self.zarr.load(resolution)
+            data: da.core.Array = self.array(resolution, version)
             chunk_sizes = [
                 str(c[0]) + (" (+ %s)" % c[-1] if c[-1] != c[0] else "")
                 for c in data.chunks
@@ -288,6 +290,11 @@ class Multiscales(Spec):
         child_zarr = self.zarr.create("labels")
         if child_zarr.exists():
             node.add(child_zarr, visibility=False)
+
+    def array(self, resolution: str, version: str) -> da.core.Array:
+        nested = version != "0.1"
+        # data.shape is (t, c, z, y, x) by convention
+        return self.zarr.load(resolution, nested)
 
 
 class OMERO(Spec):

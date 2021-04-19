@@ -28,6 +28,7 @@ class ZarrLocation:
 
     def __init__(self, path: Union[Path, str], mode: str = "r") -> None:
 
+        self.__mode = mode
         if isinstance(path, Path):
             self.__path = str(path.resolve())
         elif isinstance(path, str):
@@ -35,53 +36,48 @@ class ZarrLocation:
         else:
             raise TypeError(f"not expecting: {type(path)}")
 
-        nest_args = {
+        self.__store = FSStore(
+            self.__path, mode=mode,  # TODO: open issue for using Path
+        )
+        LOGGER.debug(f"Created FSStore {path}(mode={mode})")
+
+        self.zarray: JSONDict = self.get_json(".zarray")
+        self.zgroup: JSONDict = self.get_json(".zgroup")
+        self.__metadata: JSONDict = {}
+        self.__exists: bool = True
+        if self.zgroup:
+            self.__metadata = self.get_json(".zattrs")
+        elif self.zarray:
+            self.__metadata = self.get_json(".zattrs")
+        else:
+            self.__exists = False
+
+    def nested_store(self, mode: str = None) -> FSStore:
+        """
+        Not ideal. Stores should remain hidden
+        TODO: could also check dimension_separator
+        """
+
+        path = self.__path
+
+        if mode is None:
+            mode = self.__mode
+
+        kwargs = {
             "key_separator": "/",  # TODO: in 2.8 "dimension_separator"
             "normalize_keys": True,
         }
 
         mkdir = True
-        if "r" in mode or self.__path.startswith("http"):
+        if "r" in mode or path.startswith("http"):
             # Could be simplified on the fsspec side
             mkdir = False
         if mkdir:
-            nest_args["auto_mkdir"] = True
+            kwargs["auto_mkdir"] = True
 
-        v0_1 = True
-        while True:
-
-            if v0_1:
-                kwargs = {}
-            else:
-                kwargs = nest_args
-
-            self.__store = FSStore(
-                self.__path, mode=mode, **kwargs,  # TODO: open issue for using Path
-            )
-            LOGGER.debug(f"Created FSStore {path}({kwargs})")
-
-            self.zarray: JSONDict = self.get_json(".zarray")
-            self.zgroup: JSONDict = self.get_json(".zgroup")
-            self.__metadata: JSONDict = {}
-            self.__exists: bool = True
-            if self.zgroup:
-                self.__metadata = self.get_json(".zattrs")
-            elif self.zarray:
-                self.__metadata = self.get_json(".zattrs")
-            else:
-                self.__exists = False
-
-            if v0_1:
-                # First pass through
-                v0_1 = False
-
-                # If we detect v0.2+, then we re-try with nesting
-                LOGGER.warning(self.__metadata)
-                dim_sep = self.zarray.get("dimension_separator", None)
-                if dim_sep == "/":
-                    LOGGER.debug("Found dimension_separator=/; reloading")
-                    continue
-            break
+        store = FSStore(path, mode=mode, **kwargs,)  # TODO: open issue for using Path
+        LOGGER.debug(f"Created nested FSStore {path}(mode={mode}, {kwargs})")
+        return store
 
     def __repr__(self) -> str:
         """Print the path as well as whether this is a group or an array."""
@@ -107,9 +103,15 @@ class ZarrLocation:
         """Return the contents of the zattrs file."""
         return dict(self.__metadata)
 
-    def load(self, subpath: str = "") -> da.core.Array:
+    def load(self, subpath: str = "", nested: bool = False) -> da.core.Array:
         """Use dask.array.from_zarr to load the subpath."""
-        return da.from_zarr(self.store, subpath)
+
+        store = self.store
+
+        if nested:
+            store = self.nested_store()
+
+        return da.from_zarr(store, subpath)
 
     def __eq__(self, rhs: object) -> bool:
         if type(self) != type(rhs):
