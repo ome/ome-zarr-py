@@ -12,8 +12,8 @@ from typing import List, Optional
 from urllib.parse import urljoin, urlparse
 
 import dask.array as da
-import requests
-import zarr
+from zarr.core import Array
+from zarr.storage import FSStore
 
 from .types import JSONDict
 
@@ -29,6 +29,9 @@ class BaseZarrLocation(ABC):
     """
 
     def __init__(self) -> None:
+        self._store: Optional[FSStore] = None
+
+    def _load(self) -> None:
         self.zarray: JSONDict = self.get_json(".zarray")
         self.zgroup: JSONDict = self.get_json(".zgroup")
         self.__metadata: JSONDict = {}
@@ -52,6 +55,12 @@ class BaseZarrLocation(ABC):
     def exists(self) -> bool:
         """Return true if either zgroup or zarray metadata exists."""
         return self.__exists
+
+    @property
+    def store(self) -> FSStore:
+        """Return the initialized store for this location"""
+        assert self._store is not None
+        return self._store
 
     @property
     def root_attrs(self) -> JSONDict:
@@ -108,12 +117,17 @@ class LocalZarrLocation(BaseZarrLocation):
     """
 
     def __init__(self, path: Path, mode: str = "r") -> None:
+        super().__init__()
         self.__path: Path = path
         self.mode = mode
-        if mode in ("w", "a") and not self.__path.exists():
-            _ = zarr.DirectoryStore(self.basename())
-            LOGGER.debug("Created DirectoryStore %s", self.basename())
-        super().__init__()
+        self._store = FSStore(
+            str(self.__path),  # TODO: open issue for using Path
+            auto_mkdir=True,
+            key_separator="/",
+            mode=mode,
+        )
+        LOGGER.debug("Created FSStore %s", self.basename())
+        self._load()
 
     def basename(self) -> str:
         return self.__path.name
@@ -150,8 +164,13 @@ class RemoteZarrLocation(BaseZarrLocation):
     """ Uses the :module:`requests` library for accessing Zarr metadata files. """
 
     def __init__(self, url: str) -> None:
-        self.__url: str = url.endswith("/") and url or f"{url}/"
         super().__init__()
+        self.__url: str = url.endswith("/") and url or f"{url}/"
+        self._store = FSStore(
+            url, key_separator="/", mode="r"
+        )  # FIXME: allow mode "w"?
+        LOGGER.debug("Created read-only FSStore %s", self.basename())
+        self._load()
 
     def basename(self) -> str:
         url = self.__url.endswith("/") and self.__url[0:-1] or self.__url
@@ -169,6 +188,12 @@ class RemoteZarrLocation(BaseZarrLocation):
         LOGGER.debug(f"open({self.__class__.__name__}({subpath}))")
         return self.__class__(f"{subpath}")
 
+    def load(self, subpath: str = "") -> da.core.Array:
+        """Use dask.array.from_zarr to load the subpath."""
+        # TODO: remove base implementation?
+        array = Array(self.store, subpath)
+        return da.from_zarr(array)
+
     def get_json(self, subpath: str) -> JSONDict:
         """
         Load and return a given subpath of self.__url as JSON.
@@ -177,19 +202,12 @@ class RemoteZarrLocation(BaseZarrLocation):
         Exceptions during the remote connection are logged at the WARN level.
         All other exceptions log at the ERROR level.
         """
-        url = f"{self.__url}{subpath}"
         try:
-            rsp = requests.get(url)
-        except Exception:
-            LOGGER.warn(f"unreachable: {url} -- details logged at debug")
-            LOGGER.debug("exception details:", exc_info=True)
+            return json.loads(self.store.get(subpath))
+        except KeyError:
             return {}
-        try:
-            if rsp.status_code in (403, 404):  # file doesn't exist
-                return {}
-            return rsp.json()
-        except Exception:
-            LOGGER.error(f"({rsp.status_code}): {rsp.text}")
+        except Exception as e:
+            LOGGER.error(f"{e}")
             return {}
 
 
@@ -200,18 +218,23 @@ def parse_url(path: str, mode: str = "r") -> Optional[BaseZarrLocation]:
     """
     # Check is path is local directory first
     if os.path.isdir(path):
-        return LocalZarrLocation(Path(path))
+        LOGGER.debug(f"returning local directory {path}")
+        return LocalZarrLocation(Path(path), mode=mode)
     else:
         result = urlparse(path)
         zarr_loc: Optional[BaseZarrLocation] = None
         if result.scheme in ("", "file"):
             # Strips 'file://' if necessary
             zarr_loc = LocalZarrLocation(Path(result.path), mode=mode)
+            LOGGER.debug(f"found local uri {path}")
 
         else:
             if mode != "r":
                 raise ValueError("Remote locations are read only")
             zarr_loc = RemoteZarrLocation(path)
+            LOGGER.debug(f"found remote uri {path}")
         if zarr_loc.exists() or (mode in ("a", "w")):
+            LOGGER.debug(f"uri exists or will be created: {path}")
             return zarr_loc
+    LOGGER.debug(f"no location parsed from {path}")
     return None

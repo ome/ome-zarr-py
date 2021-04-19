@@ -23,7 +23,7 @@ def write_multiscale(
         group.create_dataset(str(path), data=dataset, chunks=chunks)
         paths.append({"path": str(path)})
 
-    multiscales = [{"version": "0.1", "datasets": paths}]
+    multiscales = [{"version": "0.2", "datasets": paths}]
     group.attrs["multiscales"] = multiscales
 
 

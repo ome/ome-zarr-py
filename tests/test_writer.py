@@ -12,7 +12,7 @@ class TestWriter:
     @pytest.fixture(autouse=True)
     def initdir(self, tmpdir):
         self.path = tmpdir.mkdir("data")
-        self.store = zarr.DirectoryStore(self.path)
+        self.store = parse_url(self.path, mode="w").store
         self.root = zarr.group(store=self.store)
         self.group = self.root.create_group("test")
 
