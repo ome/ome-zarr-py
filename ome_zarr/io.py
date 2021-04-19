@@ -10,7 +10,6 @@ from typing import List, Optional, Union
 from urllib.parse import urljoin
 
 import dask.array as da
-from zarr.core import Array
 from zarr.storage import FSStore
 
 from .types import JSONDict
@@ -46,6 +45,7 @@ class ZarrLocation:
             self.__path,  # TODO: open issue for using Path
             key_separator="/",  # TODO: in 2.8 "dimension_separator"
             mode=self.__mode,
+            normalize_keys=False,
             **kwargs,
         )
         LOGGER.debug(f"Created FSStore {path}")
@@ -87,8 +87,7 @@ class ZarrLocation:
 
     def load(self, subpath: str = "") -> da.core.Array:
         """Use dask.array.from_zarr to load the subpath."""
-        array = Array(self.store, subpath)
-        return da.from_zarr(array)
+        return da.from_zarr(self.store, subpath)
 
     def __eq__(self, rhs: object) -> bool:
         if type(self) != type(rhs):
