@@ -35,31 +35,53 @@ class ZarrLocation:
         else:
             raise TypeError(f"not expecting: {type(path)}")
 
-        self.__mode = mode
+        nest_args = {
+            "key_separator": "/",  # TODO: in 2.8 "dimension_separator"
+            "normalize_keys": True,
+        }
 
-        kwargs = {}
-        if "r" not in mode and not self.__path.startswith("http"):
-            kwargs["auto_mkdir"] = True
+        mkdir = True
+        if "r" in mode or self.__path.startswith("http"):
+            # Could be simplified on the fsspec side
+            mkdir = False
+        if mkdir:
+            nest_args["auto_mkdir"] = True
 
-        self.__store = FSStore(
-            self.__path,  # TODO: open issue for using Path
-            key_separator="/",  # TODO: in 2.8 "dimension_separator"
-            mode=self.__mode,
-            normalize_keys=False,
-            **kwargs,
-        )
-        LOGGER.debug(f"Created FSStore {path}")
+        v0_1 = True
+        while True:
 
-        self.zarray: JSONDict = self.get_json(".zarray")
-        self.zgroup: JSONDict = self.get_json(".zgroup")
-        self.__metadata: JSONDict = {}
-        self.__exists: bool = True
-        if self.zgroup:
-            self.__metadata = self.get_json(".zattrs")
-        elif self.zarray:
-            self.__metadata = self.get_json(".zattrs")
-        else:
-            self.__exists = False
+            if v0_1:
+                kwargs = {}
+            else:
+                kwargs = nest_args
+
+            self.__store = FSStore(
+                self.__path, mode=mode, **kwargs,  # TODO: open issue for using Path
+            )
+            LOGGER.debug(f"Created FSStore {path}({kwargs})")
+
+            self.zarray: JSONDict = self.get_json(".zarray")
+            self.zgroup: JSONDict = self.get_json(".zgroup")
+            self.__metadata: JSONDict = {}
+            self.__exists: bool = True
+            if self.zgroup:
+                self.__metadata = self.get_json(".zattrs")
+            elif self.zarray:
+                self.__metadata = self.get_json(".zattrs")
+            else:
+                self.__exists = False
+
+            if v0_1:
+                # First pass through
+                v0_1 = False
+
+                # If we detect v0.2+, then we re-try with nesting
+                LOGGER.warning(self.__metadata)
+                dim_sep = self.zarray.get("dimension_separator", None)
+                if dim_sep == "/":
+                    LOGGER.debug("Found dimension_separator=/; reloading")
+                    continue
+            break
 
     def __repr__(self) -> str:
         """Print the path as well as whether this is a group or an array."""
@@ -130,6 +152,7 @@ class ZarrLocation:
                 return {}
             return json.loads(data)
         except KeyError:
+            LOGGER.debug(f"JSON not found: {subpath}")
             return {}
         except Exception as e:
             LOGGER.exception(f"{e}")
