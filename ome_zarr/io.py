@@ -36,10 +36,7 @@ class ZarrLocation:
         else:
             raise TypeError(f"not expecting: {type(path)}")
 
-        self.__store = FSStore(
-            self.__path, mode=mode,  # TODO: open issue for using Path
-        )
-        LOGGER.debug(f"Created FSStore {path}(mode={mode})")
+        self.__store = self.nested_store()
 
         self.zarray: JSONDict = self.get_json(".zarray")
         self.zgroup: JSONDict = self.get_json(".zgroup")
@@ -51,6 +48,17 @@ class ZarrLocation:
             self.__metadata = self.get_json(".zattrs")
         else:
             self.__exists = False
+
+    def flat_store(self, mode: str = None) -> FSStore:
+
+        path = self.__path
+
+        if mode is None:
+            mode = self.__mode
+
+        store = FSStore(path, mode=mode)
+        LOGGER.debug(f"Created legacy flat FSStore {path}(mode={mode})")
+        return store
 
     def nested_store(self, mode: str = None) -> FSStore:
         """
@@ -106,10 +114,10 @@ class ZarrLocation:
     def load(self, subpath: str = "", nested: bool = False) -> da.core.Array:
         """Use dask.array.from_zarr to load the subpath."""
 
-        store = self.store
+        store = self.__store
 
-        if nested:
-            store = self.nested_store()
+        if not nested:
+            store = self.flat_store()
 
         return da.from_zarr(store, subpath)
 
@@ -149,7 +157,7 @@ class ZarrLocation:
         All other exceptions log at the ERROR level.
         """
         try:
-            data = self.store.get(subpath)
+            data = self.__store.get(subpath)
             if not data:
                 return {}
             return json.loads(data)
