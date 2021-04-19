@@ -10,7 +10,7 @@ import numpy as np
 from dask import delayed
 from vispy.color import Colormap
 
-from .io import BaseZarrLocation
+from .io import ZarrLocation
 from .types import JSONDict
 
 LOGGER = logging.getLogger("ome_zarr.reader")
@@ -22,18 +22,18 @@ class Node:
 
     def __init__(
         self,
-        zarr: BaseZarrLocation,
-        root: Union["Node", "Reader", List[BaseZarrLocation]],
+        zarr: ZarrLocation,
+        root: Union["Node", "Reader", List[ZarrLocation]],
         visibility: bool = True,
         plate_labels: bool = False,
     ):
         self.zarr = zarr
         self.root = root
-        self.seen: List[BaseZarrLocation] = []
+        self.seen: List[ZarrLocation] = []
         if isinstance(root, Node) or isinstance(root, Reader):
             self.seen = root.seen
         else:
-            self.seen = cast(List[BaseZarrLocation], root)
+            self.seen = cast(List[ZarrLocation], root)
         self.__visible = visibility
 
         # Likely to be updated by specs
@@ -93,7 +93,7 @@ class Node:
 
     def add(
         self,
-        zarr: BaseZarrLocation,
+        zarr: ZarrLocation,
         prepend: bool = False,
         visibility: Optional[bool] = None,
         plate_labels: bool = False,
@@ -148,7 +148,7 @@ class Spec(ABC):
     """
 
     @staticmethod
-    def matches(zarr: BaseZarrLocation) -> bool:
+    def matches(zarr: ZarrLocation) -> bool:
         raise NotImplementedError()
 
     def __init__(self, node: Node) -> None:
@@ -168,7 +168,7 @@ class Labels(Spec):
     contains the name of subgroups which should be loaded as labeled images."""
 
     @staticmethod
-    def matches(zarr: BaseZarrLocation) -> bool:
+    def matches(zarr: ZarrLocation) -> bool:
         """Does the Zarr Image group also include a /labels sub-group?"""
         # TODO: also check for "labels" entry and perhaps version?
         return bool("labels" in zarr.root_attrs)
@@ -187,7 +187,7 @@ class Label(Spec):
     which each discrete pixel value represents a separate object."""
 
     @staticmethod
-    def matches(zarr: BaseZarrLocation) -> bool:
+    def matches(zarr: ZarrLocation) -> bool:
         """If label-specific metadata is present, then return true."""
         return bool("image-label" in zarr.root_attrs)
 
@@ -252,7 +252,7 @@ class Label(Spec):
 
 class Multiscales(Spec):
     @staticmethod
-    def matches(zarr: BaseZarrLocation) -> bool:
+    def matches(zarr: ZarrLocation) -> bool:
         """is multiscales metadata present?"""
         if zarr.zgroup:
             if "multiscales" in zarr.root_attrs:
@@ -292,7 +292,7 @@ class Multiscales(Spec):
 
 class OMERO(Spec):
     @staticmethod
-    def matches(zarr: BaseZarrLocation) -> bool:
+    def matches(zarr: ZarrLocation) -> bool:
         return bool("omero" in zarr.root_attrs)
 
     def __init__(self, node: Node) -> None:
@@ -361,7 +361,7 @@ class OMERO(Spec):
 
 class Well(Spec):
     @staticmethod
-    def matches(zarr: BaseZarrLocation) -> bool:
+    def matches(zarr: ZarrLocation) -> bool:
         return bool("well" in zarr.root_attrs)
 
     def __init__(self, node: Node) -> None:
@@ -418,7 +418,7 @@ class Well(Spec):
 
 class Plate(Spec):
     @staticmethod
-    def matches(zarr: BaseZarrLocation) -> bool:
+    def matches(zarr: ZarrLocation) -> bool:
         return bool("plate" in zarr.root_attrs)
 
     def __init__(self, node: Node) -> None:
@@ -588,10 +588,10 @@ class Reader:
     hierarchy.
     """
 
-    def __init__(self, zarr: BaseZarrLocation) -> None:
+    def __init__(self, zarr: ZarrLocation) -> None:
         assert zarr.exists()
         self.zarr = zarr
-        self.seen: List[BaseZarrLocation] = [zarr]
+        self.seen: List[ZarrLocation] = [zarr]
 
     def __call__(self) -> Iterator[Node]:
         node = Node(self.zarr, self)

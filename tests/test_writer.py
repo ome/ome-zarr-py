@@ -1,3 +1,5 @@
+import pathlib
+
 import numpy as np
 import pytest
 import zarr
@@ -11,7 +13,7 @@ from ome_zarr.writer import write_image
 class TestWriter:
     @pytest.fixture(autouse=True)
     def initdir(self, tmpdir):
-        self.path = tmpdir.mkdir("data")
+        self.path = pathlib.Path(tmpdir.mkdir("data"))
         self.store = parse_url(self.path, mode="w").store
         self.root = zarr.group(store=self.store)
         self.group = self.root.create_group("test")
