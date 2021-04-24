@@ -28,7 +28,7 @@ def info(path: str) -> Iterator[Node]:
     for node in reader():
 
         if not node.specs:
-            print(f"not an ome-zarr: {zarr}")
+            print(f"not an ome-zarr node: {node}")
             continue
 
         print(node)
