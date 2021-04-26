@@ -5,6 +5,7 @@ import logging
 from pathlib import Path
 from typing import Iterator, List
 
+import dask
 import dask.array as da
 import zarr
 from dask.diagnostics import ProgressBar
@@ -16,7 +17,7 @@ from .types import JSONDict
 LOGGER = logging.getLogger("ome_zarr.utils")
 
 
-def info(path: str) -> Iterator[Node]:
+def info(path: str, stats: bool = False) -> Iterator[Node]:
     """Print information about an OME-Zarr fileset.
 
     All :class:`Nodes <ome_utils.reader.Node>` that are found from the given path will
@@ -37,7 +38,10 @@ def info(path: str) -> Iterator[Node]:
             print(f"   - {spec.__class__.__name__}")
         print(" - data")
         for array in node.data:
-            print(f"   - {array.shape}")
+            minmax = ""
+            if stats:
+                minmax = f" minmax={dask.compute(array.min(), array.max())}"
+            print(f"   - {array.shape}{minmax}")
         LOGGER.debug(node.data)
         yield node
 
