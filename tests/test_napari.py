@@ -57,7 +57,8 @@ class TestNapari:
 
     @pytest.mark.qt
     @pytest.mark.skipif(
-        sys.version_info < (3, 7), reason="on_draw is missing in napari < 0.4.0",
+        sys.version_info < (3, 7),
+        reason="on_draw is missing in napari < 0.4.0",
     )
     def test_viewer(self, make_napari_viewer):  # noqa
         """example of testing the viewer."""

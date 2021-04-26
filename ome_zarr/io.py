@@ -83,7 +83,11 @@ class ZarrLocation:
         if mkdir:
             kwargs["auto_mkdir"] = True
 
-        store = FSStore(path, mode=mode, **kwargs,)  # TODO: open issue for using Path
+        store = FSStore(
+            path,
+            mode=mode,
+            **kwargs,
+        )  # TODO: open issue for using Path
         LOGGER.debug(f"Created nested FSStore {path}(mode={mode}, {kwargs})")
         return store
 
