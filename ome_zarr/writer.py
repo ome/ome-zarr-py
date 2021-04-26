@@ -7,6 +7,7 @@ from typing import Any, List, Tuple, Union
 import numpy as np
 import zarr
 
+from .format import Format, FormatV2
 from .scale import Scaler
 from .types import JSONDict
 
@@ -14,16 +15,26 @@ LOGGER = logging.getLogger("ome_zarr.writer")
 
 
 def write_multiscale(
-    pyramid: List, group: zarr.Group, chunks: Union[Tuple[Any, ...], int] = None,
+    pyramid: List,
+    group: zarr.Group,
+    chunks: Union[Tuple[Any, ...], int] = None,
+    fmt: Format = FormatV2(),
 ) -> None:
-    """Write a pyramid with multiscale metadata to disk."""
+    """
+    Write a pyramid with multiscale metadata to disk.
+
+    Parameters
+    ----------
+    TODO:
+    """
+
     paths = []
     for path, dataset in enumerate(pyramid):
         # TODO: chunks here could be different per layer
         group.create_dataset(str(path), data=dataset, chunks=chunks)
         paths.append({"path": str(path)})
 
-    multiscales = [{"version": "0.2", "datasets": paths}]
+    multiscales = [{"version": fmt.version, "datasets": paths}]
     group.attrs["multiscales"] = multiscales
 
 
