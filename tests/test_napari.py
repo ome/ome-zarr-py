@@ -2,8 +2,8 @@ import sys
 
 import numpy as np
 import pytest
-
 from napari.conftest import make_test_viewer  # noqa
+
 from ome_zarr.data import astronaut, create_zarr
 from ome_zarr.napari import napari_get_reader
 

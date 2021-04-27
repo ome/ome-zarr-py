@@ -15,8 +15,12 @@ import dask.array as da
 import numpy as np
 import zarr
 from scipy.ndimage import zoom
-from skimage.transform import downscale_local_mean, pyramid_gaussian
-from skimage.transform import pyramid_laplacian, rescale
+from skimage.transform import (
+    downscale_local_mean,
+    pyramid_gaussian,
+    pyramid_laplacian,
+    rescale,
+)
 
 from .io import parse_url
 
@@ -197,7 +201,9 @@ class Scaler:
                 size_x = plane_2d.shape[-1] // self.downscale
                 size_y = plane_2d.shape[-2] // self.downscale
                 return cv2.resize(
-                    plane_2d, dsize=(size_x, size_y), interpolation=cv2.INTER_NEAREST,
+                    plane_2d,
+                    dsize=(size_x, size_y),
+                    interpolation=cv2.INTER_NEAREST,
                 )
 
         assert func is not None
