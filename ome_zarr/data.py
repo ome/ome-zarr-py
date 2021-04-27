@@ -11,7 +11,7 @@ from skimage.measure import label
 from skimage.morphology import closing, remove_small_objects, square
 from skimage.segmentation import clear_border
 
-from .format import Format, FormatV2
+from .format import CurrentFormat, Format
 from .io import parse_url
 from .scale import Scaler
 from .writer import write_multiscale
@@ -99,7 +99,7 @@ def create_zarr(
     zarr_directory: str,
     method: Callable[..., Tuple[List, List]] = coins,
     label_name: str = "coins",
-    fmt: Format = FormatV2(),
+    fmt: Format = CurrentFormat(),
 ) -> None:
     """Generate a synthetic image pyramid with labels."""
     pyramid, labels = method()

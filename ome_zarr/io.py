@@ -12,6 +12,7 @@ from urllib.parse import urljoin
 import dask.array as da
 from zarr.storage import FSStore
 
+from .format import CurrentFormat, Format, detect_format
 from .types import JSONDict
 
 LOGGER = logging.getLogger("ome_zarr.io")
@@ -26,8 +27,11 @@ class ZarrLocation:
     Attempts are made to load various metadata files and cache them internally.
     """
 
-    def __init__(self, path: Union[Path, str], mode: str = "r") -> None:
+    def __init__(
+        self, path: Union[Path, str], mode: str = "r", fmt: Format = CurrentFormat()
+    ) -> None:
 
+        self.__fmt = fmt
         self.__mode = mode
         if isinstance(path, Path):
             self.__path = str(path.resolve())
@@ -36,8 +40,18 @@ class ZarrLocation:
         else:
             raise TypeError(f"not expecting: {type(path)}")
 
-        self.__store = self.nested_store()
+        self.__store = fmt.init_store(self.__path, mode)
+        self.__init_metadata()
+        detected = detect_format(self.__metadata)
+        if detected != fmt:
+            LOGGER.warning(f"version mistmatch: detected:{detected}, requested:{fmt}")
+            self.__store == detected.init_store(self.__path, mode)
+            self.__init_metadata()
 
+    def __init_metadata(self) -> None:
+        """
+        Load the Zarr metadata files for the given location.
+        """
         self.zarray: JSONDict = self.get_json(".zarray")
         self.zgroup: JSONDict = self.get_json(".zgroup")
         self.__metadata: JSONDict = {}
@@ -48,44 +62,6 @@ class ZarrLocation:
             self.__metadata = self.get_json(".zattrs")
         else:
             self.__exists = False
-
-    def flat_store(self, mode: str = None) -> FSStore:
-
-        path = self.__path
-
-        if mode is None:
-            mode = self.__mode
-
-        store = FSStore(path, mode=mode)
-        LOGGER.debug(f"Created legacy flat FSStore {path}(mode={mode})")
-        return store
-
-    def nested_store(self, mode: str = None) -> FSStore:
-        """
-        Not ideal. Stores should remain hidden
-        TODO: could also check dimension_separator
-        """
-
-        path = self.__path
-
-        if mode is None:
-            mode = self.__mode
-
-        kwargs = {
-            "key_separator": "/",  # TODO: in 2.8 "dimension_separator"
-            "normalize_keys": True,
-        }
-
-        mkdir = True
-        if "r" in mode or path.startswith("http"):
-            # Could be simplified on the fsspec side
-            mkdir = False
-        if mkdir:
-            kwargs["auto_mkdir"] = True
-
-        store = FSStore(path, mode=mode, **kwargs,)  # TODO: open issue for using Path
-        LOGGER.debug(f"Created nested FSStore {path}(mode={mode}, {kwargs})")
-        return store
 
     def __repr__(self) -> str:
         """Print the path as well as whether this is a group or an array."""
@@ -101,6 +77,18 @@ class ZarrLocation:
         return self.__exists
 
     @property
+    def fmt(self) -> Format:
+        return self.__fmt
+
+    @property
+    def mode(self) -> str:
+        return self.__mode
+
+    @property
+    def path(self) -> str:
+        return self.__path
+
+    @property
     def store(self) -> FSStore:
         """Return the initialized store for this location"""
         assert self.__store is not None
@@ -111,15 +99,9 @@ class ZarrLocation:
         """Return the contents of the zattrs file."""
         return dict(self.__metadata)
 
-    def load(self, subpath: str = "", nested: bool = False) -> da.core.Array:
+    def load(self, subpath: str = "") -> da.core.Array:
         """Use dask.array.from_zarr to load the subpath."""
-
-        store = self.__store
-
-        if not nested:
-            store = self.flat_store()
-
-        return da.from_zarr(store, subpath)
+        return da.from_zarr(self.__store, subpath)
 
     def __eq__(self, rhs: object) -> bool:
         if type(self) != type(rhs):
@@ -146,7 +128,7 @@ class ZarrLocation:
         """Create a new Zarr location for the given path."""
         subpath = self.subpath(path)
         LOGGER.debug(f"open({self.__class__.__name__}({subpath}))")
-        return self.__class__(subpath)
+        return self.__class__(subpath, mode=self.__mode, fmt=self.__fmt)
 
     def get_json(self, subpath: str) -> JSONDict:
         """
@@ -183,13 +165,15 @@ class ZarrLocation:
             return urljoin(self.__path, subpath)
 
 
-def parse_url(path: Union[Path, str], mode: str = "r") -> Optional[ZarrLocation]:
+def parse_url(
+    path: Union[Path, str], mode: str = "r", fmt: Format = CurrentFormat()
+) -> Optional[ZarrLocation]:
     """Convert a path string or URL to a ZarrLocation subclass.
 
     >>> parse_url('does-not-exist')
     """
     try:
-        loc = ZarrLocation(path, mode=mode)
+        loc = ZarrLocation(path, mode=mode, fmt=fmt)
         if "r" in mode and not loc.exists():
             return None
         else:

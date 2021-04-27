@@ -7,7 +7,7 @@ from typing import Any, List, Tuple, Union
 import numpy as np
 import zarr
 
-from .format import Format, FormatV2
+from .format import CurrentFormat, Format
 from .scale import Scaler
 from .types import JSONDict
 
@@ -18,7 +18,7 @@ def write_multiscale(
     pyramid: List,
     group: zarr.Group,
     chunks: Union[Tuple[Any, ...], int] = None,
-    fmt: Format = FormatV2(),
+    fmt: Format = CurrentFormat(),
 ) -> None:
     """
     Write a pyramid with multiscale metadata to disk.
@@ -44,6 +44,7 @@ def write_image(
     chunks: Union[Tuple[Any, ...], int] = None,
     byte_order: Union[str, List[str]] = "tczyx",
     scaler: Scaler = Scaler(),
+    fmt: Format = CurrentFormat(),
     **metadata: JSONDict,
 ) -> None:
     """Writes an image to the zarr store according to ome-zarr specification
@@ -63,6 +64,9 @@ def write_image(
     scaler: Scaler
       Scaler implementation for downsampling the image argument. If None,
       no downsampling will be performed.
+    fmt: Format
+      The format of the ome_zarr data which should be used.
+      Defaults to the most current.
     """
 
     if image.ndim > 5:
@@ -80,7 +84,7 @@ def write_image(
         LOGGER.debug("disabling pyramid")
         image = [image]
 
-    write_multiscale(image, group, chunks=chunks)
+    write_multiscale(image, group, chunks=chunks, fmt=fmt)
     group.attrs.update(metadata)
 
 

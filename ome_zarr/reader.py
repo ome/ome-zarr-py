@@ -292,9 +292,8 @@ class Multiscales(Spec):
             node.add(child_zarr, visibility=False)
 
     def array(self, resolution: str, version: str) -> da.core.Array:
-        nested = version != "0.1"
         # data.shape is (t, c, z, y, x) by convention
-        return self.zarr.load(resolution, nested)
+        return self.zarr.load(resolution)
 
 
 class OMERO(Spec):

@@ -30,6 +30,7 @@ repos:
       - id: trailing-whitespace
         exclude: .bumpversion.cfg
       - id: end-of-file-fixer
+        exclude: tests/data/
       - id: check-json
         files: \.(json)$
       - id: check-yaml
