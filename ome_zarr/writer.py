@@ -14,7 +14,9 @@ LOGGER = logging.getLogger("ome_zarr.writer")
 
 
 def write_multiscale(
-    pyramid: List, group: zarr.Group, chunks: Union[Tuple[Any, ...], int] = None,
+    pyramid: List,
+    group: zarr.Group,
+    chunks: Union[Tuple[Any, ...], int] = None,
 ) -> None:
     """Write a pyramid with multiscale metadata to disk."""
     paths = []
