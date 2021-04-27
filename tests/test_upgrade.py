@@ -35,14 +35,19 @@ class TestUpgrade:
         assert loc.fmt == fmt
 
     @pytest.mark.parametrize(
-        "path, version", (("v1", V01()), ("v2", V02())),
+        "path, version",
+        (("v1", V01()), ("v2", V02())),
     )
     def test_pre_created(self, request, path, version):
         shape = (1, 2, 1, 16, 16)
         self.assert_data(f"{request.fspath.dirname}/data/{path}", shape, version)
 
     @pytest.mark.parametrize(
-        "version", (pytest.param(V01(), id="V01"), pytest.param(V02(), id="V02"),)
+        "version",
+        (
+            pytest.param(V01(), id="V01"),
+            pytest.param(V02(), id="V02"),
+        ),
     )
     def test_newly_created(self, version):
         shape = (1, 1, 1, 8, 8)
