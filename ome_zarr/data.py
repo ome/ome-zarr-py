@@ -11,7 +11,9 @@ from skimage.measure import label
 from skimage.morphology import closing, remove_small_objects, square
 from skimage.segmentation import clear_border
 
+from .io import parse_url
 from .scale import Scaler
+from .writer import write_multiscale
 
 CHANNEL_DIMENSION = 1
 
@@ -92,17 +94,6 @@ def rgb_to_5d(pixels: np.ndarray) -> List:
     return video
 
 
-def write_multiscale(pyramid: List, group: zarr.Group) -> None:
-    """Write a pyramid with multiscale metadata to disk."""
-    paths = []
-    for path, dataset in enumerate(pyramid):
-        group.create_dataset(str(path), data=pyramid[path])
-        paths.append({"path": str(path)})
-
-    multiscales = [{"version": "0.1", "datasets": paths}]
-    group.attrs["multiscales"] = multiscales
-
-
 def create_zarr(
     zarr_directory: str,
     method: Callable[..., Tuple[List, List]] = coins,
@@ -111,8 +102,9 @@ def create_zarr(
     """Generate a synthetic image pyramid with labels."""
     pyramid, labels = method()
 
-    store = zarr.DirectoryStore(zarr_directory)
-    grp = zarr.group(store)
+    loc = parse_url(zarr_directory, mode="w")
+    assert loc
+    grp = zarr.group(loc.store)
     write_multiscale(pyramid, grp)
 
     if pyramid[0].shape[CHANNEL_DIMENSION] == 1:
@@ -161,7 +153,7 @@ def create_zarr(
             colors.append({"label-value": x, "rgba": rgba})
             properties.append({"label-value": x, "class": f"class {x}"})
         label_grp.attrs["image-label"] = {
-            "version": "0.1",
+            "version": "0.2",
             "colors": colors,
             "properties": properties,
             "source": {"image": "../../"},

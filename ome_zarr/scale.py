@@ -18,6 +18,8 @@ from scipy.ndimage import zoom
 from skimage.transform import downscale_local_mean, pyramid_gaussian
 from skimage.transform import pyramid_laplacian, rescale
 
+from .io import parse_url
+
 LOGGER = logging.getLogger("ome_zarr.scale")
 
 
@@ -349,7 +351,9 @@ class Scaler:
     def __check_store(self, output_directory: str) -> MutableMapping:
         """Return a Zarr store if it doesn't already exist."""
         assert not os.path.exists(output_directory)
-        return zarr.DirectoryStore(output_directory)
+        loc = parse_url(output_directory, mode="w")
+        assert loc
+        return loc.store
 
     def __assert_values(self, pyramid: List[np.ndarray]) -> None:
         """Check for a single unique set of values for all pyramid levels."""
@@ -443,7 +447,9 @@ class Scaler:
     #
 
     def _by_plane(
-        self, base: np.ndarray, func: Callable[[np.ndarray, int, int], np.ndarray],
+        self,
+        base: np.ndarray,
+        func: Callable[[np.ndarray, int, int], np.ndarray],
     ) -> np.ndarray:
         """Loop over 3 of the 5 dimensions and apply the func transform."""
         assert 5 == len(base.shape)
