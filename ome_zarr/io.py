@@ -31,8 +31,6 @@ class ZarrLocation:
         self, path: Union[Path, str], mode: str = "r", fmt: Format = CurrentFormat()
     ) -> None:
 
-        if fmt is None:
-            fmt = CurrentFormat()
         self.__fmt = fmt
         self.__mode = mode
         if isinstance(path, Path):
@@ -42,7 +40,11 @@ class ZarrLocation:
         else:
             raise TypeError(f"not expecting: {type(path)}")
 
-        self.__store = fmt.init_store(self.__path, mode)
+        loader = fmt
+        if loader is None:
+            loader = CurrentFormat()
+        self.__store = loader.init_store(self.__path, mode)
+
         self.__init_metadata()
         detected = detect_format(self.__metadata)
         if detected != fmt:
