@@ -104,7 +104,7 @@ class FormatV02(Format):
         """
 
         kwargs = {
-            "key_separator": "/",  # TODO: in 2.8 "dimension_separator"
+            "dimension_separator": "/",
             "normalize_keys": True,
         }
 

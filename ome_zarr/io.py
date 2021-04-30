@@ -31,6 +31,8 @@ class ZarrLocation:
         self, path: Union[Path, str], mode: str = "r", fmt: Format = CurrentFormat()
     ) -> None:
 
+        if fmt is None:
+            fmt = CurrentFormat()
         self.__fmt = fmt
         self.__mode = mode
         if isinstance(path, Path):
@@ -45,6 +47,7 @@ class ZarrLocation:
         detected = detect_format(self.__metadata)
         if detected != fmt:
             LOGGER.warning(f"version mistmatch: detected:{detected}, requested:{fmt}")
+            self.__fmt = detected
             self.__store == detected.init_store(self.__path, mode)
             self.__init_metadata()
 
