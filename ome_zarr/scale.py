@@ -21,6 +21,7 @@ from skimage.transform import (
     pyramid_laplacian,
     rescale,
 )
+from zarr.storage import FSStore
 
 from .io import parse_url
 
@@ -104,7 +105,8 @@ class Scaler:
 
         # If input is array, first downsample XY to create pyramid
         pyramid_dir = None
-        if os.path.exists(os.path.join(input_array_or_group, ".zarray")):
+        input_zarray = os.path.join(input_array_or_group, ".zarray")
+        if os.path.exists(input_zarray):
             print("downsampling in X and Y to create pyramid...")
             if downsample_z:
                 # will delete this once downsample_z is done
@@ -154,6 +156,18 @@ class Scaler:
                 print("Deleting temp ", pyramid_dir)
                 shutil.rmtree(pyramid_dir)
 
+    def _open_store(self, name: str) -> FSStore:
+        """
+        Create an FSStore instance that supports nested storage of chunks.
+        """
+        return FSStore(
+            name,
+            auto_mkdir=True,
+            key_separator="/",
+            normalize_keys=False,
+            mode="w",
+        )
+
     def add_plane_to_pyramid(
         self,
         plane: np.ndarray,
@@ -186,7 +200,7 @@ class Scaler:
 
         # pyramid shape could be given by (t, c, z, y, x) or (t, c, z)
         assert len(shape) > 2
-        store = zarr.DirectoryStore(output_directory)
+        store = self._open_store(output_directory)
         parent = zarr.group(store)
 
         size_t: int = shape[0]
@@ -286,7 +300,7 @@ class Scaler:
             output_arrays = input_arrays
 
         # output_directory may already exist
-        store = zarr.DirectoryStore(output_group)
+        store = self._open_store(output_group)
         grp = zarr.group(store)
 
         for input_level, output_level in zip(input_arrays, output_arrays):
