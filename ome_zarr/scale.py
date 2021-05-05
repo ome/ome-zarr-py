@@ -131,15 +131,15 @@ class Scaler:
 
                 grp = self.__create_group(store, base, pyramid)
 
-            if self.copy_metadata:
-                print(f"copying attribute keys: {list(base.attrs.keys())}")
-                grp.attrs.update(base.attrs)
+                if self.copy_metadata:
+                    print(f"copying attribute keys: {list(base.attrs.keys())}")
+                    grp.attrs.update(base.attrs)
 
         elif os.path.exists(os.path.join(input_array_or_group, ".zgroup")):
             # if input is a .zgroup
             if not downsample_z:
                 raise ValueError(
-                    "If input is a pyramid, use" " --downsample_z to downsample"
+                    "If input is a pyramid, use --downsample_z to downsample"
                 )
         else:
             raise ValueError("input is not a zarr array or group")
@@ -174,7 +174,7 @@ class Scaler:
         indices: Tuple[int, int, int],
         func: Optional[Callable] = None,
         get_level_name: Optional[Callable] = None,
-    ) -> None:
+    ) -> zarr.Group:
         """
         Adds a 2D numpy plane to each level of a pyramid, at (t, c, z) indices.
 
@@ -238,6 +238,8 @@ class Scaler:
 
             dataset[t, c, z, :, :] = plane
 
+        return parent
+
     def scale_array_xy_to_pyramid(
         self, input_array: str, output_directory: str
     ) -> None:
@@ -258,7 +260,12 @@ class Scaler:
                 for z in range(size_z):
                     plane_2d = base[t, c, z, :, :]
                     plane_2d = plane_2d.compute()
-                    self.add_plane_to_pyramid(plane_2d, (t, c, z))
+                    parent_group = self.add_plane_to_pyramid(plane_2d, (t, c, z))
+
+        paths = [{"path": str(level)} for level in range(self.max_layer)]
+        multiscales = [{"version": "0.2", "datasets": paths}]
+        print("creating multiscales...")
+        parent_group.attrs.update({"multiscales": multiscales})
 
     def scale_arrays_3d(
         self,
