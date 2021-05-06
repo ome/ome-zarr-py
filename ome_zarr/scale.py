@@ -321,6 +321,7 @@ class Scaler:
             size_c = base.shape[1]
             for t in range(size_t):
                 for c in range(size_c):
+                    print(f"3D scaling T: {t}, C: {c}")
                     data_3d = base[t, c, :, :, :]
                     resized = func3d(data_3d, input_level)
                     size_z, size_y, size_x = resized.shape
