@@ -249,7 +249,7 @@ class Scaler:
         Process the T/C/Z planes one at a time, writing them to the
         pyramid on disk in turn.
         """
-        base = da.from_zarr(input_array)
+        base = da.from_zarr(self._open_store(input_array), "")
         self.dtype = base.dtype
         self.output_directory = output_directory
         size_t, size_c, size_z, size_y, size_x = base.shape
@@ -311,12 +311,7 @@ class Scaler:
         grp = zarr.group(store)
 
         for input_level, output_level in zip(input_arrays, output_arrays):
-            if input_group is not None:
-                input_path = os.path.join(input_group, input_level)
-            else:
-                input_path = input_level
-            base = da.from_zarr(input_path)
-
+            base = da.from_zarr(self._open_store(input_group), input_level)
             size_t = base.shape[0]
             size_c = base.shape[1]
             for t in range(size_t):
