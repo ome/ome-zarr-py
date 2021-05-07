@@ -350,6 +350,8 @@ class Scaler:
             # Assume input pyramid levels are named '0', '1', '2' etc.
             input_level = int(array_name)
             factor = (1 / self.downscale) ** input_level
+            if array_3d.shape[-3] == 1:
+                factor = 1
             rescaled = rescale(array_3d, (factor, 1, 1), preserve_range=True)
             # preserve input dtype
             return rescaled.astype(array_3d.dtype)
