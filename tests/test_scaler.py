@@ -2,7 +2,7 @@ import pytest
 
 from ome_zarr.cli import main
 from ome_zarr.io import parse_url
-from ome_zarr.reader import Multiscales, Reader
+from ome_zarr.reader import Reader
 
 # from ome_zarr.scale import Scaler
 from ome_zarr.writer import write_image
@@ -11,14 +11,6 @@ from .test_writer import TestWriter
 
 
 class TestScaler(TestWriter):
-
-    # @pytest.fixture(autouse=True)
-    # def initdir(self, tmpdir):
-    #     self.path = pathlib.Path(tmpdir.mkdir("data"))
-    #     self.store = parse_url(self.path, mode="w").store
-    #     self.root = zarr.group(store=self.store)
-    #     self.group = self.root.create_group("test")
-
     @pytest.mark.parametrize("downsample_z", [True, False])
     @pytest.mark.parametrize("input_group", [True, False])
     def test_writer(self, downsample_z, input_group):
@@ -55,7 +47,7 @@ class TestScaler(TestWriter):
         # Verify
         reader = Reader(parse_url(out_path))
         node = list(reader())[0]
-        assert Multiscales.matches(node.zarr)
         assert node.data[0].shape == (1, 2, 16, 256, 256)
         assert node.data[1].shape == (1, 2, size_z, 128, 128)
-        # assert node.data[0].chunks == ((1,), (2,), (1,), (128, 128), (128, 128))
+        assert node.data[0].max().compute() > 0
+        assert node.data[1].max().compute() > 0
