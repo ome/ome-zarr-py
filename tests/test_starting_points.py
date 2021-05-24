@@ -21,8 +21,8 @@ class TestStartingPoints:
         for spec in node.specs:
             found.append(type(spec))
 
-        expected_names = sorted([x.__name__ for x in expected])
-        found_names = sorted([x.__name__ for x in found])
+        expected_names = sorted(x.__name__ for x in expected)
+        found_names = sorted(x.__name__ for x in found)
         assert expected_names == found_names
 
     def get_spec(self, node: Node, spec_type: Type[Spec]):

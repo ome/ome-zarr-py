@@ -110,7 +110,7 @@ def strip_common_prefix(parts: List[List[str]]) -> str:
     [['b'], ['b', 'c']]
     """
     first_mismatch = 0
-    min_length = min([len(x) for x in parts])
+    min_length = min(len(x) for x in parts)
 
     for idx in range(min_length):
         if len({x[idx] for x in parts}) == 1:
