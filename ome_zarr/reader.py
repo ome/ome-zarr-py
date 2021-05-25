@@ -391,7 +391,7 @@ class Well(Spec):
         # stitch full-resolution images into a grid
         def get_field(tile_name: str) -> np.ndarray:
             """tile_name is 'row,col'"""
-            row, col = [int(n) for n in tile_name.split(",")]
+            row, col = (int(n) for n in tile_name.split(","))
             field_index = (column_count * row) + col
             path = f"{field_index}/{level}"
             LOGGER.debug(f"LOADING tile... {path}")
@@ -521,7 +521,7 @@ class Plate(Spec):
     def get_stitched_grid(self, level: int, tile_shape: tuple) -> da.core.Array:
         def get_tile(tile_name: str) -> np.ndarray:
             """tile_name is 'level,z,c,t,row,col'"""
-            row, col = [int(n) for n in tile_name.split(",")]
+            row, col = (int(n) for n in tile_name.split(","))
             path = self.get_tile_path(level, row, col)
             LOGGER.debug(f"LOADING tile... {path}")
 
