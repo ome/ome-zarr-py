@@ -48,15 +48,9 @@ setup(
         "Programming Language :: Python :: 3",
         "Operating System :: OS Independent",
         "License :: OSI Approved :: BSD License",
-        "Framework :: napari",
     ],
     entry_points={
         "console_scripts": ["ome_zarr = ome_zarr.cli:main"],
-        "napari.plugin": ["ome_zarr = ome_zarr.napari"],
     },
-    extras_require={
-        "napari:python_version>='3.7'": ["napari"],
-        "napari:python_version<'3.7'": ["napari<0.4.0"],
-    },
-    tests_require=["pytest", "napari"],
+    tests_require=["pytest"],
 )
