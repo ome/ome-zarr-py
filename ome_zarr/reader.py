@@ -262,10 +262,15 @@ class Multiscales(Spec):
     def __init__(self, node: Node) -> None:
         super().__init__(node)
 
+        axes_values = {"t", "c", "z", "y", "x"}
         try:
             multiscales = self.lookup("multiscales", [])
             version = multiscales[0].get("version", "0.1")
             datasets = multiscales[0]["datasets"]
+            # axes field was introduced in 0.3, before all data was 5d
+            axes = multiscales[0].get("axes", ["t", "c", "z", "y", "x"])
+            if len(set(axes) - axes_values) > 0:
+                raise RuntimeError(f"Invalid axes names: {set(axes) - axes_values}")
             datasets = [d["path"] for d in datasets]
             self.datasets: List[str] = datasets
             LOGGER.info("datasets %s", datasets)
@@ -274,14 +279,13 @@ class Multiscales(Spec):
             return  # EARLY EXIT
 
         for resolution in self.datasets:
-            # data.shape is (t, c, z, y, x) by convention
             data: da.core.Array = self.array(resolution, version)
             chunk_sizes = [
                 str(c[0]) + (" (+ %s)" % c[-1] if c[-1] != c[0] else "")
                 for c in data.chunks
             ]
             LOGGER.info("resolution: %s", resolution)
-            LOGGER.info(" - shape (t, c, z, y, x) = %s", data.shape)
+            LOGGER.info(" - shape %s = %s", axes, data.shape)
             LOGGER.info(" - chunks =  %s", chunk_sizes)
             LOGGER.info(" - dtype = %s", data.dtype)
             node.data.append(data)
