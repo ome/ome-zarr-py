@@ -17,8 +17,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - {os: windows-latest, python_Version: '3.9', toxenv: 'py39-PySide2'}
-          - {os: macos-latest, python_Version: '3.8', toxenv: 'py38-PyQt5'}
+          - {os: windows-latest, python_Version: '3.9', toxenv: 'py39'}
+          - {os: macos-latest, python_Version: '3.8', toxenv: 'py38'}
 
     steps:
       - uses: actions/checkout@v1
