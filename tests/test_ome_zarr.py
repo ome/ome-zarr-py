@@ -4,7 +4,6 @@ import os
 import pytest
 
 from ome_zarr.data import astronaut, create_zarr
-from ome_zarr.napari import napari_get_reader
 from ome_zarr.utils import download, info
 
 
@@ -20,31 +19,6 @@ class TestOmeZarr:
     def initdir(self, tmpdir):
         self.path = tmpdir.mkdir("data")
         create_zarr(str(self.path), method=astronaut)
-
-    def test_get_reader_hit(self):
-        reader = napari_get_reader(str(self.path))
-        assert reader is not None
-        assert callable(reader)
-
-    def test_reader(self):
-        reader = napari_get_reader(str(self.path))
-        results = reader(str(self.path))
-        assert len(results) == 2
-        image, label = results
-        assert isinstance(image[0], list)
-        assert isinstance(image[1], dict)
-        assert image[1]["channel_axis"] == 1
-        assert image[1]["name"] == ["Red", "Green", "Blue"]
-
-    def test_get_reader_with_list(self):
-        # a better test here would use real data
-        reader = napari_get_reader([str(self.path)])
-        assert reader is not None
-        assert callable(reader)
-
-    def test_get_reader_pass(self):
-        reader = napari_get_reader("fake.file")
-        assert reader is None
 
     def check_info_stdout(self, out):
         for log in log_strings(0, 1, 3, 1, 1024, 1024, 1, 1, 1, 256, 256, "float64"):

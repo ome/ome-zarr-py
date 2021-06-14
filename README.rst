@@ -8,7 +8,7 @@ Experimental support for multi-resolution images stored in Zarr filesets, accord
 Features
 --------
 
-- Use as a image reader plugin for `napari`_. The `napari`_ plugin was generated with `Cookiecutter`_ along with `@napari`_'s `cookiecutter-napari-plugin`_ template.
+- Use as a image reader plugin for `napari`_. See `napari-ome-zarr`_.
 - Simple command-line to read and download conforming Zarr filesets.
 - Helper methods for parsing related metadata.
 
@@ -60,30 +60,6 @@ To download all the resolutions and metadata for an image::
 
     # Specify output directory
     $ ome_zarr download https://s3.embassy.ebi.ac.uk/idr/zarr/v0.1/6001240.zarr/ --output image_dir
-
-napari plugin
-=============
-
-Napari will use `ome-zarr` to open images that the plugin recognises as ome-zarr.
-The image metadata from OMERO will be used to set channel names and rendering settings
-in napari::
-
-    $ napari 'https://s3.embassy.ebi.ac.uk/idr/zarr/v0.1/6001240.zarr/'
-
-    # Also works with local files
-    $ napari 6001240.zarr
-
-OR in python::
-
-    import napari
-    with napari.gui_qt():
-        viewer = napari.Viewer()
-        viewer.open('https://s3.embassy.ebi.ac.uk/idr/zarr/v0.1/6001240.zarr/')
-
-If single zarray is passed to the plugin, it will be opened without the use of
-the metadata::
-
-    $ napari '/tmp/6001240.zarr/0'
 
 csv to labels
 =============
@@ -146,11 +122,10 @@ Distributed under the terms of the `BSD`_ license,
 "ome-zarr-py" is free and open source software
 
 .. _`OME zarr spec`: https://github.com/ome/omero-ms-zarr/blob/master/spec.md
-.. _`Cookiecutter`: https://github.com/audreyr/cookiecutter
 .. _`@napari`: https://github.com/napari
 .. _`BSD`: https://opensource.org/licenses/BSD-2-Clause
 .. _`Apache Software License 2.0`: http://www.apache.org/licenses/LICENSE-2.0
 .. _`Mozilla Public License 2.0`: https://www.mozilla.org/media/MPL/2.0/index.txt
-.. _`cookiecutter-napari-plugin`: https://github.com/napari/cookiecutter-napari-plugin
 .. _`napari`: https://github.com/napari/napari
+.. _`napari-ome-zarr`: https://github.com/ome/napari-ome-zarr
 .. _`ome-zarr`: https://pypi.org/project/ome-zarr/
