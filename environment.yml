@@ -4,7 +4,6 @@ channels:
   - conda-forge
   - defaults
 dependencies:
-  - pyqt
   - flake8
   - ipython
   - mypy
@@ -20,8 +19,6 @@ dependencies:
   - xarray
   - zarr >= 2.4.0
   - pip:
-      - napari
       - pre-commit
-      - pytest-qt
 # python.app -- only install on OSX:
 # sys_platform environment marker doesn't work in environment.yml
