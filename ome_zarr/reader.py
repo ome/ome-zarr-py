@@ -265,7 +265,7 @@ class Multiscales(Spec):
         axes_values = {"t", "c", "z", "y", "x"}
         try:
             multiscales = self.lookup("multiscales", [])
-            version = multiscales[0].get("version", "0.1")
+            version = multiscales[0].get("version", "0.1")  # should this be matched with Format.version?
             datasets = multiscales[0]["datasets"]
             # axes field was introduced in 0.3, before all data was 5d
             axes = multiscales[0].get("axes", ["t", "c", "z", "y", "x"])
@@ -336,7 +336,7 @@ class OMERO(Spec):
 
                 color = ch.get("color", None)
                 if color is not None:
-                    rgb = [(int(color[i : i + 2], 16) / 255) for i in range(0, 6, 2)]
+                    rgb = [(int(color[i: i + 2], 16) / 255) for i in range(0, 6, 2)]
                     # TODO: make this value an enumeration
                     if model == "greyscale":
                         rgb = [1, 1, 1]
