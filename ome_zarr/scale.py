@@ -12,7 +12,12 @@ from typing import Callable, Iterator, List
 import numpy as np
 import zarr
 from scipy.ndimage import zoom
-from skimage.transform import downscale_local_mean, pyramid_gaussian, pyramid_laplacian, resize
+from skimage.transform import (
+    downscale_local_mean,
+    pyramid_gaussian,
+    pyramid_laplacian,
+    resize,
+)
 
 from .io import parse_url
 
@@ -135,7 +140,7 @@ class Scaler:
             output_shape=(sizeY // self.downscale, sizeX // self.downscale),
             order=0,
             preserve_range=True,
-            anti_aliasing=False
+            anti_aliasing=False,
         ).astype(plane.dtype)
 
     def gaussian(self, base: np.ndarray) -> List[np.ndarray]:
