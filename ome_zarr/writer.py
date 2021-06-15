@@ -7,6 +7,7 @@ from typing import Any, List, Tuple, Union
 import numpy as np
 import zarr
 
+from .format import CurrentFormat, Format
 from .scale import Scaler
 from .types import JSONDict
 
@@ -17,15 +18,23 @@ def write_multiscale(
     pyramid: List,
     group: zarr.Group,
     chunks: Union[Tuple[Any, ...], int] = None,
+    fmt: Format = CurrentFormat(),
 ) -> None:
-    """Write a pyramid with multiscale metadata to disk."""
+    """
+    Write a pyramid with multiscale metadata to disk.
+
+    Parameters
+    ----------
+    TODO:
+    """
+
     paths = []
     for path, dataset in enumerate(pyramid):
         # TODO: chunks here could be different per layer
         group.create_dataset(str(path), data=dataset, chunks=chunks)
         paths.append({"path": str(path)})
 
-    multiscales = [{"version": "0.2", "datasets": paths}]
+    multiscales = [{"version": fmt.version, "datasets": paths}]
     group.attrs["multiscales"] = multiscales
 
 
@@ -35,6 +44,7 @@ def write_image(
     chunks: Union[Tuple[Any, ...], int] = None,
     byte_order: Union[str, List[str]] = "tczyx",
     scaler: Scaler = Scaler(),
+    fmt: Format = CurrentFormat(),
     **metadata: JSONDict,
 ) -> None:
     """Writes an image to the zarr store according to ome-zarr specification
@@ -54,6 +64,9 @@ def write_image(
     scaler: Scaler
       Scaler implementation for downsampling the image argument. If None,
       no downsampling will be performed.
+    fmt: Format
+      The format of the ome_zarr data which should be used.
+      Defaults to the most current.
     """
 
     if image.ndim > 5:
@@ -71,7 +84,7 @@ def write_image(
         LOGGER.debug("disabling pyramid")
         image = [image]
 
-    write_multiscale(image, group, chunks=chunks)
+    write_multiscale(image, group, chunks=chunks, fmt=fmt)
     group.attrs.update(metadata)
 
 

@@ -26,7 +26,7 @@ def config_logging(loglevel: int, args: argparse.Namespace) -> None:
 def info(args: argparse.Namespace) -> None:
     """Wrap the :func:`~ome_zarr.utils.info` method."""
     config_logging(logging.WARN, args)
-    list(zarr_info(args.path))
+    list(zarr_info(args.path, stats=args.stats))
 
 
 def download(args: argparse.Namespace) -> None:
@@ -96,6 +96,7 @@ def main(args: List[str] = None) -> None:
     # info
     parser_info = subparsers.add_parser("info")
     parser_info.add_argument("path")
+    parser_info.add_argument("--stats", action="store_true")
     parser_info.set_defaults(func=info)
 
     # download
