@@ -268,7 +268,7 @@ class Multiscales(Spec):
             version = multiscales[0].get("version", "0.1")  # should this be matched with Format.version?
             datasets = multiscales[0]["datasets"]
             # axes field was introduced in 0.3, before all data was 5d
-            axes = multiscales[0].get("axes", ["t", "c", "z", "y", "x"])
+            axes = tuple(multiscales[0].get("axes", ["t", "c", "z", "y", "x"]))
             if len(set(axes) - axes_values) > 0:
                 raise RuntimeError(f"Invalid axes names: {set(axes) - axes_values}")
             datasets = [d["path"] for d in datasets]
