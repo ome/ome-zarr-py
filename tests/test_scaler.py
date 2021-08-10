@@ -1,5 +1,6 @@
 import numpy as np
 import pytest
+
 from ome_zarr.scale import Scaler
 
 
@@ -16,7 +17,9 @@ class TestScaler:
         expected_shape = shape
         for data in downscaled:
             assert data.shape == expected_shape
-            expected_shape = expected_shape[:-2] + tuple(sh // scale_factor for sh in expected_shape[-2:])
+            expected_shape = expected_shape[:-2] + tuple(
+                sh // scale_factor for sh in expected_shape[-2:]
+            )
 
     def test_nearest(self, shape):
         data = self.create_data(shape)
