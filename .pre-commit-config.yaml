@@ -7,18 +7,18 @@ repos:
       - id: seed-isort-config
 
   - repo: https://github.com/PyCQA/isort
-    rev: 5.9.1
+    rev: 5.9.3
     hooks:
       - id: isort
 
   - repo: https://github.com/psf/black
-    rev: 21.6b0
+    rev: 21.7b0
     hooks:
       - id: black
         args: [--target-version=py36]
 
   - repo: https://github.com/asottile/pyupgrade
-    rev: v2.20.0
+    rev: v2.23.3
     hooks:
       - id: pyupgrade
         args:
@@ -78,7 +78,7 @@ repos:
         exclude: tests/|setup.py
 
   - repo: https://github.com/adrienverge/yamllint.git
-    rev: v1.26.1
+    rev: v1.26.2
     hooks:
       - id: yamllint
         # args: [--config-data=relaxed]
