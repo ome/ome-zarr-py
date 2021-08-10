@@ -34,14 +34,22 @@ class TestWriter:
         else:
             return None
 
-    @pytest.fixture(params=[FormatV01, FormatV02, FormatV03], ids=["v0.1", "v0.2", "v0.3"])
+    @pytest.fixture(
+        params=[FormatV01, FormatV02, FormatV03], ids=["v0.1", "v0.2", "v0.3"]
+    )
     def format_version(self, request):
         return request.param
 
     def test_writer(self, shape, scaler, format_version):
 
         data = self.create_data(shape)
-        write_image(image=data, group=self.group, chunks=(128, 128), scaler=scaler, fmt=format_version())
+        write_image(
+            image=data,
+            group=self.group,
+            chunks=(128, 128),
+            scaler=scaler,
+            fmt=format_version(),
+        )
 
         # Verify
         reader = Reader(parse_url(f"{self.path}/test"))
