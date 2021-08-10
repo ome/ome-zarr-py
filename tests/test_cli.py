@@ -19,7 +19,7 @@ class TestCli:
     def s3_address(self, request):
         urls = {
             "0.1": "https://s3.embassy.ebi.ac.uk/idr/zarr/v0.1/6001240.zarr",
-            "0.3": "https://minio-dev.openmicroscopy.org/idr/v0.3/idr0077-valuchova-flowerlightsheet/9836842.zarr"
+            "0.3": "https://minio-dev.openmicroscopy.org/idr/v0.3/idr0077-valuchova-flowerlightsheet/9836842.zarr",
         }
         return urls[request.param]
 
