@@ -273,6 +273,7 @@ class Multiscales(Spec):
             axes = tuple(multiscales[0].get("axes", ["t", "c", "z", "y", "x"]))
             if len(set(axes) - axes_values) > 0:
                 raise RuntimeError(f"Invalid axes names: {set(axes) - axes_values}")
+            node.metadata["axes"] = axes
             datasets = [d["path"] for d in datasets]
             self.datasets: List[str] = datasets
             LOGGER.info("datasets %s", datasets)
