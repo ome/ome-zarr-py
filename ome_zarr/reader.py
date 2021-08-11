@@ -8,7 +8,6 @@ from typing import Any, Dict, Iterator, List, Optional, Type, Union, cast
 import dask.array as da
 import numpy as np
 from dask import delayed
-from vispy.color import Colormap
 
 from .io import ZarrLocation
 from .types import JSONDict
@@ -336,7 +335,7 @@ class OMERO(Spec):
                     # TODO: make this value an enumeration
                     if model == "greyscale":
                         rgb = [1, 1, 1]
-                    colormaps.append(Colormap([[0, 0, 0], rgb]))
+                    colormaps.append([[0, 0, 0], rgb])
 
                 label = ch.get("label", None)
                 if label is not None:

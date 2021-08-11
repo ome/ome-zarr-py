@@ -24,7 +24,6 @@ install_requires += (["aiohttp"],)
 install_requires += (["requests"],)
 install_requires += (["scikit-image"],)
 install_requires += (["toolz"],)
-install_requires += (["vispy"],)
 install_requires += (["opencv-contrib-python-headless"],)
 
 

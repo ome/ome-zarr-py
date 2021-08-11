@@ -10,33 +10,17 @@ jobs:
       fail-fast: false
       matrix:
         include:
-
-          - {os: windows-latest, python_Version: '3.6', toxenv: 'py36-PyQt5'}
-          - {os: windows-latest, python_Version: '3.6', toxenv: 'py36-PySide2'}
-          - {os: windows-latest, python_Version: '3.7', toxenv: 'py37-PyQt5'}
-          - {os: windows-latest, python_Version: '3.7', toxenv: 'py37-PySide2'}
-          - {os: windows-latest, python_Version: '3.8', toxenv: 'py38-PyQt5'}
-          - {os: windows-latest, python_Version: '3.8', toxenv: 'py38-PySide2'}
-          - {os: windows-latest, python_Version: '3.9', toxenv: 'py39-PyQt5'}
-          - {os: windows-latest, python_Version: '3.9', toxenv: 'py39-PySide2'}
-
-          # No Python 3.6
-          # Linux all failing on GHA
-          # {os: linux-latest, python_Version: '3.7', toxenv: 'py37-PyQt5'}
-          # {os: linux-latest, python_Version: '3.7', toxenv: 'py37-PySide2'}
-          # {os: linux-latest, python_Version: '3.8', toxenv: 'py38-PyQt5'}
-          # {os: linux-latest, python_Version: '3.8', toxenv: 'py38-PySide2'}
-          # {os: linux-latest, python_Version: '3.9', toxenv: 'py39-PyQt5'}
-          # {os: linux-latest, python_Version: '3.9', toxenv: 'py39-PySide2'}
-
-          # No Python 3.6
-          - {os: macos-latest, python_Version: '3.7', toxenv: 'py37-PyQt5'}
-          - {os: macos-latest, python_Version: '3.7', toxenv: 'py37-PySide2'}
-          - {os: macos-latest, python_Version: '3.8', toxenv: 'py38-PyQt5'}
-          - {os: macos-latest, python_Version: '3.8', toxenv: 'py38-PySide2'}
+          - {os: windows-latest, python_Version: '3.7', toxenv: 'py37'}
+          - {os: windows-latest, python_Version: '3.8', toxenv: 'py38'}
+          - {os: windows-latest, python_Version: '3.9', toxenv: 'py39'}
+          # Linux still not working
+          # {os: linux-latest, python_Version: '3.7', toxenv: 'py37'}
+          # {os: linux-latest, python_Version: '3.8', toxenv: 'py38'}
+          # {os: linux-latest, python_Version: '3.9', toxenv: 'py39'}
+          - {os: macos-latest, python_Version: '3.7', toxenv: 'py37'}
+          - {os: macos-latest, python_Version: '3.8', toxenv: 'py38'}
           # missing numcodecs wheels on 3.9. conda not yet an option. see gh-51
-          # {os: macos-latest, python_Version: '3.9', toxenv: 'py39-PyQt5'}
-          # {os: macos-latest, python_Version: '3.9', toxenv: 'py39-PySide2'}
+          # {os: macos-latest, python_Version: '3.9', toxenv: 'py39'}
 
     steps:
       - uses: actions/checkout@v1
@@ -77,7 +61,7 @@ jobs:
           python -m pip install -r requirements/requirements-dev.txt
 
       - name: Test
-        run: tox -e  'py37-PyQt5-coverage'
+        run: tox -e  'py37-coverage'
 
       - uses: codecov/codecov-action@v1
         with:
