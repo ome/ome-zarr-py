@@ -7,6 +7,7 @@ import zarr
 from ome_zarr.format import CurrentFormat
 from ome_zarr.format import FormatV01 as V01
 from ome_zarr.format import FormatV02 as V02
+from ome_zarr.format import FormatV03 as V03
 from ome_zarr.io import parse_url
 from ome_zarr.reader import Multiscales, Reader
 from ome_zarr.writer import write_image
@@ -45,8 +46,12 @@ class TestUpgrade:
     @pytest.mark.parametrize(
         "version",
         (
-            pytest.param(V01(), id="V01"),
+            pytest.param(
+                V01(),
+                id="V01",
+                marks=pytest.mark.xfail(reason="issues with dimension_separator")),
             pytest.param(V02(), id="V02"),
+            pytest.param(V03(), id="V03"),
         ),
     )
     def test_newly_created(self, version):

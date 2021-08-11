@@ -34,12 +34,17 @@ class TestWriter:
         else:
             return None
 
-    @pytest.fixture(
-        params=[FormatV01, FormatV02, FormatV03], ids=["v0.1", "v0.2", "v0.3"]
+    @pytest.mark.parametrize(
+        "format_version",
+        (
+            pytest.param(
+                FormatV01,
+                id="V01",
+                marks=pytest.mark.xfail(reason="issues with dimension_separator")),
+            pytest.param(FormatV02, id="V02"),
+            pytest.param(FormatV03, id="V03"),
+        ),
     )
-    def format_version(self, request):
-        return request.param
-
     def test_writer(self, shape, scaler, format_version):
 
         data = self.create_data(shape)

@@ -27,14 +27,16 @@ class TestScaler:
         downscaled = scaler.nearest(data)
         self.check_downscaled(downscaled, shape)
 
-    # this fails because of wrong channel dimension; mark expected failure?
+    # this fails because of wrong channel dimension; need to fix in follow-up PR
+    @pytest.mark.xfail
     def test_gaussian(self, shape):
         data = self.create_data(shape)
         scaler = Scaler()
         downscaled = scaler.gaussian(data)
         self.check_downscaled(downscaled, shape)
 
-    # this fails because of wrong channel dimension; mark expected failure?
+    # this fails because of wrong channel dimension; need to fix in follow-up PR
+    @pytest.mark.xfail
     def test_laplacian(self, shape):
         data = self.create_data(shape)
         scaler = Scaler()

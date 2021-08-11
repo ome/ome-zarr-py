@@ -79,7 +79,7 @@ class FormatV01(Format):
         return version == self.version
 
     def init_store(self, path: str, mode: str = "r") -> FSStore:
-        store = FSStore(path, mode=mode)
+        store = FSStore(path, mode=mode, dimension_separator=".")
         LOGGER.debug(f"Created legacy flat FSStore({path}, {mode})")
         return store
 
