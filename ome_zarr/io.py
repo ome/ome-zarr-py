@@ -50,7 +50,7 @@ class ZarrLocation:
         if detected != fmt:
             LOGGER.warning(f"version mismatch: detected:{detected}, requested:{fmt}")
             self.__fmt = detected
-            self.__store == detected.init_store(self.__path, mode)
+            self.__store = detected.init_store(self.__path, mode)
             self.__init_metadata()
 
     def __init_metadata(self) -> None:
