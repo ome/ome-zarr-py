@@ -49,7 +49,8 @@ class TestUpgrade:
             pytest.param(
                 V01(),
                 id="V01",
-                marks=pytest.mark.xfail(reason="issues with dimension_separator")),
+                marks=pytest.mark.xfail(reason="issues with dimension_separator"),
+            ),
             pytest.param(V02(), id="V02"),
             pytest.param(V03(), id="V03"),
         ),

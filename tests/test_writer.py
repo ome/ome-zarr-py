@@ -40,7 +40,8 @@ class TestWriter:
             pytest.param(
                 FormatV01,
                 id="V01",
-                marks=pytest.mark.xfail(reason="issues with dimension_separator")),
+                marks=pytest.mark.xfail(reason="issues with dimension_separator"),
+            ),
             pytest.param(FormatV02, id="V02"),
             pytest.param(FormatV03, id="V03"),
         ),
