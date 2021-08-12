@@ -14,11 +14,11 @@ class TestCli:
     def initdir(self, tmpdir):
         self.path = (tmpdir / "data").mkdir()
 
-    # TODO extend with test data for 0.2
-    @pytest.fixture(params=["0.1", "0.3"], ids=["v0.1", "v0.3"])
+    @pytest.fixture(params=["0.1", "0.2", "0.3"], ids=["v0.1", "v0.2", "v0.3"])
     def s3_address(self, request):
         urls = {
             "0.1": "https://s3.embassy.ebi.ac.uk/idr/zarr/v0.1/6001240.zarr",
+            "0.2": "https://s3.embassy.ebi.ac.uk/idr/zarr/v0.2/6001240.zarr",
             "0.3": (
                 "https://minio-dev.openmicroscopy.org/idr/v0.3/"
                 "idr0077-valuchova-flowerlightsheet/9836842.zarr"
