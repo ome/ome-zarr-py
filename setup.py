@@ -18,13 +18,11 @@ install_requires += (["tifffile<2020.09.22;python_version<'3.7'"],)
 install_requires += (["numpy"],)
 install_requires += (["dask"],)
 install_requires += (["zarr>=2.8.1"],)
-install_requires += (["fsspec>=0.9.0"],)
-install_requires += (["s3fs"],)
+install_requires += (["fsspec[s3fs]!=2021.07.0"],)
 install_requires += (["aiohttp"],)
 install_requires += (["requests"],)
 install_requires += (["scikit-image"],)
 install_requires += (["toolz"],)
-install_requires += (["opencv-contrib-python-headless"],)
 
 
 setup(

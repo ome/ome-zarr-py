@@ -14,6 +14,15 @@ class TestCli:
     def initdir(self, tmpdir):
         self.path = (tmpdir / "data").mkdir()
 
+    @pytest.fixture(params=["0.1", "0.2", "0.3"], ids=["v0.1", "v0.2", "v0.3"])
+    def s3_address(self, request):
+        urls = {
+            "0.1": "https://s3.embassy.ebi.ac.uk/idr/zarr/v0.1/6001240.zarr",
+            "0.2": "https://s3.embassy.ebi.ac.uk/idr/zarr/v0.2/6001240.zarr",
+            "0.3": "https://s3.embassy.ebi.ac.uk/idr/zarr/v0.3/9836842.zarr",
+        }
+        return urls[request.param]
+
     def test_coins_info(self):
         filename = str(self.path) + "-1"
         main(["create", "--method=coins", filename])
@@ -31,6 +40,9 @@ class TestCli:
         main(["create", "--method=astronaut", filename])
         main(["download", filename, f"--output={out}"])
         main(["info", f"{out}/{basename}"])
+
+    def test_s3_info(self, s3_address):
+        main(["info", s3_address])
 
     def test_strip_prefix_relative(self):
         top = Path(".") / "d"

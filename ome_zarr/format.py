@@ -13,6 +13,7 @@ def format_implementations() -> Iterator["Format"]:
     """
     Return an instance of each format implementation, newest to oldest.
     """
+    yield FormatV03()
     yield FormatV02()
     yield FormatV01()
 
@@ -78,7 +79,7 @@ class FormatV01(Format):
         return version == self.version
 
     def init_store(self, path: str, mode: str = "r") -> FSStore:
-        store = FSStore(path, mode=mode)
+        store = FSStore(path, mode=mode, dimension_separator=".")
         LOGGER.debug(f"Created legacy flat FSStore({path}, {mode})")
         return store
 
@@ -124,4 +125,15 @@ class FormatV02(Format):
         return store
 
 
-CurrentFormat = FormatV02
+class FormatV03(FormatV02):  # inherits from V02 to avoid code duplication
+    """
+    Changelog: variable number of dimensions (up to 5),
+    introduce axes field in multiscales (June 2021)
+    """
+
+    @property
+    def version(self) -> str:
+        return "0.3"
+
+
+CurrentFormat = FormatV03

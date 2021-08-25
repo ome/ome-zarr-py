@@ -8,9 +8,7 @@ dependencies:
   - ipython
   - mypy
   - omero-py
-  - opencv
   - pip
-  - py-opencv
   - pytest
   - requests
   - s3fs

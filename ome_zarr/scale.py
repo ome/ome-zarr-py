@@ -9,11 +9,15 @@ from collections.abc import MutableMapping
 from dataclasses import dataclass
 from typing import Callable, Iterator, List
 
-import cv2
 import numpy as np
 import zarr
 from scipy.ndimage import zoom
-from skimage.transform import downscale_local_mean, pyramid_gaussian, pyramid_laplacian
+from skimage.transform import (
+    downscale_local_mean,
+    pyramid_gaussian,
+    pyramid_laplacian,
+    resize,
+)
 
 from .io import parse_url
 
@@ -123,7 +127,7 @@ class Scaler:
 
     def nearest(self, base: np.ndarray) -> List[np.ndarray]:
         """
-        Downsample using :func:`cv2.resize`.
+        Downsample using :func:`skimage.transform.resize`.
 
         The :const:`cvs2.INTER_NEAREST` interpolation method is used.
         """
@@ -131,11 +135,13 @@ class Scaler:
 
     def __nearest(self, plane: np.ndarray, sizeY: int, sizeX: int) -> np.ndarray:
         """Apply the 2-dimensional transformation."""
-        return cv2.resize(
+        return resize(
             plane,
-            dsize=(sizeY // self.downscale, sizeX // self.downscale),
-            interpolation=cv2.INTER_NEAREST,
-        )
+            output_shape=(sizeY // self.downscale, sizeX // self.downscale),
+            order=0,
+            preserve_range=True,
+            anti_aliasing=False,
+        ).astype(plane.dtype)
 
     def gaussian(self, base: np.ndarray) -> List[np.ndarray]:
         """Downsample using :func:`skimage.transform.pyramid_gaussian`."""

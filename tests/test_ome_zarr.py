@@ -9,7 +9,7 @@ from ome_zarr.utils import download, info
 
 def log_strings(idx, t, c, z, y, x, ct, cc, cz, cy, cx, dtype):
     yield f"resolution: {idx}"
-    yield f" - shape (t, c, z, y, x) = ({t}, {c}, {z}, {y}, {x})"
+    yield f" - shape ('t', 'c', 'z', 'y', 'x') = ({t}, {c}, {z}, {y}, {x})"
     yield f" - chunks =  ['{ct}', '{cc}', '{cz}', '{cx}', '{cy}']"
     yield f" - dtype = {dtype}"
 
