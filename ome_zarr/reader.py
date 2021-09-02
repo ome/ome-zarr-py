@@ -60,16 +60,16 @@ class Node:
             self.specs.append(Well(self))
 
     @overload
-    def first(self, spectype: Type["Well"]) -> Optional[Type["Well"]]:
+    def first(self, spectype: Type["Well"]) -> Optional["Well"]:
         ...
 
     @overload
-    def first(self, spectype: Type["Plate"]) -> Optional[Type["Plate"]]:
+    def first(self, spectype: Type["Plate"]) -> Optional["Plate"]:
         ...
 
-    def first(self, spectype: Type["Spec"]) -> Optional[Type["Spec"]]:
+    def first(self, spectype: Type["Spec"]) -> Optional["Spec"]:
         for spec in self.specs:
-            if spectype.matches(spec):
+            if isinstance(spec, spectype):
                 return spec
         return None
 
@@ -486,7 +486,9 @@ class Plate(Spec):
         # Get the first well...
         well_zarr = self.zarr.create(self.well_paths[0])
         well_node = Node(well_zarr, node)
-        well_spec: Well = well_node.first(Well)
+        well_spec: Optional[Well] = well_node.first(Well)
+        if well_spec is None:
+            raise Exception("could not find first well")
         self.numpy_type = well_spec.numpy_type
 
         LOGGER.debug("img_pyramid_shapes", well_spec.img_pyramid_shapes)
