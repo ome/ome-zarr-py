@@ -464,21 +464,12 @@ class Plate(Spec):
         LOGGER.info("plate_data", self.plate_data)
         self.rows = self.plate_data.get("rows")
         self.columns = self.plate_data.get("columns")
-        self.acquisitions = self.plate_data.get("acquisitions")
         self.first_field = "0"
         self.row_names = [row["name"] for row in self.rows]
         self.col_names = [col["name"] for col in self.columns]
 
         self.well_paths = [well["path"] for well in self.plate_data.get("wells")]
         self.well_paths.sort()
-
-        self.run = ""
-        # TEMP - support acquisition path in plate/acq/row/col hierarchy
-        # remove when we don't want to support dev versions of ome-zarr plate data
-        if len(self.acquisitions) > 0:
-            self.run = self.acquisitions[0].get("path", "")
-            if len(self.run) > 0 and not self.run.endswith("/"):
-                self.run = self.run + "/"
 
         self.row_count = len(self.rows)
         self.column_count = len(self.columns)
@@ -536,7 +527,7 @@ class Plate(Spec):
 
     def get_tile_path(self, level: int, row: int, col: int) -> str:
         return (
-            f"{self.run}{self.row_names[row]}/"
+            f"{self.row_names[row]}/"
             f"{self.col_names[col]}/{self.first_field}/{level}"
         )
 
