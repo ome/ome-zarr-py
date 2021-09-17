@@ -163,11 +163,14 @@ class ZarrLocation:
 
     def subpath(self, subpath: str = "") -> str:
         if self.__store.fs.protocol == "file":
-            path = Path(self.__path) / subpath
-            path = path.resolve()
-            return str(path)
+            filename = Path(self.__path) / subpath
+            filename = filename.resolve()
+            return str(filename)
         else:
-            return urljoin(self.__path, subpath)
+            url = str(self.__path)
+            if not url.endswith("/"):
+                url = f"{url}/"
+            return urljoin(url, subpath)
 
 
 def parse_url(

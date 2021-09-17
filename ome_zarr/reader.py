@@ -3,7 +3,7 @@
 import logging
 import math
 from abc import ABC
-from typing import Any, Dict, Iterator, List, Optional, Type, Union, cast
+from typing import Any, Dict, Iterator, List, Optional, Type, Union, cast, overload
 
 import dask.array as da
 import numpy as np
@@ -58,6 +58,20 @@ class Node:
             self.add(zarr, plate_labels=True)
         if Well.matches(zarr):
             self.specs.append(Well(self))
+
+    @overload
+    def first(self, spectype: Type["Well"]) -> Optional["Well"]:
+        ...
+
+    @overload
+    def first(self, spectype: Type["Plate"]) -> Optional["Plate"]:
+        ...
+
+    def first(self, spectype: Type["Spec"]) -> Optional["Spec"]:
+        for spec in self.specs:
+            if isinstance(spec, spectype):
+                return spec
+        return None
 
     @property
     def visible(self) -> bool:
@@ -390,8 +404,10 @@ class Well(Spec):
         image_zarr = self.zarr.create(image_paths[0])
         image_node = Node(image_zarr, node)
         level = 0  # load full resolution image
-        numpy_type = image_node.data[level].dtype
-        img_shape = image_node.data[level].shape
+        self.numpy_type = image_node.data[level].dtype
+        self.img_metadata = image_node.metadata
+        self.img_shape = image_node.data[level].shape
+        self.img_pyramid_shapes = [d.shape for d in image_node.data]
 
         # stitch full-resolution images into a grid
         def get_field(tile_name: str) -> np.ndarray:
@@ -404,7 +420,7 @@ class Well(Spec):
                 data = self.zarr.load(path)
             except ValueError:
                 LOGGER.error(f"Failed to load {path}")
-                data = np.zeros(img_shape, dtype=numpy_type)
+                data = np.zeros(self.img_shape, dtype=self.numpy_type)
             return data
 
         lazy_reader = delayed(get_field)
@@ -418,7 +434,9 @@ class Well(Spec):
                     tile_name = f"{row},{col}"
                     LOGGER.debug(f"creating lazy_reader. row:{row} col:{col}")
                     lazy_tile = da.from_delayed(
-                        lazy_reader(tile_name), shape=img_shape, dtype=numpy_type
+                        lazy_reader(tile_name),
+                        shape=self.img_shape,
+                        dtype=self.numpy_type,
                     )
                     lazy_row.append(lazy_tile)
                 lazy_rows.append(da.concatenate(lazy_row, axis=4))
@@ -446,7 +464,6 @@ class Plate(Spec):
         LOGGER.info("plate_data", self.plate_data)
         self.rows = self.plate_data.get("rows")
         self.columns = self.plate_data.get("columns")
-        self.acquisitions = self.plate_data.get("acquisitions")
         self.first_field = "0"
         self.row_names = [row["name"] for row in self.rows]
         self.col_names = [col["name"] for col in self.columns]
@@ -454,30 +471,21 @@ class Plate(Spec):
         self.well_paths = [well["path"] for well in self.plate_data.get("wells")]
         self.well_paths.sort()
 
-        self.run = ""
-        # TEMP - support acquisition path in plate/acq/row/col hierarchy
-        # remove when we don't want to support dev versions of ome-zarr plate data
-        if len(self.acquisitions) > 0:
-            self.run = self.acquisitions[0].get("path", "")
-            if len(self.run) > 0 and not self.run.endswith("/"):
-                self.run = self.run + "/"
-
         self.row_count = len(self.rows)
         self.column_count = len(self.columns)
-        # Get the first image...
-        path = f"{self.well_paths[0]}/{self.first_field}"
-        image_zarr = self.zarr.create(path)
-        image_node = Node(image_zarr, node)
 
-        self.numpy_type = self.get_numpy_type(image_node)
-        img_shape = image_node.data[0].shape
+        # Get the first well...
+        well_zarr = self.zarr.create(self.well_paths[0])
+        well_node = Node(well_zarr, node)
+        well_spec: Optional[Well] = well_node.first(Well)
+        if well_spec is None:
+            raise Exception("could not find first well")
+        self.numpy_type = well_spec.numpy_type
 
-        img_pyramid_shapes = [d.shape for d in image_node.data]
+        LOGGER.debug("img_pyramid_shapes", well_spec.img_pyramid_shapes)
 
-        LOGGER.debug("img_pyramid_shapes", img_pyramid_shapes)
-
-        size_y = img_shape[3]
-        size_x = img_shape[4]
+        size_y = well_spec.img_shape[3]
+        size_x = well_spec.img_shape[4]
 
         # FIXME - if only returning a single stiched plate (not a pyramid)
         # need to decide optimal size. E.g. longest side < 1500
@@ -486,7 +494,7 @@ class Plate(Spec):
         plate_height = self.row_count * size_y
         longest_side = max(plate_width, plate_height)
         target_level = 0
-        for level, shape in enumerate(img_pyramid_shapes):
+        for level, shape in enumerate(well_spec.img_pyramid_shapes):
             plate_width = self.column_count * shape[-1]
             plate_height = self.row_count * shape[-2]
             longest_side = max(plate_width, plate_height)
@@ -502,14 +510,14 @@ class Plate(Spec):
         # for level in range(5):
         for level in [target_level]:
 
-            tile_shape = img_pyramid_shapes[level]
+            tile_shape = well_spec.img_pyramid_shapes[level]
             lazy_plate = self.get_stitched_grid(level, tile_shape)
             pyramid.append(lazy_plate)
 
         # Set the node.data to be pyramid view of the plate
         node.data = pyramid
         # Use the first image's metadata for viewing the whole Plate
-        node.metadata = image_node.metadata
+        node.metadata = well_spec.img_metadata
 
         # "metadata" dict gets added to each 'plate' layer in napari
         node.metadata.update({"metadata": {"plate": self.plate_data}})
@@ -519,7 +527,7 @@ class Plate(Spec):
 
     def get_tile_path(self, level: int, row: int, col: int) -> str:
         return (
-            f"{self.run}{self.row_names[row]}/"
+            f"{self.row_names[row]}/"
             f"{self.col_names[col]}/{self.first_field}/{level}"
         )
 
