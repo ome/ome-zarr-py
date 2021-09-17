@@ -45,7 +45,7 @@ info
 Use the `ome_zarr` command to interrogate Zarr datasets::
 
     # Remote data
-    $ ome_zarr info https://s3.embassy.ebi.ac.uk/idr/zarr/v0.1/6001240.zarr/
+    $ ome_zarr info https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.1/6001240.zarr/
 
     # Local data (after downloading as below)
     $ ome_zarr info 6001240.zarr/
@@ -56,10 +56,10 @@ download
 To download all the resolutions and metadata for an image::
 
     # creates local 6001240.zarr/
-    $ ome_zarr download https://s3.embassy.ebi.ac.uk/idr/zarr/v0.1/6001240.zarr/
+    $ ome_zarr download https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.1/6001240.zarr/
 
     # Specify output directory
-    $ ome_zarr download https://s3.embassy.ebi.ac.uk/idr/zarr/v0.1/6001240.zarr/ --output image_dir
+    $ ome_zarr download https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.1/6001240.zarr/ --output image_dir
 
 csv to labels
 =============
