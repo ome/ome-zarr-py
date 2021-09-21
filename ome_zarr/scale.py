@@ -168,14 +168,10 @@ class Scaler:
     def local_mean(self, base: np.ndarray) -> List[np.ndarray]:
         """Downsample using :func:`skimage.transform.downscale_local_mean`."""
         rv = [base]
-        # FIXME: fix hard-coding
-        rv = [base]
+        stack_dims = base.ndim - 2
+        factors = (*(1,) * stack_dims, *(self.downscale, self.downscale))
         for i in range(self.max_layer):
-            rv.append(
-                downscale_local_mean(
-                    rv[-1], factors=(1, 1, 1, self.downscale, self.downscale)
-                )
-            )
+            rv.append(downscale_local_mean(rv[-1], factors=factors))
         return rv
 
     def zoom(self, base: np.ndarray) -> List[np.ndarray]:

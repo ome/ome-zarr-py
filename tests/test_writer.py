@@ -26,9 +26,10 @@ class TestWriter:
     @pytest.fixture(
         params=(
             (1, 2, 1, 256, 256),
+            (3, 512, 512),
             (256, 256),
         ),
-        ids=["5D", "2D"],
+        ids=["5D", "3D", "2D"],
     )
     def shape(self, request):
         return request.param
