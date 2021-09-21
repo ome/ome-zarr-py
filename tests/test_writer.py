@@ -57,12 +57,14 @@ class TestWriter:
 
         data = self.create_data(shape)
         version = format_version()
+        axes = "tczyx"[-len(shape) :]
         write_image(
             image=data,
             group=self.group,
             chunks=(128, 128),
             scaler=scaler,
             fmt=version,
+            axes=axes,
         )
 
         # Verify
@@ -74,5 +76,4 @@ class TestWriter:
             assert node.data[0].shape == shape
         else:
             assert node.data[0].ndim == 5
-        # assert node.data[0].chunks == ((1,), (2,), (1,), (128, 128), (128, 128))
         assert np.allclose(data, node.data[0][...].compute())

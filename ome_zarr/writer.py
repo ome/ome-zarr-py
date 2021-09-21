@@ -19,6 +19,7 @@ def write_multiscale(
     group: zarr.Group,
     chunks: Union[Tuple[Any, ...], int] = None,
     fmt: Format = CurrentFormat(),
+    axes: Union[str, List[str]] = None,
 ) -> None:
     """
     Write a pyramid with multiscale metadata to disk.
@@ -28,6 +29,23 @@ def write_multiscale(
     TODO:
     """
 
+    dims = len(pyramid[0].shape)
+    if fmt.version not in ("0.1", "0.2"):
+        if axes is None:
+            if dims == 2:
+                axes = ["y", "x"]
+            else:
+                raise ValueError("axes must be provided")
+        if len(axes) != dims:
+            raise ValueError("axes length must match number of dimensions")
+
+        if isinstance(axes, str):
+            axes = list(axes)
+
+        for dim in axes:
+            if dim not in ("t", "c", "z", "y", "x"):
+                raise ValueError("axes must each be one of 'x', 'y', 'z', 'c' or 't'")
+
     paths = []
     for path, dataset in enumerate(pyramid):
         # TODO: chunks here could be different per layer
@@ -35,6 +53,8 @@ def write_multiscale(
         paths.append({"path": str(path)})
 
     multiscales = [{"version": fmt.version, "datasets": paths}]
+    if axes is not None:
+        multiscales[0]["axes"] = axes
     group.attrs["multiscales"] = multiscales
 
 
@@ -45,6 +65,7 @@ def write_image(
     byte_order: Union[str, List[str]] = "tczyx",
     scaler: Scaler = Scaler(),
     fmt: Format = CurrentFormat(),
+    axes: Union[str, List[str]] = None,
     **metadata: JSONDict,
 ) -> None:
     """Writes an image to the zarr store according to ome-zarr specification
@@ -67,6 +88,9 @@ def write_image(
     fmt: Format
       The format of the ome_zarr data which should be used.
       Defaults to the most current.
+    axes: str or list of str
+      the names of the axes. e.g. "tczyx". Not needed for v0.1 or v0.2
+      or for v0.3 if only 2D. Otherwise this must be provided
     """
 
     if image.ndim > 5:
@@ -86,7 +110,7 @@ def write_image(
         LOGGER.debug("disabling pyramid")
         image = [image]
 
-    write_multiscale(image, group, chunks=chunks, fmt=fmt)
+    write_multiscale(image, group, chunks=chunks, fmt=fmt, axes=axes)
     group.attrs.update(metadata)
 
 
