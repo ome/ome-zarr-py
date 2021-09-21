@@ -198,23 +198,47 @@ class Scaler:
         func: Callable[[np.ndarray, int, int], np.ndarray],
     ) -> np.ndarray:
         """Loop over 3 of the 5 dimensions and apply the func transform."""
-        assert 5 == len(base.shape)
+
+        shape_5d = (*(1,) * (5 - base.ndim), *base.shape)
 
         rv = [base]
         for i in range(self.max_layer):
-            fiveD = rv[-1]
+            nd_planes = rv[-1]
             # FIXME: fix hard-coding of dimensions
-            T, C, Z, Y, X = fiveD.shape
+            T, C, Z, Y, X = shape_5d
+            # stack_dims is any dims over 2D
+            stack_dims = base.ndim - 2
+            print("base.ndim", base.ndim)
+            print("stack_dims", stack_dims)
 
             smaller = None
             for t in range(T):
                 for c in range(C):
                     for z in range(Z):
-                        out = func(fiveD[t][c][z][:], Y, X)
+                        dims_to_slice = (t, c, z)[-stack_dims:]
+                        print("dims_to_slice", dims_to_slice)
+                        if stack_dims == 0:
+                            # nd_planes is already just 2D
+                            plane = nd_planes[:]
+                        else:
+                            # slice nd down to 2D
+                            plane = nd_planes[(dims_to_slice)][:]
+                        print("plane", plane.shape)
+                        out = func(plane, Y, X)
                         if smaller is None:
+                            zct_dims = shape_5d[:-2]
+                            print("zct_dims", zct_dims)
+                            shape_dims = zct_dims[-stack_dims:]
+                            print("shape_dims", shape_dims)
+                            print("smaller", (*shape_dims, out.shape[0], out.shape[1]))
                             smaller = np.zeros(
-                                (T, C, Z, out.shape[0], out.shape[1]), dtype=base.dtype
+                                (*shape_dims, out.shape[0], out.shape[1]),
+                                dtype=base.dtype,
                             )
-                        smaller[t][c][z] = out
+                        print("smaller slice", smaller[(dims_to_slice)].shape)
+                        if stack_dims == 0:
+                            smaller = out
+                        else:
+                            smaller[(dims_to_slice)] = out
             rv.append(smaller)
         return rv

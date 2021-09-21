@@ -72,11 +72,13 @@ def write_image(
     if image.ndim > 5:
         raise ValueError("Only images of 5D or less are supported")
 
-    shape_5d: Tuple[Any, ...] = (*(1,) * (5 - image.ndim), *image.shape)
-    image = image.reshape(shape_5d)
+    if fmt.version in ("0.1", "0.2"):
+        # v0.1 and v0.2 are strictly 5D
+        shape_5d: Tuple[Any, ...] = (*(1,) * (5 - image.ndim), *image.shape)
+        image = image.reshape(shape_5d)
 
     if chunks is not None:
-        chunks = _retuple(chunks, shape_5d)
+        chunks = _retuple(chunks, image.shape)
 
     if scaler is not None:
         image = scaler.nearest(image)
@@ -98,4 +100,6 @@ def _retuple(
     else:
         _chunks = chunks
 
-    return (*shape[: (5 - len(_chunks))], *_chunks)
+    dims_to_add = len(shape) - len(_chunks)
+
+    return (*shape[:dims_to_add], *_chunks)
