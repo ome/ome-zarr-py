@@ -107,7 +107,10 @@ def create_zarr(
     loc = parse_url(zarr_directory, mode="w")
     assert loc
     grp = zarr.group(loc.store)
-    write_multiscale(pyramid, grp)
+    axes = None
+    if fmt.version not in ("0.1", "0.2"):
+        axes = "tczyx"[-pyramid[0].ndim :]
+    write_multiscale(pyramid, grp, axes=axes)
 
     if pyramid[0].shape[CHANNEL_DIMENSION] == 1:
         image_data = {
@@ -146,7 +149,7 @@ def create_zarr(
         labels_grp.attrs["labels"] = [label_name]
 
         label_grp = labels_grp.create_group(label_name)
-        write_multiscale(labels, label_grp)
+        write_multiscale(labels, label_grp, axes=axes)
 
         colors = []
         properties = []
