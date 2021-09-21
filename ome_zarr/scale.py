@@ -199,46 +199,36 @@ class Scaler:
     ) -> np.ndarray:
         """Loop over 3 of the 5 dimensions and apply the func transform."""
 
-        shape_5d = (*(1,) * (5 - base.ndim), *base.shape)
-
         rv = [base]
         for i in range(self.max_layer):
-            nd_planes = rv[-1]
-            # FIXME: fix hard-coding of dimensions
+            stack_to_scale = rv[-1]
+            shape_5d = (*(1,) * (5 - stack_to_scale.ndim), *stack_to_scale.shape)
             T, C, Z, Y, X = shape_5d
-            # stack_dims is any dims over 2D
-            stack_dims = base.ndim - 2
-            print("base.ndim", base.ndim)
-            print("stack_dims", stack_dims)
 
-            smaller = None
+            # If our data is already 2D, simply resize and add to pyramid
+            if stack_to_scale.ndim == 2:
+                rv.append(func(stack_to_scale, Y, X))
+                continue
+
+            # stack_dims is any dims over 2D
+            stack_dims = stack_to_scale.ndim - 2
+            new_stack = None
             for t in range(T):
                 for c in range(C):
                     for z in range(Z):
                         dims_to_slice = (t, c, z)[-stack_dims:]
-                        print("dims_to_slice", dims_to_slice)
-                        if stack_dims == 0:
-                            # nd_planes is already just 2D
-                            plane = nd_planes[:]
-                        else:
-                            # slice nd down to 2D
-                            plane = nd_planes[(dims_to_slice)][:]
-                        print("plane", plane.shape)
+                        # slice nd down to 2D
+                        plane = stack_to_scale[(dims_to_slice)][:]
                         out = func(plane, Y, X)
-                        if smaller is None:
+                        # first iteration of loop creates the new nd stack
+                        if new_stack is None:
                             zct_dims = shape_5d[:-2]
-                            print("zct_dims", zct_dims)
                             shape_dims = zct_dims[-stack_dims:]
-                            print("shape_dims", shape_dims)
-                            print("smaller", (*shape_dims, out.shape[0], out.shape[1]))
-                            smaller = np.zeros(
+                            new_stack = np.zeros(
                                 (*shape_dims, out.shape[0], out.shape[1]),
                                 dtype=base.dtype,
                             )
-                        print("smaller slice", smaller[(dims_to_slice)].shape)
-                        if stack_dims == 0:
-                            smaller = out
-                        else:
-                            smaller[(dims_to_slice)] = out
-            rv.append(smaller)
+                        # insert resized plane into the stack at correct indices
+                        new_stack[(dims_to_slice)] = out
+            rv.append(new_stack)
         return rv
