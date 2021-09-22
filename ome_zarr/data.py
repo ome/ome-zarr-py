@@ -114,7 +114,7 @@ def create_zarr(
 
     if pyramid[0].shape[CHANNEL_DIMENSION] == 1:
         image_data = {
-            "channels": [{"window": {"start": 0, "end": 1}}],
+            "channels": [{"window": {"start": 0, "end": 1}, "color": "FF0000"}],
             "rdefs": {"model": "greyscale"},
         }
     else:
