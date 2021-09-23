@@ -26,7 +26,18 @@ def write_multiscale(
 
     Parameters
     ----------
-    TODO:
+    pyramid: List of np.ndarray
+      the image data to save. Largest level first
+    group: zarr.Group
+      the group within the zarr store to store the data in
+    chunks: int or tuple of ints,
+      size of the saved chunks to store the image
+    fmt: Format
+      The format of the ome_zarr data which should be used.
+      Defaults to the most current.
+    axes: str or list of str
+      the names of the axes. e.g. "tczyx". Not needed for v0.1 or v0.2
+      or for v0.3 if 2D or 5D. Otherwise this must be provided
     """
 
     dims = len(pyramid[0].shape)
@@ -34,8 +45,12 @@ def write_multiscale(
         if axes is None:
             if dims == 2:
                 axes = ["y", "x"]
+            elif dims == 5:
+                axes = ["t", "c", "z", "y", "x"]
             else:
-                raise ValueError("axes must be provided")
+                raise ValueError(
+                    "axes must be provided. Can't be guessed for 3D or 4D data"
+                )
         if len(axes) != dims:
             raise ValueError("axes length must match number of dimensions")
 
@@ -90,7 +105,7 @@ def write_image(
       Defaults to the most current.
     axes: str or list of str
       the names of the axes. e.g. "tczyx". Not needed for v0.1 or v0.2
-      or for v0.3 if only 2D. Otherwise this must be provided
+      or for v0.3 if 2D or 5D. Otherwise this must be provided
     """
 
     if image.ndim > 5:
