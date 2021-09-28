@@ -80,7 +80,6 @@ jobs:
       # yamllint disable rule:line-length
       - name: Dispatch event to ome_zarr_test_suite.
         uses: peter-evans/repository-dispatch@v1
-        if: ${{github.event.action != 'run_test_suite' }}
         with:
           token: ${{ secrets.API_TOKEN_GITHUB }}
           event-type: run_test_suite
