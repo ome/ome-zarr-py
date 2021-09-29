@@ -10,14 +10,14 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - {os: windows-latest, python_Version: '3.7', toxenv: 'py37'}
-          - {os: windows-latest, python_Version: '3.8', toxenv: 'py38'}
-          - {os: windows-latest, python_Version: '3.9', toxenv: 'py39'}
+          #- {os: windows-latest, python_Version: '3.7', toxenv: 'py37'}
+          #- {os: windows-latest, python_Version: '3.8', toxenv: 'py38'}
+          #- {os: windows-latest, python_Version: '3.9', toxenv: 'py39'}
           # Linux still not working
           # {os: linux-latest, python_Version: '3.7', toxenv: 'py37'}
           # {os: linux-latest, python_Version: '3.8', toxenv: 'py38'}
           # {os: linux-latest, python_Version: '3.9', toxenv: 'py39'}
-          - {os: macos-latest, python_Version: '3.7', toxenv: 'py37'}
+          #- {os: macos-latest, python_Version: '3.7', toxenv: 'py37'}
           - {os: macos-latest, python_Version: '3.8', toxenv: 'py38'}
           # missing numcodecs wheels on 3.9. conda not yet an option. see gh-51
           # {os: macos-latest, python_Version: '3.9', toxenv: 'py39'}
@@ -77,11 +77,18 @@ jobs:
       - uses: actions/checkout@v2
         with:
           ref: ${{ github.event.pull_request.head.sha }}
+      - name: post
+        run: |
+          curl -X POST \
+               -H "Accept: application/vnd.github.v3+json" \
+               -H "Authorization: 'Bearer ${process.env.GITHUB_TOKEN}'" \
+               --data '{"event_type": "run_test_suite", "client_payload": { "version": "1.2.3"}}' \
+               https://api.github.com/repos/ome/ome_zarr_test_suite/dispatches
       # yamllint disable rule:line-length
-      - name: Dispatch event to ome_zarr_test_suite.
-        uses: peter-evans/repository-dispatch@v1
-        with:
-          token: ${{ secrets.API_TOKEN_GITHUB }}
-          event-type: run_test_suite
-          repository: ome/ome_zarr_test_suite
-          client-payload: '{"ref": "${{ github.ref }}", "sha": "${{ github.event.pull_request.head.sha }}", "repo": "${{ github.repository }}", "owner": "${{github.repository_owner}}", "number": "${{github.event.number}}"}'
+      # - name: Dispatch event to ome_zarr_test_suite.
+        # uses: peter-evans/repository-dispatch@v1
+        # with:
+        #  token: ${{ secrets.ACTION_API_TOKEN }}
+        #  event-type: run_test_suite
+        #  repository: ome/ome_zarr_test_suite
+        #  client-payload: '{"ref": "${{ github.ref }}", "sha": "${{ github.event.pull_request.head.sha }}", "repo": "${{ github.repository }}", "owner": "${{github.repository_owner}}", "number": "${{github.event.number}}"}'
