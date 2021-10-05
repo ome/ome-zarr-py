@@ -139,7 +139,7 @@ def create_zarr(
 
     if size_c == 1:
         image_data = {
-            "channels": [{"window": {"start": 0, "end": 1}, "color": "FF0000"}],
+            "channels": [{"window": {"start": 0, "end": 255}, "color": "FF0000"}],
             "rdefs": {"model": "greyscale"},
         }
     else:
