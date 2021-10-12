@@ -54,7 +54,10 @@ class TestUpgrade:
     def test_newly_created(self, version):
         shape = (1, 1, 1, 8, 8)
         data = self.create_data(shape, version)
-        write_image(image=data, group=self.group, scaler=None, fmt=version)
+        axes = None
+        if version not in ("0.1", "0.2"):
+            axes = "tczyx"
+        write_image(image=data, group=self.group, scaler=None, fmt=version, axes=axes)
         self.assert_data(f"{self.path}/test", shape=shape, fmt=version)
 
     def test_requested_no_upgrade(self):

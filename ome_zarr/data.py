@@ -1,6 +1,6 @@
 """Functions for generating synthetic data."""
 from random import randrange
-from typing import Callable, List, Tuple
+from typing import Callable, List, Tuple, Union
 
 import numpy as np
 import zarr
@@ -32,8 +32,6 @@ def coins() -> Tuple[List, List]:
     pyramid = list(reversed([zoom(image, 2 ** i, order=3) for i in range(4)]))
     labels = list(reversed([zoom(label_image, 2 ** i, order=0) for i in range(4)]))
 
-    pyramid = [rgb_to_5d(layer) for layer in pyramid]
-    labels = [rgb_to_5d(layer) for layer in labels]
     return pyramid, labels
 
 
@@ -41,14 +39,19 @@ def astronaut() -> Tuple[List, List]:
     """Sample data from skimage."""
     scaler = Scaler()
 
-    pixels = rgb_to_5d(np.tile(data.astronaut(), (2, 2, 1)))
+    astro = data.astronaut()
+    red = astro[:, :, 0]
+    green = astro[:, :, 1]
+    blue = astro[:, :, 2]
+    astro = np.array([red, green, blue])
+    pixels = np.tile(astro, (1, 2, 2))
     pyramid = scaler.nearest(pixels)
 
     shape = list(pyramid[0].shape)
-    shape[1] = 1
-    label = np.zeros(shape)
-    make_circle(100, 100, 1, label[0, 0, 0, 200:300, 200:300])
-    make_circle(150, 150, 2, label[0, 0, 0, 250:400, 250:400])
+    c, y, x = shape
+    label = np.zeros((y, x), dtype=np.int8)
+    make_circle(100, 100, 1, label[200:300, 200:300])
+    make_circle(150, 150, 2, label[250:400, 250:400])
     labels = scaler.nearest(label)
 
     return pyramid, labels
@@ -100,6 +103,7 @@ def create_zarr(
     method: Callable[..., Tuple[List, List]] = coins,
     label_name: str = "coins",
     fmt: Format = CurrentFormat(),
+    chunks: Union[Tuple, List] = None,
 ) -> None:
     """Generate a synthetic image pyramid with labels."""
     pyramid, labels = method()
@@ -107,11 +111,35 @@ def create_zarr(
     loc = parse_url(zarr_directory, mode="w")
     assert loc
     grp = zarr.group(loc.store)
-    write_multiscale(pyramid, grp)
+    axes = None
+    size_c = 1
+    if fmt.version not in ("0.1", "0.2"):
+        if pyramid[0].ndim == 3:
+            axes = "cyx"
+            size_c = 3
+        else:
+            axes = "tczyx"[-pyramid[0].ndim :]
+            size_c = 1
+    else:
+        # v0.1 and v0.2 must be 5D
+        pyramid = [rgb_to_5d(layer) for layer in pyramid]
+        if labels:
+            labels = [rgb_to_5d(layer) for layer in labels]
+        size_c = pyramid[0].shape[CHANNEL_DIMENSION]
 
-    if pyramid[0].shape[CHANNEL_DIMENSION] == 1:
+    if chunks is None:
+        # Use smallest pyramid as chunk size...
+        chunks = list(pyramid[-1].shape)
+        # setting any z, c, t sizes to 1
+        for zct in range(3):
+            if zct + 2 < len(chunks):
+                chunks[zct] = 1
+
+    write_multiscale(pyramid, grp, chunks=tuple(chunks), axes=axes)
+
+    if size_c == 1:
         image_data = {
-            "channels": [{"window": {"start": 0, "end": 1}}],
+            "channels": [{"window": {"start": 0, "end": 255}, "color": "FF0000"}],
             "rdefs": {"model": "greyscale"},
         }
     else:
@@ -119,19 +147,19 @@ def create_zarr(
             "channels": [
                 {
                     "color": "FF0000",
-                    "window": {"start": 0, "end": 1},
+                    "window": {"start": 0, "end": 255},
                     "label": "Red",
                     "active": True,
                 },
                 {
                     "color": "00FF00",
-                    "window": {"start": 0, "end": 1},
+                    "window": {"start": 0, "end": 255},
                     "label": "Green",
                     "active": True,
                 },
                 {
                     "color": "0000FF",
-                    "window": {"start": 0, "end": 1},
+                    "window": {"start": 0, "end": 255},
                     "label": "Blue",
                     "active": True,
                 },
@@ -146,7 +174,10 @@ def create_zarr(
         labels_grp.attrs["labels"] = [label_name]
 
         label_grp = labels_grp.create_group(label_name)
-        write_multiscale(labels, label_grp)
+        if axes is not None:
+            # remove channel axis for masks
+            axes = axes.replace("c", "")
+        write_multiscale(labels, label_grp, axes=axes)
 
         colors = []
         properties = []

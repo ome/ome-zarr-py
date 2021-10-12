@@ -19,14 +19,47 @@ def write_multiscale(
     group: zarr.Group,
     chunks: Union[Tuple[Any, ...], int] = None,
     fmt: Format = CurrentFormat(),
+    axes: Union[str, List[str]] = None,
 ) -> None:
     """
     Write a pyramid with multiscale metadata to disk.
 
     Parameters
     ----------
-    TODO:
+    pyramid: List of np.ndarray
+      the image data to save. Largest level first
+    group: zarr.Group
+      the group within the zarr store to store the data in
+    chunks: int or tuple of ints,
+      size of the saved chunks to store the image
+    fmt: Format
+      The format of the ome_zarr data which should be used.
+      Defaults to the most current.
+    axes: str or list of str
+      the names of the axes. e.g. "tczyx". Not needed for v0.1 or v0.2
+      or for v0.3 if 2D or 5D. Otherwise this must be provided
     """
+
+    dims = len(pyramid[0].shape)
+    if fmt.version not in ("0.1", "0.2"):
+        if axes is None:
+            if dims == 2:
+                axes = ["y", "x"]
+            elif dims == 5:
+                axes = ["t", "c", "z", "y", "x"]
+            else:
+                raise ValueError(
+                    "axes must be provided. Can't be guessed for 3D or 4D data"
+                )
+        if len(axes) != dims:
+            raise ValueError("axes length must match number of dimensions")
+
+        if isinstance(axes, str):
+            axes = list(axes)
+
+        for dim in axes:
+            if dim not in ("t", "c", "z", "y", "x"):
+                raise ValueError("axes must each be one of 'x', 'y', 'z', 'c' or 't'")
 
     paths = []
     for path, dataset in enumerate(pyramid):
@@ -35,6 +68,8 @@ def write_multiscale(
         paths.append({"path": str(path)})
 
     multiscales = [{"version": fmt.version, "datasets": paths}]
+    if axes is not None:
+        multiscales[0]["axes"] = axes
     group.attrs["multiscales"] = multiscales
 
 
@@ -45,6 +80,7 @@ def write_image(
     byte_order: Union[str, List[str]] = "tczyx",
     scaler: Scaler = Scaler(),
     fmt: Format = CurrentFormat(),
+    axes: Union[str, List[str]] = None,
     **metadata: JSONDict,
 ) -> None:
     """Writes an image to the zarr store according to ome-zarr specification
@@ -67,16 +103,21 @@ def write_image(
     fmt: Format
       The format of the ome_zarr data which should be used.
       Defaults to the most current.
+    axes: str or list of str
+      the names of the axes. e.g. "tczyx". Not needed for v0.1 or v0.2
+      or for v0.3 if 2D or 5D. Otherwise this must be provided
     """
 
     if image.ndim > 5:
         raise ValueError("Only images of 5D or less are supported")
 
-    shape_5d: Tuple[Any, ...] = (*(1,) * (5 - image.ndim), *image.shape)
-    image = image.reshape(shape_5d)
+    if fmt.version in ("0.1", "0.2"):
+        # v0.1 and v0.2 are strictly 5D
+        shape_5d: Tuple[Any, ...] = (*(1,) * (5 - image.ndim), *image.shape)
+        image = image.reshape(shape_5d)
 
     if chunks is not None:
-        chunks = _retuple(chunks, shape_5d)
+        chunks = _retuple(chunks, image.shape)
 
     if scaler is not None:
         image = scaler.nearest(image)
@@ -84,7 +125,7 @@ def write_image(
         LOGGER.debug("disabling pyramid")
         image = [image]
 
-    write_multiscale(image, group, chunks=chunks, fmt=fmt)
+    write_multiscale(image, group, chunks=chunks, fmt=fmt, axes=axes)
     group.attrs.update(metadata)
 
 
@@ -98,4 +139,6 @@ def _retuple(
     else:
         _chunks = chunks
 
-    return (*shape[: (5 - len(_chunks))], *_chunks)
+    dims_to_add = len(shape) - len(_chunks)
+
+    return (*shape[:dims_to_add], *_chunks)

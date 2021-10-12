@@ -23,7 +23,14 @@ class TestWriter:
         rng = np.random.default_rng(0)
         return rng.poisson(mean_val, size=shape).astype(dtype)
 
-    @pytest.fixture(params=((1, 2, 1, 256, 256),))
+    @pytest.fixture(
+        params=(
+            (1, 2, 1, 256, 256),
+            (3, 512, 512),
+            (256, 256),
+        ),
+        ids=["5D", "3D", "2D"],
+    )
     def shape(self, request):
         return request.param
 
@@ -49,18 +56,24 @@ class TestWriter:
     def test_writer(self, shape, scaler, format_version):
 
         data = self.create_data(shape)
+        version = format_version()
+        axes = "tczyx"[-len(shape) :]
         write_image(
             image=data,
             group=self.group,
             chunks=(128, 128),
             scaler=scaler,
-            fmt=format_version(),
+            fmt=version,
+            axes=axes,
         )
 
         # Verify
         reader = Reader(parse_url(f"{self.path}/test"))
         node = list(reader())[0]
         assert Multiscales.matches(node.zarr)
-        assert node.data[0].shape == shape
-        assert node.data[0].chunks == ((1,), (2,), (1,), (128, 128), (128, 128))
+        if version.version not in ("0.1", "0.2"):
+            # v0.1 and v0.2 MUST be 5D
+            assert node.data[0].shape == shape
+        else:
+            assert node.data[0].ndim == 5
         assert np.allclose(data, node.data[0][...].compute())

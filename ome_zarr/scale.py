@@ -168,14 +168,10 @@ class Scaler:
     def local_mean(self, base: np.ndarray) -> List[np.ndarray]:
         """Downsample using :func:`skimage.transform.downscale_local_mean`."""
         rv = [base]
-        # FIXME: fix hard-coding
-        rv = [base]
+        stack_dims = base.ndim - 2
+        factors = (*(1,) * stack_dims, *(self.downscale, self.downscale))
         for i in range(self.max_layer):
-            rv.append(
-                downscale_local_mean(
-                    rv[-1], factors=(1, 1, 1, self.downscale, self.downscale)
-                )
-            )
+            rv.append(downscale_local_mean(rv[-1], factors=factors))
         return rv
 
     def zoom(self, base: np.ndarray) -> List[np.ndarray]:
@@ -198,23 +194,37 @@ class Scaler:
         func: Callable[[np.ndarray, int, int], np.ndarray],
     ) -> np.ndarray:
         """Loop over 3 of the 5 dimensions and apply the func transform."""
-        assert 5 == len(base.shape)
 
         rv = [base]
         for i in range(self.max_layer):
-            fiveD = rv[-1]
-            # FIXME: fix hard-coding of dimensions
-            T, C, Z, Y, X = fiveD.shape
+            stack_to_scale = rv[-1]
+            shape_5d = (*(1,) * (5 - stack_to_scale.ndim), *stack_to_scale.shape)
+            T, C, Z, Y, X = shape_5d
 
-            smaller = None
+            # If our data is already 2D, simply resize and add to pyramid
+            if stack_to_scale.ndim == 2:
+                rv.append(func(stack_to_scale, Y, X))
+                continue
+
+            # stack_dims is any dims over 2D
+            stack_dims = stack_to_scale.ndim - 2
+            new_stack = None
             for t in range(T):
                 for c in range(C):
                     for z in range(Z):
-                        out = func(fiveD[t][c][z][:], Y, X)
-                        if smaller is None:
-                            smaller = np.zeros(
-                                (T, C, Z, out.shape[0], out.shape[1]), dtype=base.dtype
+                        dims_to_slice = (t, c, z)[-stack_dims:]
+                        # slice nd down to 2D
+                        plane = stack_to_scale[(dims_to_slice)][:]
+                        out = func(plane, Y, X)
+                        # first iteration of loop creates the new nd stack
+                        if new_stack is None:
+                            zct_dims = shape_5d[:-2]
+                            shape_dims = zct_dims[-stack_dims:]
+                            new_stack = np.zeros(
+                                (*shape_dims, out.shape[0], out.shape[1]),
+                                dtype=base.dtype,
                             )
-                        smaller[t][c][z] = out
-            rv.append(smaller)
+                        # insert resized plane into the stack at correct indices
+                        new_stack[(dims_to_slice)] = out
+            rv.append(new_stack)
         return rv
