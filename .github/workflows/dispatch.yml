@@ -23,7 +23,7 @@ jobs:
       - name: Dispatch event
         uses: peter-evans/repository-dispatch@v1
         with:
-          token: ${{ secrets.API_TOKEN_GITHUB }}
+          token: ${{ secrets.ACTION_API_TOKEN }}
           event-type: ${{ env.event_dispatch }}
           repository: ${{ matrix.repo }}
           client-payload: '{"ref": "${{ github.ref }}", "sha": "${{ github.event.pull_request.head.sha }}", "repo": "${{ github.repository }}", "owner": "${{github.repository_owner}}", "number": "${{github.event.number}}"}'
