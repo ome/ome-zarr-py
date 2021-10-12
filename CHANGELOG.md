@@ -16,4 +16,3 @@
 - Point to new Embassy object store ([#109](https://github.com/ome/ome-zarr-py/pull/109))
 
 # 0.1.0 (Sep 2021)
-
