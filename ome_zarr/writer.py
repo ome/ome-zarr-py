@@ -69,6 +69,8 @@ def write_multiscale(
     ----------
     pyramid: List of np.ndarray
       the image data to save. Largest level first
+      All image arrays MUST be up to 5-dimensional with dimensions
+      ordered (t, c, z, y, x)
     group: zarr.Group
       the group within the zarr store to store the data in
     chunks: int or tuple of ints,
@@ -113,6 +115,8 @@ def write_image(
     image: np.ndarray
       the image data to save. A downsampling of the data will be computed
       if the scaler argument is non-None.
+      Image array MUST be up to 5-dimensional with dimensions
+      ordered (t, c, z, y, x)
     group: zarr.Group
       the group within the zarr store to store the data in
     chunks: int or tuple of ints,
