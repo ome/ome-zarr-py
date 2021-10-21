@@ -14,6 +14,47 @@ from .types import JSONDict
 LOGGER = logging.getLogger("ome_zarr.writer")
 
 
+def validate_axes_names(
+    ndim: int, axes: Union[str, List[str]] = None, fmt: Format = CurrentFormat()
+) -> Union[None, List[str]]:
+
+    if fmt.version not in ("0.1", "0.2"):
+        if axes is None:
+            if ndim == 2:
+                axes = ["y", "x"]
+            elif ndim == 5:
+                axes = ["t", "c", "z", "y", "x"]
+            else:
+                raise ValueError(
+                    "axes must be provided. Can't be guessed for 3D or 4D data"
+                )
+
+    if isinstance(axes, str):
+        axes = list(axes)
+
+    if axes is not None:
+        if len(axes) != ndim:
+            raise ValueError("axes length must match number of dimensions")
+        # from https://github.com/constantinpape/ome-ngff-implementations/
+        val_axes = tuple(axes)
+        if ndim == 2:
+            assert val_axes == ("y", "x"), str(val_axes)
+        elif ndim == 3:
+            assert val_axes in [("z", "y", "x"), ("c", "y", "x"), ("t", "y", "x")], str(
+                val_axes
+            )
+        elif ndim == 4:
+            assert val_axes in [
+                ("t", "z", "y", "x"),
+                ("c", "z", "y", "x"),
+                ("t", "c", "y", "x"),
+            ], str(val_axes)
+        else:
+            assert val_axes == ("t", "c", "z", "y", "x"), str(val_axes)
+
+    return axes
+
+
 def write_multiscale(
     pyramid: List,
     group: zarr.Group,
@@ -41,25 +82,7 @@ def write_multiscale(
     """
 
     dims = len(pyramid[0].shape)
-    if fmt.version not in ("0.1", "0.2"):
-        if axes is None:
-            if dims == 2:
-                axes = ["y", "x"]
-            elif dims == 5:
-                axes = ["t", "c", "z", "y", "x"]
-            else:
-                raise ValueError(
-                    "axes must be provided. Can't be guessed for 3D or 4D data"
-                )
-        if len(axes) != dims:
-            raise ValueError("axes length must match number of dimensions")
-
-        if isinstance(axes, str):
-            axes = list(axes)
-
-        for dim in axes:
-            if dim not in ("t", "c", "z", "y", "x"):
-                raise ValueError("axes must each be one of 'x', 'y', 'z', 'c' or 't'")
+    axes = validate_axes_names(dims, axes, fmt)
 
     paths = []
     for path, dataset in enumerate(pyramid):
@@ -115,6 +138,8 @@ def write_image(
         # v0.1 and v0.2 are strictly 5D
         shape_5d: Tuple[Any, ...] = (*(1,) * (5 - image.ndim), *image.shape)
         image = image.reshape(shape_5d)
+        # and we don't need axes
+        axes = None
 
     if chunks is not None:
         chunks = _retuple(chunks, image.shape)
