@@ -91,9 +91,9 @@ class TestWriter:
             validate_axes_names(3, axes="yx", fmt=v03)
 
         # axes must be ordered tczyx
-        with pytest.raises(AssertionError):
+        with pytest.raises(ValueError):
             validate_axes_names(3, axes="yxt", fmt=v03)
-        with pytest.raises(AssertionError):
+        with pytest.raises(ValueError):
             validate_axes_names(2, axes=["x", "y"], fmt=v03)
 
         validate_axes_names(2, axes=["y", "x"], fmt=v03)

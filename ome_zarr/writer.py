@@ -38,17 +38,21 @@ def validate_axes_names(
         # from https://github.com/constantinpape/ome-ngff-implementations/
         val_axes = tuple(axes)
         if ndim == 2:
-            assert val_axes == ("y", "x"), str(val_axes)
+            if val_axes != ("y", "x"):
+                raise ValueError(f"2D data must have axes ('y', 'x') {val_axes}")
         elif ndim == 3:
-            assert val_axes in [("z", "y", "x"), ("c", "y", "x"), ("t", "y", "x")], str(
-                val_axes
-            )
+            if val_axes not in [("z", "y", "x"), ("c", "y", "x"), ("t", "y", "x")]:
+                raise ValueError(
+                    "3D data must have axes ('z', 'y', 'x') or ('c', 'y', 'x')"
+                    " or ('t', 'y', 'x'), not %s" % (val_axes,)
+                )
         elif ndim == 4:
-            assert val_axes in [
+            if val_axes not in [
                 ("t", "z", "y", "x"),
                 ("c", "z", "y", "x"),
                 ("t", "c", "y", "x"),
-            ], str(val_axes)
+            ]:
+                raise ValueError("4D data must have axes tzyx or czyx or tcyx")
         else:
             assert val_axes == ("t", "c", "z", "y", "x"), str(val_axes)
 
@@ -149,6 +153,11 @@ def write_image(
         chunks = _retuple(chunks, image.shape)
 
     if scaler is not None:
+        if image.shape[-1] == 1 or image.shape[-2] == 1:
+            raise ValueError(
+                "Can't downsample if size of x or y dimension is 1. "
+                "Shape: %s" % (image.shape,)
+            )
         image = scaler.nearest(image)
     else:
         LOGGER.debug("disabling pyramid")
