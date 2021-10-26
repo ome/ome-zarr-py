@@ -18,16 +18,19 @@ def validate_axes_names(
     ndim: int, axes: Union[str, List[str]] = None, fmt: Format = CurrentFormat()
 ) -> Union[None, List[str]]:
 
-    if fmt.version not in ("0.1", "0.2"):
-        if axes is None:
-            if ndim == 2:
-                axes = ["y", "x"]
-            elif ndim == 5:
-                axes = ["t", "c", "z", "y", "x"]
-            else:
-                raise ValueError(
-                    "axes must be provided. Can't be guessed for 3D or 4D data"
-                )
+    if fmt.version in ("0.1", "0.2"):
+        return None
+
+    # handle version 0.3...
+    if axes is None:
+        if ndim == 2:
+            axes = ["y", "x"]
+        elif ndim == 5:
+            axes = ["t", "c", "z", "y", "x"]
+        else:
+            raise ValueError(
+                "axes must be provided. Can't be guessed for 3D or 4D data"
+            )
 
     if isinstance(axes, str):
         axes = list(axes)

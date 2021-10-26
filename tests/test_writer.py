@@ -96,8 +96,16 @@ class TestWriter:
         with pytest.raises(ValueError):
             validate_axes_names(2, axes=["x", "y"], fmt=v03)
 
+        # valid axes
         validate_axes_names(2, axes=["y", "x"], fmt=v03)
         validate_axes_names(5, axes="tczyx", fmt=v03)
+
+        # if 2D or 5D, axes can be assigned automatically
+        assert validate_axes_names(2, axes=None, fmt=v03) == ["y", "x"]
+        assert validate_axes_names(5, axes=None, fmt=v03) == ["t", "c", "z", "y", "x"]
+
+        # for v0.1 or v0.2, axes should be None
+        assert validate_axes_names(2, axes=["y", "x"], fmt=FormatV02()) is None
 
         # check that write_image is checking axes
         data = self.create_data((125, 125))
