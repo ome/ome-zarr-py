@@ -136,7 +136,7 @@ Sample code for creating a 3D Image in OME-Zarr with labels:
     write_multiscale([label], label_grp, axes="zyx")
 
 This image can be viewed in `napari` using the
-`napari-ome-zarr <https://github.com/ome/napari-ome-zarr>`_ plugin:
+`napari-ome-zarr <https://github.com/ome/napari-ome-zarr>`_ plugin::
 
     $ napari test_ngff_image
 
