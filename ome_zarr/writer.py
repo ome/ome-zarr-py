@@ -19,14 +19,18 @@ def validate_axes_names(
 ) -> Union[None, List[str]]:
 
     if fmt.version in ("0.1", "0.2"):
+        if axes is not None:
+            LOGGER.info("axes ignored for version 0.1 or 0.2")
         return None
 
     # handle version 0.3...
     if axes is None:
         if ndim == 2:
             axes = ["y", "x"]
+            LOGGER.info("Auto using axes %s for 2D data" % axes)
         elif ndim == 5:
             axes = ["t", "c", "z", "y", "x"]
+            LOGGER.info("Auto using axes %s for 5D data" % axes)
         else:
             raise ValueError(
                 "axes must be provided. Can't be guessed for 3D or 4D data"
