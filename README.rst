@@ -65,7 +65,7 @@ create
 ======
 
 To create sample OME-Zarr image from the `skimage coins <https://scikit-image.org/docs/stable/api/skimage.data.html#skimage.data.coins>`_
-image:
+image::
 
     # Create an OME-Zarr image in coinsdata/ dir:
     $ ome_zarr create coinsdata
