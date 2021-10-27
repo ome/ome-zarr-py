@@ -73,7 +73,7 @@ image::
 writing OME-Zarr
 ================
 
-Sample code for creating a 3D Image in OME-Zarr with labels:
+Sample code for creating a 3D Image in OME-Zarr with labels::
 
     import numpy as np
     import zarr
