@@ -14,9 +14,10 @@ from .types import JSONDict
 LOGGER = logging.getLogger("ome_zarr.writer")
 
 
-def validate_axes_names(
+def _validate_axes_names(
     ndim: int, axes: Union[str, List[str]] = None, fmt: Format = CurrentFormat()
 ) -> Union[None, List[str]]:
+    """Returns validated list of axes names or raise exception if invalid"""
 
     if fmt.version in ("0.1", "0.2"):
         if axes is not None:
@@ -95,7 +96,7 @@ def write_multiscale(
     """
 
     dims = len(pyramid[0].shape)
-    axes = validate_axes_names(dims, axes, fmt)
+    axes = _validate_axes_names(dims, axes, fmt)
 
     paths = []
     for path, dataset in enumerate(pyramid):
