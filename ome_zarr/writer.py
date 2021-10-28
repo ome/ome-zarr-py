@@ -158,6 +158,9 @@ def write_image(
         # and we don't need axes
         axes = None
 
+    # check axes before trying to scale
+    _validate_axes_names(image.ndim, axes, fmt)
+
     if chunks is not None:
         chunks = _retuple(chunks, image.shape)
 
