@@ -95,6 +95,8 @@ class TestWriter:
             _validate_axes_names(3, axes="yxt", fmt=v03)
         with pytest.raises(ValueError):
             _validate_axes_names(2, axes=["x", "y"], fmt=v03)
+        with pytest.raises(ValueError):
+            _validate_axes_names(5, axes="xyzct", fmt=v03)
 
         # valid axes - no change, converted to list
         assert _validate_axes_names(2, axes=["y", "x"], fmt=v03) == ["y", "x"]

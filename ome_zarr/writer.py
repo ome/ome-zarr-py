@@ -62,7 +62,8 @@ def _validate_axes_names(
             ]:
                 raise ValueError("4D data must have axes tzyx or czyx or tcyx")
         else:
-            assert val_axes == ("t", "c", "z", "y", "x"), str(val_axes)
+            if val_axes != ("t", "c", "z", "y", "x"):
+                raise ValueError("5D data must have axes ('t', 'c', 'z', 'y', 'x')")
 
     return axes
 
