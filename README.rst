@@ -64,7 +64,7 @@ To download all the resolutions and metadata for an image::
 csv to labels
 =============
 
-The `csv_to_labels` command uses a CSV file to add key:value properties to labels
+The `csv_to_labels` command uses a CSV file to add `key:value` properties to labels
 under an OME-Zarr Image or Plate.
 
 The OME-Zarr labels metadata must already contain a `properties`
@@ -73,7 +73,7 @@ in the example below.
 
 This ID can be used to identify a single row of the CSV table by specifying the name of
 a column with unique values, e.g. `shape_id` below.
-This row is used to add additional column_name:value data to the label properties.
+This row is used to add additional `column_name:value` data to the label properties.
 
 You also need to specify which columns from the CSV to use, e.g. `"area,X,Y,Width,Height"`.
 You can also specify the column types (as in https://github.com/ome/omero-metadata/)
@@ -84,7 +84,7 @@ to specify the data-type for each column (string by default).
  - `s`: `StringColumn`, for text
  - `b`: `BoolColumn`, for true/false
 
-Use e.g. `#d` as a suffix in the column name to denote a `float` column, no spaces etc:
+Use e.g. `#d` as a suffix in the column name to denote a `float` column, no spaces etc.:
 ```
 "area#d,label_text#s,Width#l,Height#l"
 ```
