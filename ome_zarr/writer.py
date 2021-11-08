@@ -14,6 +14,60 @@ from .types import JSONDict
 LOGGER = logging.getLogger("ome_zarr.writer")
 
 
+def _validate_axes_names(
+    ndim: int, axes: Union[str, List[str]] = None, fmt: Format = CurrentFormat()
+) -> Union[None, List[str]]:
+    """Returns validated list of axes names or raise exception if invalid"""
+
+    if fmt.version in ("0.1", "0.2"):
+        if axes is not None:
+            LOGGER.info("axes ignored for version 0.1 or 0.2")
+        return None
+
+    # handle version 0.3...
+    if axes is None:
+        if ndim == 2:
+            axes = ["y", "x"]
+            LOGGER.info("Auto using axes %s for 2D data" % axes)
+        elif ndim == 5:
+            axes = ["t", "c", "z", "y", "x"]
+            LOGGER.info("Auto using axes %s for 5D data" % axes)
+        else:
+            raise ValueError(
+                "axes must be provided. Can't be guessed for 3D or 4D data"
+            )
+
+    if isinstance(axes, str):
+        axes = list(axes)
+
+    if axes is not None:
+        if len(axes) != ndim:
+            raise ValueError("axes length must match number of dimensions")
+        # from https://github.com/constantinpape/ome-ngff-implementations/
+        val_axes = tuple(axes)
+        if ndim == 2:
+            if val_axes != ("y", "x"):
+                raise ValueError(f"2D data must have axes ('y', 'x') {val_axes}")
+        elif ndim == 3:
+            if val_axes not in [("z", "y", "x"), ("c", "y", "x"), ("t", "y", "x")]:
+                raise ValueError(
+                    "3D data must have axes ('z', 'y', 'x') or ('c', 'y', 'x')"
+                    " or ('t', 'y', 'x'), not %s" % (val_axes,)
+                )
+        elif ndim == 4:
+            if val_axes not in [
+                ("t", "z", "y", "x"),
+                ("c", "z", "y", "x"),
+                ("t", "c", "y", "x"),
+            ]:
+                raise ValueError("4D data must have axes tzyx or czyx or tcyx")
+        else:
+            if val_axes != ("t", "c", "z", "y", "x"):
+                raise ValueError("5D data must have axes ('t', 'c', 'z', 'y', 'x')")
+
+    return axes
+
+
 def write_multiscale(
     pyramid: List,
     group: zarr.Group,
@@ -28,6 +82,8 @@ def write_multiscale(
     ----------
     pyramid: List of np.ndarray
       the image data to save. Largest level first
+      All image arrays MUST be up to 5-dimensional with dimensions
+      ordered (t, c, z, y, x)
     group: zarr.Group
       the group within the zarr store to store the data in
     chunks: int or tuple of ints,
@@ -41,25 +97,7 @@ def write_multiscale(
     """
 
     dims = len(pyramid[0].shape)
-    if fmt.version not in ("0.1", "0.2"):
-        if axes is None:
-            if dims == 2:
-                axes = ["y", "x"]
-            elif dims == 5:
-                axes = ["t", "c", "z", "y", "x"]
-            else:
-                raise ValueError(
-                    "axes must be provided. Can't be guessed for 3D or 4D data"
-                )
-        if len(axes) != dims:
-            raise ValueError("axes length must match number of dimensions")
-
-        if isinstance(axes, str):
-            axes = list(axes)
-
-        for dim in axes:
-            if dim not in ("t", "c", "z", "y", "x"):
-                raise ValueError("axes must each be one of 'x', 'y', 'z', 'c' or 't'")
+    axes = _validate_axes_names(dims, axes, fmt)
 
     paths = []
     for path, dataset in enumerate(pyramid):
@@ -90,6 +128,8 @@ def write_image(
     image: np.ndarray
       the image data to save. A downsampling of the data will be computed
       if the scaler argument is non-None.
+      Image array MUST be up to 5-dimensional with dimensions
+      ordered (t, c, z, y, x)
     group: zarr.Group
       the group within the zarr store to store the data in
     chunks: int or tuple of ints,
@@ -115,11 +155,21 @@ def write_image(
         # v0.1 and v0.2 are strictly 5D
         shape_5d: Tuple[Any, ...] = (*(1,) * (5 - image.ndim), *image.shape)
         image = image.reshape(shape_5d)
+        # and we don't need axes
+        axes = None
+
+    # check axes before trying to scale
+    _validate_axes_names(image.ndim, axes, fmt)
 
     if chunks is not None:
         chunks = _retuple(chunks, image.shape)
 
     if scaler is not None:
+        if image.shape[-1] == 1 or image.shape[-2] == 1:
+            raise ValueError(
+                "Can't downsample if size of x or y dimension is 1. "
+                "Shape: %s" % (image.shape,)
+            )
         image = scaler.nearest(image)
     else:
         LOGGER.debug("disabling pyramid")

@@ -8,7 +8,7 @@ from ome_zarr.format import FormatV01, FormatV02, FormatV03
 from ome_zarr.io import parse_url
 from ome_zarr.reader import Multiscales, Reader
 from ome_zarr.scale import Scaler
-from ome_zarr.writer import write_image
+from ome_zarr.writer import _validate_axes_names, write_image
 
 
 class TestWriter:
@@ -77,3 +77,51 @@ class TestWriter:
         else:
             assert node.data[0].ndim == 5
         assert np.allclose(data, node.data[0][...].compute())
+
+    def test_dim_names(self):
+
+        v03 = FormatV03()
+
+        # v0.3 MUST specify axes for 3D or 4D data
+        with pytest.raises(ValueError):
+            _validate_axes_names(3, axes=None, fmt=v03)
+
+        # ndims must match axes length
+        with pytest.raises(ValueError):
+            _validate_axes_names(3, axes="yx", fmt=v03)
+
+        # axes must be ordered tczyx
+        with pytest.raises(ValueError):
+            _validate_axes_names(3, axes="yxt", fmt=v03)
+        with pytest.raises(ValueError):
+            _validate_axes_names(2, axes=["x", "y"], fmt=v03)
+        with pytest.raises(ValueError):
+            _validate_axes_names(5, axes="xyzct", fmt=v03)
+
+        # valid axes - no change, converted to list
+        assert _validate_axes_names(2, axes=["y", "x"], fmt=v03) == ["y", "x"]
+        assert _validate_axes_names(5, axes="tczyx", fmt=v03) == [
+            "t",
+            "c",
+            "z",
+            "y",
+            "x",
+        ]
+
+        # if 2D or 5D, axes can be assigned automatically
+        assert _validate_axes_names(2, axes=None, fmt=v03) == ["y", "x"]
+        assert _validate_axes_names(5, axes=None, fmt=v03) == ["t", "c", "z", "y", "x"]
+
+        # for v0.1 or v0.2, axes should be None
+        assert _validate_axes_names(2, axes=["y", "x"], fmt=FormatV01()) is None
+        assert _validate_axes_names(2, axes=["y", "x"], fmt=FormatV02()) is None
+
+        # check that write_image is checking axes
+        data = self.create_data((125, 125))
+        with pytest.raises(ValueError):
+            write_image(
+                image=data,
+                group=self.group,
+                fmt=v03,
+                axes="xyz",
+            )
