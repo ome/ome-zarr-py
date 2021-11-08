@@ -1,14 +1,14 @@
 name: Dispatch
 
 on:
-  pull_request:
+  push:
     branches:
       - master
-    types: [closed]
+  #  types: [closed]
 
 jobs:
   dispatch:
-    if: github.event.pull_request.merged == true
+    #if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     strategy:
       matrix:
