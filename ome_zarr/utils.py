@@ -36,6 +36,8 @@ def info(path: str, stats: bool = False) -> Iterator[Node]:
         print(" - metadata")
         for spec in node.specs:
             print(f"   - {spec.__class__.__name__}")
+            for key, value in spec.metadata.items():
+                print(f"     - {key}: {value}")
         print(" - data")
         for array in node.data:
             minmax = ""
