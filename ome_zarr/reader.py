@@ -299,8 +299,7 @@ class Multiscales(Spec):
             return  # EARLY EXIT
 
         for resolution in self.datasets:
-            data: da.core.Array = self.array(
-                resolution, self.metadata["version"])
+            data: da.core.Array = self.array(resolution, self.metadata["version"])
             chunk_sizes = [
                 str(c[0]) + (" (+ %s)" % c[-1] if c[-1] != c[0] else "")
                 for c in data.chunks
