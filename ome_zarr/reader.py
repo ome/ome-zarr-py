@@ -166,6 +166,7 @@ class Spec(ABC):
 
     def __init__(self, node: Node) -> None:
         self.node = node
+        self.metadata: JSONDict = dict()
         self.zarr = node.zarr
         LOGGER.debug(f"treating {self.zarr} as {self.__class__.__name__}")
         for k, v in self.zarr.root_attrs.items():
@@ -189,6 +190,7 @@ class Labels(Spec):
     def __init__(self, node: Node) -> None:
         super().__init__(node)
         label_names = self.lookup("labels", [])
+        self.metadata["version"] = label_names.get("version", "")
         for name in label_names:
             child_zarr = self.zarr.create(name)
             if child_zarr.exists():
@@ -208,6 +210,7 @@ class Label(Spec):
         super().__init__(node)
 
         image_label = self.lookup("image-label", {})
+        self.metadata["version"] = image_label.get("version", None)
 
         image = image_label.get("source", {}).get("image", None)
         parent_zarr = None
@@ -278,7 +281,7 @@ class Multiscales(Spec):
         axes_values = {"t", "c", "z", "y", "x"}
         try:
             multiscales = self.lookup("multiscales", [])
-            version = multiscales[0].get(
+            self.metadata["version"] = multiscales[0].get(
                 "version", "0.1"
             )  # should this be matched with Format.version?
             datasets = multiscales[0]["datasets"]
@@ -286,6 +289,7 @@ class Multiscales(Spec):
             axes = tuple(multiscales[0].get("axes", ["t", "c", "z", "y", "x"]))
             if len(set(axes) - axes_values) > 0:
                 raise RuntimeError(f"Invalid axes names: {set(axes) - axes_values}")
+            self.metadata["axes"] = axes
             node.metadata["axes"] = axes
             datasets = [d["path"] for d in datasets]
             self.datasets: List[str] = datasets
@@ -295,7 +299,8 @@ class Multiscales(Spec):
             return  # EARLY EXIT
 
         for resolution in self.datasets:
-            data: da.core.Array = self.array(resolution, version)
+            data: da.core.Array = self.array(
+                resolution, self.metadata["version"])
             chunk_sizes = [
                 str(c[0]) + (" (+ %s)" % c[-1] if c[-1] != c[0] else "")
                 for c in data.chunks
@@ -325,6 +330,7 @@ class OMERO(Spec):
         super().__init__(node)
         # TODO: start checking metadata version
         self.image_data = self.lookup("omero", {})
+        self.metadata["version"] = self.image_data.get("version", "")
 
         try:
             model = "unknown"
@@ -393,6 +399,7 @@ class Well(Spec):
     def __init__(self, node: Node) -> None:
         super().__init__(node)
         self.well_data = self.lookup("well", {})
+        self.metadata["version"] = self.well_data.get("version", "")
         LOGGER.info("well_data: %s", self.well_data)
 
         image_paths = [image["path"] for image in self.well_data.get("images")]
@@ -462,6 +469,7 @@ class Plate(Spec):
         """
         self.plate_data = self.lookup("plate", {})
         LOGGER.info("plate_data", self.plate_data)
+        self.metadata["version"] = self.plate_data.get("version", "")
         self.rows = self.plate_data.get("rows")
         self.columns = self.plate_data.get("columns")
         self.first_field = "0"
