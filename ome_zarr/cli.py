@@ -9,6 +9,7 @@ from .data import astronaut, coins, create_zarr
 from .scale import Scaler
 from .utils import download as zarr_download
 from .utils import info as zarr_info
+from .utils import validate as zarr_validate
 
 
 def config_logging(loglevel: int, args: argparse.Namespace) -> None:
@@ -27,6 +28,12 @@ def info(args: argparse.Namespace) -> None:
     """Wrap the :func:`~ome_zarr.utils.info` method."""
     config_logging(logging.WARN, args)
     list(zarr_info(args.path, stats=args.stats))
+
+
+def validate(args: argparse.Namespace) -> None:
+    """Wrap the :func:`~ome_zarr.utils.validate` method."""
+    config_logging(logging.WARN, args)
+    list(zarr_validate(args.path, args.warnings))
 
 
 def download(args: argparse.Namespace) -> None:
@@ -98,6 +105,12 @@ def main(args: List[str] = None) -> None:
     parser_info.add_argument("path")
     parser_info.add_argument("--stats", action="store_true")
     parser_info.set_defaults(func=info)
+
+    # validate
+    parser_validate = subparsers.add_parser("validate")
+    parser_validate.add_argument("path")
+    parser_validate.add_argument("--warnings", action="store_true")
+    parser_validate.set_defaults(func=validate)
 
     # download
     parser_download = subparsers.add_parser("download")

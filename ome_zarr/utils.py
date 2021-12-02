@@ -46,6 +46,26 @@ def info(path: str, stats: bool = False) -> Iterator[Node]:
         yield node
 
 
+def validate(path: str, warnings: bool) -> Iterator[Node]:
+    """
+    Validate OME-NGFF data
+
+    All :class:`Nodes <ome_utils.reader.Node>` that are found from the given path will
+    be visited recursively.
+    """
+    zarr = parse_url(path)
+    assert zarr, f"not a zarr: {zarr}"
+    reader = Reader(zarr)
+    for node in reader():
+        if not node.specs:
+            print(f"not an ome-zarr node: {node}")
+            continue
+
+        if hasattr(node, "validate"):
+            node.validate(warnings)
+        yield node
+
+
 def download(input_path: str, output_dir: str = ".") -> None:
     """Download an OME-Zarr from the given path.
 

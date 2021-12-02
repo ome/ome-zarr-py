@@ -8,8 +8,11 @@ from typing import Any, Dict, Iterator, List, Optional, Type, Union, cast, overl
 import dask.array as da
 import numpy as np
 from dask import delayed
+from jsonschema import validate
+from jsonschema.validators import validator_for
 
 from .io import ZarrLocation
+from .schemas import get_schema, get_strict_schema
 from .types import JSONDict
 
 LOGGER = logging.getLogger("ome_zarr.reader")
@@ -104,6 +107,12 @@ class Node:
                 return spec
         return None
 
+    def validate(self, warnings: bool) -> None:
+        # Validation for a node is delegated to each spec
+        # e.g. Labels may have spec for multiscales and labels
+        for spec in self.specs:
+            spec.validate(warnings)
+
     def add(
         self,
         zarr: ZarrLocation,
@@ -174,6 +183,10 @@ class Spec(ABC):
 
     def lookup(self, key: str, default: Any) -> Any:
         return self.zarr.root_attrs.get(key, default)
+
+    def validate(self, warnings: bool = False) -> None:
+        # If not implemented, ignore for now
+        pass
 
 
 class Labels(Spec):
@@ -314,6 +327,28 @@ class Multiscales(Spec):
     def array(self, resolution: str, version: str) -> da.core.Array:
         # data.shape is (t, c, z, y, x) by convention
         return self.zarr.load(resolution)
+
+    def validate(self, warnings: bool = False) -> None:
+        multiscales = self.lookup("multiscales", [])
+        version = multiscales[0].get("version", "0.1")
+        print("Validating Multiscales spec at", self.zarr)
+        print("Using Multiscales schema version", version)
+        image_schema = get_schema(version)
+
+        # Always do a validation with the MUST rules
+        # Will throw ValidationException if it fails
+        json_data = self.zarr.root_attrs
+        validate(instance=json_data, schema=image_schema)
+
+        # If we're also checking for SHOULD rules,
+        # we want to iterate all errors and show as "Warnings"
+        if warnings:
+            strict_schema = get_strict_schema(version)
+            cls = validator_for(strict_schema)
+            cls.check_schema(strict_schema)
+            validator = cls(strict_schema)
+            for error in validator.iter_errors(json_data):
+                print("WARNING", error.message)
 
 
 class OMERO(Spec):
