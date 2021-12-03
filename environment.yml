@@ -6,6 +6,7 @@ channels:
 dependencies:
   - flake8
   - ipython
+  - jsonschema
   - mypy
   - omero-py
   - pip
