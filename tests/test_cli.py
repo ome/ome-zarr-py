@@ -33,6 +33,15 @@ class TestCli:
         main(["create", "--method=astronaut", filename])
         main(["info", filename])
 
+    @pytest.mark.parametrize("warnings", [False, True])
+    def test_astronaut_validation(self, warnings):
+        filename = str(self.path) + "-2"
+        main(["create", "--method=astronaut", filename])
+        if warnings:
+            main(["validate", "--warnings", filename])
+        else:
+            main(["validate", filename])
+
     def test_astronaut_download(self, tmpdir):
         out = str(tmpdir / "out")
         filename = str(self.path) + "-3"

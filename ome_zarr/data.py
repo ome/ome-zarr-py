@@ -147,19 +147,19 @@ def create_zarr(
             "channels": [
                 {
                     "color": "FF0000",
-                    "window": {"start": 0, "end": 255},
+                    "window": {"start": 0, "end": 255, "min": 0, "max": 255},
                     "label": "Red",
                     "active": True,
                 },
                 {
                     "color": "00FF00",
-                    "window": {"start": 0, "end": 255},
+                    "window": {"start": 0, "end": 255, "min": 0, "max": 255},
                     "label": "Green",
                     "active": True,
                 },
                 {
                     "color": "0000FF",
-                    "window": {"start": 0, "end": 255},
+                    "window": {"start": 0, "end": 255, "min": 0, "max": 255},
                     "label": "Blue",
                     "active": True,
                 },
