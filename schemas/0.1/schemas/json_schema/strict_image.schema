@@ -1,0 +1,18 @@
+{
+  "allOf": [
+    {
+      "$ref": "https://ngff.openmicroscopy.org/0.1/schemas/json_schema/image.schema"
+    },
+    {
+      "properties": {
+        "multiscales": {
+          "items": {
+            "required": [
+              "version", "metadata", "type", "name"
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

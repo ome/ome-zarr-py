@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "http://localhost:8000/plate.schema",
+  "title": "NGFF Plate",
+  "description": "JSON from OME-NGFF Plate .zattrs",
+  "type": "object",
+  "properties": {
+    "plate": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "string",
+          "enum": [
+            "0.1"
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "columns": {
+          "description": "Columns of the Plate grid",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name"
+            ]
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "rows": {
+          "description": "Rows of the Plate grid",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name"
+            ]
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "wells": {
+          "description": "Rows of the Plate grid",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "path"
+            ]
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "field_count": {
+          "description": "Maximum number of fields per view across all wells."
+        },
+        "acquisitions": {
+          "description": "Rows of the Plate grid",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "number"
+              },
+              "maximumfieldcount": {
+                "type": "number"
+              },
+              "name": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "starttime": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "id"
+            ]
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "version", "columns", "rows", "wells"
+      ]
+    }
+  },
+  "required": [
+    "plate"
+  ]
+}

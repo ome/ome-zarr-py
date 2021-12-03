@@ -12,7 +12,7 @@ from jsonschema import validate
 from jsonschema.validators import validator_for
 
 from .io import ZarrLocation
-from .schemas import get_schema, get_strict_schema
+from .schemas import LocalRefResolver, get_schema, get_strict_schema
 from .types import JSONDict
 
 LOGGER = logging.getLogger("ome_zarr.reader")
@@ -346,7 +346,9 @@ class Multiscales(Spec):
             strict_schema = get_strict_schema(version)
             cls = validator_for(strict_schema)
             cls.check_schema(strict_schema)
-            validator = cls(strict_schema)
+            # Use our local resolver subclass to resolve local documents
+            localResolver = LocalRefResolver.from_schema(strict_schema)
+            validator = cls(strict_schema, resolver=localResolver)
             for error in validator.iter_errors(json_data):
                 print("WARNING", error.message)
 
