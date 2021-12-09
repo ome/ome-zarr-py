@@ -8,7 +8,7 @@ from typing import Any, Dict, Iterator, List, Optional, Type, Union, cast, overl
 import dask.array as da
 import numpy as np
 from dask import delayed
-from jsonschema import validate
+from jsonschema import validate as jsonschema_validate
 from jsonschema.validators import validator_for
 
 from .format import CurrentFormat
@@ -339,7 +339,7 @@ class Multiscales(Spec):
         # Always do a validation with the MUST rules
         # Will throw ValidationException if it fails
         json_data = self.zarr.root_attrs
-        validate(instance=json_data, schema=image_schema)
+        jsonschema_validate(instance=json_data, schema=image_schema)
 
         # If we're also checking for SHOULD rules,
         # we want to iterate all errors and show as "Warnings"
