@@ -332,8 +332,8 @@ class Multiscales(Spec):
     def validate(self, warnings: bool = False) -> None:
         multiscales = self.lookup("multiscales", [])
         version = multiscales[0].get("version", CurrentFormat().version)
-        print("Validating Multiscales spec at", self.zarr)
-        print("Using Multiscales schema version", version)
+        LOGGER.info("Validating Multiscales spec at: %s" % self.zarr)
+        LOGGER.info("Using Multiscales schema version: %s" % version)
         image_schema = get_schema(version)
 
         # Always do a validation with the MUST rules
@@ -351,7 +351,7 @@ class Multiscales(Spec):
             localResolver = LocalRefResolver.from_schema(strict_schema)
             validator = cls(strict_schema, resolver=localResolver)
             for error in validator.iter_errors(json_data):
-                print("WARNING", error.message)
+                LOGGER.warn(error.message)
 
 
 class OMERO(Spec):
