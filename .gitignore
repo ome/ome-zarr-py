@@ -5,3 +5,5 @@ var
 build
 dist/
 target/
+*.DS_Store
+*/.DS_Store
