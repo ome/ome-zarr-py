@@ -11,6 +11,7 @@ from dask import delayed
 from jsonschema import validate
 from jsonschema.validators import validator_for
 
+from .format import CurrentFormat
 from .io import ZarrLocation
 from .schemas import LocalRefResolver, get_schema, get_strict_schema
 from .types import JSONDict
@@ -330,7 +331,7 @@ class Multiscales(Spec):
 
     def validate(self, warnings: bool = False) -> None:
         multiscales = self.lookup("multiscales", [])
-        version = multiscales[0].get("version", "0.1")
+        version = multiscales[0].get("version", CurrentFormat().version)
         print("Validating Multiscales spec at", self.zarr)
         print("Using Multiscales schema version", version)
         image_schema = get_schema(version)
