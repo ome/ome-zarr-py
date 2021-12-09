@@ -26,20 +26,12 @@ def load_json(path: str) -> Dict:
     return document
 
 
-def get_schema(version: str) -> Dict:
+def get_schema(version: str, strict: bool = False) -> Dict:
+    schema_name = "strict_image.schema" if strict else "image.schema"
     curr_dir = os.path.dirname(__file__)
     # The paths here match the paths in the ngff repo (and public schemas)
     path = os.path.join(
-        curr_dir, f"{SCHEMAS_PATH}/{version}/schemas/json_schema/image.schema"
-    )
-    path = os.path.normpath(path)
-    return load_json(path)
-
-
-def get_strict_schema(version: str) -> Dict:
-    curr_dir = os.path.dirname(__file__)
-    path = os.path.join(
-        curr_dir, f"{SCHEMAS_PATH}/{version}/schemas/json_schema/strict_image.schema"
+        curr_dir, SCHEMAS_PATH, version, "schemas", "json_schema", schema_name
     )
     path = os.path.normpath(path)
     return load_json(path)
