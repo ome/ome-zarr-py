@@ -543,8 +543,9 @@ class Plate(Spec):
 
             try:
                 data = self.zarr.load(path)
-            except ValueError:
+            except ValueError as e:
                 LOGGER.error(f"Failed to load {path}")
+                LOGGER.debug(f"{e}")
                 data = np.zeros(tile_shape, dtype=self.numpy_type)
             return data
 
