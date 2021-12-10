@@ -70,6 +70,9 @@ image::
     # Create an OME-Zarr image in coinsdata/ dir:
     $ ome_zarr create coinsdata
 
+    # Create an rgb image from skimage astronaut in testimage dir:
+    $ ome_zarr create testimage --method=astronaut
+
 writing OME-Zarr
 ================
 
