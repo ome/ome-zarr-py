@@ -576,8 +576,8 @@ class PlateLabels(Plate):
     def get_pyramid_lazy(self, node: Node) -> None:
         super().get_pyramid_lazy(node)
         # pyramid data may be multi-channel, but we only have 1 labels channel
-        if 'c' in self.axes:
-            c_index = self.axes.index('c')
+        if "c" in self.axes:
+            c_index = self.axes.index("c")
             idx = [slice(None)] * len(self.axes)
             idx[c_index] = 0
             node.data[0] = node.data[0][c_index]
