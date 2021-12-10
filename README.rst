@@ -85,7 +85,7 @@ Sample code for creating a 3D Image in OME-Zarr with labels::
     from ome_zarr.io import parse_url
     from ome_zarr.writer import write_image
 
-    path = "test_ngff_image_no_labels"
+    path = "test_ngff_image"
     os.mkdir(path)
 
     mean_val=10
