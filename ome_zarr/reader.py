@@ -579,7 +579,7 @@ class PlateLabels(Plate):
         if "c" in self.axes:
             c_index = self.axes.index("c")
             idx = [slice(None)] * len(self.axes)
-            idx[c_index] = 0
+            idx[c_index] = slice(0)
             node.data[0] = node.data[0][c_index]
         # remove image metadata
         node.metadata = {}
