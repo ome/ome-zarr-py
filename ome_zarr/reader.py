@@ -403,6 +403,8 @@ class Well(Spec):
         # Use first Field for rendering settings, shape etc.
         image_zarr = self.zarr.create(image_paths[0])
         image_node = Node(image_zarr, node)
+        x_index = len(image_node.metadata["axes"]) - 1
+        y_index = len(image_node.metadata["axes"]) - 2
         level = 0  # load full resolution image
         self.numpy_type = image_node.data[level].dtype
         self.img_metadata = image_node.metadata
@@ -439,8 +441,8 @@ class Well(Spec):
                         dtype=self.numpy_type,
                     )
                     lazy_row.append(lazy_tile)
-                lazy_rows.append(da.concatenate(lazy_row, axis=4))
-            return da.concatenate(lazy_rows, axis=3)
+                lazy_rows.append(da.concatenate(lazy_row, axis=x_index))
+            return da.concatenate(lazy_rows, axis=y_index)
 
         node.data = [get_lazy_well()]
         node.metadata = image_node.metadata
@@ -484,8 +486,9 @@ class Plate(Spec):
 
         LOGGER.debug("img_pyramid_shapes", well_spec.img_pyramid_shapes)
 
-        size_y = well_spec.img_shape[3]
-        size_x = well_spec.img_shape[4]
+        self.axes = well_spec.img_metadata["axes"]
+        size_y = well_spec.img_shape[len(self.axes) - 2]
+        size_x = well_spec.img_shape[len(self.axes) - 1]
 
         # FIXME - if only returning a single stiched plate (not a pyramid)
         # need to decide optimal size. E.g. longest side < 1500
@@ -557,8 +560,8 @@ class Plate(Spec):
                     lazy_reader(tile_name), shape=tile_shape, dtype=self.numpy_type
                 )
                 lazy_row.append(lazy_tile)
-            lazy_rows.append(da.concatenate(lazy_row, axis=4))
-        return da.concatenate(lazy_rows, axis=3)
+            lazy_rows.append(da.concatenate(lazy_row, axis=len(self.axes) - 1))
+        return da.concatenate(lazy_rows, axis=len(self.axes) - 2)
 
 
 class PlateLabels(Plate):
@@ -573,7 +576,11 @@ class PlateLabels(Plate):
     def get_pyramid_lazy(self, node: Node) -> None:
         super().get_pyramid_lazy(node)
         # pyramid data may be multi-channel, but we only have 1 labels channel
-        node.data[0] = node.data[0][:, 0:1, :, :, :]
+        if 'c' in self.axes:
+            c_index = self.axes.index('c')
+            idx = [slice(None)] * len(self.axes)
+            idx[c_index] = 0
+            node.data[0] = node.data[0][c_index]
         # remove image metadata
         node.metadata = {}
 
