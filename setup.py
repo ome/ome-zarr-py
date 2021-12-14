@@ -24,6 +24,7 @@ install_requires += (["requests"],)
 install_requires += (["scikit-image"],)
 install_requires += (["toolz"],)
 install_requires += (["jsonschema"],)
+install_requires += (["ngff"],)
 
 
 setup(

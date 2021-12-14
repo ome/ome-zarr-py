@@ -10,10 +10,10 @@ import numpy as np
 from dask import delayed
 from jsonschema import validate as jsonschema_validate
 from jsonschema.validators import validator_for
+from ngff.schemas import LocalRefResolver, get_schema
 
 from .format import CurrentFormat
 from .io import ZarrLocation
-from .schemas import LocalRefResolver, get_schema
 from .types import JSONDict
 
 LOGGER = logging.getLogger("ome_zarr.reader")
