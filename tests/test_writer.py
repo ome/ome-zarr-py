@@ -8,7 +8,11 @@ from ome_zarr.format import FormatV01, FormatV02, FormatV03
 from ome_zarr.io import parse_url
 from ome_zarr.reader import Multiscales, Reader
 from ome_zarr.scale import Scaler
-from ome_zarr.writer import _validate_axes_names, write_image
+from ome_zarr.writer import (
+    _validate_axes_names,
+    write_image,
+    write_multiscales_metadata,
+)
 
 
 class TestWriter:
@@ -125,3 +129,52 @@ class TestWriter:
                 fmt=v03,
                 axes="xyz",
             )
+
+
+class TestMultiscalesMetadata:
+    @pytest.fixture(autouse=True)
+    def initdir(self, tmpdir):
+        self.path = pathlib.Path(tmpdir.mkdir("data"))
+        self.store = parse_url(self.path, mode="w").store
+        self.root = zarr.group(store=self.store)
+
+    def test_single_level(self):
+        write_multiscales_metadata(self.root, ["0"])
+        assert "multiscales" in self.root.attrs
+        assert "version" in self.root.attrs["multiscales"][0]
+        assert self.root.attrs["multiscales"][0]["datasets"] == [{"path": "0"}]
+
+    def test_multi_levels(self):
+        write_multiscales_metadata(self.root, ["0", "1", "2"])
+        assert "multiscales" in self.root.attrs
+        assert "version" in self.root.attrs["multiscales"][0]
+        assert self.root.attrs["multiscales"][0]["datasets"] == [
+            {"path": "0"},
+            {"path": "1"},
+            {"path": "2"},
+        ]
+
+    @pytest.mark.parametrize("fmt", (FormatV01(), FormatV02(), FormatV03()))
+    def test_version(self, fmt):
+        write_multiscales_metadata(self.root, ["0"], fmt=fmt)
+        assert "multiscales" in self.root.attrs
+        assert self.root.attrs["multiscales"][0]["version"] == fmt.version
+        assert self.root.attrs["multiscales"][0]["datasets"] == [{"path": "0"}]
+
+    @pytest.mark.parametrize(
+        "axes",
+        (
+            ["y", "x"],
+            ["c", "y", "x"],
+            ["z", "y", "x"],
+            ["t", "y", "x"],
+            ["t", "c", "y", "x"],
+            ["t", "z", "y", "x"],
+            ["c", "z", "y", "x"],
+            ["t", "c", "z", "y", "x"],
+        ),
+    )
+    def test_axes(self, axes):
+        write_multiscales_metadata(self.root, ["0"], axes=axes)
+        assert "multiscales" in self.root.attrs
+        assert self.root.attrs["multiscales"][0]["axes"] == axes

@@ -103,9 +103,39 @@ def write_multiscale(
     for path, dataset in enumerate(pyramid):
         # TODO: chunks here could be different per layer
         group.create_dataset(str(path), data=dataset, chunks=chunks)
-        paths.append({"path": str(path)})
+        paths.append(str(path))
+    write_multiscales_metadata(group, paths, fmt, axes)
 
-    multiscales = [{"version": fmt.version, "datasets": paths}]
+
+def write_multiscales_metadata(
+    group: zarr.Group,
+    paths: List[str],
+    fmt: Format = CurrentFormat(),
+    axes: Union[str, List[str]] = None,
+) -> None:
+    """
+    Write the multiscales metadata in the group metadata
+
+    Parameters
+    ----------
+    group: zarr.Group
+      the group within the zarr store to store the data in
+    paths: list of str,
+      The list of path to the datasets for this multiscale image
+    fmt: Format
+      The format of the ome_zarr data which should be used.
+      Defaults to the most current.
+    axes: str or list of str
+      the names of the axes. e.g. "tczyx". Not needed for v0.1 or v0.2
+      or for v0.3 if 2D or 5D. Otherwise this must be provided
+    """
+
+    multiscales = [
+        {
+            "version": fmt.version,
+            "datasets": [{"path": str(p)} for p in paths],
+        }
+    ]
     if axes is not None:
         multiscales[0]["axes"] = axes
     group.attrs["multiscales"] = multiscales
