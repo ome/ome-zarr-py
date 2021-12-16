@@ -116,20 +116,20 @@ def write_multiscales_metadata(
     axes: List[str] = None,
 ) -> None:
     """
-    Write the multiscales metadata in the group metadata
+    Write the multiscales metadata in the group.
 
     Parameters
     ----------
     group: zarr.Group
-      the group within the zarr store to store the data in
-    paths: list of str,
-      The list of path to the datasets for this multiscale image
+      the group within the zarr store to write the metadata in.
+    paths: list of str
+      The list of paths to the datasets for this multiscale image.
     fmt: Format
       The format of the ome_zarr data which should be used.
       Defaults to the most current.
-    axes: str or list of str
-      the names of the axes. e.g. "tczyx". Not needed for v0.1 or v0.2
-      or for v0.3 if 2D or 5D. Otherwise this must be provided
+    axes: list of str
+      the names of the axes. e.g. ["t", "c", "z", "y", "x"].
+      Ignored for versions 0.1 and 0.2. Required for version 0.3 or greater.
     """
 
     multiscales = [
