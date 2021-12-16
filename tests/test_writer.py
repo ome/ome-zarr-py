@@ -178,3 +178,25 @@ class TestMultiscalesMetadata:
         write_multiscales_metadata(self.root, ["0"], axes=axes)
         assert "multiscales" in self.root.attrs
         assert self.root.attrs["multiscales"][0]["axes"] == axes
+
+    @pytest.mark.parametrize("fmt", (FormatV01(), FormatV02()))
+    def test_axes_ignored(self, fmt):
+        write_multiscales_metadata(
+            self.root, ["0"], fmt=fmt, axes=["t", "c", "z", "y", "x"]
+        )
+        assert "multiscales" in self.root.attrs
+        assert "axes" not in self.root.attrs["multiscales"][0]
+
+    @pytest.mark.parametrize(
+        "axes",
+        (
+            [],
+            ["i", "j"],
+            ["x", "y"],
+            ["y", "x", "c"],
+            ["x", "y", "z", "c", "t"],
+        ),
+    )
+    def test_invalid_0_3_axes(self, axes):
+        with pytest.raises(ValueError):
+            write_multiscales_metadata(self.root, ["0"], fmt=FormatV03(), axes=axes)
