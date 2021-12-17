@@ -283,7 +283,8 @@ class Multiscales(Spec):
             )  # should this be matched with Format.version?
             datasets = multiscales[0]["datasets"]
             axes = multiscales[0].get("axes")
-            if len(set(axes) - axes_values) > 0:
+            if version == "0.3" and len(set(axes) - axes_values) > 0:
+                # TODO: validate axis for > V0.3 ?
                 raise RuntimeError(f"Invalid axes names: {set(axes) - axes_values}")
             node.metadata["axes"] = axes
             datasets = [d["path"] for d in datasets]
