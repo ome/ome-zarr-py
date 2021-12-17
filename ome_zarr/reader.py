@@ -282,8 +282,7 @@ class Multiscales(Spec):
                 "version", "0.1"
             )  # should this be matched with Format.version?
             datasets = multiscales[0]["datasets"]
-            # axes field was introduced in 0.3, before all data was 5d
-            axes = tuple(multiscales[0].get("axes", ["t", "c", "z", "y", "x"]))
+            axes = multiscales[0].get("axes")
             if len(set(axes) - axes_values) > 0:
                 raise RuntimeError(f"Invalid axes names: {set(axes) - axes_values}")
             node.metadata["axes"] = axes
@@ -301,6 +300,8 @@ class Multiscales(Spec):
                 for c in data.chunks
             ]
             LOGGER.info("resolution: %s", resolution)
+            if axes is not None:
+                axes = tuple(str(axis) for axis in axes)
             LOGGER.info(" - shape %s = %s", axes, data.shape)
             LOGGER.info(" - chunks =  %s", chunk_sizes)
             LOGGER.info(" - dtype = %s", data.dtype)
