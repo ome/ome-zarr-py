@@ -40,32 +40,34 @@ def _validate_axes_names(
     if isinstance(axes, str):
         axes = list(axes)
 
-    if axes is not None:
-        if len(axes) != ndim:
-            raise ValueError("axes length must match number of dimensions")
-        # from https://github.com/constantinpape/ome-ngff-implementations/
-        val_axes = tuple(axes)
-        if ndim == 2:
-            if val_axes != ("y", "x"):
-                raise ValueError(f"2D data must have axes ('y', 'x') {val_axes}")
-        elif ndim == 3:
-            if val_axes not in [("z", "y", "x"), ("c", "y", "x"), ("t", "y", "x")]:
-                raise ValueError(
-                    "3D data must have axes ('z', 'y', 'x') or ('c', 'y', 'x')"
-                    " or ('t', 'y', 'x'), not %s" % (val_axes,)
-                )
-        elif ndim == 4:
-            if val_axes not in [
-                ("t", "z", "y", "x"),
-                ("c", "z", "y", "x"),
-                ("t", "c", "y", "x"),
-            ]:
-                raise ValueError("4D data must have axes tzyx or czyx or tcyx")
-        else:
-            if val_axes != ("t", "c", "z", "y", "x"):
-                raise ValueError("5D data must have axes ('t', 'c', 'z', 'y', 'x')")
-
+    if len(axes) != ndim:
+        raise ValueError("axes length must match number of dimensions")
+    _validate_axes(axes)
     return axes
+
+
+def _validate_axes(axes: List[str], fmt: Format = CurrentFormat()) -> None:
+
+    val_axes = tuple(axes)
+    if len(val_axes) == 2:
+        if val_axes != ("y", "x"):
+            raise ValueError(f"2D data must have axes ('y', 'x') {val_axes}")
+    elif len(val_axes) == 3:
+        if val_axes not in [("z", "y", "x"), ("c", "y", "x"), ("t", "y", "x")]:
+            raise ValueError(
+                "3D data must have axes ('z', 'y', 'x') or ('c', 'y', 'x')"
+                " or ('t', 'y', 'x'), not %s" % (val_axes,)
+            )
+    elif len(val_axes) == 4:
+        if val_axes not in [
+            ("t", "z", "y", "x"),
+            ("c", "z", "y", "x"),
+            ("t", "c", "y", "x"),
+        ]:
+            raise ValueError("4D data must have axes tzyx or czyx or tcyx")
+    else:
+        if val_axes != ("t", "c", "z", "y", "x"):
+            raise ValueError("5D data must have axes ('t', 'c', 'z', 'y', 'x')")
 
 
 def write_multiscale(
@@ -103,11 +105,45 @@ def write_multiscale(
     for path, dataset in enumerate(pyramid):
         # TODO: chunks here could be different per layer
         group.create_dataset(str(path), data=dataset, chunks=chunks)
-        paths.append({"path": str(path)})
+        paths.append(str(path))
+    write_multiscales_metadata(group, paths, fmt, axes)
 
-    multiscales = [{"version": fmt.version, "datasets": paths}]
+
+def write_multiscales_metadata(
+    group: zarr.Group,
+    paths: List[str],
+    fmt: Format = CurrentFormat(),
+    axes: List[str] = None,
+) -> None:
+    """
+    Write the multiscales metadata in the group.
+
+    Parameters
+    ----------
+    group: zarr.Group
+      the group within the zarr store to write the metadata in.
+    paths: list of str
+      The list of paths to the datasets for this multiscale image.
+    fmt: Format
+      The format of the ome_zarr data which should be used.
+      Defaults to the most current.
+    axes: list of str
+      the names of the axes. e.g. ["t", "c", "z", "y", "x"].
+      Ignored for versions 0.1 and 0.2. Required for version 0.3 or greater.
+    """
+
+    multiscales = [
+        {
+            "version": fmt.version,
+            "datasets": [{"path": str(p)} for p in paths],
+        }
+    ]
     if axes is not None:
-        multiscales[0]["axes"] = axes
+        if fmt.version in ("0.1", "0.2"):
+            LOGGER.info("axes ignored for version 0.1 or 0.2")
+        else:
+            _validate_axes(axes, fmt)
+            multiscales[0]["axes"] = axes
     group.attrs["multiscales"] = multiscales
 
 
