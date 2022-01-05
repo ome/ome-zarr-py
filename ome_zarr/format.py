@@ -106,7 +106,7 @@ class FormatV02(Format):
 
         kwargs = {
             "dimension_separator": "/",
-            "normalize_keys": True,
+            "normalize_keys": False,
         }
 
         mkdir = True
