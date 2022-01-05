@@ -301,9 +301,10 @@ class Multiscales(Spec):
                 for c in data.chunks
             ]
             LOGGER.info("resolution: %s", resolution)
+            axes_names = None
             if axes is not None:
-                axes = tuple(str(axis) for axis in axes)
-            LOGGER.info(" - shape %s = %s", axes, data.shape)
+                axes_names = tuple(axis["name"] for axis in axes)
+            LOGGER.info(" - shape %s = %s", axes_names, data.shape)
             LOGGER.info(" - chunks =  %s", chunk_sizes)
             LOGGER.info(" - dtype = %s", data.dtype)
             node.data.append(data)
