@@ -303,7 +303,9 @@ class Multiscales(Spec):
             LOGGER.info("resolution: %s", resolution)
             axes_names = None
             if axes is not None:
-                axes_names = tuple(axis["name"] for axis in axes)
+                axes_names = tuple(
+                    axis if isinstance(axis, str) else axis["name"] for axis in axes
+                )
             LOGGER.info(" - shape %s = %s", axes_names, data.shape)
             LOGGER.info(" - chunks =  %s", chunk_sizes)
             LOGGER.info(" - dtype = %s", data.dtype)
