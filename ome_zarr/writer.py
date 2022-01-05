@@ -228,7 +228,7 @@ def write_plate_metadata(
       A list of the various plate acquisitions
     """
 
-    plate = {
+    plate: Dict[str, Union[str, int, List[Dict]]] = {
         "columns": [{"name": str(c)} for c in columns],
         "rows": [{"name": str(r)} for r in rows],
         "wells": [{"path": str(wp)} for wp in wells],
