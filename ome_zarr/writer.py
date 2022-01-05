@@ -213,8 +213,7 @@ def write_multiscales_metadata(
         if fmt.version in ("0.1", "0.2"):
             LOGGER.info("axes ignored for version 0.1 or 0.2")
         else:
-            axes = _validate_axes(axes=axes, fmt=fmt)
-            multiscales[0]["axes"] = axes
+            multiscales[0]["axes"] = _validate_axes(axes=axes, fmt=fmt)
     group.attrs["multiscales"] = multiscales
 
 
