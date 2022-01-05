@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 import zarr
 
-from ome_zarr.format import FormatV01, FormatV02, FormatV03
+from ome_zarr.format import CurrentFormat, FormatV01, FormatV02, FormatV03
 from ome_zarr.io import parse_url
 from ome_zarr.reader import Multiscales, Reader
 from ome_zarr.scale import Scaler
@@ -12,6 +12,8 @@ from ome_zarr.writer import (
     _validate_axes_names,
     write_image,
     write_multiscales_metadata,
+    write_plate_metadata,
+    write_well_metadata,
 )
 
 
@@ -200,3 +202,221 @@ class TestMultiscalesMetadata:
     def test_invalid_0_3_axes(self, axes):
         with pytest.raises(ValueError):
             write_multiscales_metadata(self.root, ["0"], fmt=FormatV03(), axes=axes)
+
+
+class TestPlateMetadata:
+    @pytest.fixture(autouse=True)
+    def initdir(self, tmpdir):
+        self.path = pathlib.Path(tmpdir.mkdir("data"))
+        self.store = parse_url(self.path, mode="w").store
+        self.root = zarr.group(store=self.store)
+
+    def test_minimal_plate(self):
+        write_plate_metadata(self.root, ["A"], ["1"], ["A/1"])
+        assert "plate" in self.root.attrs
+        assert self.root.attrs["plate"]["columns"] == [{"name": "1"}]
+        assert self.root.attrs["plate"]["rows"] == [{"name": "A"}]
+        assert self.root.attrs["plate"]["version"] == CurrentFormat().version
+        assert self.root.attrs["plate"]["wells"] == [{"path": "A/1"}]
+        assert "name" not in self.root.attrs["plate"]
+        assert "field_count" not in self.root.attrs["plate"]
+        assert "acquisitions" not in self.root.attrs["plate"]
+
+    def test_12wells_plate(self):
+        rows = ["A", "B", "C", "D"]
+        cols = ["1", "2", "3"]
+        wells = [
+            "A/1",
+            "A/2",
+            "A/3",
+            "B/1",
+            "B/2",
+            "B/3",
+            "C/1",
+            "C/2",
+            "C/3",
+            "D/1",
+            "D/2",
+            "D/3",
+        ]
+        write_plate_metadata(self.root, rows, cols, wells)
+        assert "plate" in self.root.attrs
+        assert self.root.attrs["plate"]["columns"] == [
+            {"name": "1"},
+            {"name": "2"},
+            {"name": "3"},
+        ]
+        assert self.root.attrs["plate"]["rows"] == [
+            {"name": "A"},
+            {"name": "B"},
+            {"name": "C"},
+            {"name": "D"},
+        ]
+        assert self.root.attrs["plate"]["version"] == CurrentFormat().version
+        assert self.root.attrs["plate"]["wells"] == [
+            {"path": "A/1"},
+            {"path": "A/2"},
+            {"path": "A/3"},
+            {"path": "B/1"},
+            {"path": "B/2"},
+            {"path": "B/3"},
+            {"path": "C/1"},
+            {"path": "C/2"},
+            {"path": "C/3"},
+            {"path": "D/1"},
+            {"path": "D/2"},
+            {"path": "D/3"},
+        ]
+        assert "name" not in self.root.attrs["plate"]
+        assert "field_count" not in self.root.attrs["plate"]
+        assert "acquisitions" not in self.root.attrs["plate"]
+
+    @pytest.mark.parametrize("fmt", (FormatV01(), FormatV02(), FormatV03()))
+    def test_plate_version(self, fmt):
+        write_plate_metadata(self.root, ["A"], ["1"], ["A/1"], fmt=fmt)
+        assert "plate" in self.root.attrs
+        assert self.root.attrs["plate"]["columns"] == [{"name": "1"}]
+        assert self.root.attrs["plate"]["rows"] == [{"name": "A"}]
+        assert self.root.attrs["plate"]["version"] == fmt.version
+        assert self.root.attrs["plate"]["wells"] == [{"path": "A/1"}]
+        assert "name" not in self.root.attrs["plate"]
+        assert "field_count" not in self.root.attrs["plate"]
+        assert "acquisitions" not in self.root.attrs["plate"]
+
+    def test_plate_name(self):
+        write_plate_metadata(self.root, ["A"], ["1"], ["A/1"], name="test")
+        assert "plate" in self.root.attrs
+        assert self.root.attrs["plate"]["columns"] == [{"name": "1"}]
+        assert self.root.attrs["plate"]["name"] == "test"
+        assert self.root.attrs["plate"]["rows"] == [{"name": "A"}]
+        assert self.root.attrs["plate"]["version"] == CurrentFormat().version
+        assert self.root.attrs["plate"]["wells"] == [{"path": "A/1"}]
+        assert "field_count" not in self.root.attrs["plate"]
+        assert "acquisitions" not in self.root.attrs["plate"]
+
+    def test_field_count(self):
+        write_plate_metadata(self.root, ["A"], ["1"], ["A/1"], field_count=10)
+        assert "plate" in self.root.attrs
+        assert self.root.attrs["plate"]["columns"] == [{"name": "1"}]
+        assert self.root.attrs["plate"]["field_count"] == 10
+        assert self.root.attrs["plate"]["rows"] == [{"name": "A"}]
+        assert self.root.attrs["plate"]["version"] == CurrentFormat().version
+        assert self.root.attrs["plate"]["wells"] == [{"path": "A/1"}]
+        assert "name" not in self.root.attrs["plate"]
+        assert "acquisitions" not in self.root.attrs["plate"]
+
+    def test_acquisitions_minimal(self):
+        a = [{"id": 1}, {"id": 2}, {"id": 3}]
+        write_plate_metadata(self.root, ["A"], ["1"], ["A/1"], acquisitions=a)
+        assert "plate" in self.root.attrs
+        assert self.root.attrs["plate"]["acquisitions"] == a
+        assert self.root.attrs["plate"]["columns"] == [{"name": "1"}]
+        assert self.root.attrs["plate"]["rows"] == [{"name": "A"}]
+        assert self.root.attrs["plate"]["version"] == CurrentFormat().version
+        assert self.root.attrs["plate"]["wells"] == [{"path": "A/1"}]
+        assert "name" not in self.root.attrs["plate"]
+        assert "field_count" not in self.root.attrs["plate"]
+
+    def test_acquisitions_maximal(self):
+        a = [
+            {
+                "id": 1,
+                "name": "acquisition_1",
+                "description": " first acquisition",
+                "maximumfieldcount": 2,
+                "starttime": 1343749391000,
+                "endtime": 1343749392000,
+            }
+        ]
+        write_plate_metadata(self.root, ["A"], ["1"], ["A/1"], acquisitions=a)
+        assert "plate" in self.root.attrs
+        assert self.root.attrs["plate"]["acquisitions"] == a
+        assert self.root.attrs["plate"]["columns"] == [{"name": "1"}]
+        assert self.root.attrs["plate"]["rows"] == [{"name": "A"}]
+        assert self.root.attrs["plate"]["version"] == CurrentFormat().version
+        assert self.root.attrs["plate"]["wells"] == [{"path": "A/1"}]
+        assert "name" not in self.root.attrs["plate"]
+        assert "field_count" not in self.root.attrs["plate"]
+
+    @pytest.mark.parametrize(
+        "acquisitions",
+        (
+            [0, 1],
+            [{"name": "0"}, {"name": "1"}],
+            [{"id": 0, "invalid_key": "0"}],
+            [{"id": "0"}, {"id": "1"}],
+        ),
+    )
+    def test_invalid_acquisitions(self, acquisitions):
+        with pytest.raises(ValueError):
+            write_plate_metadata(
+                self.root, ["A"], ["1"], ["A/1"], acquisitions=acquisitions
+            )
+
+
+class TestWellMetadata:
+    @pytest.fixture(autouse=True)
+    def initdir(self, tmpdir):
+        self.path = pathlib.Path(tmpdir.mkdir("data"))
+        self.store = parse_url(self.path, mode="w").store
+        self.root = zarr.group(store=self.store)
+
+    @pytest.mark.parametrize("images", (["0"], [{"path": "0"}]))
+    def test_minimal_well(self, images):
+        write_well_metadata(self.root, images)
+        assert "well" in self.root.attrs
+        assert self.root.attrs["well"]["images"] == [{"path": "0"}]
+        assert self.root.attrs["well"]["version"] == CurrentFormat().version
+
+    @pytest.mark.parametrize(
+        "images",
+        (
+            ["0", "1", "2"],
+            [
+                {"path": "0"},
+                {"path": "1"},
+                {"path": "2"},
+            ],
+        ),
+    )
+    def test_multiple_images(self, images):
+        write_well_metadata(self.root, images)
+        assert "well" in self.root.attrs
+        assert self.root.attrs["well"]["images"] == [
+            {"path": "0"},
+            {"path": "1"},
+            {"path": "2"},
+        ]
+        assert self.root.attrs["well"]["version"] == CurrentFormat().version
+
+    @pytest.mark.parametrize("fmt", (FormatV01(), FormatV02(), FormatV03()))
+    def test_version(self, fmt):
+        write_well_metadata(self.root, ["0"], fmt=fmt)
+        assert "well" in self.root.attrs
+        assert self.root.attrs["well"]["images"] == [{"path": "0"}]
+        assert self.root.attrs["well"]["version"] == fmt.version
+
+    def test_multiple_acquisitions(self):
+        images = [
+            {"path": "0", "acquisition": 1},
+            {"path": "1", "acquisition": 2},
+            {"path": "2", "acquisition": 3},
+        ]
+        write_well_metadata(self.root, images)
+        assert "well" in self.root.attrs
+        assert self.root.attrs["well"]["images"] == images
+        assert self.root.attrs["well"]["version"] == CurrentFormat().version
+
+    @pytest.mark.parametrize(
+        "images",
+        (
+            [{"acquisition": 0}, {"acquisition": 1}],
+            [{"path": "0", "acquisition": "0"}, {"path": "1", "acquisition": "1"}],
+            [{"path": 0}, {"path": 1}],
+            [{"path": "0", "name": "0"}, {"path": "1", "name": "1"}],
+            [0, 1],
+        ),
+    )
+    def test_invalid_images(self, images):
+        with pytest.raises(ValueError):
+            write_well_metadata(self.root, images)
