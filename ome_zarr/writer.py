@@ -69,7 +69,7 @@ def _validate_axes_types(axes_dicts: List[Dict[str, str]]) -> None:
         raise ValueError("'space' axes must come after 'channel'")
 
 
-def _validate_axes(
+def validate_axes(
     ndim: int = None,
     axes: Union[str, List[str], List[Dict[str, str]]] = None,
     fmt: Format = CurrentFormat(),
@@ -170,7 +170,7 @@ def write_multiscale(
     """
 
     dims = len(pyramid[0].shape)
-    axes = _validate_axes(dims, axes, fmt)
+    axes = validate_axes(dims, axes, fmt)
 
     paths = []
     for path, dataset in enumerate(pyramid):
@@ -213,7 +213,7 @@ def write_multiscales_metadata(
         if fmt.version in ("0.1", "0.2"):
             LOGGER.info("axes ignored for version 0.1 or 0.2")
         else:
-            axes = _validate_axes(axes=axes, fmt=fmt)
+            axes = validate_axes(axes=axes, fmt=fmt)
             if axes is not None:
                 multiscales[0]["axes"] = axes
     group.attrs["multiscales"] = multiscales
@@ -267,7 +267,7 @@ def write_image(
         axes = None
 
     # check axes before trying to scale
-    _validate_axes(image.ndim, axes, fmt)
+    validate_axes(image.ndim, axes, fmt)
 
     if chunks is not None:
         chunks = _retuple(chunks, image.shape)

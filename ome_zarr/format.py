@@ -9,10 +9,19 @@ from zarr.storage import FSStore
 LOGGER = logging.getLogger("ome_zarr.format")
 
 
+def format_from_version(version: str) -> "Format":
+
+    for fmt in format_implementations():
+        if fmt.version == version:
+            return fmt
+    raise ValueError(f"Version {version} not recognized")
+
+
 def format_implementations() -> Iterator["Format"]:
     """
     Return an instance of each format implementation, newest to oldest.
     """
+    yield FormatV04()
     yield FormatV03()
     yield FormatV02()
     yield FormatV01()
