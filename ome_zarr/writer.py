@@ -7,66 +7,12 @@ from typing import Any, Dict, List, Tuple, Union
 import numpy as np
 import zarr
 
+from .axes import Axes
 from .format import CurrentFormat, Format
 from .scale import Scaler
 from .types import JSONDict
 
 LOGGER = logging.getLogger("ome_zarr.writer")
-
-KNOWN_AXES = {"x": "space", "y": "space", "z": "space", "c": "channel", "t": "time"}
-
-
-def _axes_to_dicts(
-    axes: Union[List[str], List[Dict[str, str]]]
-) -> List[Dict[str, str]]:
-    """Returns a list of axis dicts with name and type"""
-    axes_dicts = []
-    for axis in axes:
-        if isinstance(axis, str):
-            axis_dict = {"name": axis}
-            if axis in KNOWN_AXES:
-                axis_dict["type"] = KNOWN_AXES[axis]
-            axes_dicts.append(axis_dict)
-        else:
-            axes_dicts.append(axis)
-    return axes_dicts
-
-
-def _axes_to_names(axes: List[Dict[str, str]]) -> List[str]:
-    """Returns a list of axis names"""
-    axes_names = []
-    for axis in axes:
-        if "name" not in axis:
-            raise ValueError("Axis Dict %s has no 'name'" % axis)
-        axes_names.append(axis["name"])
-    return axes_names
-
-
-def _validate_axes_types(axes_dicts: List[Dict[str, str]]) -> None:
-    """
-    Validate the axes types according to the spec, version 0.4+
-    """
-    axes_types = [axis.get("type") for axis in axes_dicts]
-    known_types = list(KNOWN_AXES.values())
-    unknown_types = [atype for atype in axes_types if atype not in known_types]
-    if len(unknown_types) > 1:
-        raise ValueError(
-            "Too many unknown axes types. 1 allowed, found: %s" % unknown_types
-        )
-
-    def _last_index(item: str, item_list: List[Any]) -> int:
-        return max(loc for loc, val in enumerate(item_list) if val == item)
-
-    if "time" in axes_types and _last_index("time", axes_types) > 0:
-        raise ValueError("'time' axis must be first dimension only")
-
-    if axes_types.count("channel") > 1:
-        raise ValueError("Only 1 axis can be type 'channel'")
-
-    if "channel" in axes_types and _last_index(
-        "channel", axes_types
-    ) > axes_types.index("space"):
-        raise ValueError("'space' axes must come after 'channel'")
 
 
 def validate_axes(
@@ -103,42 +49,10 @@ def validate_axes(
             f"axes length ({len(axes)}) must match number of dimensions ({ndim})"
         )
 
-    # axes may be list of 'x', 'y' or list of {'name': 'x'}
-    axes_dicts = _axes_to_dicts(axes)
-    axes_names = _axes_to_names(axes_dicts)
+    axes_obj = Axes(axes)
+    axes_obj.validate(fmt)
 
-    # check names (only enforced for version 0.3)
-    if fmt.version == "0.3":
-        _validate_axes_03(axes_names)
-        return axes_names
-
-    _validate_axes_types(axes_dicts)
-
-    return axes_dicts
-
-
-def _validate_axes_03(axes: List[str]) -> None:
-
-    val_axes = tuple(axes)
-    if len(val_axes) == 2:
-        if val_axes != ("y", "x"):
-            raise ValueError(f"2D data must have axes ('y', 'x') {val_axes}")
-    elif len(val_axes) == 3:
-        if val_axes not in [("z", "y", "x"), ("c", "y", "x"), ("t", "y", "x")]:
-            raise ValueError(
-                "3D data must have axes ('z', 'y', 'x') or ('c', 'y', 'x')"
-                " or ('t', 'y', 'x'), not %s" % (val_axes,)
-            )
-    elif len(val_axes) == 4:
-        if val_axes not in [
-            ("t", "z", "y", "x"),
-            ("c", "z", "y", "x"),
-            ("t", "c", "y", "x"),
-        ]:
-            raise ValueError("4D data must have axes tzyx or czyx or tcyx")
-    else:
-        if val_axes != ("t", "c", "z", "y", "x"):
-            raise ValueError("5D data must have axes ('t', 'c', 'z', 'y', 'x')")
+    return axes_obj.get_axes(fmt)
 
 
 def write_multiscale(

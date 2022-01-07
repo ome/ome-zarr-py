@@ -4,16 +4,12 @@ import numpy as np
 import pytest
 import zarr
 
+from ome_zarr.axes import KNOWN_AXES
 from ome_zarr.format import FormatV01, FormatV02, FormatV03, FormatV04
 from ome_zarr.io import parse_url
 from ome_zarr.reader import Multiscales, Reader
 from ome_zarr.scale import Scaler
-from ome_zarr.writer import (
-    KNOWN_AXES,
-    validate_axes,
-    write_image,
-    write_multiscales_metadata,
-)
+from ome_zarr.writer import validate_axes, write_image, write_multiscales_metadata
 
 
 class TestWriter:
