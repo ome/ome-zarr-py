@@ -347,11 +347,10 @@ class TestPlateMetadata:
             [{"id": "0"}, {"id": "1"}],
         ),
     )
-    def test_invalid_acquisitions(self, acquisitions):
-        with pytest.raises(ValueError):
-            write_plate_metadata(
-                self.root, ["A"], ["1"], ["A/1"], acquisitions=acquisitions
-            )
+    def test_unspecified_acquisition_keys(self, acquisitions):
+        a = [{"id": 0, "invalid_key": "0"}]
+        write_plate_metadata(self.root, ["A"], ["1"], ["A/1"], acquisitions=a)
+        assert "plate" in self.root.attrs
 
 
 class TestWellMetadata:
@@ -413,10 +412,20 @@ class TestWellMetadata:
             [{"acquisition": 0}, {"acquisition": 1}],
             [{"path": "0", "acquisition": "0"}, {"path": "1", "acquisition": "1"}],
             [{"path": 0}, {"path": 1}],
-            [{"path": "0", "name": "0"}, {"path": "1", "name": "1"}],
             [0, 1],
         ),
     )
     def test_invalid_images(self, images):
         with pytest.raises(ValueError):
             write_well_metadata(self.root, images)
+
+    def test_unspecified_images_keys(self):
+        images = [
+            {"path": "0", "acquisition": 1, "unspecified_key": "alpha"},
+            {"path": "1", "acquisition": 2, "unspecified_key": "beta"},
+            {"path": "2", "acquisition": 3, "unspecified_key": "gamma"},
+        ]
+        write_well_metadata(self.root, images)
+        assert "well" in self.root.attrs
+        assert self.root.attrs["well"]["images"] == images
+        assert self.root.attrs["well"]["version"] == CurrentFormat().version

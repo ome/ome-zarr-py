@@ -80,8 +80,8 @@ def _validate_well_images(images: List, fmt: Format = CurrentFormat()) -> None:
         if isinstance(image, str):
             images[index] = {"path": str(image)}
         elif isinstance(image, dict):
-            if not all(e in VALID_KEYS for e in image.keys()):
-                raise ValueError(f"{image} contains invalid keys")
+            if any(e not in VALID_KEYS for e in image.keys()):
+                LOGGER.debug("f{image} contains unspecified keys")
             if "path" not in image:
                 raise ValueError(f"{image} must contain a path key")
             if not isinstance(image["path"], str):
@@ -109,8 +109,8 @@ def _validate_plate_acquisitions(
     for acquisition in acquisitions:
         if not isinstance(acquisition, dict):
             raise ValueError(f"{acquisition} must be a dictionary")
-        if not all(e in VALID_KEYS for e in acquisition.keys()):
-            raise ValueError(f"{acquisition} contains invalid keys")
+        if not any(e not in VALID_KEYS for e in acquisition.keys()):
+            LOGGER.debug("f{acquisition} contains unspecified keys")
         if "id" not in acquisition:
             raise ValueError(f"{acquisition} must contain an id key")
         if not isinstance(acquisition["id"], int):
