@@ -109,7 +109,7 @@ def _validate_plate_acquisitions(
     for acquisition in acquisitions:
         if not isinstance(acquisition, dict):
             raise ValueError(f"{acquisition} must be a dictionary")
-        if not any(e not in VALID_KEYS for e in acquisition.keys()):
+        if any(e not in VALID_KEYS for e in acquisition.keys()):
             LOGGER.debug("f{acquisition} contains unspecified keys")
         if "id" not in acquisition:
             raise ValueError(f"{acquisition} must contain an id key")
