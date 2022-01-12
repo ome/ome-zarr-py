@@ -2,7 +2,7 @@
 
 """
 import logging
-from typing import Any, List, Tuple, Union
+from typing import Any, Dict, List, Tuple, Union
 
 import numpy as np
 import zarr
@@ -40,32 +40,81 @@ def _validate_axes_names(
     if isinstance(axes, str):
         axes = list(axes)
 
-    if axes is not None:
-        if len(axes) != ndim:
-            raise ValueError("axes length must match number of dimensions")
-        # from https://github.com/constantinpape/ome-ngff-implementations/
-        val_axes = tuple(axes)
-        if ndim == 2:
-            if val_axes != ("y", "x"):
-                raise ValueError(f"2D data must have axes ('y', 'x') {val_axes}")
-        elif ndim == 3:
-            if val_axes not in [("z", "y", "x"), ("c", "y", "x"), ("t", "y", "x")]:
-                raise ValueError(
-                    "3D data must have axes ('z', 'y', 'x') or ('c', 'y', 'x')"
-                    " or ('t', 'y', 'x'), not %s" % (val_axes,)
-                )
-        elif ndim == 4:
-            if val_axes not in [
-                ("t", "z", "y", "x"),
-                ("c", "z", "y", "x"),
-                ("t", "c", "y", "x"),
-            ]:
-                raise ValueError("4D data must have axes tzyx or czyx or tcyx")
-        else:
-            if val_axes != ("t", "c", "z", "y", "x"):
-                raise ValueError("5D data must have axes ('t', 'c', 'z', 'y', 'x')")
-
+    if len(axes) != ndim:
+        raise ValueError("axes length must match number of dimensions")
+    _validate_axes(axes)
     return axes
+
+
+def _validate_axes(axes: List[str], fmt: Format = CurrentFormat()) -> None:
+
+    val_axes = tuple(axes)
+    if len(val_axes) == 2:
+        if val_axes != ("y", "x"):
+            raise ValueError(f"2D data must have axes ('y', 'x') {val_axes}")
+    elif len(val_axes) == 3:
+        if val_axes not in [("z", "y", "x"), ("c", "y", "x"), ("t", "y", "x")]:
+            raise ValueError(
+                "3D data must have axes ('z', 'y', 'x') or ('c', 'y', 'x')"
+                " or ('t', 'y', 'x'), not %s" % (val_axes,)
+            )
+    elif len(val_axes) == 4:
+        if val_axes not in [
+            ("t", "z", "y", "x"),
+            ("c", "z", "y", "x"),
+            ("t", "c", "y", "x"),
+        ]:
+            raise ValueError("4D data must have axes tzyx or czyx or tcyx")
+    else:
+        if val_axes != ("t", "c", "z", "y", "x"):
+            raise ValueError("5D data must have axes ('t', 'c', 'z', 'y', 'x')")
+
+
+def _validate_well_images(images: List, fmt: Format = CurrentFormat()) -> None:
+
+    VALID_KEYS = [
+        "acquisition",
+        "path",
+    ]
+    for index, image in enumerate(images):
+        if isinstance(image, str):
+            images[index] = {"path": str(image)}
+        elif isinstance(image, dict):
+            if any(e not in VALID_KEYS for e in image.keys()):
+                LOGGER.debug("f{image} contains unspecified keys")
+            if "path" not in image:
+                raise ValueError(f"{image} must contain a path key")
+            if not isinstance(image["path"], str):
+                raise ValueError(f"{image} path must be of string type")
+            if "acquisition" in image and not isinstance(image["acquisition"], int):
+                raise ValueError(f"{image} acquisition must be of int type")
+        else:
+            raise ValueError(f"Unrecognized type for {image}")
+
+
+def _validate_plate_acquisitions(
+    acquisitions: List[Dict], fmt: Format = CurrentFormat()
+) -> None:
+
+    VALID_KEYS = [
+        "id",
+        "name",
+        "maximumfieldcount",
+        "description",
+        "starttime",
+        "endtime",
+    ]
+    if acquisitions is None:
+        return
+    for acquisition in acquisitions:
+        if not isinstance(acquisition, dict):
+            raise ValueError(f"{acquisition} must be a dictionary")
+        if any(e not in VALID_KEYS for e in acquisition.keys()):
+            LOGGER.debug("f{acquisition} contains unspecified keys")
+        if "id" not in acquisition:
+            raise ValueError(f"{acquisition} must contain an id key")
+        if not isinstance(acquisition["id"], int):
+            raise ValueError(f"{acquisition} id must be of int type")
 
 
 def write_multiscale(
@@ -103,12 +152,125 @@ def write_multiscale(
     for path, dataset in enumerate(pyramid):
         # TODO: chunks here could be different per layer
         group.create_dataset(str(path), data=dataset, chunks=chunks)
-        paths.append({"path": str(path)})
+        paths.append(str(path))
+    write_multiscales_metadata(group, paths, fmt, axes)
 
-    multiscales = [{"version": fmt.version, "datasets": paths}]
+
+def write_multiscales_metadata(
+    group: zarr.Group,
+    paths: List[str],
+    fmt: Format = CurrentFormat(),
+    axes: List[str] = None,
+) -> None:
+    """
+    Write the multiscales metadata in the group.
+
+    Parameters
+    ----------
+    group: zarr.Group
+      the group within the zarr store to write the metadata in.
+    paths: list of str
+      The list of paths to the datasets for this multiscale image.
+    fmt: Format
+      The format of the ome_zarr data which should be used.
+      Defaults to the most current.
+    axes: list of str
+      the names of the axes. e.g. ["t", "c", "z", "y", "x"].
+      Ignored for versions 0.1 and 0.2. Required for version 0.3 or greater.
+    """
+
+    multiscales = [
+        {
+            "version": fmt.version,
+            "datasets": [{"path": str(p)} for p in paths],
+        }
+    ]
     if axes is not None:
-        multiscales[0]["axes"] = axes
+        if fmt.version in ("0.1", "0.2"):
+            LOGGER.info("axes ignored for version 0.1 or 0.2")
+        else:
+            _validate_axes(axes, fmt)
+            multiscales[0]["axes"] = axes
     group.attrs["multiscales"] = multiscales
+
+
+def write_plate_metadata(
+    group: zarr.Group,
+    rows: List[str],
+    columns: List[str],
+    wells: List[str],
+    fmt: Format = CurrentFormat(),
+    acquisitions: List[dict] = None,
+    field_count: int = None,
+    name: str = None,
+) -> None:
+    """
+    Write the plate metadata in the group.
+
+    Parameters
+    ----------
+    group: zarr.Group
+      the group within the zarr store to write the metadata in.
+    rows: list of str
+      The list of names for the plate rows
+    columns: list of str
+      The list of names for the plate columns
+    wells: list of str
+      The list of paths for the well groups
+    fmt: Format
+      The format of the ome_zarr data which should be used.
+      Defaults to the most current.
+    name: str
+      The plate name
+    field_count: int
+      The maximum number of fields per view across wells
+    acquisitions: list of dict
+      A list of the various plate acquisitions
+    """
+
+    plate: Dict[str, Union[str, int, List[Dict]]] = {
+        "columns": [{"name": str(c)} for c in columns],
+        "rows": [{"name": str(r)} for r in rows],
+        "wells": [{"path": str(wp)} for wp in wells],
+        "version": fmt.version,
+    }
+    if name is not None:
+        plate["name"] = name
+    if field_count is not None:
+        plate["field_count"] = field_count
+    if acquisitions is not None:
+        _validate_plate_acquisitions(acquisitions)
+        plate["acquisitions"] = acquisitions
+    group.attrs["plate"] = plate
+
+
+def write_well_metadata(
+    group: zarr.Group,
+    images: Union[List[str], List[dict]],
+    fmt: Format = CurrentFormat(),
+) -> None:
+    """
+    Write the well metadata in the group.
+
+    Parameters
+    ----------
+    group: zarr.Group
+      the group within the zarr store to write the metadata in.
+    image_paths: list of str
+      The list of paths for the well images
+    image_acquisitions: list of int
+      The list of acquisitions for the well images
+    fmt: Format
+      The format of the ome_zarr data which should be used.
+      Defaults to the most current.
+    """
+
+    _validate_well_images(images)
+    well = {
+        "images": images,
+        "version": fmt.version,
+    }
+    group.attrs["well"] = well
 
 
 def write_image(

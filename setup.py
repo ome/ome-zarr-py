@@ -19,7 +19,8 @@ install_requires += (["numpy"],)
 install_requires += (["dask"],)
 install_requires += (["zarr>=2.8.1"],)
 install_requires += (["fsspec[s3]!=2021.07.0"],)
-install_requires += (["aiohttp"],)
+# See https://github.com/fsspec/filesystem_spec/issues/819
+install_requires += (["aiohttp<4"],)
 install_requires += (["requests"],)
 install_requires += (["scikit-image"],)
 install_requires += (["toolz"],)
@@ -27,7 +28,7 @@ install_requires += (["toolz"],)
 
 setup(
     name="ome-zarr",
-    version="0.2.2.dev0",
+    version="0.3.0.dev0",
     author="The Open Microscopy Team",
     url="https://github.com/ome/ome-zarr-py",
     description="Implementation of images in Zarr files.",
