@@ -2,7 +2,7 @@
 
 """
 import logging
-from typing import Any, List, Tuple, Union
+from typing import Any, Dict, List, Tuple, Union
 
 import numpy as np
 import zarr
@@ -68,6 +68,53 @@ def _validate_axes(axes: List[str], fmt: Format = CurrentFormat()) -> None:
     else:
         if val_axes != ("t", "c", "z", "y", "x"):
             raise ValueError("5D data must have axes ('t', 'c', 'z', 'y', 'x')")
+
+
+def _validate_well_images(images: List, fmt: Format = CurrentFormat()) -> None:
+
+    VALID_KEYS = [
+        "acquisition",
+        "path",
+    ]
+    for index, image in enumerate(images):
+        if isinstance(image, str):
+            images[index] = {"path": str(image)}
+        elif isinstance(image, dict):
+            if any(e not in VALID_KEYS for e in image.keys()):
+                LOGGER.debug("f{image} contains unspecified keys")
+            if "path" not in image:
+                raise ValueError(f"{image} must contain a path key")
+            if not isinstance(image["path"], str):
+                raise ValueError(f"{image} path must be of string type")
+            if "acquisition" in image and not isinstance(image["acquisition"], int):
+                raise ValueError(f"{image} acquisition must be of int type")
+        else:
+            raise ValueError(f"Unrecognized type for {image}")
+
+
+def _validate_plate_acquisitions(
+    acquisitions: List[Dict], fmt: Format = CurrentFormat()
+) -> None:
+
+    VALID_KEYS = [
+        "id",
+        "name",
+        "maximumfieldcount",
+        "description",
+        "starttime",
+        "endtime",
+    ]
+    if acquisitions is None:
+        return
+    for acquisition in acquisitions:
+        if not isinstance(acquisition, dict):
+            raise ValueError(f"{acquisition} must be a dictionary")
+        if any(e not in VALID_KEYS for e in acquisition.keys()):
+            LOGGER.debug("f{acquisition} contains unspecified keys")
+        if "id" not in acquisition:
+            raise ValueError(f"{acquisition} must contain an id key")
+        if not isinstance(acquisition["id"], int):
+            raise ValueError(f"{acquisition} id must be of int type")
 
 
 def write_multiscale(
@@ -145,6 +192,85 @@ def write_multiscales_metadata(
             _validate_axes(axes, fmt)
             multiscales[0]["axes"] = axes
     group.attrs["multiscales"] = multiscales
+
+
+def write_plate_metadata(
+    group: zarr.Group,
+    rows: List[str],
+    columns: List[str],
+    wells: List[str],
+    fmt: Format = CurrentFormat(),
+    acquisitions: List[dict] = None,
+    field_count: int = None,
+    name: str = None,
+) -> None:
+    """
+    Write the plate metadata in the group.
+
+    Parameters
+    ----------
+    group: zarr.Group
+      the group within the zarr store to write the metadata in.
+    rows: list of str
+      The list of names for the plate rows
+    columns: list of str
+      The list of names for the plate columns
+    wells: list of str
+      The list of paths for the well groups
+    fmt: Format
+      The format of the ome_zarr data which should be used.
+      Defaults to the most current.
+    name: str
+      The plate name
+    field_count: int
+      The maximum number of fields per view across wells
+    acquisitions: list of dict
+      A list of the various plate acquisitions
+    """
+
+    plate: Dict[str, Union[str, int, List[Dict]]] = {
+        "columns": [{"name": str(c)} for c in columns],
+        "rows": [{"name": str(r)} for r in rows],
+        "wells": [{"path": str(wp)} for wp in wells],
+        "version": fmt.version,
+    }
+    if name is not None:
+        plate["name"] = name
+    if field_count is not None:
+        plate["field_count"] = field_count
+    if acquisitions is not None:
+        _validate_plate_acquisitions(acquisitions)
+        plate["acquisitions"] = acquisitions
+    group.attrs["plate"] = plate
+
+
+def write_well_metadata(
+    group: zarr.Group,
+    images: Union[List[str], List[dict]],
+    fmt: Format = CurrentFormat(),
+) -> None:
+    """
+    Write the well metadata in the group.
+
+    Parameters
+    ----------
+    group: zarr.Group
+      the group within the zarr store to write the metadata in.
+    image_paths: list of str
+      The list of paths for the well images
+    image_acquisitions: list of int
+      The list of acquisitions for the well images
+    fmt: Format
+      The format of the ome_zarr data which should be used.
+      Defaults to the most current.
+    """
+
+    _validate_well_images(images)
+    well = {
+        "images": images,
+        "version": fmt.version,
+    }
+    group.attrs["well"] = well
 
 
 def write_image(
