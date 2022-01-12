@@ -109,7 +109,6 @@ class TestHCSNode:
         for wp in empty_wells:
             assert parse_url(str(self.path / wp)) is None
 
-    @pytest.mark.xfail(reason="https://github.com/ome/ome-zarr-py/issues/145")
     @pytest.mark.parametrize(
         "axes, dims",
         (
