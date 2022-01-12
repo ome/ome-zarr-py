@@ -30,7 +30,7 @@ class Axes:
 
         self._validate_axes_types()
 
-    def get_axes(self, fmt: Format) -> Union[List[str], List[Dict[str, str]]]:
+    def to_list(self, fmt: Format) -> Union[List[str], List[Dict[str, str]]]:
         if fmt.version == "0.3":
             return self._get_names()
         return self.axes

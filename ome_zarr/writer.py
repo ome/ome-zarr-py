@@ -52,7 +52,7 @@ def validate_axes(
     axes_obj = Axes(axes, fmt)
     axes_obj.validate()
 
-    return axes_obj.get_axes(fmt)
+    return axes_obj.to_list(fmt)
 
 
 def _validate_well_images(images: List, fmt: Format = CurrentFormat()) -> None:
