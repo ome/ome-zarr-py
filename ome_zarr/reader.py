@@ -9,10 +9,10 @@ import dask.array as da
 import numpy as np
 from dask import delayed
 
+from .axes import Axes
 from .format import format_from_version
 from .io import ZarrLocation
 from .types import JSONDict
-from .writer import validate_axes
 
 LOGGER = logging.getLogger("ome_zarr.reader")
 
@@ -286,7 +286,7 @@ class Multiscales(Spec):
             axes = multiscales[0].get("axes")
             fmt = format_from_version(version)
             # Raises ValueError if not valid
-            validate_axes(None, axes, fmt)
+            Axes(axes, fmt).validate()
             node.metadata["axes"] = axes
             datasets = [d["path"] for d in datasets]
             self.datasets: List[str] = datasets

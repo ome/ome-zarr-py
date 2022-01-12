@@ -2,20 +2,30 @@
 """
 from typing import Any, Dict, List, Union
 
-from .format import Format
+from .format import CurrentFormat, Format
 
 KNOWN_AXES = {"x": "space", "y": "space", "z": "space", "c": "channel", "t": "time"}
 
 
 class Axes:
-    def __init__(self, axes: Union[List[str], List[Dict[str, str]]]) -> None:
-        self.axes = self._axes_to_dicts(axes)
+    def __init__(
+        self,
+        axes: Union[List[str], List[Dict[str, str]]],
+        fmt: Format = CurrentFormat(),
+    ) -> None:
 
-    def validate(self, fmt: Format) -> None:
+        if axes is not None:
+            self.axes = self._axes_to_dicts(axes)
+        self.fmt = fmt
+
+    def validate(self) -> None:
+        """Raises ValueError if not valid"""
+        if self.fmt.version in ("0.1", "0.2"):
+            return
 
         # check names (only enforced for version 0.3)
-        if fmt.version == "0.3":
-            self._validate_axes_03()
+        if self.fmt.version == "0.3":
+            self._validate_03()
             return
 
         self._validate_axes_types()
@@ -76,7 +86,7 @@ class Axes:
             axes_names.append(axis["name"])
         return axes_names
 
-    def _validate_axes_03(self) -> None:
+    def _validate_03(self) -> None:
 
         val_axes = tuple(self._get_names())
         if len(val_axes) == 2:

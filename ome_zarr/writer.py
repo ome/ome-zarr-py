@@ -49,8 +49,8 @@ def validate_axes(
             f"axes length ({len(axes)}) must match number of dimensions ({ndim})"
         )
 
-    axes_obj = Axes(axes)
-    axes_obj.validate(fmt)
+    axes_obj = Axes(axes, fmt)
+    axes_obj.validate()
 
     return axes_obj.get_axes(fmt)
 
