@@ -70,15 +70,16 @@ def _validate_axes(axes: List[str], fmt: Format = CurrentFormat()) -> None:
             raise ValueError("5D data must have axes ('t', 'c', 'z', 'y', 'x')")
 
 
-def _validate_well_images(images: List, fmt: Format = CurrentFormat()) -> None:
+def _validate_well_images(images: List, fmt: Format = CurrentFormat()) -> List[dict]:
 
     VALID_KEYS = [
         "acquisition",
         "path",
     ]
-    for index, image in enumerate(images):
+    validated_images = []
+    for image in images:
         if isinstance(image, str):
-            images[index] = {"path": str(image)}
+            validated_images.append({"path": str(image)})
         elif isinstance(image, dict):
             if any(e not in VALID_KEYS for e in image.keys()):
                 LOGGER.debug("f{image} contains unspecified keys")
@@ -88,13 +89,15 @@ def _validate_well_images(images: List, fmt: Format = CurrentFormat()) -> None:
                 raise ValueError(f"{image} path must be of string type")
             if "acquisition" in image and not isinstance(image["acquisition"], int):
                 raise ValueError(f"{image} acquisition must be of int type")
+            validated_images.append(image)
         else:
             raise ValueError(f"Unrecognized type for {image}")
+    return validated_images
 
 
 def _validate_plate_acquisitions(
     acquisitions: List[Dict], fmt: Format = CurrentFormat()
-) -> None:
+) -> List[Dict]:
 
     VALID_KEYS = [
         "id",
@@ -114,6 +117,7 @@ def _validate_plate_acquisitions(
             raise ValueError(f"{acquisition} must contain an id key")
         if not isinstance(acquisition["id"], int):
             raise ValueError(f"{acquisition} id must be of int type")
+    return acquisitions
 
 
 def write_multiscale(
@@ -238,8 +242,7 @@ def write_plate_metadata(
     if field_count is not None:
         plate["field_count"] = field_count
     if acquisitions is not None:
-        _validate_plate_acquisitions(acquisitions)
-        plate["acquisitions"] = acquisitions
+        plate["acquisitions"] = _validate_plate_acquisitions(acquisitions)
     group.attrs["plate"] = plate
 
 
@@ -264,9 +267,8 @@ def write_well_metadata(
       Defaults to the most current.
     """
 
-    _validate_well_images(images)
     well = {
-        "images": images,
+        "images": _validate_well_images(images),
         "version": fmt.version,
     }
     group.attrs["well"] = well
