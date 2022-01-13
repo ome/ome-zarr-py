@@ -120,6 +120,30 @@ def _validate_plate_acquisitions(
     return acquisitions
 
 
+def _validate_plate_wells(wells: List, fmt: Format = CurrentFormat()) -> List[dict]:
+
+    VALID_KEYS = [
+        "path",
+    ]
+    validated_wells = []
+    if wells is None:
+        raise ValueError("Empty wells list")
+    for well in wells:
+        if isinstance(well, str):
+            validated_wells.append({"path": str(well)})
+        elif isinstance(well, dict):
+            if any(e not in VALID_KEYS for e in well.keys()):
+                LOGGER.debug("f{well} contains unspecified keys")
+            if "path" not in well:
+                raise ValueError(f"{well} must contain an path key")
+            if not isinstance(well["path"], str):
+                raise ValueError(f"{well} path must be of str type")
+            validated_wells.append({"path": str(well)})
+        else:
+            raise ValueError(f"Unrecognized type for {well}")
+    return validated_wells
+
+
 def write_multiscale(
     pyramid: List,
     group: zarr.Group,
@@ -201,7 +225,7 @@ def write_plate_metadata(
     group: zarr.Group,
     rows: List[str],
     columns: List[str],
-    wells: List[str],
+    wells: Union[List[str], List[dict]],
     fmt: Format = CurrentFormat(),
     acquisitions: List[dict] = None,
     field_count: int = None,
@@ -218,7 +242,7 @@ def write_plate_metadata(
       The list of names for the plate rows
     columns: list of str
       The list of names for the plate columns
-    wells: list of str
+    wells: list of str or list of dict
       The list of paths for the well groups
     fmt: Format
       The format of the ome_zarr data which should be used.
@@ -234,7 +258,7 @@ def write_plate_metadata(
     plate: Dict[str, Union[str, int, List[Dict]]] = {
         "columns": [{"name": str(c)} for c in columns],
         "rows": [{"name": str(r)} for r in rows],
-        "wells": [{"path": str(wp)} for wp in wells],
+        "wells": _validate_plate_wells(wells),
         "version": fmt.version,
     }
     if name is not None:
