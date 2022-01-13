@@ -375,7 +375,6 @@ class TestPlateMetadata:
         ),
     )
     def test_invalid_well_keys(self, wells):
-        wells = [{"path": 0}]
         with pytest.raises(ValueError):
             write_plate_metadata(self.root, ["A"], ["1"], wells)
 
