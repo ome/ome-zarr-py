@@ -126,7 +126,7 @@ def _validate_plate_wells(wells: List, fmt: Format = CurrentFormat()) -> List[di
         "path",
     ]
     validated_wells = []
-    if wells is None:
+    if wells is None or len(wells) == 0:
         raise ValueError("Empty wells list")
     for well in wells:
         if isinstance(well, str):
@@ -138,7 +138,7 @@ def _validate_plate_wells(wells: List, fmt: Format = CurrentFormat()) -> List[di
                 raise ValueError(f"{well} must contain an path key")
             if not isinstance(well["path"], str):
                 raise ValueError(f"{well} path must be of str type")
-            validated_wells.append({"path": str(well)})
+            validated_wells.append(well)
         else:
             raise ValueError(f"Unrecognized type for {well}")
     return validated_wells

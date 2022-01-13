@@ -343,14 +343,54 @@ class TestPlateMetadata:
         (
             [0, 1],
             [{"name": "0"}, {"name": "1"}],
-            [{"id": 0, "invalid_key": "0"}],
             [{"id": "0"}, {"id": "1"}],
         ),
     )
-    def test_unspecified_acquisition_keys(self, acquisitions):
-        a = [{"id": 0, "invalid_key": "0"}]
+    def test_invalid_acquisition_keys(self, acquisitions):
+        with pytest.raises(ValueError):
+            write_plate_metadata(
+                self.root, ["A"], ["1"], ["A/1"], acquisitions=acquisitions
+            )
+
+    def test_unspecified_acquisition_keys(self):
+        a = [{"id": 0, "unspecified_key": "0"}]
         write_plate_metadata(self.root, ["A"], ["1"], ["A/1"], acquisitions=a)
         assert "plate" in self.root.attrs
+        assert self.root.attrs["plate"]["acquisitions"] == a
+
+    @pytest.mark.parametrize(
+        "wells",
+        (None, [], [1]),
+    )
+    def test_invalid_well_list(self, wells):
+        with pytest.raises(ValueError):
+            write_plate_metadata(self.root, ["A"], ["1"], wells)
+
+    @pytest.mark.parametrize(
+        "wells",
+        (
+            [{"path": 0}],
+            [{"id": "test"}],
+            [{"path": "A/1"}, {"path": None}],
+        ),
+    )
+    def test_invalid_well_keys(self, wells):
+        wells = [{"path": 0}]
+        with pytest.raises(ValueError):
+            write_plate_metadata(self.root, ["A"], ["1"], wells)
+
+    def test_unspecified_well_keys(self):
+        wells = [
+            {"path": "A/1", "unspecified_key": "alpha"},
+            {"path": "A/2", "unspecified_key": "beta"},
+            {"path": "B/1", "unspecified_key": "gamma"},
+        ]
+        write_plate_metadata(self.root, ["A", "B"], ["1", "2"], wells)
+        assert "plate" in self.root.attrs
+        assert self.root.attrs["plate"]["columns"] == [{"name": "1"}, {"name": "2"}]
+        assert self.root.attrs["plate"]["rows"] == [{"name": "A"}, {"name": "B"}]
+        assert self.root.attrs["plate"]["version"] == CurrentFormat().version
+        assert self.root.attrs["plate"]["wells"] == wells
 
 
 class TestWellMetadata:
