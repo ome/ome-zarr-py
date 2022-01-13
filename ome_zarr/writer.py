@@ -104,8 +104,7 @@ def _validate_plate_acquisitions(
         "starttime",
         "endtime",
     ]
-    if acquisitions is None:
-        return
+
     for acquisition in acquisitions:
         if not isinstance(acquisition, dict):
             raise ValueError(f"{acquisition} must be a dictionary")
