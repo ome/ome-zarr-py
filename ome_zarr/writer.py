@@ -108,6 +108,7 @@ def write_multiscale(
     chunks: Union[Tuple[Any, ...], int] = None,
     fmt: Format = CurrentFormat(),
     axes: Union[str, List[str], List[Dict[str, str]]] = None,
+    transformations: List[List[Dict[str, Any]]] = None,
 ) -> None:
     """
     Write a pyramid with multiscale metadata to disk.
@@ -128,6 +129,9 @@ def write_multiscale(
     axes: str or list of str or list of dict
       List of axes dicts, or names. Not needed for v0.1 or v0.2
       or if 2D. Otherwise this must be provided
+    transformations: 2Dlist of dict
+      For each path, we have a List of transformation Dicts (not validated).
+      Each list of dicts are added to each datasets in order.
     """
 
     dims = len(pyramid[0].shape)
@@ -138,7 +142,7 @@ def write_multiscale(
         # TODO: chunks here could be different per layer
         group.create_dataset(str(path), data=dataset, chunks=chunks)
         paths.append(str(path))
-    write_multiscales_metadata(group, paths, fmt, axes)
+    write_multiscales_metadata(group, paths, fmt, axes, transformations)
 
 
 def write_multiscales_metadata(
@@ -146,6 +150,7 @@ def write_multiscales_metadata(
     paths: List[str],
     fmt: Format = CurrentFormat(),
     axes: Union[str, List[str], List[Dict[str, str]]] = None,
+    transformations: List[List[Dict[str, Any]]] = None,
 ) -> None:
     """
     Write the multiscales metadata in the group.
@@ -159,15 +164,23 @@ def write_multiscales_metadata(
     fmt: Format
       The format of the ome_zarr data which should be used.
       Defaults to the most current.
-    axes: list of str
+    axes: list of str or list of dicts
       the names of the axes. e.g. ["t", "c", "z", "y", "x"].
       Ignored for versions 0.1 and 0.2. Required for version 0.3 or greater.
+    transformations: 2Dlist of dict
+      For each path, we have a List of transformation Dicts (not validated).
+      Each list of dicts are added to each datasets in order.
     """
+
+    datasets: List[Dict[str, Any]] = [{"path": path} for path in paths]
+    if transformations is not None:
+        for dataset, transform in zip(datasets, transformations):
+            dataset["transformations"] = transform
 
     multiscales = [
         {
             "version": fmt.version,
-            "datasets": [{"path": str(p)} for p in paths],
+            "datasets": datasets,
         }
     ]
     if axes is not None:
@@ -267,6 +280,7 @@ def write_image(
     scaler: Scaler = Scaler(),
     fmt: Format = CurrentFormat(),
     axes: Union[str, List[str], List[Dict[str, str]]] = None,
+    transformations: List[List[Dict[str, Any]]] = None,
     **metadata: JSONDict,
 ) -> None:
     """Writes an image to the zarr store according to ome-zarr specification
@@ -294,6 +308,9 @@ def write_image(
     axes: str or list of str or list of dict
       List of axes dicts, or names. Not needed for v0.1 or v0.2
       or if 2D. Otherwise this must be provided
+    transformations: 2Dlist of dict
+      For each resolution, we have a List of transformation Dicts (not validated).
+      Each list of dicts are added to each datasets in order.
     """
 
     if image.ndim > 5:
@@ -323,7 +340,9 @@ def write_image(
         LOGGER.debug("disabling pyramid")
         image = [image]
 
-    write_multiscale(image, group, chunks=chunks, fmt=fmt, axes=axes)
+    write_multiscale(
+        image, group, chunks=chunks, fmt=fmt, axes=axes, transformations=transformations
+    )
     group.attrs.update(metadata)
 
 

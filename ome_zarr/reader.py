@@ -288,8 +288,11 @@ class Multiscales(Spec):
             # Raises ValueError if not valid
             Axes(axes, fmt)
             node.metadata["axes"] = axes
-            datasets = [d["path"] for d in datasets]
-            self.datasets: List[str] = datasets
+            paths = [d["path"] for d in datasets]
+            self.datasets: List[str] = paths
+            transformations = [d.get("transformations") for d in datasets]
+            if any(trans is not None for trans in transformations):
+                node.metadata["transformations"] = transformations
             LOGGER.info("datasets %s", datasets)
         except Exception as e:
             LOGGER.error(f"failed to parse multiscale metadata: {e}")

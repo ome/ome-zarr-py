@@ -17,6 +17,12 @@ from ome_zarr.writer import (
     write_well_metadata,
 )
 
+TRANSFORMATIONS = [
+    {"axisIndices": [1, 2, 3], "scale": [0.50, 0.36, 0.36], "type": "scale"},
+    {"axisIndices": [1, 2, 3], "scale": [0.50, 0.72, 0.72], "type": "scale"},
+    {"axisIndices": [1, 2, 3], "scale": [0.50, 1.44, 1.44], "type": "scale"},
+]
+
 
 class TestWriter:
     @pytest.fixture(autouse=True)
@@ -73,6 +79,7 @@ class TestWriter:
             scaler=scaler,
             fmt=version,
             axes=axes,
+            transformations=TRANSFORMATIONS,
         )
 
         # Verify
@@ -84,6 +91,10 @@ class TestWriter:
             assert node.data[0].ndim == 5
         else:
             assert node.data[0].shape == shape
+        print("node.metadata", node.metadata)
+        for transf, expected in zip(node.metadata["transformations"], TRANSFORMATIONS):
+            assert transf == expected
+        assert len(node.metadata["transformations"]) == len(node.data)
         assert np.allclose(data, node.data[0][...].compute())
 
     def test_dim_names(self):
