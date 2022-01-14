@@ -70,7 +70,9 @@ def _validate_axes(axes: List[str], fmt: Format = CurrentFormat()) -> None:
             raise ValueError("5D data must have axes ('t', 'c', 'z', 'y', 'x')")
 
 
-def _validate_well_images(images: List, fmt: Format = CurrentFormat()) -> List[dict]:
+def _validate_well_images(
+    images: List[Union[str, dict]], fmt: Format = CurrentFormat()
+) -> List[dict]:
 
     VALID_KEYS = [
         "acquisition",
@@ -120,7 +122,9 @@ def _validate_plate_acquisitions(
     return acquisitions
 
 
-def _validate_plate_wells(wells: List, fmt: Format = CurrentFormat()) -> List[dict]:
+def _validate_plate_wells(
+    wells: List[Union[str, dict]], fmt: Format = CurrentFormat()
+) -> List[dict]:
 
     VALID_KEYS = [
         "path",
@@ -225,7 +229,7 @@ def write_plate_metadata(
     group: zarr.Group,
     rows: List[str],
     columns: List[str],
-    wells: Union[List[str], List[dict]],
+    wells: List[Union[str, dict]],
     fmt: Format = CurrentFormat(),
     acquisitions: List[dict] = None,
     field_count: int = None,
@@ -242,7 +246,7 @@ def write_plate_metadata(
       The list of names for the plate rows
     columns: list of str
       The list of names for the plate columns
-    wells: list of str or list of dict
+    wells: list of str or dict
       The list of paths for the well groups
     fmt: Format
       The format of the ome_zarr data which should be used.
@@ -272,7 +276,7 @@ def write_plate_metadata(
 
 def write_well_metadata(
     group: zarr.Group,
-    images: Union[List[str], List[dict]],
+    images: List[Union[str, dict]],
     fmt: Format = CurrentFormat(),
 ) -> None:
     """
@@ -282,7 +286,7 @@ def write_well_metadata(
     ----------
     group: zarr.Group
       the group within the zarr store to write the metadata in.
-    image_paths: list of str
+    image_paths: list of str or dict
       The list of paths for the well images
     image_acquisitions: list of int
       The list of acquisitions for the well images
