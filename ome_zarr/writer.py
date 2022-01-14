@@ -15,7 +15,7 @@ from .types import JSONDict
 LOGGER = logging.getLogger("ome_zarr.writer")
 
 
-def validate_axes(
+def _get_valid_axes(
     ndim: int = None,
     axes: Union[str, List[str], List[Dict[str, str]]] = None,
     fmt: Format = CurrentFormat(),
@@ -131,7 +131,7 @@ def write_multiscale(
     """
 
     dims = len(pyramid[0].shape)
-    axes = validate_axes(dims, axes, fmt)
+    axes = _get_valid_axes(dims, axes, fmt)
 
     paths = []
     for path, dataset in enumerate(pyramid):
@@ -174,7 +174,7 @@ def write_multiscales_metadata(
         if fmt.version in ("0.1", "0.2"):
             LOGGER.info("axes ignored for version 0.1 or 0.2")
         else:
-            axes = validate_axes(axes=axes, fmt=fmt)
+            axes = _get_valid_axes(axes=axes, fmt=fmt)
             if axes is not None:
                 multiscales[0]["axes"] = axes
     group.attrs["multiscales"] = multiscales
@@ -307,7 +307,7 @@ def write_image(
         axes = None
 
     # check axes before trying to scale
-    validate_axes(image.ndim, axes, fmt)
+    _get_valid_axes(image.ndim, axes, fmt)
 
     if chunks is not None:
         chunks = _retuple(chunks, image.shape)
