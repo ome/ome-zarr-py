@@ -13,10 +13,15 @@ class Axes:
         axes: Union[List[str], List[Dict[str, str]]],
         fmt: Format = CurrentFormat(),
     ) -> None:
+        """
+        Constructor, transforms axes and validates
 
+        Raises ValueError if not valid
+        """
         if axes is not None:
             self.axes = self._axes_to_dicts(axes)
         self.fmt = fmt
+        self.validate()
 
     def validate(self) -> None:
         """Raises ValueError if not valid"""

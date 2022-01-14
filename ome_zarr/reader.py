@@ -286,7 +286,7 @@ class Multiscales(Spec):
             axes = multiscales[0].get("axes")
             fmt = format_from_version(version)
             # Raises ValueError if not valid
-            Axes(axes, fmt).validate()
+            Axes(axes, fmt)
             node.metadata["axes"] = axes
             datasets = [d["path"] for d in datasets]
             self.datasets: List[str] = datasets
