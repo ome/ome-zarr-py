@@ -139,7 +139,7 @@ def _validate_plate_wells(
             if any(e not in VALID_KEYS for e in well.keys()):
                 LOGGER.debug("f{well} contains unspecified keys")
             if "path" not in well:
-                raise ValueError(f"{well} must contain an path key")
+                raise ValueError(f"{well} must contain a path key")
             if not isinstance(well["path"], str):
                 raise ValueError(f"{well} path must be of str type")
             validated_wells.append(well)
