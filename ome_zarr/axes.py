@@ -20,6 +20,9 @@ class Axes:
         """
         if axes is not None:
             self.axes = self._axes_to_dicts(axes)
+        elif fmt.version in ("0.1", "0.2"):
+            # strictly 5D
+            self.axes = self._axes_to_dicts(["t", "c", "z", "y", "x"])
         self.fmt = fmt
         self.validate()
 
@@ -35,7 +38,9 @@ class Axes:
 
         self._validate_axes_types()
 
-    def to_list(self, fmt: Format) -> Union[List[str], List[Dict[str, str]]]:
+    def to_list(
+        self, fmt: Format = CurrentFormat()
+    ) -> Union[List[str], List[Dict[str, str]]]:
         if fmt.version == "0.3":
             return self._get_names()
         return self.axes
