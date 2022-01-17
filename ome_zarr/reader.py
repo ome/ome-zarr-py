@@ -463,7 +463,7 @@ class Plate(Spec):
         stitched full-resolution images.
         """
         self.plate_data = self.lookup("plate", {})
-        LOGGER.info("plate_data", self.plate_data)
+        LOGGER.info("plate_data: %s", self.plate_data)
         self.rows = self.plate_data.get("rows")
         self.columns = self.plate_data.get("columns")
         self.first_field = "0"
@@ -484,7 +484,7 @@ class Plate(Spec):
             raise Exception("could not find first well")
         self.numpy_type = well_spec.numpy_type
 
-        LOGGER.debug("img_pyramid_shapes", well_spec.img_pyramid_shapes)
+        LOGGER.debug(f"img_pyramid_shapes: {well_spec.img_pyramid_shapes}")
 
         self.axes = well_spec.img_metadata["axes"]
         size_y = well_spec.img_shape[len(self.axes) - 2]
@@ -505,7 +505,7 @@ class Plate(Spec):
             if longest_side <= TARGET_SIZE:
                 break
 
-        LOGGER.debug("target_level", target_level)
+        LOGGER.debug(f"target_level: {target_level}")
 
         pyramid = []
 
@@ -535,11 +535,13 @@ class Plate(Spec):
         )
 
     def get_stitched_grid(self, level: int, tile_shape: tuple) -> da.core.Array:
+        LOGGER.debug(f"get_stitched_grid() level: {level}, tile_shape: {tile_shape}")
+
         def get_tile(tile_name: str) -> np.ndarray:
             """tile_name is 'level,z,c,t,row,col'"""
             row, col = (int(n) for n in tile_name.split(","))
             path = self.get_tile_path(level, row, col)
-            LOGGER.debug(f"LOADING tile... {path}")
+            LOGGER.debug(f"LOADING tile... {path} with shape: {tile_shape}")
 
             try:
                 data = self.zarr.load(path)
