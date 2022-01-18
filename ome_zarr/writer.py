@@ -107,6 +107,21 @@ def _validate_plate_acquisitions(
     return acquisitions
 
 
+def _validate_plate_rows_columns(
+    rows_or_columns: List[str],
+    fmt: Format = CurrentFormat(),
+) -> List[dict]:
+
+    if len(set(rows_or_columns)) != len(rows_or_columns):
+        raise ValueError(f"{rows_or_columns} must contain unique elements")
+    validated_list = []
+    for element in rows_or_columns:
+        if not element.isalnum():
+            raise ValueError(f"{element} must contain alphanumeric characters")
+        validated_list.append({"name": str(element)})
+    return validated_list
+
+
 def _validate_plate_wells(
     wells: List[Union[str, dict]],
     rows: List[str],
@@ -256,8 +271,8 @@ def write_plate_metadata(
     """
 
     plate: Dict[str, Union[str, int, List[Dict]]] = {
-        "columns": [{"name": str(c)} for c in columns],
-        "rows": [{"name": str(r)} for r in rows],
+        "columns": _validate_plate_rows_columns(columns),
+        "rows": _validate_plate_rows_columns(rows),
         "wells": _validate_plate_wells(wells, rows, columns, fmt=fmt),
         "version": fmt.version,
     }

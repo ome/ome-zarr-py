@@ -551,6 +551,16 @@ class TestPlateMetadata:
         with pytest.raises(ValueError):
             write_plate_metadata(self.root, ["A", "B"], ["1", "2"], wells)
 
+    @pytest.mark.parametrize("rows", (["A", "B", "B"], ["A", "&"]))
+    def test_invalid_rows(self, rows):
+        with pytest.raises(ValueError):
+            write_plate_metadata(self.root, rows, ["1"], ["A/1"])
+
+    @pytest.mark.parametrize("columns", (["1", "2", "2"], ["1", "&"]))
+    def test_invalid_columns(self, columns):
+        with pytest.raises(ValueError):
+            write_plate_metadata(self.root, ["A"], columns, ["A/1"])
+
 
 class TestWellMetadata:
     @pytest.fixture(autouse=True)
