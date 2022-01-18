@@ -117,8 +117,6 @@ class FormatV01(Format):
                 raise ValueError(f"{well} must contain a {key} key of type {key_type}")
             if not isinstance(well[key], key_type):
                 raise ValueError(f"{well} path must be of {key_type} type")
-        if len(well["path"].split("/")) != 2:
-            raise ValueError(f"{well} path must exactly be composed of 2 groups")
 
 
 class FormatV02(FormatV01):
@@ -196,6 +194,11 @@ class FormatV04(FormatV03):
             raise ValueError(f"{column} is not defined in the list of columns")
         columnIndex = columns.index(column)
         return {"path": str(well), "rowIndex": rowIndex, "columnIndex": columnIndex}
+
+    def validate_well_dict(self, well: dict) -> None:
+        super().validate_well_dict(well)
+        if len(well["path"].split("/")) != 2:
+            raise ValueError(f"{well} path must exactly be composed of 2 groups")
 
 
 CurrentFormat = FormatV04
