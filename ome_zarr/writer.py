@@ -108,7 +108,10 @@ def _validate_plate_acquisitions(
 
 
 def _validate_plate_wells(
-    wells: List[Union[str, dict]], fmt: Format = CurrentFormat()
+    wells: List[Union[str, dict]],
+    rows: List[str],
+    columns: List[str],
+    fmt: Format = CurrentFormat(),
 ) -> List[dict]:
 
     validated_wells = []
@@ -116,7 +119,9 @@ def _validate_plate_wells(
         raise ValueError("Empty wells list")
     for well in wells:
         if isinstance(well, str):
-            validated_wells.append(fmt.generate_well_dict(well))
+            well_dict = fmt.generate_well_dict(well, rows, columns)
+            fmt.validate_well_dict(well_dict)
+            validated_wells.append(well_dict)
         elif isinstance(well, dict):
             fmt.validate_well_dict(well)
             validated_wells.append(well)
@@ -253,7 +258,7 @@ def write_plate_metadata(
     plate: Dict[str, Union[str, int, List[Dict]]] = {
         "columns": [{"name": str(c)} for c in columns],
         "rows": [{"name": str(r)} for r in rows],
-        "wells": _validate_plate_wells(wells),
+        "wells": _validate_plate_wells(wells, rows, columns, fmt=fmt),
         "version": fmt.version,
     }
     if name is not None:

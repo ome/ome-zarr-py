@@ -2,7 +2,7 @@
 
 import logging
 from abc import ABC, abstractmethod
-from typing import Iterator, Optional
+from typing import Dict, Iterator, List, Optional
 
 from zarr.storage import FSStore
 
@@ -73,7 +73,9 @@ class Format(ABC):
         return self.__class__ == other.__class__
 
     @abstractmethod
-    def generate_well_dict(self, well: str) -> dict:
+    def generate_well_dict(
+        self, well: str, rows: List[str], columns: List[str]
+    ) -> dict:
         raise NotImplementedError()
 
     @abstractmethod
@@ -86,7 +88,7 @@ class FormatV01(Format):
     Initial format. (2020)
     """
 
-    REQUIRED_PLATE_WELL_KEYS = {"path": str}
+    REQUIRED_PLATE_WELL_KEYS: Dict[str, type] = {"path": str}
 
     @property
     def version(self) -> str:
@@ -102,7 +104,9 @@ class FormatV01(Format):
         LOGGER.debug(f"Created legacy flat FSStore({path}, {mode})")
         return store
 
-    def generate_well_dict(self, well: str) -> dict:
+    def generate_well_dict(
+        self, well: str, rows: List[str], columns: List[str]
+    ) -> dict:
         return {"path": str(well)}
 
     def validate_well_dict(self, well: dict) -> None:
@@ -173,9 +177,23 @@ class FormatV04(FormatV03):
     introduce transformations in multiscales (Nov 2021)
     """
 
+    REQUIRED_PLATE_WELL_KEYS = {"path": str, "rowIndex": int, "colIndex": int}
+
     @property
     def version(self) -> str:
         return "0.4"
+
+    def generate_well_dict(
+        self, well: str, rows: List[str], columns: List[str]
+    ) -> dict:
+        row, column = well.split("/")
+        if row not in rows:
+            raise ValueError(f"{row} is not defined in the list of rows")
+        rowIndex = rows.index(row)
+        if column not in columns:
+            raise ValueError(f"{row} is not defined in the list of rows")
+        colIndex = columns.index(column)
+        return {"path": str(well), "rowIndex": rowIndex, "colIndex": colIndex}
 
 
 CurrentFormat = FormatV04
