@@ -72,11 +72,21 @@ class Format(ABC):
     def __eq__(self, other: object) -> bool:
         return self.__class__ == other.__class__
 
+    @abstractmethod
+    def generate_well_dict(self, well: str) -> dict:
+        raise NotImplementedError()
+
+    @abstractmethod
+    def validate_well_dict(self, well: dict) -> None:
+        raise NotImplementedError()
+
 
 class FormatV01(Format):
     """
     Initial format. (2020)
     """
+
+    REQUIRED_PLATE_WELL_KEYS = {"path": str}
 
     @property
     def version(self) -> str:
@@ -92,8 +102,20 @@ class FormatV01(Format):
         LOGGER.debug(f"Created legacy flat FSStore({path}, {mode})")
         return store
 
+    def generate_well_dict(self, well: str) -> dict:
+        return {"path": str(well)}
 
-class FormatV02(Format):
+    def validate_well_dict(self, well: dict) -> None:
+        if any(e not in self.REQUIRED_PLATE_WELL_KEYS for e in well.keys()):
+            LOGGER.debug("f{well} contains unspecified keys")
+        for key, key_type in self.REQUIRED_PLATE_WELL_KEYS.items():
+            if key not in well:
+                raise ValueError(f"{well} must contain a {key} key of type {key_type}")
+            if not isinstance(well[key], key_type):
+                raise ValueError(f"{well} path must be of {key_type} type")
+
+
+class FormatV02(FormatV01):
     """
     Changelog: move to nested storage (April 2021)
     """

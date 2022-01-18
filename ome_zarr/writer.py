@@ -111,22 +111,14 @@ def _validate_plate_wells(
     wells: List[Union[str, dict]], fmt: Format = CurrentFormat()
 ) -> List[dict]:
 
-    VALID_KEYS = [
-        "path",
-    ]
     validated_wells = []
     if wells is None or len(wells) == 0:
         raise ValueError("Empty wells list")
     for well in wells:
         if isinstance(well, str):
-            validated_wells.append({"path": str(well)})
+            validated_wells.append(fmt.generate_well_dict(well))
         elif isinstance(well, dict):
-            if any(e not in VALID_KEYS for e in well.keys()):
-                LOGGER.debug("f{well} contains unspecified keys")
-            if "path" not in well:
-                raise ValueError(f"{well} must contain a path key")
-            if not isinstance(well["path"], str):
-                raise ValueError(f"{well} path must be of str type")
+            fmt.validate_well_dict(well)
             validated_wells.append(well)
         else:
             raise ValueError(f"Unrecognized type for {well}")
