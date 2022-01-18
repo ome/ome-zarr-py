@@ -9,6 +9,8 @@ import dask.array as da
 import numpy as np
 from dask import delayed
 
+from .axes import Axes
+from .format import format_from_version
 from .io import ZarrLocation
 from .types import JSONDict
 
@@ -275,20 +277,22 @@ class Multiscales(Spec):
     def __init__(self, node: Node) -> None:
         super().__init__(node)
 
-        axes_values = {"t", "c", "z", "y", "x"}
         try:
             multiscales = self.lookup("multiscales", [])
             version = multiscales[0].get(
                 "version", "0.1"
             )  # should this be matched with Format.version?
             datasets = multiscales[0]["datasets"]
-            # axes field was introduced in 0.3, before all data was 5d
-            axes = tuple(multiscales[0].get("axes", ["t", "c", "z", "y", "x"]))
-            if len(set(axes) - axes_values) > 0:
-                raise RuntimeError(f"Invalid axes names: {set(axes) - axes_values}")
-            node.metadata["axes"] = axes
-            datasets = [d["path"] for d in datasets]
-            self.datasets: List[str] = datasets
+            axes = multiscales[0].get("axes")
+            fmt = format_from_version(version)
+            # Raises ValueError if not valid
+            axes_obj = Axes(axes, fmt)
+            node.metadata["axes"] = axes_obj.to_list()
+            paths = [d["path"] for d in datasets]
+            self.datasets: List[str] = paths
+            transformations = [d.get("transformations") for d in datasets]
+            if any(trans is not None for trans in transformations):
+                node.metadata["transformations"] = transformations
             LOGGER.info("datasets %s", datasets)
         except Exception as e:
             LOGGER.error(f"failed to parse multiscale metadata: {e}")
@@ -301,7 +305,12 @@ class Multiscales(Spec):
                 for c in data.chunks
             ]
             LOGGER.info("resolution: %s", resolution)
-            LOGGER.info(" - shape %s = %s", axes, data.shape)
+            axes_names = None
+            if axes is not None:
+                axes_names = tuple(
+                    axis if isinstance(axis, str) else axis["name"] for axis in axes
+                )
+            LOGGER.info(" - shape %s = %s", axes_names, data.shape)
             LOGGER.info(" - chunks =  %s", chunk_sizes)
             LOGGER.info(" - dtype = %s", data.dtype)
             node.data.append(data)

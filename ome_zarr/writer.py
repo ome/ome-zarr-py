@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Tuple, Union
 import numpy as np
 import zarr
 
+from .axes import Axes
 from .format import CurrentFormat, Format
 from .scale import Scaler
 from .types import JSONDict
@@ -14,17 +15,19 @@ from .types import JSONDict
 LOGGER = logging.getLogger("ome_zarr.writer")
 
 
-def _validate_axes_names(
-    ndim: int, axes: Union[str, List[str]] = None, fmt: Format = CurrentFormat()
-) -> Union[None, List[str]]:
-    """Returns validated list of axes names or raise exception if invalid"""
+def _get_valid_axes(
+    ndim: int = None,
+    axes: Union[str, List[str], List[Dict[str, str]]] = None,
+    fmt: Format = CurrentFormat(),
+) -> Union[None, List[str], List[Dict[str, str]]]:
+    """Returns list of axes valid for fmt.version or raise exception if invalid"""
 
     if fmt.version in ("0.1", "0.2"):
         if axes is not None:
             LOGGER.info("axes ignored for version 0.1 or 0.2")
         return None
 
-    # handle version 0.3...
+    # We can guess axes for 2D and 5D data
     if axes is None:
         if ndim == 2:
             axes = ["y", "x"]
@@ -37,48 +40,33 @@ def _validate_axes_names(
                 "axes must be provided. Can't be guessed for 3D or 4D data"
             )
 
+    # axes may be string e.g. "tczyx"
     if isinstance(axes, str):
         axes = list(axes)
 
-    if len(axes) != ndim:
-        raise ValueError("axes length must match number of dimensions")
-    _validate_axes(axes)
-    return axes
+    if ndim is not None and len(axes) != ndim:
+        raise ValueError(
+            f"axes length ({len(axes)}) must match number of dimensions ({ndim})"
+        )
+
+    # valiates on init
+    axes_obj = Axes(axes, fmt)
+
+    return axes_obj.to_list(fmt)
 
 
-def _validate_axes(axes: List[str], fmt: Format = CurrentFormat()) -> None:
-
-    val_axes = tuple(axes)
-    if len(val_axes) == 2:
-        if val_axes != ("y", "x"):
-            raise ValueError(f"2D data must have axes ('y', 'x') {val_axes}")
-    elif len(val_axes) == 3:
-        if val_axes not in [("z", "y", "x"), ("c", "y", "x"), ("t", "y", "x")]:
-            raise ValueError(
-                "3D data must have axes ('z', 'y', 'x') or ('c', 'y', 'x')"
-                " or ('t', 'y', 'x'), not %s" % (val_axes,)
-            )
-    elif len(val_axes) == 4:
-        if val_axes not in [
-            ("t", "z", "y", "x"),
-            ("c", "z", "y", "x"),
-            ("t", "c", "y", "x"),
-        ]:
-            raise ValueError("4D data must have axes tzyx or czyx or tcyx")
-    else:
-        if val_axes != ("t", "c", "z", "y", "x"):
-            raise ValueError("5D data must have axes ('t', 'c', 'z', 'y', 'x')")
-
-
-def _validate_well_images(images: List, fmt: Format = CurrentFormat()) -> None:
+def _validate_well_images(
+    images: List[Union[str, dict]], fmt: Format = CurrentFormat()
+) -> List[dict]:
 
     VALID_KEYS = [
         "acquisition",
         "path",
     ]
-    for index, image in enumerate(images):
+    validated_images = []
+    for image in images:
         if isinstance(image, str):
-            images[index] = {"path": str(image)}
+            validated_images.append({"path": str(image)})
         elif isinstance(image, dict):
             if any(e not in VALID_KEYS for e in image.keys()):
                 LOGGER.debug("f{image} contains unspecified keys")
@@ -88,13 +76,15 @@ def _validate_well_images(images: List, fmt: Format = CurrentFormat()) -> None:
                 raise ValueError(f"{image} path must be of string type")
             if "acquisition" in image and not isinstance(image["acquisition"], int):
                 raise ValueError(f"{image} acquisition must be of int type")
+            validated_images.append(image)
         else:
             raise ValueError(f"Unrecognized type for {image}")
+    return validated_images
 
 
 def _validate_plate_acquisitions(
     acquisitions: List[Dict], fmt: Format = CurrentFormat()
-) -> None:
+) -> List[Dict]:
 
     VALID_KEYS = [
         "id",
@@ -104,8 +94,7 @@ def _validate_plate_acquisitions(
         "starttime",
         "endtime",
     ]
-    if acquisitions is None:
-        return
+
     for acquisition in acquisitions:
         if not isinstance(acquisition, dict):
             raise ValueError(f"{acquisition} must be a dictionary")
@@ -115,6 +104,33 @@ def _validate_plate_acquisitions(
             raise ValueError(f"{acquisition} must contain an id key")
         if not isinstance(acquisition["id"], int):
             raise ValueError(f"{acquisition} id must be of int type")
+    return acquisitions
+
+
+def _validate_plate_wells(
+    wells: List[Union[str, dict]], fmt: Format = CurrentFormat()
+) -> List[dict]:
+
+    VALID_KEYS = [
+        "path",
+    ]
+    validated_wells = []
+    if wells is None or len(wells) == 0:
+        raise ValueError("Empty wells list")
+    for well in wells:
+        if isinstance(well, str):
+            validated_wells.append({"path": str(well)})
+        elif isinstance(well, dict):
+            if any(e not in VALID_KEYS for e in well.keys()):
+                LOGGER.debug("f{well} contains unspecified keys")
+            if "path" not in well:
+                raise ValueError(f"{well} must contain a path key")
+            if not isinstance(well["path"], str):
+                raise ValueError(f"{well} path must be of str type")
+            validated_wells.append(well)
+        else:
+            raise ValueError(f"Unrecognized type for {well}")
+    return validated_wells
 
 
 def write_multiscale(
@@ -122,7 +138,8 @@ def write_multiscale(
     group: zarr.Group,
     chunks: Union[Tuple[Any, ...], int] = None,
     fmt: Format = CurrentFormat(),
-    axes: Union[str, List[str]] = None,
+    axes: Union[str, List[str], List[Dict[str, str]]] = None,
+    transformations: List[List[Dict[str, Any]]] = None,
 ) -> None:
     """
     Write a pyramid with multiscale metadata to disk.
@@ -140,27 +157,31 @@ def write_multiscale(
     fmt: Format
       The format of the ome_zarr data which should be used.
       Defaults to the most current.
-    axes: str or list of str
-      the names of the axes. e.g. "tczyx". Not needed for v0.1 or v0.2
-      or for v0.3 if 2D or 5D. Otherwise this must be provided
+    axes: str or list of str or list of dict
+      List of axes dicts, or names. Not needed for v0.1 or v0.2
+      or if 2D. Otherwise this must be provided
+    transformations: 2Dlist of dict
+      For each path, we have a List of transformation Dicts (not validated).
+      Each list of dicts are added to each datasets in order.
     """
 
     dims = len(pyramid[0].shape)
-    axes = _validate_axes_names(dims, axes, fmt)
+    axes = _get_valid_axes(dims, axes, fmt)
 
     paths = []
     for path, dataset in enumerate(pyramid):
         # TODO: chunks here could be different per layer
         group.create_dataset(str(path), data=dataset, chunks=chunks)
         paths.append(str(path))
-    write_multiscales_metadata(group, paths, fmt, axes)
+    write_multiscales_metadata(group, paths, fmt, axes, transformations)
 
 
 def write_multiscales_metadata(
     group: zarr.Group,
     paths: List[str],
     fmt: Format = CurrentFormat(),
-    axes: List[str] = None,
+    axes: Union[str, List[str], List[Dict[str, str]]] = None,
+    transformations: List[List[Dict[str, Any]]] = None,
 ) -> None:
     """
     Write the multiscales metadata in the group.
@@ -174,23 +195,32 @@ def write_multiscales_metadata(
     fmt: Format
       The format of the ome_zarr data which should be used.
       Defaults to the most current.
-    axes: list of str
+    axes: list of str or list of dicts
       the names of the axes. e.g. ["t", "c", "z", "y", "x"].
       Ignored for versions 0.1 and 0.2. Required for version 0.3 or greater.
+    transformations: 2Dlist of dict
+      For each path, we have a List of transformation Dicts (not validated).
+      Each list of dicts are added to each datasets in order.
     """
+
+    datasets: List[Dict[str, Any]] = [{"path": path} for path in paths]
+    if transformations is not None:
+        for dataset, transform in zip(datasets, transformations):
+            dataset["transformations"] = transform
 
     multiscales = [
         {
             "version": fmt.version,
-            "datasets": [{"path": str(p)} for p in paths],
+            "datasets": datasets,
         }
     ]
     if axes is not None:
         if fmt.version in ("0.1", "0.2"):
             LOGGER.info("axes ignored for version 0.1 or 0.2")
         else:
-            _validate_axes(axes, fmt)
-            multiscales[0]["axes"] = axes
+            axes = _get_valid_axes(axes=axes, fmt=fmt)
+            if axes is not None:
+                multiscales[0]["axes"] = axes
     group.attrs["multiscales"] = multiscales
 
 
@@ -198,7 +228,7 @@ def write_plate_metadata(
     group: zarr.Group,
     rows: List[str],
     columns: List[str],
-    wells: List[str],
+    wells: List[Union[str, dict]],
     fmt: Format = CurrentFormat(),
     acquisitions: List[dict] = None,
     field_count: int = None,
@@ -215,7 +245,7 @@ def write_plate_metadata(
       The list of names for the plate rows
     columns: list of str
       The list of names for the plate columns
-    wells: list of str
+    wells: list of str or dict
       The list of paths for the well groups
     fmt: Format
       The format of the ome_zarr data which should be used.
@@ -231,7 +261,7 @@ def write_plate_metadata(
     plate: Dict[str, Union[str, int, List[Dict]]] = {
         "columns": [{"name": str(c)} for c in columns],
         "rows": [{"name": str(r)} for r in rows],
-        "wells": [{"path": str(wp)} for wp in wells],
+        "wells": _validate_plate_wells(wells),
         "version": fmt.version,
     }
     if name is not None:
@@ -239,14 +269,13 @@ def write_plate_metadata(
     if field_count is not None:
         plate["field_count"] = field_count
     if acquisitions is not None:
-        _validate_plate_acquisitions(acquisitions)
-        plate["acquisitions"] = acquisitions
+        plate["acquisitions"] = _validate_plate_acquisitions(acquisitions)
     group.attrs["plate"] = plate
 
 
 def write_well_metadata(
     group: zarr.Group,
-    images: Union[List[str], List[dict]],
+    images: List[Union[str, dict]],
     fmt: Format = CurrentFormat(),
 ) -> None:
     """
@@ -256,7 +285,7 @@ def write_well_metadata(
     ----------
     group: zarr.Group
       the group within the zarr store to write the metadata in.
-    image_paths: list of str
+    image_paths: list of str or dict
       The list of paths for the well images
     image_acquisitions: list of int
       The list of acquisitions for the well images
@@ -265,9 +294,8 @@ def write_well_metadata(
       Defaults to the most current.
     """
 
-    _validate_well_images(images)
     well = {
-        "images": images,
+        "images": _validate_well_images(images),
         "version": fmt.version,
     }
     group.attrs["well"] = well
@@ -280,7 +308,8 @@ def write_image(
     byte_order: Union[str, List[str]] = "tczyx",
     scaler: Scaler = Scaler(),
     fmt: Format = CurrentFormat(),
-    axes: Union[str, List[str]] = None,
+    axes: Union[str, List[str], List[Dict[str, str]]] = None,
+    transformations: List[List[Dict[str, Any]]] = None,
     **metadata: JSONDict,
 ) -> None:
     """Writes an image to the zarr store according to ome-zarr specification
@@ -305,9 +334,12 @@ def write_image(
     fmt: Format
       The format of the ome_zarr data which should be used.
       Defaults to the most current.
-    axes: str or list of str
-      the names of the axes. e.g. "tczyx". Not needed for v0.1 or v0.2
-      or for v0.3 if 2D or 5D. Otherwise this must be provided
+    axes: str or list of str or list of dict
+      List of axes dicts, or names. Not needed for v0.1 or v0.2
+      or if 2D. Otherwise this must be provided
+    transformations: 2Dlist of dict
+      For each resolution, we have a List of transformation Dicts (not validated).
+      Each list of dicts are added to each datasets in order.
     """
 
     if image.ndim > 5:
@@ -321,7 +353,7 @@ def write_image(
         axes = None
 
     # check axes before trying to scale
-    _validate_axes_names(image.ndim, axes, fmt)
+    _get_valid_axes(image.ndim, axes, fmt)
 
     if chunks is not None:
         chunks = _retuple(chunks, image.shape)
@@ -337,7 +369,9 @@ def write_image(
         LOGGER.debug("disabling pyramid")
         image = [image]
 
-    write_multiscale(image, group, chunks=chunks, fmt=fmt, axes=axes)
+    write_multiscale(
+        image, group, chunks=chunks, fmt=fmt, axes=axes, transformations=transformations
+    )
     group.attrs.update(metadata)
 
 
