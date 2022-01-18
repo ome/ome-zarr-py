@@ -1,4 +1,5 @@
 import pathlib
+import uuid
 
 import numpy as np
 import pytest
@@ -572,6 +573,37 @@ class TestPlateMetadata:
     def test_invalid_columns(self, columns):
         with pytest.raises(ValueError):
             write_plate_metadata(self.root, ["A"], columns, ["A/1"])
+
+    def test_uuid_plate(self):
+        wells = [
+            {
+                "path": str(uuid.uuid4()) + "/" + str(uuid.uuid4()),
+                "rowIndex": 0,
+                "columnIndex": 0,
+            },
+            {
+                "path": str(uuid.uuid4()) + "/" + str(uuid.uuid4()),
+                "rowIndex": 0,
+                "columnIndex": 1,
+            },
+            {
+                "path": str(uuid.uuid4()) + "/" + str(uuid.uuid4()),
+                "rowIndex": 1,
+                "columnIndex": 0,
+            },
+            {
+                "path": str(uuid.uuid4()) + "/" + str(uuid.uuid4()),
+                "rowIndex": 0,
+                "columnIndex": 1,
+            },
+        ]
+        write_plate_metadata(self.root, ["A", "B"], ["1", "2"], wells)
+
+        assert "plate" in self.root.attrs
+        assert self.root.attrs["plate"]["columns"] == [{"name": "1"}, {"name": "2"}]
+        assert self.root.attrs["plate"]["rows"] == [{"name": "A"}, {"name": "B"}]
+        assert self.root.attrs["plate"]["version"] == CurrentFormat().version
+        assert self.root.attrs["plate"]["wells"] == wells
 
 
 class TestWellMetadata:

@@ -1,3 +1,5 @@
+import uuid
+
 import pytest
 import zarr
 from numpy import zeros
@@ -137,6 +139,34 @@ class TestHCSNode:
         assert isinstance(node.specs[0], Plate)
 
         node = Node(parse_url(str(self.path / "A" / "1")), list())
+        assert node.data
+        assert node.metadata
+        assert len(node.specs) == 1
+        assert isinstance(node.specs[0], Well)
+
+    def test_uuid_plate(self):
+        group1 = uuid.uuid4()
+        group2 = uuid.uuid4()
+        well = {"path": f"{group1}/{group2}", "rowIndex": 0, "columnIndex": 0}
+        write_plate_metadata(self.root, ["A"], ["1"], [well])
+        row_group = self.root.require_group(group1)
+        well = row_group.require_group(group2)
+        write_well_metadata(well, ["0"])
+        image = well.require_group("0")
+        write_image(zeros((1, 1, 1, 256, 256)), image)
+
+        node = Node(parse_url(str(self.path)), list())
+        assert node.data
+        assert node.metadata
+        assert len(node.specs) == 1
+        assert isinstance(node.specs[0], Plate)
+        assert node.specs[0].row_names == ["A"]
+        assert node.specs[0].col_names == ["1"]
+        assert node.specs[0].well_paths == [f"{group1}/{group2}"]
+        assert node.specs[0].row_count == 1
+        assert node.specs[0].column_count == 1
+
+        node = Node(parse_url(str(self.path / f"{group1}/{group2}")), list())
         assert node.data
         assert node.metadata
         assert len(node.specs) == 1
