@@ -588,6 +588,8 @@ class PlateLabels(Plate):
     def get_pyramid_lazy(self, node: Node) -> None:  # pragma: no cover
         super().get_pyramid_lazy(node)
         # pyramid data may be multi-channel, but we only have 1 labels channel
+        # TODO: when PlateLabels are re-enabled, update the logic to handle
+        # 0.4 axes (list of dictionaries)
         if "c" in self.axes:
             c_index = self.axes.index("c")
             idx = [slice(None)] * len(self.axes)
