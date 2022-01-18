@@ -205,6 +205,11 @@ class FormatV04(FormatV03):
         super().validate_well_dict(well, rows, columns)
         if len(well["path"].split("/")) != 2:
             raise ValueError(f"{well} path must exactly be composed of 2 groups")
+        row, column = well["path"].split("/")
+        if row not in rows:
+            raise ValueError(f"{row} is not defined in the plate rows")
+        if column not in columns:
+            raise ValueError(f"{column} is not defined in the plate columns")
 
 
 CurrentFormat = FormatV04
