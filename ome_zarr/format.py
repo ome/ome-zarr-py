@@ -208,8 +208,12 @@ class FormatV04(FormatV03):
         row, column = well["path"].split("/")
         if row not in rows:
             raise ValueError(f"{row} is not defined in the plate rows")
+        if well["rowIndex"] != rows.index(row):
+            raise ValueError(f"Mismatching row index for {well}")
         if column not in columns:
             raise ValueError(f"{column} is not defined in the plate columns")
+        if well["columnIndex"] != columns.index(column):
+            raise ValueError(f"Mismatching column index for {well}")
 
 
 CurrentFormat = FormatV04

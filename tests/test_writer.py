@@ -503,6 +503,8 @@ class TestPlateMetadata:
             [{"path": "plate/A/1", "rowIndex": 0, "columnIndex": "0"}],
             [{"path": "C/1", "rowIndex": 2, "columnIndex": 0}],
             [{"path": "A/3", "rowIndex": 0, "columnIndex": 2}],
+            [{"path": "A/1", "rowIndex": 0, "columnIndex": 1}],
+            [{"path": "A/1", "rowIndex": 1, "columnIndex": 0}],
         ),
     )
     def test_invalid_well_keys(self, wells):
