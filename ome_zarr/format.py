@@ -44,11 +44,11 @@ def detect_format(metadata: dict) -> "Format":
 class Format(ABC):
     @property
     @abstractmethod
-    def version(self) -> str:
+    def version(self) -> str:  # pragma: no cover
         raise NotImplementedError()
 
     @abstractmethod
-    def matches(self, metadata: dict) -> bool:
+    def matches(self, metadata: dict) -> bool:  # pragma: no cover
         raise NotImplementedError()
 
     @abstractmethod
@@ -56,7 +56,7 @@ class Format(ABC):
         raise NotImplementedError()
 
     # @abstractmethod
-    def init_channels(self) -> None:
+    def init_channels(self) -> None:  # pragma: no cover
         raise NotImplementedError()
 
     def _get_multiscale_version(self, metadata: dict) -> Optional[str]:
@@ -75,13 +75,13 @@ class Format(ABC):
     @abstractmethod
     def generate_well_dict(
         self, well: str, rows: List[str], columns: List[str]
-    ) -> dict:
+    ) -> dict:  # pragma: no cover
         raise NotImplementedError()
 
     @abstractmethod
     def validate_well_dict(
         self, well: dict, rows: List[str], columns: List[str]
-    ) -> None:
+    ) -> None:  # pragma: no cover
         raise NotImplementedError()
 
 
