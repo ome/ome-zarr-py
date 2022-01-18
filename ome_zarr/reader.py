@@ -577,7 +577,7 @@ class Plate(Spec):
 
 
 class PlateLabels(Plate):
-    def get_tile_path(self, level: int, row: int, col: int) -> str:
+    def get_tile_path(self, level: int, row: int, col: int) -> str:  # pragma: no cover
         """251.zarr/A/1/0/labels/0/3/"""
         path = (
             f"{self.row_names[row]}/{self.col_names[col]}/"
@@ -585,7 +585,7 @@ class PlateLabels(Plate):
         )
         return path
 
-    def get_pyramid_lazy(self, node: Node) -> None:
+    def get_pyramid_lazy(self, node: Node) -> None:  # pragma: no cover
         super().get_pyramid_lazy(node)
         # pyramid data may be multi-channel, but we only have 1 labels channel
         if "c" in self.axes:
@@ -612,7 +612,7 @@ class PlateLabels(Plate):
                         del properties[label_val]["label-value"]
         node.metadata["properties"] = properties
 
-    def get_numpy_type(self, image_node: Node) -> np.dtype:
+    def get_numpy_type(self, image_node: Node) -> np.dtype:  # pragma: no cover
         # FIXME - don't assume Well A1 is valid
         path = self.get_tile_path(0, 0, 0)
         label_zarr = self.zarr.load(path)
