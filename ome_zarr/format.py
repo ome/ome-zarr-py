@@ -117,6 +117,8 @@ class FormatV01(Format):
                 raise ValueError(f"{well} must contain a {key} key of type {key_type}")
             if not isinstance(well[key], key_type):
                 raise ValueError(f"{well} path must be of {key_type} type")
+        if len(well["path"].split("/")) != 2:
+            raise ValueError(f"{well} path must exactly be composed of 2 groups")
 
 
 class FormatV02(FormatV01):
