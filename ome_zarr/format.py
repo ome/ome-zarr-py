@@ -79,7 +79,9 @@ class Format(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def validate_well_dict(self, well: dict) -> None:
+    def validate_well_dict(
+        self, well: dict, rows: List[str], columns: List[str]
+    ) -> None:
         raise NotImplementedError()
 
 
@@ -109,7 +111,9 @@ class FormatV01(Format):
     ) -> dict:
         return {"path": str(well)}
 
-    def validate_well_dict(self, well: dict) -> None:
+    def validate_well_dict(
+        self, well: dict, rows: List[str], columns: List[str]
+    ) -> None:
         if any(e not in self.REQUIRED_PLATE_WELL_KEYS for e in well.keys()):
             LOGGER.debug("f{well} contains unspecified keys")
         for key, key_type in self.REQUIRED_PLATE_WELL_KEYS.items():
@@ -195,8 +199,10 @@ class FormatV04(FormatV03):
         columnIndex = columns.index(column)
         return {"path": str(well), "rowIndex": rowIndex, "columnIndex": columnIndex}
 
-    def validate_well_dict(self, well: dict) -> None:
-        super().validate_well_dict(well)
+    def validate_well_dict(
+        self, well: dict, rows: List[str], columns: List[str]
+    ) -> None:
+        super().validate_well_dict(well, rows, columns)
         if len(well["path"].split("/")) != 2:
             raise ValueError(f"{well} path must exactly be composed of 2 groups")
 

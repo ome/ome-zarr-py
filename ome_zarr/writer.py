@@ -135,10 +135,10 @@ def _validate_plate_wells(
     for well in wells:
         if isinstance(well, str):
             well_dict = fmt.generate_well_dict(well, rows, columns)
-            fmt.validate_well_dict(well_dict)
+            fmt.validate_well_dict(well_dict, rows, columns)
             validated_wells.append(well_dict)
         elif isinstance(well, dict):
-            fmt.validate_well_dict(well)
+            fmt.validate_well_dict(well, rows, columns)
             validated_wells.append(well)
         else:
             raise ValueError(f"Unrecognized type for {well}")
