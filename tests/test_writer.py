@@ -299,7 +299,7 @@ class TestPlateMetadata:
         assert self.root.attrs["plate"]["rows"] == [{"name": "A"}]
         assert self.root.attrs["plate"]["version"] == CurrentFormat().version
         assert self.root.attrs["plate"]["wells"] == [
-            {"path": "A/1", "rowIndex": 0, "colIndex": 0}
+            {"path": "A/1", "rowIndex": 0, "columnIndex": 0}
         ]
         assert "name" not in self.root.attrs["plate"]
         assert "field_count" not in self.root.attrs["plate"]
@@ -337,18 +337,18 @@ class TestPlateMetadata:
         ]
         assert self.root.attrs["plate"]["version"] == CurrentFormat().version
         assert self.root.attrs["plate"]["wells"] == [
-            {"path": "A/1", "rowIndex": 0, "colIndex": 0},
-            {"path": "A/2", "rowIndex": 0, "colIndex": 1},
-            {"path": "A/3", "rowIndex": 0, "colIndex": 2},
-            {"path": "B/1", "rowIndex": 1, "colIndex": 0},
-            {"path": "B/2", "rowIndex": 1, "colIndex": 1},
-            {"path": "B/3", "rowIndex": 1, "colIndex": 2},
-            {"path": "C/1", "rowIndex": 2, "colIndex": 0},
-            {"path": "C/2", "rowIndex": 2, "colIndex": 1},
-            {"path": "C/3", "rowIndex": 2, "colIndex": 2},
-            {"path": "D/1", "rowIndex": 3, "colIndex": 0},
-            {"path": "D/2", "rowIndex": 3, "colIndex": 1},
-            {"path": "D/3", "rowIndex": 3, "colIndex": 2},
+            {"path": "A/1", "rowIndex": 0, "columnIndex": 0},
+            {"path": "A/2", "rowIndex": 0, "columnIndex": 1},
+            {"path": "A/3", "rowIndex": 0, "columnIndex": 2},
+            {"path": "B/1", "rowIndex": 1, "columnIndex": 0},
+            {"path": "B/2", "rowIndex": 1, "columnIndex": 1},
+            {"path": "B/3", "rowIndex": 1, "columnIndex": 2},
+            {"path": "C/1", "rowIndex": 2, "columnIndex": 0},
+            {"path": "C/2", "rowIndex": 2, "columnIndex": 1},
+            {"path": "C/3", "rowIndex": 2, "columnIndex": 2},
+            {"path": "D/1", "rowIndex": 3, "columnIndex": 0},
+            {"path": "D/2", "rowIndex": 3, "columnIndex": 1},
+            {"path": "D/3", "rowIndex": 3, "columnIndex": 2},
         ]
         assert "name" not in self.root.attrs["plate"]
         assert "field_count" not in self.root.attrs["plate"]
@@ -379,8 +379,8 @@ class TestPlateMetadata:
         ]
         assert self.root.attrs["plate"]["version"] == CurrentFormat().version
         assert self.root.attrs["plate"]["wells"] == [
-            {"path": "B/2", "rowIndex": 1, "colIndex": 1},
-            {"path": "E/5", "rowIndex": 4, "colIndex": 4},
+            {"path": "B/2", "rowIndex": 1, "columnIndex": 1},
+            {"path": "E/5", "rowIndex": 4, "columnIndex": 4},
         ]
         assert "name" not in self.root.attrs["plate"]
         assert "field_count" not in self.root.attrs["plate"]
@@ -406,7 +406,7 @@ class TestPlateMetadata:
         assert self.root.attrs["plate"]["rows"] == [{"name": "A"}]
         assert self.root.attrs["plate"]["version"] == CurrentFormat().version
         assert self.root.attrs["plate"]["wells"] == [
-            {"path": "A/1", "rowIndex": 0, "colIndex": 0}
+            {"path": "A/1", "rowIndex": 0, "columnIndex": 0}
         ]
         assert "field_count" not in self.root.attrs["plate"]
         assert "acquisitions" not in self.root.attrs["plate"]
@@ -419,7 +419,7 @@ class TestPlateMetadata:
         assert self.root.attrs["plate"]["rows"] == [{"name": "A"}]
         assert self.root.attrs["plate"]["version"] == CurrentFormat().version
         assert self.root.attrs["plate"]["wells"] == [
-            {"path": "A/1", "rowIndex": 0, "colIndex": 0}
+            {"path": "A/1", "rowIndex": 0, "columnIndex": 0}
         ]
         assert "name" not in self.root.attrs["plate"]
         assert "acquisitions" not in self.root.attrs["plate"]
@@ -433,7 +433,7 @@ class TestPlateMetadata:
         assert self.root.attrs["plate"]["rows"] == [{"name": "A"}]
         assert self.root.attrs["plate"]["version"] == CurrentFormat().version
         assert self.root.attrs["plate"]["wells"] == [
-            {"path": "A/1", "rowIndex": 0, "colIndex": 0}
+            {"path": "A/1", "rowIndex": 0, "columnIndex": 0}
         ]
         assert "name" not in self.root.attrs["plate"]
         assert "field_count" not in self.root.attrs["plate"]
@@ -456,7 +456,7 @@ class TestPlateMetadata:
         assert self.root.attrs["plate"]["rows"] == [{"name": "A"}]
         assert self.root.attrs["plate"]["version"] == CurrentFormat().version
         assert self.root.attrs["plate"]["wells"] == [
-            {"path": "A/1", "rowIndex": 0, "colIndex": 0}
+            {"path": "A/1", "rowIndex": 0, "columnIndex": 0}
         ]
         assert "name" not in self.root.attrs["plate"]
         assert "field_count" not in self.root.attrs["plate"]
@@ -496,11 +496,11 @@ class TestPlateMetadata:
             [{"id": "test"}],
             [{"path": "A/1"}, {"path": None}],
             [{"path": "A/1", "rowIndex": 0}],
-            [{"path": "A/1", "colIndex": 0}],
-            [{"path": "A/1", "rowIndex": "0", "colIndex": 0}],
-            [{"path": "A/1", "rowIndex": 0, "colIndex": "0"}],
-            [{"path": "A1", "rowIndex": 0, "colIndex": "0"}],
-            [{"path": "plate/A/1", "rowIndex": 0, "colIndex": "0"}],
+            [{"path": "A/1", "columnIndex": 0}],
+            [{"path": "A/1", "rowIndex": "0", "columnIndex": 0}],
+            [{"path": "A/1", "rowIndex": 0, "columnIndex": "0"}],
+            [{"path": "A1", "rowIndex": 0, "columnIndex": "0"}],
+            [{"path": "plate/A/1", "rowIndex": 0, "columnIndex": "0"}],
         ),
     )
     def test_invalid_well_keys(self, wells):
@@ -523,9 +523,19 @@ class TestPlateMetadata:
 
     def test_unspecified_well_keys(self):
         wells = [
-            {"path": "A/1", "rowIndex": 0, "colIndex": 0, "unspecified_key": "alpha"},
-            {"path": "A/2", "rowIndex": 0, "colIndex": 1, "unspecified_key": "beta"},
-            {"path": "B/1", "rowIndex": 1, "colIndex": 0, "unspecified_key": "gamma"},
+            {
+                "path": "A/1",
+                "rowIndex": 0,
+                "columnIndex": 0,
+                "unspecified_key": "alpha",
+            },
+            {"path": "A/2", "rowIndex": 0, "columnIndex": 1, "unspecified_key": "beta"},
+            {
+                "path": "B/1",
+                "rowIndex": 1,
+                "columnIndex": 0,
+                "unspecified_key": "gamma",
+            },
         ]
         write_plate_metadata(self.root, ["A", "B"], ["1", "2"], wells)
         assert "plate" in self.root.attrs

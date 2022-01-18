@@ -179,7 +179,7 @@ class FormatV04(FormatV03):
     introduce transformations in multiscales (Nov 2021)
     """
 
-    REQUIRED_PLATE_WELL_KEYS = {"path": str, "rowIndex": int, "colIndex": int}
+    REQUIRED_PLATE_WELL_KEYS = {"path": str, "rowIndex": int, "columnIndex": int}
 
     @property
     def version(self) -> str:
@@ -193,9 +193,9 @@ class FormatV04(FormatV03):
             raise ValueError(f"{row} is not defined in the list of rows")
         rowIndex = rows.index(row)
         if column not in columns:
-            raise ValueError(f"{row} is not defined in the list of rows")
-        colIndex = columns.index(column)
-        return {"path": str(well), "rowIndex": rowIndex, "colIndex": colIndex}
+            raise ValueError(f"{column} is not defined in the list of columns")
+        columnIndex = columns.index(column)
+        return {"path": str(well), "rowIndex": rowIndex, "columnIndex": columnIndex}
 
 
 CurrentFormat = FormatV04
