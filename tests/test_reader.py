@@ -4,7 +4,7 @@ from numpy import zeros
 
 from ome_zarr.data import create_zarr
 from ome_zarr.io import parse_url
-from ome_zarr.reader import Node, Plate, PlateLabels, Reader
+from ome_zarr.reader import Node, Plate, Reader
 from ome_zarr.writer import write_image, write_plate_metadata, write_well_metadata
 
 
@@ -50,11 +50,12 @@ class TestHCSReader:
 
         reader = Reader(parse_url(str(self.path)))
         nodes = list(reader())
-        assert len(nodes) == 2
+        # currently reading plate labels disabled. Only 1 node
+        assert len(nodes) == 1
         assert len(nodes[0].specs) == 1
         assert isinstance(nodes[0].specs[0], Plate)
-        assert len(nodes[1].specs) == 1
-        assert isinstance(nodes[1].specs[0], PlateLabels)
+        # assert len(nodes[1].specs) == 1
+        # assert isinstance(nodes[1].specs[0], PlateLabels)
 
     def test_multiwells_plate(self):
         row_names = ["A", "B", "C"]
@@ -72,8 +73,9 @@ class TestHCSReader:
 
         reader = Reader(parse_url(str(self.path)))
         nodes = list(reader())
-        assert len(nodes) == 2
+        # currently reading plate labels disabled. Only 1 node
+        assert len(nodes) == 1
         assert len(nodes[0].specs) == 1
         assert isinstance(nodes[0].specs[0], Plate)
-        assert len(nodes[1].specs) == 1
-        assert isinstance(nodes[1].specs[0], PlateLabels)
+        # assert len(nodes[1].specs) == 1
+        # assert isinstance(nodes[1].specs[0], PlateLabels)
