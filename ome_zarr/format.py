@@ -2,7 +2,7 @@
 
 import logging
 from abc import ABC, abstractmethod
-from typing import Iterator, Optional
+from typing import Dict, Iterator, List, Optional
 
 from zarr.storage import FSStore
 
@@ -44,11 +44,11 @@ def detect_format(metadata: dict) -> "Format":
 class Format(ABC):
     @property
     @abstractmethod
-    def version(self) -> str:
+    def version(self) -> str:  # pragma: no cover
         raise NotImplementedError()
 
     @abstractmethod
-    def matches(self, metadata: dict) -> bool:
+    def matches(self, metadata: dict) -> bool:  # pragma: no cover
         raise NotImplementedError()
 
     @abstractmethod
@@ -56,7 +56,7 @@ class Format(ABC):
         raise NotImplementedError()
 
     # @abstractmethod
-    def init_channels(self) -> None:
+    def init_channels(self) -> None:  # pragma: no cover
         raise NotImplementedError()
 
     def _get_multiscale_version(self, metadata: dict) -> Optional[str]:
@@ -72,11 +72,25 @@ class Format(ABC):
     def __eq__(self, other: object) -> bool:
         return self.__class__ == other.__class__
 
+    @abstractmethod
+    def generate_well_dict(
+        self, well: str, rows: List[str], columns: List[str]
+    ) -> dict:  # pragma: no cover
+        raise NotImplementedError()
+
+    @abstractmethod
+    def validate_well_dict(
+        self, well: dict, rows: List[str], columns: List[str]
+    ) -> None:  # pragma: no cover
+        raise NotImplementedError()
+
 
 class FormatV01(Format):
     """
     Initial format. (2020)
     """
+
+    REQUIRED_PLATE_WELL_KEYS: Dict[str, type] = {"path": str}
 
     @property
     def version(self) -> str:
@@ -92,8 +106,24 @@ class FormatV01(Format):
         LOGGER.debug(f"Created legacy flat FSStore({path}, {mode})")
         return store
 
+    def generate_well_dict(
+        self, well: str, rows: List[str], columns: List[str]
+    ) -> dict:
+        return {"path": str(well)}
 
-class FormatV02(Format):
+    def validate_well_dict(
+        self, well: dict, rows: List[str], columns: List[str]
+    ) -> None:
+        if any(e not in self.REQUIRED_PLATE_WELL_KEYS for e in well.keys()):
+            LOGGER.debug("f{well} contains unspecified keys")
+        for key, key_type in self.REQUIRED_PLATE_WELL_KEYS.items():
+            if key not in well:
+                raise ValueError(f"{well} must contain a {key} key of type {key_type}")
+            if not isinstance(well[key], key_type):
+                raise ValueError(f"{well} path must be of {key_type} type")
+
+
+class FormatV02(FormatV01):
     """
     Changelog: move to nested storage (April 2021)
     """
@@ -151,9 +181,39 @@ class FormatV04(FormatV03):
     introduce transformations in multiscales (Nov 2021)
     """
 
+    REQUIRED_PLATE_WELL_KEYS = {"path": str, "rowIndex": int, "columnIndex": int}
+
     @property
     def version(self) -> str:
         return "0.4"
+
+    def generate_well_dict(
+        self, well: str, rows: List[str], columns: List[str]
+    ) -> dict:
+        row, column = well.split("/")
+        if row not in rows:
+            raise ValueError(f"{row} is not defined in the list of rows")
+        rowIndex = rows.index(row)
+        if column not in columns:
+            raise ValueError(f"{column} is not defined in the list of columns")
+        columnIndex = columns.index(column)
+        return {"path": str(well), "rowIndex": rowIndex, "columnIndex": columnIndex}
+
+    def validate_well_dict(
+        self, well: dict, rows: List[str], columns: List[str]
+    ) -> None:
+        super().validate_well_dict(well, rows, columns)
+        if len(well["path"].split("/")) != 2:
+            raise ValueError(f"{well} path must exactly be composed of 2 groups")
+        row, column = well["path"].split("/")
+        if row not in rows:
+            raise ValueError(f"{row} is not defined in the plate rows")
+        if well["rowIndex"] != rows.index(row):
+            raise ValueError(f"Mismatching row index for {well}")
+        if column not in columns:
+            raise ValueError(f"{column} is not defined in the plate columns")
+        if well["columnIndex"] != columns.index(column):
+            raise ValueError(f"Mismatching column index for {well}")
 
 
 CurrentFormat = FormatV04

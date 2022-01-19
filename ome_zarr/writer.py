@@ -107,26 +107,38 @@ def _validate_plate_acquisitions(
     return acquisitions
 
 
-def _validate_plate_wells(
-    wells: List[Union[str, dict]], fmt: Format = CurrentFormat()
+def _validate_plate_rows_columns(
+    rows_or_columns: List[str],
+    fmt: Format = CurrentFormat(),
 ) -> List[dict]:
 
-    VALID_KEYS = [
-        "path",
-    ]
+    if len(set(rows_or_columns)) != len(rows_or_columns):
+        raise ValueError(f"{rows_or_columns} must contain unique elements")
+    validated_list = []
+    for element in rows_or_columns:
+        if not element.isalnum():
+            raise ValueError(f"{element} must contain alphanumeric characters")
+        validated_list.append({"name": str(element)})
+    return validated_list
+
+
+def _validate_plate_wells(
+    wells: List[Union[str, dict]],
+    rows: List[str],
+    columns: List[str],
+    fmt: Format = CurrentFormat(),
+) -> List[dict]:
+
     validated_wells = []
     if wells is None or len(wells) == 0:
         raise ValueError("Empty wells list")
     for well in wells:
         if isinstance(well, str):
-            validated_wells.append({"path": str(well)})
+            well_dict = fmt.generate_well_dict(well, rows, columns)
+            fmt.validate_well_dict(well_dict, rows, columns)
+            validated_wells.append(well_dict)
         elif isinstance(well, dict):
-            if any(e not in VALID_KEYS for e in well.keys()):
-                LOGGER.debug("f{well} contains unspecified keys")
-            if "path" not in well:
-                raise ValueError(f"{well} must contain a path key")
-            if not isinstance(well["path"], str):
-                raise ValueError(f"{well} path must be of str type")
+            fmt.validate_well_dict(well, rows, columns)
             validated_wells.append(well)
         else:
             raise ValueError(f"Unrecognized type for {well}")
@@ -259,9 +271,9 @@ def write_plate_metadata(
     """
 
     plate: Dict[str, Union[str, int, List[Dict]]] = {
-        "columns": [{"name": str(c)} for c in columns],
-        "rows": [{"name": str(r)} for r in rows],
-        "wells": _validate_plate_wells(wells),
+        "columns": _validate_plate_rows_columns(columns),
+        "rows": _validate_plate_rows_columns(rows),
+        "wells": _validate_plate_wells(wells, rows, columns, fmt=fmt),
         "version": fmt.version,
     }
     if name is not None:

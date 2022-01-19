@@ -298,7 +298,9 @@ class TestPlateMetadata:
         assert self.root.attrs["plate"]["columns"] == [{"name": "1"}]
         assert self.root.attrs["plate"]["rows"] == [{"name": "A"}]
         assert self.root.attrs["plate"]["version"] == CurrentFormat().version
-        assert self.root.attrs["plate"]["wells"] == [{"path": "A/1"}]
+        assert self.root.attrs["plate"]["wells"] == [
+            {"path": "A/1", "rowIndex": 0, "columnIndex": 0}
+        ]
         assert "name" not in self.root.attrs["plate"]
         assert "field_count" not in self.root.attrs["plate"]
         assert "acquisitions" not in self.root.attrs["plate"]
@@ -335,25 +337,57 @@ class TestPlateMetadata:
         ]
         assert self.root.attrs["plate"]["version"] == CurrentFormat().version
         assert self.root.attrs["plate"]["wells"] == [
-            {"path": "A/1"},
-            {"path": "A/2"},
-            {"path": "A/3"},
-            {"path": "B/1"},
-            {"path": "B/2"},
-            {"path": "B/3"},
-            {"path": "C/1"},
-            {"path": "C/2"},
-            {"path": "C/3"},
-            {"path": "D/1"},
-            {"path": "D/2"},
-            {"path": "D/3"},
+            {"path": "A/1", "rowIndex": 0, "columnIndex": 0},
+            {"path": "A/2", "rowIndex": 0, "columnIndex": 1},
+            {"path": "A/3", "rowIndex": 0, "columnIndex": 2},
+            {"path": "B/1", "rowIndex": 1, "columnIndex": 0},
+            {"path": "B/2", "rowIndex": 1, "columnIndex": 1},
+            {"path": "B/3", "rowIndex": 1, "columnIndex": 2},
+            {"path": "C/1", "rowIndex": 2, "columnIndex": 0},
+            {"path": "C/2", "rowIndex": 2, "columnIndex": 1},
+            {"path": "C/3", "rowIndex": 2, "columnIndex": 2},
+            {"path": "D/1", "rowIndex": 3, "columnIndex": 0},
+            {"path": "D/2", "rowIndex": 3, "columnIndex": 1},
+            {"path": "D/3", "rowIndex": 3, "columnIndex": 2},
+        ]
+        assert "name" not in self.root.attrs["plate"]
+        assert "field_count" not in self.root.attrs["plate"]
+        assert "acquisitions" not in self.root.attrs["plate"]
+
+    def test_sparse_plate(self):
+        rows = ["A", "B", "C", "D", "E"]
+        cols = ["1", "2", "3", "4", "5"]
+        wells = [
+            "B/2",
+            "E/5",
+        ]
+        write_plate_metadata(self.root, rows, cols, wells)
+        assert "plate" in self.root.attrs
+        assert self.root.attrs["plate"]["columns"] == [
+            {"name": "1"},
+            {"name": "2"},
+            {"name": "3"},
+            {"name": "4"},
+            {"name": "5"},
+        ]
+        assert self.root.attrs["plate"]["rows"] == [
+            {"name": "A"},
+            {"name": "B"},
+            {"name": "C"},
+            {"name": "D"},
+            {"name": "E"},
+        ]
+        assert self.root.attrs["plate"]["version"] == CurrentFormat().version
+        assert self.root.attrs["plate"]["wells"] == [
+            {"path": "B/2", "rowIndex": 1, "columnIndex": 1},
+            {"path": "E/5", "rowIndex": 4, "columnIndex": 4},
         ]
         assert "name" not in self.root.attrs["plate"]
         assert "field_count" not in self.root.attrs["plate"]
         assert "acquisitions" not in self.root.attrs["plate"]
 
     @pytest.mark.parametrize("fmt", (FormatV01(), FormatV02(), FormatV03()))
-    def test_plate_version(self, fmt):
+    def test_legacy_wells(self, fmt):
         write_plate_metadata(self.root, ["A"], ["1"], ["A/1"], fmt=fmt)
         assert "plate" in self.root.attrs
         assert self.root.attrs["plate"]["columns"] == [{"name": "1"}]
@@ -371,7 +405,9 @@ class TestPlateMetadata:
         assert self.root.attrs["plate"]["name"] == "test"
         assert self.root.attrs["plate"]["rows"] == [{"name": "A"}]
         assert self.root.attrs["plate"]["version"] == CurrentFormat().version
-        assert self.root.attrs["plate"]["wells"] == [{"path": "A/1"}]
+        assert self.root.attrs["plate"]["wells"] == [
+            {"path": "A/1", "rowIndex": 0, "columnIndex": 0}
+        ]
         assert "field_count" not in self.root.attrs["plate"]
         assert "acquisitions" not in self.root.attrs["plate"]
 
@@ -382,7 +418,9 @@ class TestPlateMetadata:
         assert self.root.attrs["plate"]["field_count"] == 10
         assert self.root.attrs["plate"]["rows"] == [{"name": "A"}]
         assert self.root.attrs["plate"]["version"] == CurrentFormat().version
-        assert self.root.attrs["plate"]["wells"] == [{"path": "A/1"}]
+        assert self.root.attrs["plate"]["wells"] == [
+            {"path": "A/1", "rowIndex": 0, "columnIndex": 0}
+        ]
         assert "name" not in self.root.attrs["plate"]
         assert "acquisitions" not in self.root.attrs["plate"]
 
@@ -394,7 +432,9 @@ class TestPlateMetadata:
         assert self.root.attrs["plate"]["columns"] == [{"name": "1"}]
         assert self.root.attrs["plate"]["rows"] == [{"name": "A"}]
         assert self.root.attrs["plate"]["version"] == CurrentFormat().version
-        assert self.root.attrs["plate"]["wells"] == [{"path": "A/1"}]
+        assert self.root.attrs["plate"]["wells"] == [
+            {"path": "A/1", "rowIndex": 0, "columnIndex": 0}
+        ]
         assert "name" not in self.root.attrs["plate"]
         assert "field_count" not in self.root.attrs["plate"]
 
@@ -415,7 +455,9 @@ class TestPlateMetadata:
         assert self.root.attrs["plate"]["columns"] == [{"name": "1"}]
         assert self.root.attrs["plate"]["rows"] == [{"name": "A"}]
         assert self.root.attrs["plate"]["version"] == CurrentFormat().version
-        assert self.root.attrs["plate"]["wells"] == [{"path": "A/1"}]
+        assert self.root.attrs["plate"]["wells"] == [
+            {"path": "A/1", "rowIndex": 0, "columnIndex": 0}
+        ]
         assert "name" not in self.root.attrs["plate"]
         assert "field_count" not in self.root.attrs["plate"]
 
@@ -450,20 +492,64 @@ class TestPlateMetadata:
     @pytest.mark.parametrize(
         "wells",
         (
-            [{"path": 0}],
+            # Missing required keys
             [{"id": "test"}],
-            [{"path": "A/1"}, {"path": None}],
+            [{"path": "A/1"}],
+            [{"path": "A/1", "rowIndex": 0}],
+            [{"path": "A/1", "columnIndex": 0}],
+            [{"rowIndex": 0, "columnIndex": 0}],
+            # Invalid paths
+            [{"path": 0, "rowIndex": 0, "columnIndex": 0}],
+            [{"path": None, "rowIndex": 0, "columnIndex": 0}],
+            [{"path": "plate/A/1", "rowIndex": 0, "columnIndex": 0}],
+            [{"path": "plate/A1", "rowIndex": 0, "columnIndex": 0}],
+            [{"path": "A/1/0", "rowIndex": 0, "columnIndex": 0}],
+            [{"path": "A1", "rowIndex": 0, "columnIndex": 0}],
+            [{"path": "0", "rowIndex": 0, "columnIndex": 0}],
+            # Invalid row/column indices
+            [{"path": "A/1", "rowIndex": "0", "columnIndex": 0}],
+            [{"path": "A/1", "rowIndex": 0, "columnIndex": "0"}],
+            # Undefined rows/columns
+            [{"path": "C/1", "rowIndex": 2, "columnIndex": 0}],
+            [{"path": "A/3", "rowIndex": 0, "columnIndex": 2}],
+            # Mismatching indices
+            [{"path": "A/1", "rowIndex": 0, "columnIndex": 1}],
+            [{"path": "A/1", "rowIndex": 1, "columnIndex": 0}],
         ),
     )
     def test_invalid_well_keys(self, wells):
         with pytest.raises(ValueError):
             write_plate_metadata(self.root, ["A"], ["1"], wells)
 
-    def test_unspecified_well_keys(self):
+    @pytest.mark.parametrize("fmt", (FormatV01(), FormatV02(), FormatV03()))
+    def test_legacy_unspecified_well_keys(self, fmt):
         wells = [
             {"path": "A/1", "unspecified_key": "alpha"},
             {"path": "A/2", "unspecified_key": "beta"},
             {"path": "B/1", "unspecified_key": "gamma"},
+        ]
+        write_plate_metadata(self.root, ["A", "B"], ["1", "2"], wells, fmt=fmt)
+        assert "plate" in self.root.attrs
+        assert self.root.attrs["plate"]["columns"] == [{"name": "1"}, {"name": "2"}]
+        assert self.root.attrs["plate"]["rows"] == [{"name": "A"}, {"name": "B"}]
+        assert self.root.attrs["plate"]["version"] == fmt.version
+        assert self.root.attrs["plate"]["wells"] == wells
+
+    def test_unspecified_well_keys(self):
+        wells = [
+            {
+                "path": "A/1",
+                "rowIndex": 0,
+                "columnIndex": 0,
+                "unspecified_key": "alpha",
+            },
+            {"path": "A/2", "rowIndex": 0, "columnIndex": 1, "unspecified_key": "beta"},
+            {
+                "path": "B/1",
+                "rowIndex": 1,
+                "columnIndex": 0,
+                "unspecified_key": "gamma",
+            },
         ]
         write_plate_metadata(self.root, ["A", "B"], ["1", "2"], wells)
         assert "plate" in self.root.attrs
@@ -471,6 +557,35 @@ class TestPlateMetadata:
         assert self.root.attrs["plate"]["rows"] == [{"name": "A"}, {"name": "B"}]
         assert self.root.attrs["plate"]["version"] == CurrentFormat().version
         assert self.root.attrs["plate"]["wells"] == wells
+
+    def test_missing_well_keys(self):
+        wells = [
+            {"path": "A/1"},
+            {"path": "A/2"},
+            {"path": "B/1"},
+        ]
+        with pytest.raises(ValueError):
+            write_plate_metadata(self.root, ["A", "B"], ["1", "2"], wells)
+
+    def test_well_not_in_rows(self):
+        wells = ["A/1", "B/1", "C/1"]
+        with pytest.raises(ValueError):
+            write_plate_metadata(self.root, ["A", "B"], ["1", "2"], wells)
+
+    def test_well_not_in_columns(self):
+        wells = ["A/1", "A/2", "A/3"]
+        with pytest.raises(ValueError):
+            write_plate_metadata(self.root, ["A", "B"], ["1", "2"], wells)
+
+    @pytest.mark.parametrize("rows", (["A", "B", "B"], ["A", "&"]))
+    def test_invalid_rows(self, rows):
+        with pytest.raises(ValueError):
+            write_plate_metadata(self.root, rows, ["1"], ["A/1"])
+
+    @pytest.mark.parametrize("columns", (["1", "2", "2"], ["1", "&"]))
+    def test_invalid_columns(self, columns):
+        with pytest.raises(ValueError):
+            write_plate_metadata(self.root, ["A"], columns, ["A/1"])
 
 
 class TestWellMetadata:
