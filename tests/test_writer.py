@@ -504,13 +504,15 @@ class TestPlateMetadata:
             [{"path": "plate/A/1", "rowIndex": 0, "columnIndex": 0}],
             [{"path": "plate/A1", "rowIndex": 0, "columnIndex": 0}],
             [{"path": "A/1/0", "rowIndex": 0, "columnIndex": 0}],
-            # Invalid indices
+            [{"path": "A1", "rowIndex": 0, "columnIndex": 0}],
+            [{"path": "0", "rowIndex": 0, "columnIndex": 0}],
+            # Invalid row/column indices
             [{"path": "A/1", "rowIndex": "0", "columnIndex": 0}],
             [{"path": "A/1", "rowIndex": 0, "columnIndex": "0"}],
-            [{"path": "A1", "rowIndex": 0, "columnIndex": 0}],
-            # Mismatching indices
+            # Undefined rows/columns
             [{"path": "C/1", "rowIndex": 2, "columnIndex": 0}],
             [{"path": "A/3", "rowIndex": 0, "columnIndex": 2}],
+            # Mismatching indices
             [{"path": "A/1", "rowIndex": 0, "columnIndex": 1}],
             [{"path": "A/1", "rowIndex": 1, "columnIndex": 0}],
         ),
