@@ -492,15 +492,23 @@ class TestPlateMetadata:
     @pytest.mark.parametrize(
         "wells",
         (
-            [{"path": 0}],
+            # Missing required keys
             [{"id": "test"}],
-            [{"path": "A/1"}, {"path": None}],
+            [{"path": "A/1"}],
             [{"path": "A/1", "rowIndex": 0}],
             [{"path": "A/1", "columnIndex": 0}],
+            [{"rowIndex": 0, "columnIndex": 0}],
+            # Invalid paths
+            [{"path": 0, "rowIndex": 0, "columnIndex": 0}],
+            [{"path": None, "rowIndex": 0, "columnIndex": 0}],
+            [{"path": "plate/A/1", "rowIndex": 0, "columnIndex": 0}],
+            [{"path": "plate/A1", "rowIndex": 0, "columnIndex": 0}],
+            [{"path": "A/1/0", "rowIndex": 0, "columnIndex": 0}],
+            # Invalid indices
             [{"path": "A/1", "rowIndex": "0", "columnIndex": 0}],
             [{"path": "A/1", "rowIndex": 0, "columnIndex": "0"}],
-            [{"path": "A1", "rowIndex": 0, "columnIndex": "0"}],
-            [{"path": "plate/A/1", "rowIndex": 0, "columnIndex": 0}],
+            [{"path": "A1", "rowIndex": 0, "columnIndex": 0}],
+            # Mismatching indices
             [{"path": "C/1", "rowIndex": 2, "columnIndex": 0}],
             [{"path": "A/3", "rowIndex": 0, "columnIndex": 2}],
             [{"path": "A/1", "rowIndex": 0, "columnIndex": 1}],
