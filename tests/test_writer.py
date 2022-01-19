@@ -57,11 +57,7 @@ class TestWriter:
     @pytest.mark.parametrize(
         "format_version",
         (
-            pytest.param(
-                FormatV01,
-                id="V01",
-                marks=pytest.mark.xfail(reason="issues with dimension_separator"),
-            ),
+            pytest.param(FormatV01, id="V01"),
             pytest.param(FormatV02, id="V02"),
             pytest.param(FormatV03, id="V03"),
             pytest.param(FormatV04, id="V04"),
