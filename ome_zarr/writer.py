@@ -186,7 +186,9 @@ def write_multiscale(
     paths = []
     for path, dataset in enumerate(pyramid):
         # TODO: chunks here could be different per layer
-        group.create_dataset(str(path), data=dataset, chunks=chunks, compressor=compressor)
+        group.create_dataset(
+            str(path), data=dataset, chunks=chunks, compressor=compressor
+        )
         paths.append(str(path))
     write_multiscales_metadata(group, paths, fmt, axes, transformations)
 
@@ -388,12 +390,13 @@ def write_image(
         image = [image]
 
     write_multiscale(
-        image, group, 
-        chunks=chunks, 
-        fmt=fmt, 
-        axes=axes, 
-        transformations=transformations, 
-        compressor=compressor
+        image,
+        group,
+        chunks=chunks,
+        fmt=fmt,
+        axes=axes,
+        transformations=transformations,
+        compressor=compressor,
     )
     group.attrs.update(metadata)
 
