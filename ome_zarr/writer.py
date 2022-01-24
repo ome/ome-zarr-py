@@ -152,6 +152,7 @@ def write_multiscale(
     fmt: Format = CurrentFormat(),
     axes: Union[str, List[str], List[Dict[str, str]]] = None,
     transformations: List[List[Dict[str, Any]]] = None,
+    compressor: Any = None,
 ) -> None:
     """
     Write a pyramid with multiscale metadata to disk.
@@ -175,6 +176,8 @@ def write_multiscale(
     transformations: 2Dlist of dict
       For each path, we have a List of transformation Dicts (not validated).
       Each list of dicts are added to each datasets in order.
+    compressor: A compressor object
+      An optional compressor object to be passed on to zarr dataset creation
     """
 
     dims = len(pyramid[0].shape)
@@ -183,7 +186,7 @@ def write_multiscale(
     paths = []
     for path, dataset in enumerate(pyramid):
         # TODO: chunks here could be different per layer
-        group.create_dataset(str(path), data=dataset, chunks=chunks)
+        group.create_dataset(str(path), data=dataset, chunks=chunks, compressor=compressor)
         paths.append(str(path))
     write_multiscales_metadata(group, paths, fmt, axes, transformations)
 
@@ -322,6 +325,7 @@ def write_image(
     fmt: Format = CurrentFormat(),
     axes: Union[str, List[str], List[Dict[str, str]]] = None,
     transformations: List[List[Dict[str, Any]]] = None,
+    compressor: Any = None,
     **metadata: JSONDict,
 ) -> None:
     """Writes an image to the zarr store according to ome-zarr specification
@@ -352,6 +356,8 @@ def write_image(
     transformations: 2Dlist of dict
       For each resolution, we have a List of transformation Dicts (not validated).
       Each list of dicts are added to each datasets in order.
+    compressor: A compressor object
+      An optional compressor object to be passed on to zarr dataset creation
     """
 
     if image.ndim > 5:
@@ -382,7 +388,12 @@ def write_image(
         image = [image]
 
     write_multiscale(
-        image, group, chunks=chunks, fmt=fmt, axes=axes, transformations=transformations
+        image, group, 
+        chunks=chunks, 
+        fmt=fmt, 
+        axes=axes, 
+        transformations=transformations, 
+        compressor=compressor
     )
     group.attrs.update(metadata)
 
