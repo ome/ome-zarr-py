@@ -232,6 +232,15 @@ class TestMultiscalesMetadata:
             {"path": "2"},
         ]
 
+    def test_multi_levels_transformations(self):
+        datasets = []
+        for level, transf in enumerate(TRANSFORMATIONS):
+            datasets.append({"path": str(level), "transformation": transf})
+        write_multiscales_metadata(self.root, datasets)
+        assert "multiscales" in self.root.attrs
+        assert "version" in self.root.attrs["multiscales"][0]
+        assert self.root.attrs["multiscales"][0]["datasets"] == datasets
+
     @pytest.mark.parametrize("fmt", (FormatV01(), FormatV02(), FormatV03()))
     def test_version(self, fmt):
         write_multiscales_metadata(self.root, ["0"], fmt=fmt)
