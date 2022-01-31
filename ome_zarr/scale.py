@@ -180,7 +180,7 @@ class Scaler:
         print(base.shape)
         for i in range(self.max_layer):
             print(i, self.downscale)
-            rv.append(zoom(base, self.downscale ** i))
+            rv.append(zoom(base, self.downscale**i))
             print(rv[-1].shape)
         return list(reversed(rv))
 
