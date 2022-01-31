@@ -290,9 +290,9 @@ class Multiscales(Spec):
             node.metadata["axes"] = axes_obj.to_list()
             paths = [d["path"] for d in datasets]
             self.datasets: List[str] = paths
-            transformations = [d.get("transformations") for d in datasets]
+            transformations = [d.get("coordinateTransformations") for d in datasets]
             if any(trans is not None for trans in transformations):
-                node.metadata["transformations"] = transformations
+                node.metadata["coordinateTransformations"] = transformations
             LOGGER.info("datasets %s", datasets)
         except Exception as e:
             LOGGER.error(f"failed to parse multiscale metadata: {e}")

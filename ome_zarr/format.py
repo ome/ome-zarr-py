@@ -178,7 +178,7 @@ class FormatV03(FormatV02):  # inherits from V02 to avoid code duplication
 class FormatV04(FormatV03):
     """
     Changelog: axes is list of dicts,
-    introduce transformations in multiscales (Nov 2021)
+    introduce coordinateTransformations in multiscales (Nov 2021)
     """
 
     REQUIRED_PLATE_WELL_KEYS = {"path": str, "rowIndex": int, "columnIndex": int}

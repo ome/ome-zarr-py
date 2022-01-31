@@ -168,7 +168,7 @@ def write_multiscale(
     chunks: Union[Tuple[Any, ...], int] = None,
     fmt: Format = CurrentFormat(),
     axes: Union[str, List[str], List[Dict[str, str]]] = None,
-    transformations: List[List[Dict[str, Any]]] = None,
+    coordinateTransformations: List[List[Dict[str, Any]]] = None,
 ) -> None:
     """
     Write a pyramid with multiscale metadata to disk.
@@ -189,7 +189,7 @@ def write_multiscale(
     axes: str or list of str or list of dict
       List of axes dicts, or names. Not needed for v0.1 or v0.2
       or if 2D. Otherwise this must be provided
-    transformations: 2Dlist of dict
+    coordinateTransformations: 2Dlist of dict
       For each path, we have a List of transformation Dicts (not validated).
       Each list of dicts are added to each datasets in order.
     """
@@ -203,9 +203,9 @@ def write_multiscale(
         group.create_dataset(str(path), data=dataset, chunks=chunks)
         datasets.append({"path": str(path)})
 
-    if transformations is not None:
-        for dataset, transform in zip(datasets, transformations):
-            dataset["transformations"] = transform
+    if coordinateTransformations is not None:
+        for dataset, transform in zip(datasets, coordinateTransformations):
+            dataset["coordinateTransformations"] = transform
 
     write_multiscales_metadata(group, datasets, fmt, axes)
 
@@ -335,7 +335,7 @@ def write_image(
     scaler: Scaler = Scaler(),
     fmt: Format = CurrentFormat(),
     axes: Union[str, List[str], List[Dict[str, str]]] = None,
-    transformations: List[List[Dict[str, Any]]] = None,
+    coordinateTransformations: List[List[Dict[str, Any]]] = None,
     **metadata: JSONDict,
 ) -> None:
     """Writes an image to the zarr store according to ome-zarr specification
@@ -363,7 +363,7 @@ def write_image(
     axes: str or list of str or list of dict
       List of axes dicts, or names. Not needed for v0.1 or v0.2
       or if 2D. Otherwise this must be provided
-    transformations: 2Dlist of dict
+    coordinateTransformations: 2Dlist of dict
       For each resolution, we have a List of transformation Dicts (not validated).
       Each list of dicts are added to each datasets in order.
     """
@@ -396,7 +396,12 @@ def write_image(
         image = [image]
 
     write_multiscale(
-        image, group, chunks=chunks, fmt=fmt, axes=axes, transformations=transformations
+        image,
+        group,
+        chunks=chunks,
+        fmt=fmt,
+        axes=axes,
+        coordinateTransformations=coordinateTransformations,
     )
     group.attrs.update(metadata)
 

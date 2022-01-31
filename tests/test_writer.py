@@ -18,9 +18,9 @@ from ome_zarr.writer import (
 )
 
 TRANSFORMATIONS = [
-    {"axisIndices": [1, 2, 3], "scale": [0.50, 0.36, 0.36], "type": "scale"},
-    {"axisIndices": [1, 2, 3], "scale": [0.50, 0.72, 0.72], "type": "scale"},
-    {"axisIndices": [1, 2, 3], "scale": [0.50, 1.44, 1.44], "type": "scale"},
+    {"scale": [0.50, 0.36, 0.36], "type": "scale"},
+    {"scale": [0.50, 0.72, 0.72], "type": "scale"},
+    {"scale": [0.50, 1.44, 1.44], "type": "scale"},
 ]
 
 
@@ -75,7 +75,7 @@ class TestWriter:
             scaler=scaler,
             fmt=version,
             axes=axes,
-            transformations=TRANSFORMATIONS,
+            coordinateTransformations=TRANSFORMATIONS,
         )
 
         # Verify
@@ -88,9 +88,11 @@ class TestWriter:
         else:
             assert node.data[0].shape == shape
         print("node.metadata", node.metadata)
-        for transf, expected in zip(node.metadata["transformations"], TRANSFORMATIONS):
+        for transf, expected in zip(
+            node.metadata["coordinateTransformations"], TRANSFORMATIONS
+        ):
             assert transf == expected
-        assert len(node.metadata["transformations"]) == len(node.data)
+        assert len(node.metadata["coordinateTransformations"]) == len(node.data)
         assert np.allclose(data, node.data[0][...].compute())
 
     def test_dim_names(self):
@@ -235,7 +237,7 @@ class TestMultiscalesMetadata:
     def test_multi_levels_transformations(self):
         datasets = []
         for level, transf in enumerate(TRANSFORMATIONS):
-            datasets.append({"path": str(level), "transformation": transf})
+            datasets.append({"path": str(level), "coordinateTransformations": transf})
         write_multiscales_metadata(self.root, datasets)
         assert "multiscales" in self.root.attrs
         assert "version" in self.root.attrs["multiscales"][0]
