@@ -168,7 +168,7 @@ def write_multiscale(
     chunks: Union[Tuple[Any, ...], int] = None,
     fmt: Format = CurrentFormat(),
     axes: Union[str, List[str], List[Dict[str, str]]] = None,
-    coordinateTransformations: List[List[Dict[str, Any]]] = None,
+    coordinate_transformations: List[List[Dict[str, Any]]] = None,
 ) -> None:
     """
     Write a pyramid with multiscale metadata to disk.
@@ -189,7 +189,7 @@ def write_multiscale(
     axes: str or list of str or list of dict
       List of axes dicts, or names. Not needed for v0.1 or v0.2
       or if 2D. Otherwise this must be provided
-    coordinateTransformations: 2Dlist of dict
+    coordinate_transformations: 2Dlist of dict
       For each path, we have a List of transformation Dicts.
       Each list of dicts are added to each datasets in order
       and must include a 'scale' transform.
@@ -205,9 +205,11 @@ def write_multiscale(
         datasets.append({"path": str(path)})
 
     shapes = [data.shape for data in pyramid]
-    transf = fmt.validate_coordinate_transformations(shapes, coordinateTransformations)
-    if transf is not None:
-        for dataset, transform in zip(datasets, transf):
+    if coordinate_transformations is None:
+        coordinate_transformations = fmt.generate_coordinate_transformations(shapes)
+    fmt.validate_coordinate_transformations(shapes, coordinate_transformations)
+    if coordinate_transformations is not None:
+        for dataset, transform in zip(datasets, coordinate_transformations):
             dataset["coordinateTransformations"] = transform
 
     write_multiscales_metadata(group, datasets, fmt, axes)
@@ -339,7 +341,7 @@ def write_image(
     scaler: Scaler = Scaler(),
     fmt: Format = CurrentFormat(),
     axes: Union[str, List[str], List[Dict[str, str]]] = None,
-    coordinateTransformations: List[List[Dict[str, Any]]] = None,
+    coordinate_transformations: List[List[Dict[str, Any]]] = None,
     **metadata: JSONDict,
 ) -> None:
     """Writes an image to the zarr store according to ome-zarr specification
@@ -367,7 +369,7 @@ def write_image(
     axes: str or list of str or list of dict
       List of axes dicts, or names. Not needed for v0.1 or v0.2
       or if 2D. Otherwise this must be provided
-    coordinateTransformations: 2Dlist of dict
+    coordinate_transformations: 2Dlist of dict
       For each resolution, we have a List of transformation Dicts (not validated).
       Each list of dicts are added to each datasets in order.
     """
@@ -405,7 +407,7 @@ def write_image(
         chunks=chunks,
         fmt=fmt,
         axes=axes,
-        coordinateTransformations=coordinateTransformations,
+        coordinate_transformations=coordinate_transformations,
     )
     group.attrs.update(metadata)
 

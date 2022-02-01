@@ -86,7 +86,7 @@ class TestWriter:
             scaler=scaler,
             fmt=version,
             axes=axes,
-            coordinateTransformations=transformations,
+            coordinate_transformations=transformations,
         )
 
         # Verify
