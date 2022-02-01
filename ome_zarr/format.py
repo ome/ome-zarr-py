@@ -280,8 +280,10 @@ class FormatV04(FormatV03):
             scale_transfs = [
                 trans for trans in transformations if trans["type"] == "scale"
             ]
-            if len(scale_transfs) == 0:
-                raise ValueError("No scale items in coordinate_transformations")
+            if len(scale_transfs) != 1:
+                raise ValueError(
+                    "Must supply 1 'scale' item in coordinate_transformations"
+                )
             for trans in scale_transfs:
                 scale = trans["scale"]
                 if ndim is not None:
@@ -292,9 +294,7 @@ class FormatV04(FormatV03):
                         )
                 for value in scale:
                     if not isinstance(value, (float, int)):
-                        raise ValueError(
-                            "'scale' values must all be numbers: %s" % scale
-                        )
+                        raise ValueError(f"'scale' values must all be numbers: {scale}")
 
 
 CurrentFormat = FormatV04

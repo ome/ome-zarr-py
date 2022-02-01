@@ -122,6 +122,33 @@ class TestWriter:
             for value in transfs[0]["scale"]:
                 assert value >= 1
 
+    def test_validate_coordinate_transforms(self):
+
+        shapes = [(256, 256), (128, 128)]
+        fmt = FormatV04()
+
+        transformations = [
+            [{"type": "scale", "scale": (1, 1)}],
+            [{"type": "scale", "scale": (0.5, 0.5)}],
+        ]
+        fmt.validate_coordinate_transformations(shapes, transformations)
+
+        with pytest.raises(ValueError):
+            # transformations different length than shapes
+            fmt.validate_coordinate_transformations([(512, 512)], transformations)
+
+        with pytest.raises(ValueError):
+            transf = [[{"type": "scale", "scale": ("1", 1)}]]
+            fmt.validate_coordinate_transformations([(512, 512)], transf)
+
+        with pytest.raises(ValueError):
+            transf = [[{"type": "foo", "scale": (1, 1)}]]
+            fmt.validate_coordinate_transformations([(512, 512)], transf)
+
+        with pytest.raises(ValueError):
+            transf = [[{"type": "scale", "scale": (1, 1)}]]
+            fmt.validate_coordinate_transformations([(64, 64, 64)], transf)
+
     def test_dim_names(self):
 
         v03 = FormatV03()
