@@ -18,9 +18,11 @@ from ome_zarr.writer import (
 )
 
 TRANSFORMATIONS = [
-    {"scale": [0.50, 0.36, 0.36], "type": "scale"},
-    {"scale": [0.50, 0.72, 0.72], "type": "scale"},
-    {"scale": [0.50, 1.44, 1.44], "type": "scale"},
+    [{"scale": [1, 1, 0.5, 0.18, 0.18], "type": "scale"}],
+    [{"scale": [1, 1, 0.5, 0.36, 0.36], "type": "scale"}],
+    [{"scale": [1, 1, 0.5, 0.72, 0.72], "type": "scale"}],
+    [{"scale": [1, 1, 0.5, 1.44, 1.44], "type": "scale"}],
+    [{"scale": [1, 1, 0.5, 2.88, 2.88], "type": "scale"}],
 ]
 
 
@@ -68,6 +70,15 @@ class TestWriter:
         data = self.create_data(shape)
         version = format_version()
         axes = "tczyx"[-len(shape) :]
+        transformations = []
+        for dataset_transfs in TRANSFORMATIONS:
+            transf = dataset_transfs[0]
+            # e.g. slice [1, 1, z, x, y] -> [z, x, y] for 3D
+            transformations.append(
+                [{"type": "scale", "scale": transf["scale"][-len(shape) :]}]
+            )
+        if scaler is None:
+            transformations = [transformations[0]]
         write_image(
             image=data,
             group=self.group,
@@ -75,7 +86,7 @@ class TestWriter:
             scaler=scaler,
             fmt=version,
             axes=axes,
-            coordinateTransformations=TRANSFORMATIONS,
+            coordinateTransformations=transformations,
         )
 
         # Verify
@@ -88,12 +99,28 @@ class TestWriter:
         else:
             assert node.data[0].shape == shape
         print("node.metadata", node.metadata)
-        for transf, expected in zip(
-            node.metadata["coordinateTransformations"], TRANSFORMATIONS
-        ):
-            assert transf == expected
-        assert len(node.metadata["coordinateTransformations"]) == len(node.data)
+        if version.version not in ("0.1", "0.2", "0.3"):
+            for transf, expected in zip(
+                node.metadata["coordinateTransformations"], transformations
+            ):
+                assert transf == expected
+            assert len(node.metadata["coordinateTransformations"]) == len(node.data)
         assert np.allclose(data, node.data[0][...].compute())
+
+    def test_write_image_current(self):
+        shape = (64, 64, 64)
+        data = self.create_data(shape)
+        write_image(data, self.group, axes="zyx")
+        reader = Reader(parse_url(f"{self.path}/test"))
+        image_node = list(reader())[0]
+        for transfs in image_node.metadata["coordinateTransformations"]:
+            assert len(transfs) == 1
+            assert transfs[0]["type"] == "scale"
+            assert len(transfs[0]["scale"]) == len(shape)
+            # Scaler only downsamples x and y. z scale will be 1
+            assert transfs[0]["scale"][0] == 1
+            for value in transfs[0]["scale"]:
+                assert value >= 1
 
     def test_dim_names(self):
 
