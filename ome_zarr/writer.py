@@ -162,32 +162,6 @@ def _validate_plate_wells(
     return validated_wells
 
 
-def _validate_coordinate_transformations(
-    transformations: List[Dict[str, Any]], ndim: int = None
-) -> None:
-    """
-    Validates that a list of dicts contains a 'scale' transformation
-
-    Raises ValueError if no 'scale' found or doesn't match ndim
-    """
-
-    assert isinstance(transformations, list)
-    scale_transfs = [trans for trans in transformations if trans["type"] == "scale"]
-    if len(scale_transfs) == 0:
-        raise ValueError("No scale items in coordinateTransforms")
-    for trans in scale_transfs:
-        scale = trans["scale"]
-        if ndim is not None:
-            if len(scale) != ndim:
-                raise ValueError(
-                    "'scale' list %s must match number of image dimensions: %s"
-                    % (scale, ndim)
-                )
-        for value in scale:
-            if not isinstance(value, (float, int)):
-                raise ValueError("'scale' values must all be numbers: %s" % scale)
-
-
 def write_multiscale(
     pyramid: List,
     group: zarr.Group,
@@ -221,8 +195,7 @@ def write_multiscale(
       and must include a 'scale' transform.
     """
 
-    data_shape = pyramid[0].shape
-    dims = len(data_shape)
+    dims = len(pyramid[0].shape)
     axes = _get_valid_axes(dims, axes, fmt)
 
     datasets: List[dict] = []
@@ -231,25 +204,11 @@ def write_multiscale(
         group.create_dataset(str(path), data=data, chunks=chunks)
         datasets.append({"path": str(path)})
 
-    if fmt.version not in ("0.1", "0.2", "0.3"):
-        if coordinateTransformations is None:
-            # calculate minimal 'scale' transform based on pyramid dims
-            for dataset, data in zip(datasets, pyramid):
-                assert len(data.shape) == len(data_shape)
-                scale = [full / level for full, level in zip(data_shape, data.shape)]
-                dataset["coordinateTransformations"] = [
-                    {"type": "scale", "scale": scale}
-                ]
-        else:
-            ct_count = len(coordinateTransformations)
-            if ct_count != len(datasets):
-                raise ValueError(
-                    "coordinateTransformations count: %s must match datasets %s"
-                    % (ct_count, len(datasets))
-                )
-            for dataset, transform in zip(datasets, coordinateTransformations):
-                _validate_coordinate_transformations(transform, dims)
-                dataset["coordinateTransformations"] = transform
+    shapes = [data.shape for data in pyramid]
+    transf = fmt.validate_coordinate_transformations(shapes, coordinateTransformations)
+    if transf is not None:
+        for dataset, transform in zip(datasets, transf):
+            dataset["coordinateTransformations"] = transform
 
     write_multiscales_metadata(group, datasets, fmt, axes)
 
