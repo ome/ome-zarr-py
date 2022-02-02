@@ -134,7 +134,7 @@ class TestWriter:
         fmt.validate_coordinate_transformations(ndims, transformations)
 
         with pytest.raises(ValueError):
-            # transformations different length than shapes
+            # transformations different length than levels
             fmt.validate_coordinate_transformations([2], transformations)
 
         with pytest.raises(ValueError):
@@ -146,8 +146,25 @@ class TestWriter:
             fmt.validate_coordinate_transformations([2], transf)
 
         with pytest.raises(ValueError):
+            # scale list of floats different length from 3
             transf = [[{"type": "scale", "scale": (1, 1)}]]
             fmt.validate_coordinate_transformations([3], transf)
+
+        translate = [{"type": "translation", "translation": (1, 1)}]
+        scale_then_trans = [transf + translate for transf in transformations]
+        print("scale_then_trans", scale_then_trans)
+
+        fmt.validate_coordinate_transformations(ndims, scale_then_trans)
+
+        trans_then_scale = [translate + transf for transf in transformations]
+        with pytest.raises(ValueError):
+            # scale must come first
+            fmt.validate_coordinate_transformations(ndims, trans_then_scale)
+
+        with pytest.raises(ValueError):
+            scale_then_trans2 = [transf + translate for transf in scale_then_trans]
+            # more than 1 transformation
+            fmt.validate_coordinate_transformations(ndims, scale_then_trans2)
 
     def test_dim_names(self):
 

@@ -277,6 +277,7 @@ class FormatV04(FormatV03):
             )
         for ndim, transformations in zip(ndims, coordinate_transformations):
             assert isinstance(transformations, list)
+            # validate scales...
             scale_transfs = [
                 trans for trans in transformations if trans["type"] == "scale"
             ]
@@ -284,16 +285,41 @@ class FormatV04(FormatV03):
                 raise ValueError(
                     "Must supply 1 'scale' item in coordinate_transformations"
                 )
-            for trans in scale_transfs:
-                scale = trans["scale"]
-                if len(scale) != ndim:
+            # first transformation must be scale
+            first = transformations[0]
+            if first["type"] != "scale":
+                raise ValueError("First coordinate_transformations must be 'scale'")
+            scale = first["scale"]
+            if len(scale) != ndim:
+                raise ValueError(
+                    "'scale' list %s must match number of image dimensions: %s"
+                    % (scale, ndim)
+                )
+            for value in scale:
+                if not isinstance(value, (float, int)):
+                    raise ValueError(f"'scale' values must all be numbers: {scale}")
+
+            # validate translations...
+            translates = [
+                trans for trans in transformations if trans["type"] == "translation"
+            ]
+            if len(translates) > 1:
+                raise ValueError(
+                    "Must supply 0 or 1 'translation' item in"
+                    "coordinate_transformations"
+                )
+            elif len(translates) == 1:
+                translate = translates[0]["translation"]
+                if len(translate) != ndim:
                     raise ValueError(
-                        "'scale' list %s must match number of image dimensions: %s"
-                        % (scale, ndim)
+                        "'translation' list %s must match image dimensions count: %s"
+                        % (translate, ndim)
                     )
-                for value in scale:
+                for value in translate:
                     if not isinstance(value, (float, int)):
-                        raise ValueError(f"'scale' values must all be numbers: {scale}")
+                        raise ValueError(
+                            f"'translation' values must all be numbers: {translate}"
+                        )
 
 
 CurrentFormat = FormatV04
