@@ -122,11 +122,14 @@ def _validate_plate_rows_columns(
     return validated_list
 
 
-def _validate_datasets(datasets: List[dict]) -> List[Dict]:
+def _validate_datasets(
+    datasets: List[dict], dims: int, fmt: Format = CurrentFormat()
+) -> List[Dict]:
 
     validated_datasets = []
     if datasets is None or len(datasets) == 0:
         raise ValueError("Empty datasets list")
+    transformations = []
     for dataset in datasets:
         if isinstance(dataset, str):
             validated_datasets.append({"path": dataset})
@@ -134,8 +137,14 @@ def _validate_datasets(datasets: List[dict]) -> List[Dict]:
             if not dataset.get("path"):
                 raise ValueError("no 'path' in dataset")
             validated_datasets.append(dataset)
+            transformation = dataset.get("coordinateTransformations")
+            # transformation may be None for < 0.4 - validated below
+            if transformation is not None:
+                transformations.append(transformation)
         else:
             raise ValueError(f"Unrecognized type for {dataset}")
+
+    fmt.validate_coordinate_transformations(dims, len(datasets), transformations)
     return validated_datasets
 
 
@@ -205,10 +214,11 @@ def write_multiscale(
         datasets.append({"path": str(path)})
 
     shapes = [data.shape for data in pyramid]
-    ndims = [len(shape) for shape in shapes]
     if coordinate_transformations is None:
         coordinate_transformations = fmt.generate_coordinate_transformations(shapes)
-    fmt.validate_coordinate_transformations(ndims, coordinate_transformations)
+    fmt.validate_coordinate_transformations(
+        dims, len(pyramid), coordinate_transformations
+    )
     if coordinate_transformations is not None:
         for dataset, transform in zip(datasets, coordinate_transformations):
             dataset["coordinateTransformations"] = transform
@@ -241,19 +251,25 @@ def write_multiscales_metadata(
       Ignored for versions 0.1 and 0.2. Required for version 0.3 or greater.
     """
 
-    multiscales = [
-        {
-            "version": fmt.version,
-            "datasets": _validate_datasets(datasets),
-        }
-    ]
+    ndim = -1
     if axes is not None:
         if fmt.version in ("0.1", "0.2"):
             LOGGER.info("axes ignored for version 0.1 or 0.2")
+            axes = None
         else:
             axes = _get_valid_axes(axes=axes, fmt=fmt)
             if axes is not None:
-                multiscales[0]["axes"] = axes
+                ndim = len(axes)
+
+    multiscales = [
+        {
+            "version": fmt.version,
+            "datasets": _validate_datasets(datasets, ndim, fmt),
+        }
+    ]
+    if axes is not None:
+        multiscales[0]["axes"] = axes
+
     group.attrs["multiscales"] = multiscales
 
 

@@ -93,7 +93,8 @@ class Format(ABC):
     @abstractmethod
     def validate_coordinate_transformations(
         self,
-        ndims: List[int],
+        ndim: int,
+        nlevels: int,
         coordinate_transformations: List[List[Dict[str, Any]]] = None,
     ) -> Optional[List[List[Dict[str, Any]]]]:  # pragma: no cover
         raise NotImplementedError()
@@ -143,7 +144,8 @@ class FormatV01(Format):
 
     def validate_coordinate_transformations(
         self,
-        ndims: List[int],
+        ndim: int,
+        nlevels: int,
         coordinate_transformations: List[List[Dict[str, Any]]] = None,
     ) -> None:
         return None
@@ -257,25 +259,26 @@ class FormatV04(FormatV03):
 
     def validate_coordinate_transformations(
         self,
-        ndims: List[int],
+        ndim: int,
+        nlevels: int,
         coordinate_transformations: List[List[Dict[str, Any]]] = None,
     ) -> None:
         """
         Validates that a list of dicts contains a 'scale' transformation
 
         Raises ValueError if no 'scale' found or doesn't match ndim
-        @param ndims:       List with number of dims for each dataset
+        @param ndim:       Number of image dimensions
         """
 
         if coordinate_transformations is None:
             raise ValueError("coordinate_transformations must be provided")
         ct_count = len(coordinate_transformations)
-        if ct_count != len(ndims):
+        if ct_count != nlevels:
             raise ValueError(
                 "coordinate_transformations count: %s must match datasets %s"
-                % (ct_count, len(ndims))
+                % (ct_count, nlevels)
             )
-        for ndim, transformations in zip(ndims, coordinate_transformations):
+        for transformations in coordinate_transformations:
             assert isinstance(transformations, list)
             # validate scales...
             scale_transfs = [

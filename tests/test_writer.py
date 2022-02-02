@@ -4,7 +4,6 @@ import numpy as np
 import pytest
 import zarr
 
-from ome_zarr.axes import KNOWN_AXES
 from ome_zarr.format import CurrentFormat, FormatV01, FormatV02, FormatV03, FormatV04
 from ome_zarr.io import parse_url
 from ome_zarr.reader import Multiscales, Reader
@@ -124,47 +123,45 @@ class TestWriter:
 
     def test_validate_coordinate_transforms(self):
 
-        ndims = [2, 2]
         fmt = FormatV04()
 
         transformations = [
             [{"type": "scale", "scale": (1, 1)}],
             [{"type": "scale", "scale": (0.5, 0.5)}],
         ]
-        fmt.validate_coordinate_transformations(ndims, transformations)
+        fmt.validate_coordinate_transformations(2, 2, transformations)
 
         with pytest.raises(ValueError):
             # transformations different length than levels
-            fmt.validate_coordinate_transformations([2], transformations)
+            fmt.validate_coordinate_transformations(2, 1, transformations)
 
         with pytest.raises(ValueError):
             transf = [[{"type": "scale", "scale": ("1", 1)}]]
-            fmt.validate_coordinate_transformations([2], transf)
+            fmt.validate_coordinate_transformations(2, 1, transf)
 
         with pytest.raises(ValueError):
             transf = [[{"type": "foo", "scale": (1, 1)}]]
-            fmt.validate_coordinate_transformations([2], transf)
+            fmt.validate_coordinate_transformations(2, 1, transf)
 
         with pytest.raises(ValueError):
             # scale list of floats different length from 3
             transf = [[{"type": "scale", "scale": (1, 1)}]]
-            fmt.validate_coordinate_transformations([3], transf)
+            fmt.validate_coordinate_transformations(3, 1, transf)
 
         translate = [{"type": "translation", "translation": (1, 1)}]
         scale_then_trans = [transf + translate for transf in transformations]
-        print("scale_then_trans", scale_then_trans)
 
-        fmt.validate_coordinate_transformations(ndims, scale_then_trans)
+        fmt.validate_coordinate_transformations(2, 2, scale_then_trans)
 
         trans_then_scale = [translate + transf for transf in transformations]
         with pytest.raises(ValueError):
             # scale must come first
-            fmt.validate_coordinate_transformations(ndims, trans_then_scale)
+            fmt.validate_coordinate_transformations(2, 2, trans_then_scale)
 
         with pytest.raises(ValueError):
             scale_then_trans2 = [transf + translate for transf in scale_then_trans]
             # more than 1 transformation
-            fmt.validate_coordinate_transformations(ndims, scale_then_trans2)
+            fmt.validate_coordinate_transformations(2, 2, scale_then_trans2)
 
     def test_dim_names(self):
 
@@ -289,27 +286,11 @@ class TestMultiscalesMetadata:
         self.store = parse_url(self.path, mode="w").store
         self.root = zarr.group(store=self.store)
 
-    def test_single_level(self):
-        write_multiscales_metadata(self.root, ["0"])
-        assert "multiscales" in self.root.attrs
-        assert "version" in self.root.attrs["multiscales"][0]
-        assert self.root.attrs["multiscales"][0]["datasets"] == [{"path": "0"}]
-
-    def test_multi_levels(self):
-        write_multiscales_metadata(self.root, ["0", "1", "2"])
-        assert "multiscales" in self.root.attrs
-        assert "version" in self.root.attrs["multiscales"][0]
-        assert self.root.attrs["multiscales"][0]["datasets"] == [
-            {"path": "0"},
-            {"path": "1"},
-            {"path": "2"},
-        ]
-
     def test_multi_levels_transformations(self):
         datasets = []
         for level, transf in enumerate(TRANSFORMATIONS):
             datasets.append({"path": str(level), "coordinateTransformations": transf})
-        write_multiscales_metadata(self.root, datasets)
+        write_multiscales_metadata(self.root, datasets, axes="tczyx")
         assert "multiscales" in self.root.attrs
         assert "version" in self.root.attrs["multiscales"][0]
         assert self.root.attrs["multiscales"][0]["datasets"] == datasets
@@ -335,10 +316,13 @@ class TestMultiscalesMetadata:
         ),
     )
     def test_axes(self, axes):
-        write_multiscales_metadata(self.root, ["0"], axes=axes)
+        write_multiscales_metadata(self.root, ["0"], fmt=FormatV03(), axes=axes)
         assert "multiscales" in self.root.attrs
-        axes = [{"name": name, "type": KNOWN_AXES[name]} for name in axes]
+        # for v0.3, axes is a list of names
         assert self.root.attrs["multiscales"][0]["axes"] == axes
+        with pytest.raises(ValueError):
+            # for v0.4 and above, paths no-longer supported (need dataset dicts)
+            write_multiscales_metadata(self.root, ["0"], axes=axes)
 
     @pytest.mark.parametrize("fmt", (FormatV01(), FormatV02()))
     def test_axes_ignored(self, fmt):
