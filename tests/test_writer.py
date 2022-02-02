@@ -124,30 +124,30 @@ class TestWriter:
 
     def test_validate_coordinate_transforms(self):
 
-        shapes = [(256, 256), (128, 128)]
+        ndims = [2, 2]
         fmt = FormatV04()
 
         transformations = [
             [{"type": "scale", "scale": (1, 1)}],
             [{"type": "scale", "scale": (0.5, 0.5)}],
         ]
-        fmt.validate_coordinate_transformations(shapes, transformations)
+        fmt.validate_coordinate_transformations(ndims, transformations)
 
         with pytest.raises(ValueError):
             # transformations different length than shapes
-            fmt.validate_coordinate_transformations([(512, 512)], transformations)
+            fmt.validate_coordinate_transformations([2], transformations)
 
         with pytest.raises(ValueError):
             transf = [[{"type": "scale", "scale": ("1", 1)}]]
-            fmt.validate_coordinate_transformations([(512, 512)], transf)
+            fmt.validate_coordinate_transformations([2], transf)
 
         with pytest.raises(ValueError):
             transf = [[{"type": "foo", "scale": (1, 1)}]]
-            fmt.validate_coordinate_transformations([(512, 512)], transf)
+            fmt.validate_coordinate_transformations([2], transf)
 
         with pytest.raises(ValueError):
             transf = [[{"type": "scale", "scale": (1, 1)}]]
-            fmt.validate_coordinate_transformations([(64, 64, 64)], transf)
+            fmt.validate_coordinate_transformations([3], transf)
 
     def test_dim_names(self):
 

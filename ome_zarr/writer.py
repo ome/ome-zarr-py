@@ -205,9 +205,10 @@ def write_multiscale(
         datasets.append({"path": str(path)})
 
     shapes = [data.shape for data in pyramid]
+    ndims = [len(shape) for shape in shapes]
     if coordinate_transformations is None:
         coordinate_transformations = fmt.generate_coordinate_transformations(shapes)
-    fmt.validate_coordinate_transformations(shapes, coordinate_transformations)
+    fmt.validate_coordinate_transformations(ndims, coordinate_transformations)
     if coordinate_transformations is not None:
         for dataset, transform in zip(datasets, coordinate_transformations):
             dataset["coordinateTransformations"] = transform
