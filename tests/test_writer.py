@@ -297,7 +297,7 @@ class TestMultiscalesMetadata:
 
     @pytest.mark.parametrize("fmt", (FormatV01(), FormatV02(), FormatV03()))
     def test_version(self, fmt):
-        write_multiscales_metadata(self.root, ["0"], fmt=fmt)
+        write_multiscales_metadata(self.root, [{"path": "0"}], fmt=fmt)
         assert "multiscales" in self.root.attrs
         assert self.root.attrs["multiscales"][0]["version"] == fmt.version
         assert self.root.attrs["multiscales"][0]["datasets"] == [{"path": "0"}]
@@ -315,8 +315,10 @@ class TestMultiscalesMetadata:
             ["t", "c", "z", "y", "x"],
         ),
     )
-    def test_axes(self, axes):
-        write_multiscales_metadata(self.root, ["0"], fmt=FormatV03(), axes=axes)
+    def test_axes_V03(self, axes):
+        write_multiscales_metadata(
+            self.root, [{"path": "0"}], fmt=FormatV03(), axes=axes
+        )
         assert "multiscales" in self.root.attrs
         # for v0.3, axes is a list of names
         assert self.root.attrs["multiscales"][0]["axes"] == axes
@@ -327,7 +329,7 @@ class TestMultiscalesMetadata:
     @pytest.mark.parametrize("fmt", (FormatV01(), FormatV02()))
     def test_axes_ignored(self, fmt):
         write_multiscales_metadata(
-            self.root, ["0"], fmt=fmt, axes=["t", "c", "z", "y", "x"]
+            self.root, [{"path": "0"}], fmt=fmt, axes=["t", "c", "z", "y", "x"]
         )
         assert "multiscales" in self.root.attrs
         assert "axes" not in self.root.attrs["multiscales"][0]

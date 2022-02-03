@@ -126,17 +126,13 @@ def _validate_datasets(
     datasets: List[dict], dims: int, fmt: Format = CurrentFormat()
 ) -> List[Dict]:
 
-    validated_datasets = []
     if datasets is None or len(datasets) == 0:
         raise ValueError("Empty datasets list")
     transformations = []
     for dataset in datasets:
-        if isinstance(dataset, str):
-            validated_datasets.append({"path": dataset})
-        elif isinstance(dataset, dict):
+        if isinstance(dataset, dict):
             if not dataset.get("path"):
                 raise ValueError("no 'path' in dataset")
-            validated_datasets.append(dataset)
             transformation = dataset.get("coordinateTransformations")
             # transformation may be None for < 0.4 - validated below
             if transformation is not None:
@@ -145,7 +141,7 @@ def _validate_datasets(
             raise ValueError(f"Unrecognized type for {dataset}")
 
     fmt.validate_coordinate_transformations(dims, len(datasets), transformations)
-    return validated_datasets
+    return datasets
 
 
 def _validate_plate_wells(
