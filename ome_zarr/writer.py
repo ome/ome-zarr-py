@@ -122,6 +122,32 @@ def _validate_plate_rows_columns(
     return validated_list
 
 
+def _validate_datasets(
+    datasets: List[dict], dims: int, fmt: Format = CurrentFormat()
+) -> List[Dict]:
+
+    validated_datasets = []
+    if datasets is None or len(datasets) == 0:
+        raise ValueError("Empty datasets list")
+    transformations = []
+    for dataset in datasets:
+        if isinstance(dataset, str):
+            validated_datasets.append({"path": dataset})
+        elif isinstance(dataset, dict):
+            if not dataset.get("path"):
+                raise ValueError("no 'path' in dataset")
+            validated_datasets.append(dataset)
+            transformation = dataset.get("coordinateTransformations")
+            # transformation may be None for < 0.4 - validated below
+            if transformation is not None:
+                transformations.append(transformation)
+        else:
+            raise ValueError(f"Unrecognized type for {dataset}")
+
+    fmt.validate_coordinate_transformations(dims, len(datasets), transformations)
+    return validated_datasets
+
+
 def _validate_plate_wells(
     wells: List[Union[str, dict]],
     rows: List[str],
@@ -151,7 +177,7 @@ def write_multiscale(
     chunks: Union[Tuple[Any, ...], int] = None,
     fmt: Format = CurrentFormat(),
     axes: Union[str, List[str], List[Dict[str, str]]] = None,
-    transformations: List[List[Dict[str, Any]]] = None,
+    coordinate_transformations: List[List[Dict[str, Any]]] = None,
 ) -> None:
     """
     Write a pyramid with multiscale metadata to disk.
@@ -172,28 +198,41 @@ def write_multiscale(
     axes: str or list of str or list of dict
       List of axes dicts, or names. Not needed for v0.1 or v0.2
       or if 2D. Otherwise this must be provided
-    transformations: 2Dlist of dict
-      For each path, we have a List of transformation Dicts (not validated).
-      Each list of dicts are added to each datasets in order.
+    coordinate_transformations: 2Dlist of dict
+      For each path, we have a List of transformation Dicts.
+      Each list of dicts are added to each datasets in order
+      and must include a 'scale' transform.
     """
 
     dims = len(pyramid[0].shape)
     axes = _get_valid_axes(dims, axes, fmt)
 
-    paths = []
-    for path, dataset in enumerate(pyramid):
+    datasets: List[dict] = []
+    for path, data in enumerate(pyramid):
         # TODO: chunks here could be different per layer
-        group.create_dataset(str(path), data=dataset, chunks=chunks)
-        paths.append(str(path))
-    write_multiscales_metadata(group, paths, fmt, axes, transformations)
+        group.create_dataset(str(path), data=data, chunks=chunks)
+        datasets.append({"path": str(path)})
+
+    if coordinate_transformations is None:
+        shapes = [data.shape for data in pyramid]
+        coordinate_transformations = fmt.generate_coordinate_transformations(shapes)
+
+    # we validate again later, but this catches length mismatch before zip(datasets...)
+    fmt.validate_coordinate_transformations(
+        dims, len(pyramid), coordinate_transformations
+    )
+    if coordinate_transformations is not None:
+        for dataset, transform in zip(datasets, coordinate_transformations):
+            dataset["coordinateTransformations"] = transform
+
+    write_multiscales_metadata(group, datasets, fmt, axes)
 
 
 def write_multiscales_metadata(
     group: zarr.Group,
-    paths: List[str],
+    datasets: List[dict],
     fmt: Format = CurrentFormat(),
     axes: Union[str, List[str], List[Dict[str, str]]] = None,
-    transformations: List[List[Dict[str, Any]]] = None,
 ) -> None:
     """
     Write the multiscales metadata in the group.
@@ -202,37 +241,37 @@ def write_multiscales_metadata(
     ----------
     group: zarr.Group
       the group within the zarr store to write the metadata in.
-    paths: list of str
-      The list of paths to the datasets for this multiscale image.
+    datasets: list of dicts
+      The list of datasets (dicts) for this multiscale image.
+      Each dict must include 'path' and a 'coordinateTransformations'
+      list for version 0.4 or later that must include a 'scale' transform.
     fmt: Format
       The format of the ome_zarr data which should be used.
       Defaults to the most current.
     axes: list of str or list of dicts
       the names of the axes. e.g. ["t", "c", "z", "y", "x"].
       Ignored for versions 0.1 and 0.2. Required for version 0.3 or greater.
-    transformations: 2Dlist of dict
-      For each path, we have a List of transformation Dicts (not validated).
-      Each list of dicts are added to each datasets in order.
     """
 
-    datasets: List[Dict[str, Any]] = [{"path": path} for path in paths]
-    if transformations is not None:
-        for dataset, transform in zip(datasets, transformations):
-            dataset["transformations"] = transform
+    ndim = -1
+    if axes is not None:
+        if fmt.version in ("0.1", "0.2"):
+            LOGGER.info("axes ignored for version 0.1 or 0.2")
+            axes = None
+        else:
+            axes = _get_valid_axes(axes=axes, fmt=fmt)
+            if axes is not None:
+                ndim = len(axes)
 
     multiscales = [
         {
             "version": fmt.version,
-            "datasets": datasets,
+            "datasets": _validate_datasets(datasets, ndim, fmt),
         }
     ]
     if axes is not None:
-        if fmt.version in ("0.1", "0.2"):
-            LOGGER.info("axes ignored for version 0.1 or 0.2")
-        else:
-            axes = _get_valid_axes(axes=axes, fmt=fmt)
-            if axes is not None:
-                multiscales[0]["axes"] = axes
+        multiscales[0]["axes"] = axes
+
     group.attrs["multiscales"] = multiscales
 
 
@@ -321,7 +360,7 @@ def write_image(
     scaler: Scaler = Scaler(),
     fmt: Format = CurrentFormat(),
     axes: Union[str, List[str], List[Dict[str, str]]] = None,
-    transformations: List[List[Dict[str, Any]]] = None,
+    coordinate_transformations: List[List[Dict[str, Any]]] = None,
     **metadata: JSONDict,
 ) -> None:
     """Writes an image to the zarr store according to ome-zarr specification
@@ -349,7 +388,7 @@ def write_image(
     axes: str or list of str or list of dict
       List of axes dicts, or names. Not needed for v0.1 or v0.2
       or if 2D. Otherwise this must be provided
-    transformations: 2Dlist of dict
+    coordinate_transformations: 2Dlist of dict
       For each resolution, we have a List of transformation Dicts (not validated).
       Each list of dicts are added to each datasets in order.
     """
@@ -382,7 +421,12 @@ def write_image(
         image = [image]
 
     write_multiscale(
-        image, group, chunks=chunks, fmt=fmt, axes=axes, transformations=transformations
+        image,
+        group,
+        chunks=chunks,
+        fmt=fmt,
+        axes=axes,
+        coordinate_transformations=coordinate_transformations,
     )
     group.attrs.update(metadata)
 

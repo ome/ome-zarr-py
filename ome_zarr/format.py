@@ -2,7 +2,7 @@
 
 import logging
 from abc import ABC, abstractmethod
-from typing import Dict, Iterator, List, Optional
+from typing import Any, Dict, Iterator, List, Optional
 
 from zarr.storage import FSStore
 
@@ -84,6 +84,21 @@ class Format(ABC):
     ) -> None:  # pragma: no cover
         raise NotImplementedError()
 
+    @abstractmethod
+    def generate_coordinate_transformations(
+        self, shapes: List[tuple]
+    ) -> Optional[List[List[Dict[str, Any]]]]:  # pragma: no cover
+        raise NotImplementedError()
+
+    @abstractmethod
+    def validate_coordinate_transformations(
+        self,
+        ndim: int,
+        nlevels: int,
+        coordinate_transformations: List[List[Dict[str, Any]]] = None,
+    ) -> Optional[List[List[Dict[str, Any]]]]:  # pragma: no cover
+        raise NotImplementedError()
+
 
 class FormatV01(Format):
     """
@@ -121,6 +136,19 @@ class FormatV01(Format):
                 raise ValueError(f"{well} must contain a {key} key of type {key_type}")
             if not isinstance(well[key], key_type):
                 raise ValueError(f"{well} path must be of {key_type} type")
+
+    def generate_coordinate_transformations(
+        self, shapes: List[tuple]
+    ) -> Optional[List[List[Dict[str, Any]]]]:
+        return None
+
+    def validate_coordinate_transformations(
+        self,
+        ndim: int,
+        nlevels: int,
+        coordinate_transformations: List[List[Dict[str, Any]]] = None,
+    ) -> None:
+        return None
 
 
 class FormatV02(FormatV01):
@@ -178,7 +206,7 @@ class FormatV03(FormatV02):  # inherits from V02 to avoid code duplication
 class FormatV04(FormatV03):
     """
     Changelog: axes is list of dicts,
-    introduce transformations in multiscales (Nov 2021)
+    introduce coordinate_transformations in multiscales (Nov 2021)
     """
 
     REQUIRED_PLATE_WELL_KEYS = {"path": str, "rowIndex": int, "columnIndex": int}
@@ -214,6 +242,87 @@ class FormatV04(FormatV03):
             raise ValueError(f"{column} is not defined in the plate columns")
         if well["columnIndex"] != columns.index(column):
             raise ValueError(f"Mismatching column index for {well}")
+
+    def generate_coordinate_transformations(
+        self, shapes: List[tuple]
+    ) -> Optional[List[List[Dict[str, Any]]]]:
+
+        data_shape = shapes[0]
+        coordinate_transformations: List[List[Dict[str, Any]]] = []
+        # calculate minimal 'scale' transform based on pyramid dims
+        for shape in shapes:
+            assert len(shape) == len(data_shape)
+            scale = [full / level for full, level in zip(data_shape, shape)]
+            coordinate_transformations.append([{"type": "scale", "scale": scale}])
+
+        return coordinate_transformations
+
+    def validate_coordinate_transformations(
+        self,
+        ndim: int,
+        nlevels: int,
+        coordinate_transformations: List[List[Dict[str, Any]]] = None,
+    ) -> None:
+        """
+        Validates that a list of dicts contains a 'scale' transformation
+
+        Raises ValueError if no 'scale' found or doesn't match ndim
+        @param ndim:       Number of image dimensions
+        """
+
+        if coordinate_transformations is None:
+            raise ValueError("coordinate_transformations must be provided")
+        ct_count = len(coordinate_transformations)
+        if ct_count != nlevels:
+            raise ValueError(
+                "coordinate_transformations count: %s must match datasets %s"
+                % (ct_count, nlevels)
+            )
+        for transformations in coordinate_transformations:
+            assert isinstance(transformations, list)
+            # validate scales...
+            scale_transfs = [
+                trans for trans in transformations if trans["type"] == "scale"
+            ]
+            if len(scale_transfs) != 1:
+                raise ValueError(
+                    "Must supply 1 'scale' item in coordinate_transformations"
+                )
+            # first transformation must be scale
+            first = transformations[0]
+            if first["type"] != "scale":
+                raise ValueError("First coordinate_transformations must be 'scale'")
+            scale = first["scale"]
+            if len(scale) != ndim:
+                raise ValueError(
+                    "'scale' list %s must match number of image dimensions: %s"
+                    % (scale, ndim)
+                )
+            for value in scale:
+                if not isinstance(value, (float, int)):
+                    raise ValueError(f"'scale' values must all be numbers: {scale}")
+
+            # validate translations...
+            translates = [
+                trans for trans in transformations if trans["type"] == "translation"
+            ]
+            if len(translates) > 1:
+                raise ValueError(
+                    "Must supply 0 or 1 'translation' item in"
+                    "coordinate_transformations"
+                )
+            elif len(translates) == 1:
+                translate = translates[0]["translation"]
+                if len(translate) != ndim:
+                    raise ValueError(
+                        "'translation' list %s must match image dimensions count: %s"
+                        % (translate, ndim)
+                    )
+                for value in translate:
+                    if not isinstance(value, (float, int)):
+                        raise ValueError(
+                            f"'translation' values must all be numbers: {translate}"
+                        )
 
 
 CurrentFormat = FormatV04
