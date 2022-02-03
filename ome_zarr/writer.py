@@ -213,9 +213,11 @@ def write_multiscale(
         group.create_dataset(str(path), data=data, chunks=chunks)
         datasets.append({"path": str(path)})
 
-    shapes = [data.shape for data in pyramid]
     if coordinate_transformations is None:
+        shapes = [data.shape for data in pyramid]
         coordinate_transformations = fmt.generate_coordinate_transformations(shapes)
+
+    # we validate again later, but this catches length mismatch before zip(datasets...)
     fmt.validate_coordinate_transformations(
         dims, len(pyramid), coordinate_transformations
     )
