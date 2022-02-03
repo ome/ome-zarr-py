@@ -348,6 +348,13 @@ class TestMultiscalesMetadata:
         with pytest.raises(ValueError):
             write_multiscales_metadata(self.root, ["0"], fmt=FormatV03(), axes=axes)
 
+    @pytest.mark.parametrize("datasets", ([], None, "0", ["0"], [{"key": 1}]))
+    def test_invalid_datasets(self, datasets):
+        with pytest.raises(ValueError):
+            write_multiscales_metadata(
+                self.root, datasets, axes=["t", "c", "z", "y", "x"]
+            )
+
 
 class TestPlateMetadata:
     @pytest.fixture(autouse=True)
