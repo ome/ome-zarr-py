@@ -214,13 +214,15 @@ def write_multiscale(
 
     datasets: List[dict] = []
     for path, data in enumerate(pyramid):
-        options = (
-            storage_options
-            if not isinstance(storage_options, list)
-            else storage_options[path]
-        )
-        if "chunks" not in options:
-            options["chunks"] = chunks
+        options = {}
+        if storage_options:
+            options = (
+                storage_options
+                if not isinstance(storage_options, list)
+                else storage_options[path]
+            )
+            if "chunks" not in options:
+                options["chunks"] = chunks
         group.create_dataset(str(path), data=data, **options)
         datasets.append({"path": str(path)})
 
