@@ -221,8 +221,8 @@ def write_multiscale(
                 if not isinstance(storage_options, list)
                 else storage_options[path]
             )
-            if "chunks" not in options:
-                options["chunks"] = chunks
+        if "chunks" not in options:
+            options["chunks"] = chunks
         group.create_dataset(str(path), data=data, **options)
         datasets.append({"path": str(path)})
 
