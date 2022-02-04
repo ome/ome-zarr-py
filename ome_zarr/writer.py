@@ -204,8 +204,8 @@ def write_multiscale(
       Each list of dicts are added to each datasets in order
       and must include a 'scale' transform.
     storage_options: dict or list of dict
-      Options to be passed on to the storage backend. A list would need to match 
-      the number of datasets in a multiresolution pyramid. One can provide 
+      Options to be passed on to the storage backend. A list would need to match
+      the number of datasets in a multiresolution pyramid. One can provide
       different chunk size for each level of a pyramind using this option.
     """
 
@@ -214,12 +214,14 @@ def write_multiscale(
 
     datasets: List[dict] = []
     for path, data in enumerate(pyramid):
-        options = storage_options if not isinstance(storage_options, list) else storage_options[path]
+        options = (
+            storage_options
+            if not isinstance(storage_options, list)
+            else storage_options[path]
+        )
         if "chunks" not in options:
             options["chunks"] = chunks
-        group.create_dataset(
-             str(path), data=data, **options
-        )
+        group.create_dataset(str(path), data=data, **options)
         datasets.append({"path": str(path)})
 
     if coordinate_transformations is None:
@@ -402,8 +404,8 @@ def write_image(
       For each resolution, we have a List of transformation Dicts (not validated).
       Each list of dicts are added to each datasets in order.
     storage_options: dict or list of dict
-      Options to be passed on to the storage backend. A list would need to match 
-      the number of datasets in a multiresolution pyramid. One can provide 
+      Options to be passed on to the storage backend. A list would need to match
+      the number of datasets in a multiresolution pyramid. One can provide
       different chunk size for each level of a pyramind using this option.
     """
 
