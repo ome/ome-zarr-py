@@ -29,8 +29,8 @@ def coins() -> Tuple[List, List]:
     cleared = remove_small_objects(clear_border(bw), 20)
     label_image = label(cleared)
 
-    pyramid = list(reversed([zoom(image, 2 ** i, order=3) for i in range(4)]))
-    labels = list(reversed([zoom(label_image, 2 ** i, order=0) for i in range(4)]))
+    pyramid = list(reversed([zoom(image, 2**i, order=3) for i in range(4)]))
+    labels = list(reversed([zoom(label_image, 2**i, order=0) for i in range(4)]))
 
     return pyramid, labels
 
@@ -80,7 +80,7 @@ def make_circle(h: int, w: int, value: int, target: np.ndarray) -> None:
     cy = h // 2
     r = min(w, h) // 2
 
-    mask = (x[np.newaxis, :] - cx) ** 2 + (y[:, np.newaxis] - cy) ** 2 < r ** 2
+    mask = (x[np.newaxis, :] - cx) ** 2 + (y[:, np.newaxis] - cy) ** 2 < r**2
     target[mask] = value
 
 
