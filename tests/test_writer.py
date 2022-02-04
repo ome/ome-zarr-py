@@ -355,6 +355,77 @@ class TestMultiscalesMetadata:
                 self.root, datasets, axes=["t", "c", "z", "y", "x"]
             )
 
+    @pytest.mark.parametrize(
+        "coordinateTransformations",
+        (
+            [{"type": "scale", "scale": [1, 1]}],
+            [
+                {"type": "scale", "scale": [1, 1]},
+                {"type": "translation", "translation": [0, 0]},
+            ],
+        ),
+    )
+    def test_valid_transformations(self, coordinateTransformations):
+        axes = [{"name": "y", "type": "space"}, {"name": "x", "type": "space"}]
+        datasets = [
+            {
+                "path": "0",
+                "coordinateTransformations": coordinateTransformations,
+            }
+        ]
+        write_multiscales_metadata(self.root, datasets, axes=axes)
+        assert "multiscales" in self.root.attrs
+        assert self.root.attrs["multiscales"][0]["axes"] == axes
+        assert self.root.attrs["multiscales"][0]["datasets"] == datasets
+
+    @pytest.mark.parametrize(
+        "coordinateTransformations",
+        (
+            [],
+            None,
+            [{"type": "scale"}],
+            [{"scale": [1, 1]}],
+            [{"type": "scale", "scale": ["1", 1]}],
+            [{"type": "scale", "scale": [1, 1, 1]}],
+            [{"type": "scale", "scale": [1, 1]}, {"type": "scale", "scale": [1, 1]}],
+            [
+                {"type": "scale", "scale": [1, 1]},
+                {"type": "translation", "translation": ["0", 0]},
+            ],
+            [
+                {"type": "translation", "translation": [0, 0]},
+            ],
+            [
+                {"type": "scale", "scale": [1, 1]},
+                {"type": "translation", "translation": [0, 0, 0]},
+            ],
+            [
+                {"type": "translation", "translation": [0, 0]},
+                {"type": "scale", "scale": [1, 1]},
+            ],
+            [
+                {"type": "scale", "scale": [1, 1]},
+                {"type": "translation", "translation": [0, 0]},
+                {"type": "translation", "translation": [1, 0]},
+            ],
+            [
+                {"type": "scale", "scale": [1, 1]},
+                {"translation": [0, 0]},
+            ],
+            [
+                {"type": "scale", "scale": [1, 1]},
+                {"type": "translation", "translate": [0, 0]},
+            ],
+        ),
+    )
+    def test_invalid_transformations(self, coordinateTransformations):
+        axes = [{"name": "y", "type": "space"}, {"name": "x", "type": "space"}]
+        datasets = [
+            {"path": "0", "coordinateTransformations": coordinateTransformations}
+        ]
+        with pytest.raises(ValueError):
+            write_multiscales_metadata(self.root, datasets, axes=axes)
+
 
 class TestPlateMetadata:
     @pytest.fixture(autouse=True)
