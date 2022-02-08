@@ -3,6 +3,7 @@ import pathlib
 import numpy as np
 import pytest
 import zarr
+from numcodecs import Blosc
 
 from ome_zarr.format import CurrentFormat, FormatV01, FormatV02, FormatV03, FormatV04
 from ome_zarr.io import parse_url
@@ -120,6 +121,22 @@ class TestWriter:
             assert transfs[0]["scale"][0] == 1
             for value in transfs[0]["scale"]:
                 assert value >= 1
+
+    def test_write_image_compressed(self):
+        shape = (64, 64, 64)
+        data = self.create_data(shape)
+        compressor = Blosc(cname="zstd", clevel=5, shuffle=Blosc.SHUFFLE)
+        write_image(
+            data, self.group, axes="zyx", storage_options={"compressor": compressor}
+        )
+        group = zarr.open(f"{self.path}/test")
+        assert group["0"].compressor.get_config() == {
+            "id": "blosc",
+            "cname": "zstd",
+            "clevel": 5,
+            "shuffle": Blosc.SHUFFLE,
+            "blocksize": 0,
+        }
 
     def test_validate_coordinate_transforms(self):
 

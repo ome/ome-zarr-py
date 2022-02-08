@@ -174,6 +174,7 @@ def write_multiscale(
     fmt: Format = CurrentFormat(),
     axes: Union[str, List[str], List[Dict[str, str]]] = None,
     coordinate_transformations: List[List[Dict[str, Any]]] = None,
+    storage_options: Union[JSONDict, List[JSONDict]] = None,
 ) -> None:
     """
     Write a pyramid with multiscale metadata to disk.
@@ -198,6 +199,10 @@ def write_multiscale(
       For each path, we have a List of transformation Dicts.
       Each list of dicts are added to each datasets in order
       and must include a 'scale' transform.
+    storage_options: dict or list of dict
+      Options to be passed on to the storage backend. A list would need to match
+      the number of datasets in a multiresolution pyramid. One can provide
+      different chunk size for each level of a pyramind using this option.
     """
 
     dims = len(pyramid[0].shape)
@@ -205,8 +210,16 @@ def write_multiscale(
 
     datasets: List[dict] = []
     for path, data in enumerate(pyramid):
-        # TODO: chunks here could be different per layer
-        group.create_dataset(str(path), data=data, chunks=chunks)
+        options = {}
+        if storage_options:
+            options = (
+                storage_options
+                if not isinstance(storage_options, list)
+                else storage_options[path]
+            )
+        if "chunks" not in options:
+            options["chunks"] = chunks
+        group.create_dataset(str(path), data=data, **options)
         datasets.append({"path": str(path)})
 
     if coordinate_transformations is None:
@@ -357,6 +370,7 @@ def write_image(
     fmt: Format = CurrentFormat(),
     axes: Union[str, List[str], List[Dict[str, str]]] = None,
     coordinate_transformations: List[List[Dict[str, Any]]] = None,
+    storage_options: Union[JSONDict, List[JSONDict]] = None,
     **metadata: JSONDict,
 ) -> None:
     """Writes an image to the zarr store according to ome-zarr specification
@@ -387,6 +401,10 @@ def write_image(
     coordinate_transformations: 2Dlist of dict
       For each resolution, we have a List of transformation Dicts (not validated).
       Each list of dicts are added to each datasets in order.
+    storage_options: dict or list of dict
+      Options to be passed on to the storage backend. A list would need to match
+      the number of datasets in a multiresolution pyramid. One can provide
+      different chunk size for each level of a pyramind using this option.
     """
 
     if image.ndim > 5:
@@ -423,6 +441,7 @@ def write_image(
         fmt=fmt,
         axes=axes,
         coordinate_transformations=coordinate_transformations,
+        storage_options=storage_options,
     )
     group.attrs.update(metadata)
 
