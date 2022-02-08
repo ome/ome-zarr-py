@@ -1,9 +1,9 @@
 import pathlib
 
-from numcodecs import Blosc
 import numpy as np
 import pytest
 import zarr
+from numcodecs import Blosc
 
 from ome_zarr.format import CurrentFormat, FormatV01, FormatV02, FormatV03, FormatV04
 from ome_zarr.io import parse_url
