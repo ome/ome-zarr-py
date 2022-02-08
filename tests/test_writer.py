@@ -125,10 +125,18 @@ class TestWriter:
     def test_write_image_compressed(self):
         shape = (64, 64, 64)
         data = self.create_data(shape)
-        compressor = Blosc(cname='zstd', clevel=5, shuffle=Blosc.SHUFFLE)
-        write_image(data, self.group, axes="zyx", storage_options={"compressor": compressor})
+        compressor = Blosc(cname="zstd", clevel=5, shuffle=Blosc.SHUFFLE)
+        write_image(
+            data, self.group, axes="zyx", storage_options={"compressor": compressor}
+        )
         group = zarr.open(f"{self.path}/test")
-        assert group["0"].compressor.get_config() == {'id': 'blosc', 'cname': 'zstd', 'clevel': 5, 'shuffle': Blosc.SHUFFLE, 'blocksize': 0}
+        assert group["0"].compressor.get_config() == {
+            "id": "blosc",
+            "cname": "zstd",
+            "clevel": 5,
+            "shuffle": Blosc.SHUFFLE,
+            "blocksize": 0,
+        }
 
     def test_validate_coordinate_transforms(self):
 
