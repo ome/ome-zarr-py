@@ -7,6 +7,7 @@ from typing import Any, Dict, Iterator, List, Optional, Type, Union, cast, overl
 
 import dask.array as da
 import numpy as np
+import zarr
 from dask import delayed
 
 from .axes import Axes
@@ -45,21 +46,32 @@ class Node:
         self.post_nodes: List[Node] = []
 
         # TODO: this should be some form of plugin infra over subclasses
+        found: List[Spec] = []
         if Labels.matches(zarr):
-            self.specs.append(Labels(self))
+            found.append(Labels(self))
+            self.specs.append(found[-1])
         if Label.matches(zarr):
-            self.specs.append(Label(self))
+            found.append(Label(self))
+            self.specs.append(found[-1])
         if Multiscales.matches(zarr):
-            self.specs.append(Multiscales(self))
+            found.append(Multiscales(self))
+            self.specs.append(found[-1])
         if OMERO.matches(zarr):
-            self.specs.append(OMERO(self))
+            found.append(OMERO(self))
+            self.specs.append(found[-1])
         if plate_labels:
-            self.specs.append(PlateLabels(self))
+            found.append(PlateLabels(self))
+            self.specs.append(found[-1])
         elif Plate.matches(zarr):
-            self.specs.append(Plate(self))
+            found.append(Plate(self))
+            self.specs.append(found[-1])
             # self.add(zarr, plate_labels=True)
         if Well.matches(zarr):
-            self.specs.append(Well(self))
+            found.append(Well(self))
+            self.specs.append(found[-1])
+
+        if not found:
+            self.specs.append(Implicit(self))
 
     @overload
     def first(self, spectype: Type["Well"]) -> Optional["Well"]:
@@ -176,6 +188,25 @@ class Spec(ABC):
 
     def lookup(self, key: str, default: Any) -> Any:
         return self.zarr.root_attrs.get(key, default)
+
+
+class Implicit(Spec):
+    """
+    A spec-type which simply iterates over available zgroups.
+    """
+
+    @staticmethod
+    def matches(zarr: ZarrLocation) -> bool:
+        """Always return true"""
+        return True
+
+    def __init__(self, node: Node) -> None:
+        super().__init__(node)
+
+        for name in zarr.group(self.zarr.store).group_keys():
+            child_zarr = self.zarr.create(name)
+            if child_zarr.exists():
+                node.add(child_zarr)
 
 
 class Labels(Spec):
