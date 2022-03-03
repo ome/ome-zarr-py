@@ -73,6 +73,12 @@ class Node:
         if not found:
             self.specs.append(Implicit(self))
 
+        # Load up the hierarchy
+        if Leaf.matches(zarr):
+            self.specs.append(Leaf(self))
+        else:
+            self.specs.append(Root(self))
+
     @overload
     def first(self, spectype: Type["Well"]) -> Optional["Well"]:
         ...
@@ -207,6 +213,41 @@ class Implicit(Spec):
             child_zarr = self.zarr.create(name)
             if child_zarr.exists():
                 node.add(child_zarr)
+
+
+class Leaf(Spec):
+    """
+    A non-root level of the Zarr hierarchy
+    """
+
+    @staticmethod
+    def matches(zarr: ZarrLocation) -> bool:
+        """Return if the parent directory is within the zarr fileset"""
+
+        parent_zarr = zarr.create("..")
+        return bool(parent_zarr.exists() and (parent_zarr.zgroup or parent_zarr.zarray))
+
+    def __init__(self, node: Node) -> None:
+        super().__init__(node)
+        parent_zarr = node.zarr.create("..")
+        if parent_zarr.exists() and (parent_zarr.zgroup or parent_zarr.zarray):
+            node.add(parent_zarr)
+
+
+class Root(Spec):
+    """
+    Root of the Zarr fileset
+    """
+
+    @staticmethod
+    def matches(zarr: ZarrLocation) -> bool:
+        """Return if the parent directory is not within the zarr fileset"""
+
+        parent_zarr = zarr.create("..")
+        return parent_zarr.exists() and not (parent_zarr.zgroup or parent_zarr.zarray)
+
+    def __init__(self, node: Node) -> None:
+        super().__init__(node)
 
 
 class Labels(Spec):
