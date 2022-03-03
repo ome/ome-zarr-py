@@ -1,6 +1,7 @@
 black
 cython >= 0.29.16
 numpy >= 1.16.0
+entrypoints
 pre-commit
 tox
 wheel
