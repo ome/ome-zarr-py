@@ -6,6 +6,7 @@ from abc import ABC
 from typing import Any, Dict, Iterator, List, Optional, Type, Union, cast, overload
 
 import dask.array as da
+import entrypoints
 import numpy as np
 import zarr
 from dask import delayed
@@ -69,6 +70,12 @@ class Node:
         if Well.matches(zarr):
             found.append(Well(self))
             self.specs.append(found[-1])
+
+        for key, value in entrypoints.get_group_named("ome_zarr.spec").items():
+            cls = value.load()
+            if cls.matches(zarr):
+                found.append(cls(self))
+                self.specs.append(found[-1])
 
         if not found:
             self.specs.append(Implicit(self))
