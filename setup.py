@@ -2,7 +2,6 @@
 
 import codecs
 import os
-from typing import List
 
 from setuptools import setup
 
@@ -12,17 +11,13 @@ def read(fname):
     return codecs.open(file_path, encoding="utf-8").read()
 
 
-install_requires: List[List[str]] = []
-install_requires += (["dataclasses;python_version<'3.7'"],)
-install_requires += (["tifffile<2020.09.22;python_version<'3.7'"],)
-install_requires += (["numpy"],)
-install_requires += (["dask"],)
-install_requires += (["zarr>=2.8.1"],)
-install_requires += (["fsspec[s3]!=2021.07.0"],)
-install_requires += (["aiohttp"],)
-install_requires += (["requests"],)
-install_requires += (["scikit-image"],)
-install_requires += (["toolz"],)
+def get_requirements(filename="requirements.txt"):
+    with open(filename) as f:
+        rv = f.read().splitlines()
+    return rv
+
+
+install_requires = get_requirements()
 
 
 setup(

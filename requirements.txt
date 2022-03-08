@@ -1,0 +1,10 @@
+dataclasses;python_version<'3.7'
+tifffile<2020.09.22;python_version<'3.7'
+numpy
+dask
+zarr>=2.8.1
+fsspec[s3]!=2021.07.0
+aiohttp
+requests
+scikit-image
+toolz
