@@ -2,7 +2,7 @@ API
 ===
 
 write_image
-===========
+-----------
 
 Write image data to an OME-NGFF file.
 

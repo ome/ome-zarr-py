@@ -9,5 +9,7 @@ Contents
 
 .. toctree::
 
-   usage
+   intro
+   cli
+   python
    api
