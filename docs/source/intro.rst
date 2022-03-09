@@ -9,8 +9,8 @@ Features
 --------
 
 - Use as a image reader plugin for `napari`_. See `napari-ome-zarr`_.
-- Simple command-line to read and download conforming Zarr filesets.
-- Helper methods for parsing related metadata.
+- Simple :doc:`cli` to read and download conforming OME-NGFF filesets.
+- :doc:`python` for reading and writing OME-NGFF filesets.
 
 
 Installation
