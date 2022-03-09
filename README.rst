@@ -164,6 +164,16 @@ specifying ``major``, ``minor`` or ``patch`` depending on whether the developmen
 Remember to ``git push`` all commits and tags.
 
 
+Documentation
+-------------
+
+Documentation will be automatically build with `readthedocs`.
+
+It can be built locally with:
+
+    pip install spinx
+    sphinx-build -b html docs/source/ docs/build/html
+
 License
 -------
 

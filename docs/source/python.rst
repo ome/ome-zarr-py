@@ -4,8 +4,16 @@ ome_zarr python library
 writing OME-NGFF images
 -----------------------
 
+The principle entry-point for writing OME-NGFF images is :py:func:`ome_zarr.writer.write_image`.
+This takes an n-dimensional `numpy` array and writes it to the specified `zarr group` according
+to the OME-NGFF specification.
+By default, a pyramid of resolution levels will be created by down-sampling the data by a factor
+of 2 in the X and Y dimensions.
 
-Sample code for creating a 3D Image in OME-Zarr with labels::
+Alternatively, the :py:func:`ome_zarr.writer.write_multiscale` can be used, which takes a
+"pyramid" `numpy` arrays.
+
+The following code creates a 3D Image in OME-Zarr with labels::
 
     import numpy as np
     import zarr
@@ -28,6 +36,7 @@ Sample code for creating a 3D Image in OME-Zarr with labels::
     store = parse_url(path, mode="w").store
     root = zarr.group(store=store)
     write_image(image=data, group=root, chunks=(1, size_xy, size_xy), axes="zyx")
+    # optional rendering settings
     root.attrs["omero"] = {
         "channels": [{
             "color": "00FFFF",
