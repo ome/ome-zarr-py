@@ -179,8 +179,6 @@ def write_multiscale(
     """
     Write a pyramid with multiscale metadata to disk.
 
-    Parameters
-    ----------
     pyramid: List of np.ndarray
       the image data to save. Largest level first
       All image arrays MUST be up to 5-dimensional with dimensions
@@ -375,8 +373,6 @@ def write_image(
 ) -> None:
     """Writes an image to the zarr store according to ome-zarr specification
 
-    Parameters
-    ----------
     image: np.ndarray
       the image data to save. A downsampling of the data will be computed
       if the scaler argument is non-None.
