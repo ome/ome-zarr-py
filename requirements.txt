@@ -4,7 +4,8 @@ numpy
 dask
 zarr>=2.8.1
 fsspec[s3]!=2021.07.0
-aiohttp
+# See https://github.com/fsspec/filesystem_spec/issues/819
+aiohttp<4
 requests
 scikit-image
 toolz
