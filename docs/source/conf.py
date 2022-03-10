@@ -12,3 +12,9 @@ extensions = [
 
 # use index.rst instead of contents.rst
 master_doc = "index"
+
+# -- Project information -----------------------------------------------------
+
+project = "ome-zarr-py"
+copyright = "Open Microscopy Environment"  # noqa: A001
+author = "Open Microscopy Environment"
