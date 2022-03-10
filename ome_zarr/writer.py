@@ -244,8 +244,6 @@ def write_multiscales_metadata(
     """
     Write the multiscales metadata in the group.
 
-    Parameters
-    ----------
     group: zarr.Group
       the group within the zarr store to write the metadata in.
     datasets: list of dicts
@@ -295,8 +293,6 @@ def write_plate_metadata(
     """
     Write the plate metadata in the group.
 
-    Parameters
-    ----------
     group: zarr.Group
       the group within the zarr store to write the metadata in.
     rows: list of str
@@ -339,8 +335,6 @@ def write_well_metadata(
     """
     Write the well metadata in the group.
 
-    Parameters
-    ----------
     group: zarr.Group
       the group within the zarr store to write the metadata in.
     image_paths: list of str or dict
