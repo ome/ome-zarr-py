@@ -31,6 +31,3 @@ python:
   install:
     - method: pip
       path: .
-
-submodules:
-  include: all
