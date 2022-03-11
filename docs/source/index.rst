@@ -1,8 +1,9 @@
 Welcome to ome-zarr-py documentation
 ====================================
 
-**ome zarr** is a Python library for reading and writing image data
-to OME-NGFF files.
+**ome zarr** is a Python library for reading and writing multi-resolution images stored
+as Zarr filesets, according to the `OME NGFF spec`_.
+
 
 Contents
 --------
@@ -13,3 +14,5 @@ Contents
    cli
    python
    api
+
+.. _`OME NGFF spec`: https://github.com/ome/ngff

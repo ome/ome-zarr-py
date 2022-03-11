@@ -10,7 +10,7 @@ Features
 
 - :doc:`cli` for reading and downloading OME-NGFF filesets.
 - :doc:`python` for reading and writing OME-NGFF filesets.
-- `ome-zarr-py`` is used by the `napari-ome-zarr`_ plugin for viewing OME-NGFF filesets in `napari`.
+- `ome-zarr-py` is used by the `napari-ome-zarr`_ plugin for viewing OME-NGFF filesets in `napari`.
 
 
 Installation
