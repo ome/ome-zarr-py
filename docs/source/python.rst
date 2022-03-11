@@ -1,7 +1,7 @@
 ome_zarr python library
 =======================
 
-writing OME-NGFF images
+Writing OME-NGFF images
 -----------------------
 
 The principle entry-point for writing OME-NGFF images is :py:func:`ome_zarr.writer.write_image`.
