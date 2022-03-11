@@ -167,7 +167,7 @@ Remember to ``git push`` all commits and tags.
 Documentation
 -------------
 
-Documentation will be automatically build with `readthedocs`.
+Documentation will be automatically built with `readthedocs`.
 
 It can be built locally with:
 
