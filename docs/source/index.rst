@@ -1,4 +1,4 @@
-Welcome to ome-zarr-py documentation!
+Welcome to ome-zarr-py documentation
 =====================================
 
 **ome zarr** is a Python library for reading and writing image data
