@@ -1,6 +1,6 @@
 
-Command-line Tools
-------------------
+Command-line Tool
+-----------------
 
 Open Zarr filesets containing images with associated OME metadata.
 The examples below use the image at http://idr.openmicroscopy.org/webclient/?show=image-6001240.

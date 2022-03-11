@@ -2,15 +2,15 @@
 ome-zarr-py
 ===========
 
-Experimental support for multi-resolution images stored in Zarr filesets, according to the `OME zarr spec`_.
+Tools for reading and writing multi-resolution images stored in Zarr filesets, according to the `OME NGFF spec`_.
 
 
 Features
 --------
 
-- Use as a image reader plugin for `napari`_. See `napari-ome-zarr`_.
-- Simple :doc:`cli` to read and download conforming OME-NGFF filesets.
+- :doc:`cli` for reading and downloading OME-NGFF filesets.
 - :doc:`python` for reading and writing OME-NGFF filesets.
+- `ome-zarr-py`` is used by the `napari-ome-zarr`_ plugin for viewing OME-NGFF filesets in `napari`.
 
 
 Installation
@@ -21,7 +21,7 @@ Install the latest release of `ome-zarr`_ from PyPI::
     pip install ome-zarr
 
 
-Install developer mode to run from your current branch::
+Installation for developers::
 
     git clone git@github.com:ome/ome-zarr-py.git
     cd ome-zarr-py
@@ -34,7 +34,7 @@ License
 Distributed under the terms of the `BSD`_ license,
 "ome-zarr-py" is free and open source software
 
-.. _`OME zarr spec`: https://github.com/ome/ngff
+.. _`OME NGFF spec`: https://github.com/ome/ngff
 .. _`@napari`: https://github.com/napari
 .. _`BSD`: https://opensource.org/licenses/BSD-2-Clause
 .. _`Apache Software License 2.0`: http://www.apache.org/licenses/LICENSE-2.0
