@@ -67,7 +67,7 @@ to specify the data-type for each column (string by default).
  - `s`: `StringColumn`, for text
  - `b`: `BoolColumn`, for true/false
 
-Use e.g. `#d` as a suffix in the column name to denote a `float` column, no spaces etc:
+Use e.g. `#d` as a suffix in the column name to denote a `float` column, no spaces etc.:
 ```
 "area#d,label_text#s,Width#l,Height#l"
 ```
