@@ -179,8 +179,6 @@ def write_multiscale(
     """
     Write a pyramid with multiscale metadata to disk.
 
-    Parameters
-    ----------
     pyramid: List of np.ndarray
       the image data to save. Largest level first
       All image arrays MUST be up to 5-dimensional with dimensions
@@ -246,8 +244,6 @@ def write_multiscales_metadata(
     """
     Write the multiscales metadata in the group.
 
-    Parameters
-    ----------
     group: zarr.Group
       the group within the zarr store to write the metadata in.
     datasets: list of dicts
@@ -297,8 +293,6 @@ def write_plate_metadata(
     """
     Write the plate metadata in the group.
 
-    Parameters
-    ----------
     group: zarr.Group
       the group within the zarr store to write the metadata in.
     rows: list of str
@@ -341,8 +335,6 @@ def write_well_metadata(
     """
     Write the well metadata in the group.
 
-    Parameters
-    ----------
     group: zarr.Group
       the group within the zarr store to write the metadata in.
     image_paths: list of str or dict
@@ -375,8 +367,6 @@ def write_image(
 ) -> None:
     """Writes an image to the zarr store according to ome-zarr specification
 
-    Parameters
-    ----------
     image: np.ndarray
       the image data to save. A downsampling of the data will be computed
       if the scaler argument is non-None.

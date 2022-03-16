@@ -5,3 +5,4 @@ var
 build
 dist/
 target/
+docs/build/
