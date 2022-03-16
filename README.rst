@@ -1,3 +1,5 @@
+|pypi| |docs| |coverage|
+
 ===========
 ome-zarr-py
 ===========
@@ -48,3 +50,17 @@ Distributed under the terms of the `BSD`_ license,
 .. _`napari`: https://github.com/napari/napari
 .. _`napari-ome-zarr`: https://github.com/ome/napari-ome-zarr
 .. _`ome-zarr`: https://pypi.org/project/ome-zarr/
+
+.. |pypi| image:: https://badge.fury.io/py/ome-zarr.svg
+    :alt: PyPI project
+    :target: https://badge.fury.io/py/ome-zarr
+
+.. |docs| image:: https://readthedocs.org/projects/ome-zarr/badge/?version=stable
+    :alt: Documentation Status
+    :scale: 100%
+    :target: https://ome-zarr.readthedocs.io/en/latest/?badge=latest
+
+.. |coverage| image:: https://codecov.io/gh/ome/ome-zarr-py/branch/master/graph/badge.svg
+    :alt: Test coverage
+    :scale: 100%
+    :target: https://codecov.io/gh/ome/ome-zarr-py
