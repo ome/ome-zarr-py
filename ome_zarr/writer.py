@@ -274,7 +274,7 @@ def write_multiscales_metadata(
         {
             "version": fmt.version,
             "datasets": _validate_datasets(datasets, ndim, fmt),
-            **metadata
+            **metadata,
         }
     ]
     if axes is not None:
@@ -435,7 +435,7 @@ def write_image(
         axes=axes,
         coordinate_transformations=coordinate_transformations,
         storage_options=storage_options,
-        **metadata
+        **metadata,
     )
 
 
@@ -492,7 +492,15 @@ def write_multiscale_image_labels(
     """
     sub_group = group.require_group(f"labels/{name}")
     write_multiscale(
-        pyramid, sub_group, chunks, fmt, axes, coordinate_transformations, storage_options, name=name, **metadata
+        pyramid,
+        sub_group,
+        chunks,
+        fmt,
+        axes,
+        coordinate_transformations,
+        storage_options,
+        name=name,
+        **metadata,
     )
 
     image_label_metadata = {}
