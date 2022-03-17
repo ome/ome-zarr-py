@@ -175,6 +175,7 @@ def write_multiscale(
     axes: Union[str, List[str], List[Dict[str, str]]] = None,
     coordinate_transformations: List[List[Dict[str, Any]]] = None,
     storage_options: Union[JSONDict, List[JSONDict]] = None,
+    **metadata: JSONDict,
 ) -> None:
     """
     Write a pyramid with multiscale metadata to disk.
@@ -232,7 +233,7 @@ def write_multiscale(
         for dataset, transform in zip(datasets, coordinate_transformations):
             dataset["coordinateTransformations"] = transform
 
-    write_multiscales_metadata(group, datasets, fmt, axes)
+    write_multiscales_metadata(group, datasets, fmt, axes, **metadata)
 
 
 def write_multiscales_metadata(
@@ -240,6 +241,7 @@ def write_multiscales_metadata(
     datasets: List[dict],
     fmt: Format = CurrentFormat(),
     axes: Union[str, List[str], List[Dict[str, str]]] = None,
+    **metadata: JSONDict,
 ) -> None:
     """
     Write the multiscales metadata in the group.
@@ -272,6 +274,7 @@ def write_multiscales_metadata(
         {
             "version": fmt.version,
             "datasets": _validate_datasets(datasets, ndim, fmt),
+            **metadata
         }
     ]
     if axes is not None:
@@ -432,8 +435,8 @@ def write_image(
         axes=axes,
         coordinate_transformations=coordinate_transformations,
         storage_options=storage_options,
+        **metadata
     )
-    group.attrs.update(metadata)
 
 
 def _retuple(
