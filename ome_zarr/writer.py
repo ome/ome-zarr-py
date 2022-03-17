@@ -439,6 +439,75 @@ def write_image(
     )
 
 
+def write_multiscale_image_labels(
+    pyramid: List,
+    group: zarr.Group,
+    name: str,
+    chunks: Union[Tuple[Any, ...], int] = None,
+    fmt: Format = CurrentFormat(),
+    axes: Union[str, List[str], List[Dict[str, str]]] = None,
+    coordinate_transformations: List[List[Dict[str, Any]]] = None,
+    colors: List[JSONDict] = None,
+    properties: List[JSONDict] = None,
+    storage_options: Union[JSONDict, List[JSONDict]] = None,
+    **metadata: JSONDict,
+) -> None:
+    """
+    Write image labels in pyramidal format with multiscale and image-label metadata to disk.
+
+    Creates the label data in the sub-group "labels/{name}"
+
+    pyramid: List of np.ndarray
+      the image label data to save. Largest level first
+      All image arrays MUST be up to 5-dimensional with dimensions
+      ordered (t, c, z, y, x)
+    group: zarr.Group
+      the group within the zarr store to store the data in
+    name: str
+      the name of this labale data
+    chunks: int or tuple of ints,
+      size of the saved chunks to store the image
+    fmt: Format
+      The format of the ome_zarr data which should be used.
+      Defaults to the most current.
+    axes: str or list of str or list of dict
+      List of axes dicts, or names. Not needed for v0.1 or v0.2
+      or if 2D. Otherwise this must be provided
+    coordinate_transformations: 2Dlist of dict
+      For each path, we have a List of transformation Dicts.
+      Each list of dicts are added to each datasets in order
+      and must include a 'scale' transform.
+    colors: list of dict
+      Fixed colors for (a subset of) the label values.
+      Each dict specifies the color for one label and must contain the fields
+      "label-value" and "rgba".
+    properties: list of dict
+      Additional properties for (a subset of) the label values.
+      Each dict specifies additional properties for one label.
+      It must contain the field "label-value" and may contain arbitrary additional properties.
+    storage_options: dict or list of dict
+      Options to be passed on to the storage backend. A list would need to match
+      the number of datasets in a multiresolution pyramid. One can provide
+      different chunk size for each level of a pyramind using this option.
+    """
+    sub_group = group.require_group(f"labels/{name}")
+    write_multiscale(
+        pyramid, sub_group, chunks, fmt, axes, coordinate_transformations, storage_options, name=name, **metadata
+    )
+
+    image_label_metadata = {}
+    if colors is not None:
+        image_label_metadata["colors"] = colors
+    if properties is not None:
+        image_label_metadata["properties"] = properties
+    sub_group.attrs["image-label"] = image_label_metadata
+
+    label_group = group["labels"]
+    label_list = label_group.attrs.get("labels", [])
+    label_list.append(name)
+    label_group.attrs["labels"] = label_list
+
+
 def _retuple(
     chunks: Union[Tuple[Any, ...], int], shape: Tuple[Any, ...]
 ) -> Tuple[Any, ...]:
