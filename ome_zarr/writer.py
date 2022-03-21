@@ -439,7 +439,47 @@ def write_image(
     )
 
 
-def write_multiscale_image_labels(
+# how do we actually validate this?
+# do we have a schema for the image-label metadata already?
+def write_label_metadata(
+    group: zarr.Group,
+    name: str,
+    colors: List[JSONDict] = None,
+    properties: List[JSONDict] = None,
+    **metadata: JSONDict
+):
+    """
+    Write image-label metadata to the group.
+
+    The label data must have been written to a sub-group with the same name as the second argument.
+
+    group: zarr.Group
+      the top-level label group within the zarr store
+    name: str
+      the name of the label sub-group
+    colors: list of JSONDict
+      Fixed colors for (a subset of) the label values.
+      Each dict specifies the color for one label and must contain the fields
+      "label-value" and "rgba".
+    properties: list of JSONDict
+      Additional properties for (a subset of) the label values.
+      Each dict specifies additional properties for one label.
+      It must contain the field "label-value" and may contain arbitrary additional properties.
+    """
+    label_group = group[name]
+    image_label_metadata = {**metadata}
+    if colors is not None:
+        image_label_metadata["colors"] = colors
+    if properties is not None:
+        image_label_metadata["properties"] = properties
+    label_group.attrs["image-label"] = image_label_metadata
+
+    label_list = group.attrs.get("labels", [])
+    label_list.append(name)
+    group.attrs["labels"] = label_list
+
+
+def write_multiscale_labels(
     pyramid: List,
     group: zarr.Group,
     name: str,
@@ -447,9 +487,8 @@ def write_multiscale_image_labels(
     fmt: Format = CurrentFormat(),
     axes: Union[str, List[str], List[Dict[str, str]]] = None,
     coordinate_transformations: List[List[Dict[str, Any]]] = None,
-    colors: List[JSONDict] = None,
-    properties: List[JSONDict] = None,
     storage_options: Union[JSONDict, List[JSONDict]] = None,
+    label_metadata: JSONDict = None,
     **metadata: JSONDict,
 ) -> None:
     """
@@ -477,35 +516,18 @@ def write_multiscale_image_labels(
       For each path, we have a List of transformation Dicts.
       Each list of dicts are added to each datasets in order
       and must include a 'scale' transform.
-    colors: list of dict
-      Fixed colors for (a subset of) the label values.
-      Each dict specifies the color for one label and must contain the fields
-      "label-value" and "rgba".
-    properties: list of dict
-      Additional properties for (a subset of) the label values.
-      Each dict specifies additional properties for one label.
-      It must contain the field "label-value" and may contain arbitrary additional properties.
     storage_options: dict or list of dict
       Options to be passed on to the storage backend. A list would need to match
       the number of datasets in a multiresolution pyramid. One can provide
       different chunk size for each level of a pyramind using this option.
+    label_metadata: JSONDict
+      image label metadata. See 'write_label_metadata' for details
     """
     sub_group = group.require_group(f"labels/{name}")
     write_multiscale(
         pyramid, sub_group, chunks, fmt, axes, coordinate_transformations, storage_options, name=name, **metadata
     )
-
-    image_label_metadata = {}
-    if colors is not None:
-        image_label_metadata["colors"] = colors
-    if properties is not None:
-        image_label_metadata["properties"] = properties
-    sub_group.attrs["image-label"] = image_label_metadata
-
-    label_group = group["labels"]
-    label_list = label_group.attrs.get("labels", [])
-    label_list.append(name)
-    label_group.attrs["labels"] = label_list
+    write_label_metadata(group["labels"], name, **({} if label_metadata is None else label_metadata))
 
 
 def _retuple(
