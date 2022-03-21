@@ -434,7 +434,7 @@ def write_image(
         axes=axes,
         coordinate_transformations=coordinate_transformations,
         storage_options=storage_options,
-        **metadata
+        **metadata,
     )
 
 
@@ -524,7 +524,15 @@ def write_multiscale_labels(
     """
     sub_group = group.require_group(f"labels/{name}")
     write_multiscale(
-        pyramid, sub_group, chunks, fmt, axes, coordinate_transformations, storage_options, name=name, **metadata
+        pyramid,
+        sub_group,
+        chunks,
+        fmt,
+        axes,
+        coordinate_transformations,
+        storage_options,
+        name=name,
+        **metadata,
     )
     write_label_metadata(group["labels"], name, **({} if label_metadata is None else label_metadata))
 
