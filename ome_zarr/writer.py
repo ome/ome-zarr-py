@@ -270,12 +270,11 @@ def write_multiscales_metadata(
             if axes is not None:
                 ndim = len(axes)
 
+    # note: we construct the multiscale metadata via 'dict(...)' rather than `{...}` in order
+    # to avoid duplication of protected keys like 'version' in **metadata
+    # (for {} this would silently over-write it, with dict() it explicitly fails)
     multiscales = [
-        {
-            "version": fmt.version,
-            "datasets": _validate_datasets(datasets, ndim, fmt),
-            **metadata
-        }
+        dict(version=fmt.version, datasets=_validate_datasets(datasets, ndim, fmt), **metadata)
     ]
     if axes is not None:
         multiscales[0]["axes"] = axes
