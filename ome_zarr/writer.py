@@ -175,7 +175,7 @@ def write_multiscale(
     axes: Union[str, List[str], List[Dict[str, str]]] = None,
     coordinate_transformations: List[List[Dict[str, Any]]] = None,
     storage_options: Union[JSONDict, List[JSONDict]] = None,
-    **metadata: JSONDict,
+    **metadata: Union[str, JSONDict, List[JSONDict]],
 ) -> None:
     """
     Write a pyramid with multiscale metadata to disk.
@@ -241,7 +241,7 @@ def write_multiscales_metadata(
     datasets: List[dict],
     fmt: Format = CurrentFormat(),
     axes: Union[str, List[str], List[Dict[str, str]]] = None,
-    **metadata: JSONDict,
+    **metadata: Union[str, JSONDict, List[JSONDict]],
 ) -> None:
     """
     Write the multiscales metadata in the group.
@@ -369,7 +369,7 @@ def write_image(
     axes: Union[str, List[str], List[Dict[str, str]]] = None,
     coordinate_transformations: List[List[Dict[str, Any]]] = None,
     storage_options: Union[JSONDict, List[JSONDict]] = None,
-    **metadata: JSONDict,
+    **metadata: Union[str, JSONDict, List[JSONDict]],
 ) -> None:
     """Writes an image to the zarr store according to ome-zarr specification
 
@@ -425,13 +425,13 @@ def write_image(
                 "Can't downsample if size of x or y dimension is 1. "
                 "Shape: %s" % (image.shape,)
             )
-        image = scaler.nearest(image)
+        mip = scaler.nearest(image)
     else:
         LOGGER.debug("disabling pyramid")
-        image = [image]
+        mip = [image]
 
     write_multiscale(
-        image,
+        mip,
         group,
         chunks=chunks,
         fmt=fmt,
@@ -449,7 +449,7 @@ def write_label_metadata(
     name: str,
     colors: List[JSONDict] = None,
     properties: List[JSONDict] = None,
-    **metadata: JSONDict,
+    **metadata: Union[List[JSONDict], JSONDict, str],
 ):
     """
     Write image-label metadata to the group.
