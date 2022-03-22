@@ -10,7 +10,7 @@ import numpy as np
 from dask import delayed
 from jsonschema import validate as jsonschema_validate
 from jsonschema.validators import validator_for
-from ngff.schemas import LocalRefResolver, get_schema
+from ome_ngff.schemas import LocalRefResolver, get_schema
 
 from .axes import Axes
 from .format import CurrentFormat, format_from_version
