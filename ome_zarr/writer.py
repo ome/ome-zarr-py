@@ -270,7 +270,7 @@ def write_multiscales_metadata(
             if axes is not None:
                 ndim = len(axes)
 
-    # note: we construct the multiscale metadata via 'dict(...)' rather than `{...}` in order
+    # note: we construct the multiscale metadata via dict(), rather than {}
     # to avoid duplication of protected keys like 'version' in **metadata
     # (for {} this would silently over-write it, with dict() it explicitly fails)
     multiscales = [
@@ -450,11 +450,12 @@ def write_label_metadata(
     colors: List[JSONDict] = None,
     properties: List[JSONDict] = None,
     **metadata: Union[List[JSONDict], JSONDict, str],
-):
+) -> None:
     """
     Write image-label metadata to the group.
 
-    The label data must have been written to a sub-group with the same name as the second argument.
+    The label data must have been written to a sub-group,
+    with the same name as the second argument.
 
     group: zarr.Group
       the top-level label group within the zarr store
@@ -467,7 +468,8 @@ def write_label_metadata(
     properties: list of JSONDict
       Additional properties for (a subset of) the label values.
       Each dict specifies additional properties for one label.
-      It must contain the field "label-value" and may contain arbitrary additional properties.
+      It must contain the field "label-value"
+      and may contain arbitrary additional properties.
     """
     label_group = group[name]
     image_label_metadata = {**metadata}
@@ -495,8 +497,9 @@ def write_multiscale_labels(
     **metadata: JSONDict,
 ) -> None:
     """
-    Write image labels in pyramidal format with multiscale and image-label metadata to disk.
+    Write pyramidal image labels to disk.
 
+    Including the multiscales and image-label metadata.
     Creates the label data in the sub-group "labels/{name}"
 
     pyramid: List of np.ndarray
