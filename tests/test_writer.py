@@ -920,7 +920,7 @@ class TestLabelWriter:
             assert node.data[0].ndim == 5
         else:
             assert node.data[0].shape == shape
-        print("node.metadata", node.metadata)
+
         if version.version not in ("0.1", "0.2", "0.3"):
             for transf, expected in zip(
                 node.metadata["coordinateTransformations"], transformations
@@ -936,3 +936,47 @@ class TestLabelWriter:
 
         label_group = zarr.open(f"{self.path}/labels/{label_name}", "r")
         assert "image-label" in label_group.attrs
+
+        # Verify multiscale metadata
+        name = label_group.attrs["multiscales"][0].get("name", "")
+        assert label_name == name
+
+    def test_two_label_images(self):
+        axes = "tczyx"
+        transformations = []
+        for dataset_transfs in TRANSFORMATIONS:
+            transf = dataset_transfs[0]
+            transformations.append(
+                [{"type": "scale", "scale": transf["scale"]}]
+            )
+
+        # create the root level image data
+        shape = (1, 2, 1, 256, 256)
+        scaler = Scaler()
+        self.create_image_data(
+            shape, scaler, axes=axes, version=FormatV04(), transformations=transformations
+        )
+
+        label_names = ("first_labels", "second_labels")
+        for label_name in label_names:
+            label_data = np.random.randint(0, 1000, size=shape)
+            labels_mip = scaler.nearest(label_data)
+
+            write_multiscale_labels(
+                labels_mip,
+                self.root,
+                name=label_name,
+                axes=axes,
+                coordinate_transformations=transformations,
+            )
+
+            label_group = zarr.open(f"{self.path}/labels/{label_name}", "r")
+            assert "image-label" in label_group.attrs
+            name = label_group.attrs["multiscales"][0].get("name", "")
+            assert label_name == name
+
+        # Verify label metadata
+        label_root = zarr.open(f"{self.path}/labels", "r")
+        assert "labels" in label_root.attrs
+        assert len(label_root.attrs["labels"]) == len(label_names)
+        assert all(label_name in label_root.attrs["labels"] for label_name in label_names)

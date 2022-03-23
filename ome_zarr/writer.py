@@ -442,8 +442,6 @@ def write_image(
     )
 
 
-# how do we actually validate this?
-# do we have a schema for the image-label metadata already?
 def write_label_metadata(
     group: zarr.Group,
     name: str,
