@@ -3,7 +3,7 @@
 import json
 import logging
 from pathlib import Path
-from typing import Iterator, List
+from typing import Callable, Iterator, List
 
 import dask
 import dask.array as da
@@ -17,21 +17,26 @@ from .types import JSONDict
 LOGGER = logging.getLogger("ome_zarr.utils")
 
 
+def visit(path: str, func: Callable) -> Iterator[Node]:
+    """Call func(node) for each node read from path."""
+    zarr = parse_url(path)
+    assert zarr, f"not a zarr: {zarr}"
+    reader = Reader(zarr)
+    for node in reader():
+        if not node.specs:
+            print(f"not an ome-zarr node: {node}")
+            continue
+        yield func(node)
+
+
 def info(path: str, stats: bool = False) -> Iterator[Node]:
     """Print information about an OME-Zarr fileset.
 
     All :class:`Nodes <ome_utils.reader.Node>` that are found from the given path will
     be visited recursively.
     """
-    zarr = parse_url(path)
-    assert zarr, f"not a zarr: {zarr}"
-    reader = Reader(zarr)
-    for node in reader():
 
-        if not node.specs:
-            print(f"not an ome-zarr node: {node}")
-            continue
-
+    def func(node: Node) -> Node:
         print(node)
         print(" - metadata")
         for spec in node.specs:
@@ -43,7 +48,9 @@ def info(path: str, stats: bool = False) -> Iterator[Node]:
                 minmax = f" minmax={dask.compute(array.min(), array.max())}"
             print(f"   - {array.shape}{minmax}")
         LOGGER.debug(node.data)
-        yield node
+        return node
+
+    return visit(path, func)
 
 
 def validate(path: str, warnings: bool) -> Iterator[Node]:
@@ -53,17 +60,13 @@ def validate(path: str, warnings: bool) -> Iterator[Node]:
     All :class:`Nodes <ome_utils.reader.Node>` that are found from the given path will
     be visited recursively.
     """
-    zarr = parse_url(path)
-    assert zarr, f"not a zarr: {zarr}"
-    reader = Reader(zarr)
-    for node in reader():
-        if not node.specs:
-            print(f"not an ome-zarr node: {node}")
-            continue
 
+    def func(node: Node) -> Node:
         if hasattr(node, "validate"):
             node.validate(warnings)
-        yield node
+        return node
+
+    return visit(path, func)
 
 
 def download(input_path: str, output_dir: str = ".") -> None:
