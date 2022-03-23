@@ -946,15 +946,17 @@ class TestLabelWriter:
         transformations = []
         for dataset_transfs in TRANSFORMATIONS:
             transf = dataset_transfs[0]
-            transformations.append(
-                [{"type": "scale", "scale": transf["scale"]}]
-            )
+            transformations.append([{"type": "scale", "scale": transf["scale"]}])
 
         # create the root level image data
         shape = (1, 2, 1, 256, 256)
         scaler = Scaler()
         self.create_image_data(
-            shape, scaler, axes=axes, version=FormatV04(), transformations=transformations
+            shape,
+            scaler,
+            axes=axes,
+            version=FormatV04(),
+            transformations=transformations,
         )
 
         label_names = ("first_labels", "second_labels")
@@ -979,4 +981,6 @@ class TestLabelWriter:
         label_root = zarr.open(f"{self.path}/labels", "r")
         assert "labels" in label_root.attrs
         assert len(label_root.attrs["labels"]) == len(label_names)
-        assert all(label_name in label_root.attrs["labels"] for label_name in label_names)
+        assert all(
+            label_name in label_root.attrs["labels"] for label_name in label_names
+        )
