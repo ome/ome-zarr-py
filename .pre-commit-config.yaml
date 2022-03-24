@@ -59,7 +59,7 @@ repos:
           "--max-line-length=88",
           # Conflicts with black: E203 whitespace before ':'
           "--ignore=E203",
-          "--rst-roles=class,func,ref,module,const",
+          "--rst-roles=class,func,ref,mod,const",
         ]
 
   - repo: https://github.com/pre-commit/mirrors-mypy

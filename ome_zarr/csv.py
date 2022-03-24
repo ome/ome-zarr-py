@@ -41,11 +41,11 @@ def csv_to_zarr(
     Column types can be specified with #d (float), #l (int) or #b (boolean)
     e.g. "col1#d,col2#l,col5"
 
-    @param csv_path         Path to the CSV file
-    @param csv_id           Name of the CSV column to use as a row ID
-    @param csv_keys         Names of the columns to add to properties.
-    @param zarr_path        Path to the ome-zarr Plate that has labels with properties
-    @param zarr_id          Key of the label property to use for picking csv row
+    :param csv_path:        Path to the CSV file
+    :param csv_id:          Name of the CSV column to use as a row ID
+    :param csv_keys:        Names of the columns to add to properties.
+    :param zarr_path:       Path to the ome-zarr Plate that has labels with properties
+    :param zarr_id:         Key of the label property to use for picking csv row
     """
 
     # Use #d to denote double etc.
@@ -100,9 +100,9 @@ def dict_to_zarr(
     props_to_add Dict to find a Dict who's keys and values are added to the label
     properties.
 
-    @param props_to_add     Dict of id: {key:value}. id matches values of zarr_id prop
-    @param zarr_path        Path to the ome-zarr that has labels with properties
-    @param zarr_id          Key of label property, where value is key of props_to_add
+    :param props_to_add:    Dict of id: {key:value}. id matches values of zarr_id prop
+    :param zarr_path:       Path to the ome-zarr that has labels with properties
+    :param zarr_id:         Key of label property, where value is key of props_to_add
     """
 
     zarr = parse_url(zarr_path)
