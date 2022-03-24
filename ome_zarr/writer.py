@@ -170,7 +170,6 @@ def _validate_plate_wells(
 def write_multiscale(
     pyramid: List,
     group: zarr.Group,
-    chunks: Union[Tuple[Any, ...], int] = None,
     fmt: Format = CurrentFormat(),
     axes: Union[str, List[str], List[Dict[str, str]]] = None,
     coordinate_transformations: List[List[Dict[str, Any]]] = None,
@@ -186,8 +185,6 @@ def write_multiscale(
       ordered (t, c, z, y, x)
     group: zarr.Group
       the group within the zarr store to store the data in
-    chunks: int or tuple of ints,
-      size of the saved chunks to store the image
     fmt: Format
       The format of the ome_zarr data which should be used.
       Defaults to the most current.
@@ -216,9 +213,13 @@ def write_multiscale(
                 if not isinstance(storage_options, list)
                 else storage_options[path]
             )
-        if "chunks" not in options:
-            options["chunks"] = chunks
-        group.create_dataset(str(path), data=data, **options)
+        # ensure that the chunk dimensions match the image dimensions
+        # (which might have been changed for versions 0.1 or 0.2)
+        # if chunks are explicitly set in the storage options
+        chunks = options.pop("chunks", None)
+        if chunks is not None:
+            chunks = _retuple(chunks, data.shape)
+        group.create_dataset(str(path), data=data, chunks=chunks, **options)
         datasets.append({"path": str(path)})
 
     if coordinate_transformations is None:
@@ -362,7 +363,6 @@ def write_well_metadata(
 def write_image(
     image: np.ndarray,
     group: zarr.Group,
-    chunks: Union[Tuple[Any, ...], int] = None,
     scaler: Scaler = Scaler(),
     fmt: Format = CurrentFormat(),
     axes: Union[str, List[str], List[Dict[str, str]]] = None,
@@ -379,8 +379,6 @@ def write_image(
       ordered (t, c, z, y, x)
     group: zarr.Group
       the group within the zarr store to store the data in
-    chunks: int or tuple of ints,
-      size of the saved chunks to store the image
     scaler: Scaler
       Scaler implementation for downsampling the image argument. If None,
       no downsampling will be performed.
@@ -412,9 +410,6 @@ def write_image(
     # check axes before trying to scale
     _get_valid_axes(image.ndim, axes, fmt)
 
-    if chunks is not None:
-        chunks = _retuple(chunks, image.shape)
-
     if scaler is not None:
         if image.shape[-1] == 1 or image.shape[-2] == 1:
             raise ValueError(
@@ -429,7 +424,6 @@ def write_image(
     write_multiscale(
         mip,
         group,
-        chunks=chunks,
         fmt=fmt,
         axes=axes,
         coordinate_transformations=coordinate_transformations,
@@ -482,7 +476,6 @@ def write_multiscale_labels(
     pyramid: List,
     group: zarr.Group,
     name: str,
-    chunks: Union[Tuple[Any, ...], int] = None,
     fmt: Format = CurrentFormat(),
     axes: Union[str, List[str], List[Dict[str, str]]] = None,
     coordinate_transformations: List[List[Dict[str, Any]]] = None,
@@ -504,8 +497,6 @@ def write_multiscale_labels(
       the group within the zarr store to store the data in
     name: str
       the name of this labale data
-    chunks: int or tuple of ints,
-      size of the saved chunks to store the image
     fmt: Format
       The format of the ome_zarr data which should be used.
       Defaults to the most current.
@@ -527,7 +518,6 @@ def write_multiscale_labels(
     write_multiscale(
         pyramid,
         sub_group,
-        chunks,
         fmt,
         axes,
         coordinate_transformations,

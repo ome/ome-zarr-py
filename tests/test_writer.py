@@ -83,11 +83,11 @@ class TestWriter:
         write_image(
             image=data,
             group=self.group,
-            chunks=(128, 128),
             scaler=scaler,
             fmt=version,
             axes=axes,
             coordinate_transformations=transformations,
+            storage_options=dict(chunks=(128, 128)),
         )
 
         # Verify
@@ -839,11 +839,11 @@ class TestLabelWriter:
         write_image(
             image=data,
             group=self.root,
-            chunks=(128, 128),
             scaler=scaler,
             fmt=version,
             axes=axes,
             coordinate_transformations=transformations,
+            storage_options=dict(chunks=(128, 128)),
         )
 
     @pytest.fixture(
