@@ -135,7 +135,8 @@ def create_zarr(
             if zct + 2 < len(chunks):
                 chunks[zct] = 1
 
-    write_multiscale(pyramid, grp, chunks=tuple(chunks), axes=axes)
+    storage_options = dict(chunks=tuple(chunks))
+    write_multiscale(pyramid, grp, axes=axes, storage_options=storage_options)
 
     if size_c == 1:
         image_data = {
