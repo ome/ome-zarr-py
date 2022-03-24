@@ -6,7 +6,7 @@ ome-zarr-py
 
 Tools for multi-resolution images stored in Zarr filesets, according to the `OME NGFF spec`_.
 
-See `Documentation <https://ome-zarr-py--121.org.readthedocs.build/en/121/>`_ for usage information.
+See `Documentation <https://ome-zarr.readthedocs.io/>`_ for usage information.
 
 Documentation
 -------------
@@ -58,7 +58,7 @@ Distributed under the terms of the `BSD`_ license,
 .. |docs| image:: https://readthedocs.org/projects/ome-zarr/badge/?version=stable
     :alt: Documentation Status
     :scale: 100%
-    :target: https://ome-zarr.readthedocs.io/en/latest/?badge=latest
+    :target: https://ome-zarr.readthedocs.io/en/stable/?badge=stable
 
 .. |coverage| image:: https://codecov.io/gh/ome/ome-zarr-py/branch/master/graph/badge.svg
     :alt: Test coverage
