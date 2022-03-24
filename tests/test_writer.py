@@ -865,7 +865,9 @@ class TestLabelWriter:
         else:
             return None
 
-    def verify_label_data(self, label_name, label_data, version, shape, transformations):
+    def verify_label_data(
+        self, label_name, label_data, version, shape, transformations
+    ):
         # Verify image data
         reader = Reader(parse_url(f"{self.path}/labels/{label_name}"))
         node = list(reader())[0]
