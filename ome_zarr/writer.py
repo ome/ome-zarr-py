@@ -363,7 +363,6 @@ def write_image(
     image: np.ndarray,
     group: zarr.Group,
     chunks: Union[Tuple[Any, ...], int] = None,
-    byte_order: Union[str, List[str]] = "tczyx",
     scaler: Scaler = Scaler(),
     fmt: Format = CurrentFormat(),
     axes: Union[str, List[str], List[Dict[str, str]]] = None,
@@ -382,9 +381,6 @@ def write_image(
       the group within the zarr store to store the data in
     chunks: int or tuple of ints,
       size of the saved chunks to store the image
-    byte_order: str or list of str, default "tczyx"
-      combination of the letters defining the order
-      in which the dimensions are saved
     scaler: Scaler
       Scaler implementation for downsampling the image argument. If None,
       no downsampling will be performed.
