@@ -3,7 +3,7 @@
 """
 import logging
 import warnings
-from typing import Any, Dict, List, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import zarr
@@ -626,8 +626,8 @@ def _create_mip(
     image: np.ndarray,
     fmt: Format,
     scaler: Scaler,
-    axes: Union[str, List[str], List[Dict[str, str]]],
-) -> Tuple[List[np.ndarray], Union[str, List[str], List[Dict[str, str]]]]:
+    axes: Optional[Union[str, List[str], List[Dict[str, str]]]],
+) -> Tuple[List[np.ndarray], Optional[Union[str, List[str], List[Dict[str, str]]]]]:
     if image.ndim > 5:
         raise ValueError("Only images of 5D or less are supported")
 
