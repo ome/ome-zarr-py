@@ -175,6 +175,7 @@ def write_multiscale(
     axes: Union[str, List[str], List[Dict[str, str]]] = None,
     coordinate_transformations: List[List[Dict[str, Any]]] = None,
     storage_options: Union[JSONDict, List[JSONDict]] = None,
+    **metadata: Union[str, JSONDict, List[JSONDict]],
 ) -> None:
     """
     Write a pyramid with multiscale metadata to disk.
@@ -232,7 +233,7 @@ def write_multiscale(
         for dataset, transform in zip(datasets, coordinate_transformations):
             dataset["coordinateTransformations"] = transform
 
-    write_multiscales_metadata(group, datasets, fmt, axes)
+    write_multiscales_metadata(group, datasets, fmt, axes, **metadata)
 
 
 def write_multiscales_metadata(
@@ -240,6 +241,7 @@ def write_multiscales_metadata(
     datasets: List[dict],
     fmt: Format = CurrentFormat(),
     axes: Union[str, List[str], List[Dict[str, str]]] = None,
+    **metadata: Union[str, JSONDict, List[JSONDict]],
 ) -> None:
     """
     Write the multiscales metadata in the group.
@@ -268,11 +270,15 @@ def write_multiscales_metadata(
             if axes is not None:
                 ndim = len(axes)
 
+    # note: we construct the multiscale metadata via dict(), rather than {}
+    # to avoid duplication of protected keys like 'version' in **metadata
+    # (for {} this would silently over-write it, with dict() it explicitly fails)
     multiscales = [
-        {
-            "version": fmt.version,
-            "datasets": _validate_datasets(datasets, ndim, fmt),
-        }
+        dict(
+            version=fmt.version,
+            datasets=_validate_datasets(datasets, ndim, fmt),
+            **metadata,
+        )
     ]
     if axes is not None:
         multiscales[0]["axes"] = axes
@@ -363,7 +369,7 @@ def write_image(
     axes: Union[str, List[str], List[Dict[str, str]]] = None,
     coordinate_transformations: List[List[Dict[str, Any]]] = None,
     storage_options: Union[JSONDict, List[JSONDict]] = None,
-    **metadata: JSONDict,
+    **metadata: Union[str, JSONDict, List[JSONDict]],
 ) -> None:
     """Writes an image to the zarr store according to ome-zarr specification
 
@@ -419,21 +425,123 @@ def write_image(
                 "Can't downsample if size of x or y dimension is 1. "
                 "Shape: %s" % (image.shape,)
             )
-        image = scaler.nearest(image)
+        mip = scaler.nearest(image)
     else:
         LOGGER.debug("disabling pyramid")
-        image = [image]
+        mip = [image]
 
     write_multiscale(
-        image,
+        mip,
         group,
         chunks=chunks,
         fmt=fmt,
         axes=axes,
         coordinate_transformations=coordinate_transformations,
         storage_options=storage_options,
+        **metadata,
     )
-    group.attrs.update(metadata)
+
+
+def write_label_metadata(
+    group: zarr.Group,
+    name: str,
+    colors: List[JSONDict] = None,
+    properties: List[JSONDict] = None,
+    **metadata: Union[List[JSONDict], JSONDict, str],
+) -> None:
+    """
+    Write image-label metadata to the group.
+
+    The label data must have been written to a sub-group,
+    with the same name as the second argument.
+
+    group: zarr.Group
+      the top-level label group within the zarr store
+    name: str
+      the name of the label sub-group
+    colors: list of JSONDict
+      Fixed colors for (a subset of) the label values.
+      Each dict specifies the color for one label and must contain the fields
+      "label-value" and "rgba".
+    properties: list of JSONDict
+      Additional properties for (a subset of) the label values.
+      Each dict specifies additional properties for one label.
+      It must contain the field "label-value"
+      and may contain arbitrary additional properties.
+    """
+    label_group = group[name]
+    image_label_metadata = {**metadata}
+    if colors is not None:
+        image_label_metadata["colors"] = colors
+    if properties is not None:
+        image_label_metadata["properties"] = properties
+    label_group.attrs["image-label"] = image_label_metadata
+
+    label_list = group.attrs.get("labels", [])
+    label_list.append(name)
+    group.attrs["labels"] = label_list
+
+
+def write_multiscale_labels(
+    pyramid: List,
+    group: zarr.Group,
+    name: str,
+    chunks: Union[Tuple[Any, ...], int] = None,
+    fmt: Format = CurrentFormat(),
+    axes: Union[str, List[str], List[Dict[str, str]]] = None,
+    coordinate_transformations: List[List[Dict[str, Any]]] = None,
+    storage_options: Union[JSONDict, List[JSONDict]] = None,
+    label_metadata: JSONDict = None,
+    **metadata: JSONDict,
+) -> None:
+    """
+    Write pyramidal image labels to disk.
+
+    Including the multiscales and image-label metadata.
+    Creates the label data in the sub-group "labels/{name}"
+
+    pyramid: List of np.ndarray
+      the image label data to save. Largest level first
+      All image arrays MUST be up to 5-dimensional with dimensions
+      ordered (t, c, z, y, x)
+    group: zarr.Group
+      the group within the zarr store to store the data in
+    name: str
+      the name of this labale data
+    chunks: int or tuple of ints,
+      size of the saved chunks to store the image
+    fmt: Format
+      The format of the ome_zarr data which should be used.
+      Defaults to the most current.
+    axes: str or list of str or list of dict
+      List of axes dicts, or names. Not needed for v0.1 or v0.2
+      or if 2D. Otherwise this must be provided
+    coordinate_transformations: 2Dlist of dict
+      For each path, we have a List of transformation Dicts.
+      Each list of dicts are added to each datasets in order
+      and must include a 'scale' transform.
+    storage_options: dict or list of dict
+      Options to be passed on to the storage backend. A list would need to match
+      the number of datasets in a multiresolution pyramid. One can provide
+      different chunk size for each level of a pyramind using this option.
+    label_metadata: JSONDict
+      image label metadata. See 'write_label_metadata' for details
+    """
+    sub_group = group.require_group(f"labels/{name}")
+    write_multiscale(
+        pyramid,
+        sub_group,
+        chunks,
+        fmt,
+        axes,
+        coordinate_transformations,
+        storage_options,
+        name=name,
+        **metadata,
+    )
+    write_label_metadata(
+        group["labels"], name, **({} if label_metadata is None else label_metadata)
+    )
 
 
 def _retuple(
