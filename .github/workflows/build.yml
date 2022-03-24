@@ -62,7 +62,7 @@ jobs:
       - name: Test
         run: tox -e  'py37-coverage'
 
-      - uses: codecov/codecov-action@v1
+      - uses: codecov/codecov-action@v2
         with:
           file: ./coverage.xml
           fail_ci_if_error: true
