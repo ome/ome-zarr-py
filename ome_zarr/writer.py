@@ -414,7 +414,7 @@ def write_image(
       the number of datasets in a multiresolution pyramid. One can provide
       different chunk size for each level of a pyramind using this option.
     """
-    mip = _create_mip(image, fmt, scaler, axes)
+    mip, axes = _create_mip(image, fmt, scaler, axes)
     write_multiscale(
         mip,
         group,
@@ -607,7 +607,7 @@ def write_labels(
         LOGGER.debug("disabling pyramid")
         mip = [labels]
 
-    mip = _create_mip(labels, fmt, scaler, axes)
+    mip, axes = _create_mip(labels, fmt, scaler, axes)
     write_multiscale_labels(
         mip,
         group,
@@ -627,7 +627,7 @@ def _create_mip(
     fmt: Format,
     scaler: Scaler,
     axes: Union[str, List[str], List[Dict[str, str]]],
-) -> List[np.ndarray]:
+) -> Tuple[List[np.ndarray], Union[str, List[str], List[Dict[str, str]]]]:
     if image.ndim > 5:
         raise ValueError("Only images of 5D or less are supported")
 
@@ -651,7 +651,7 @@ def _create_mip(
     else:
         LOGGER.debug("disabling pyramid")
         mip = [image]
-    return mip
+    return mip, axes
 
 
 def _retuple(
