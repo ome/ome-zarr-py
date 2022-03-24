@@ -583,30 +583,6 @@ def write_labels(
     label_metadata: JSONDict
       image label metadata. See 'write_label_metadata' for details
     """
-    if labels.ndim > 5:
-        raise ValueError("Only labelss of 5D or less are supported")
-
-    if fmt.version in ("0.1", "0.2"):
-        # v0.1 and v0.2 are strictly 5D
-        shape_5d: Tuple[Any, ...] = (*(1,) * (5 - labels.ndim), *labels.shape)
-        labels = labels.reshape(shape_5d)
-        # and we don't need axes
-        axes = None
-
-    # check axes before trying to scale
-    _get_valid_axes(labels.ndim, axes, fmt)
-
-    if scaler is not None:
-        if labels.shape[-1] == 1 or labels.shape[-2] == 1:
-            raise ValueError(
-                "Can't downsample if size of x or y dimension is 1. "
-                "Shape: %s" % (labels.shape,)
-            )
-        mip = scaler.nearest(labels)
-    else:
-        LOGGER.debug("disabling pyramid")
-        mip = [labels]
-
     mip, axes = _create_mip(labels, fmt, scaler, axes)
     write_multiscale_labels(
         mip,
