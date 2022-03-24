@@ -495,6 +495,7 @@ def write_multiscale_labels(
     pyramid: List,
     group: zarr.Group,
     name: str,
+    chunks: Union[Tuple[Any, ...], int] = None,
     fmt: Format = CurrentFormat(),
     axes: Union[str, List[str], List[Dict[str, str]]] = None,
     coordinate_transformations: List[List[Dict[str, Any]]] = None,
@@ -516,6 +517,10 @@ def write_multiscale_labels(
       the group within the zarr store to store the data in
     name: str
       the name of this labale data
+    chunks: int or tuple of ints,
+      Size of the saved chunks to store the image.
+      This argument is deprecated and will be removed in a future version.
+      Use storage_options instead.
     fmt: Format
       The format of the ome_zarr data which should be used.
       Defaults to the most current.
@@ -537,6 +542,7 @@ def write_multiscale_labels(
     write_multiscale(
         pyramid,
         sub_group,
+        chunks=chunks,
         fmt=fmt,
         axes=axes,
         coordinate_transformations=coordinate_transformations,
