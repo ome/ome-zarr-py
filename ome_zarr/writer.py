@@ -2,6 +2,7 @@
 
 """
 import logging
+import warnings
 from typing import Any, Dict, List, Tuple, Union
 
 import numpy as np
@@ -170,6 +171,7 @@ def _validate_plate_wells(
 def write_multiscale(
     pyramid: List,
     group: zarr.Group,
+    chunks: Union[Tuple[Any, ...], int] = None,
     fmt: Format = CurrentFormat(),
     axes: Union[str, List[str], List[Dict[str, str]]] = None,
     coordinate_transformations: List[List[Dict[str, Any]]] = None,
@@ -185,6 +187,10 @@ def write_multiscale(
       ordered (t, c, z, y, x)
     group: zarr.Group
       the group within the zarr store to store the data in
+    chunks: int or tuple of ints,
+      Size of the saved chunks to store the image.
+      This argument is deprecated and will be removed in a future version.
+      Use storage_options instead.
     fmt: Format
       The format of the ome_zarr data which should be used.
       Defaults to the most current.
@@ -204,6 +210,11 @@ def write_multiscale(
     dims = len(pyramid[0].shape)
     axes = _get_valid_axes(dims, axes, fmt)
 
+    if chunks is not None:
+        msg = """The 'chunks' argument is deprecated and will be removed in version 0.5.
+Please use the 'storage_options' argument instead."""
+        warnings.warn(msg, DeprecationWarning)
+
     datasets: List[dict] = []
     for path, data in enumerate(pyramid):
         options = {}
@@ -216,10 +227,12 @@ def write_multiscale(
         # ensure that the chunk dimensions match the image dimensions
         # (which might have been changed for versions 0.1 or 0.2)
         # if chunks are explicitly set in the storage options
-        chunks = options.pop("chunks", None)
-        if chunks is not None:
-            chunks = _retuple(chunks, data.shape)
-        group.create_dataset(str(path), data=data, chunks=chunks, **options)
+        chunks_opt = options.pop("chunks", chunks)
+        # switch to this code in 0.5
+        # chunks_opt = options.pop("chunks", None)
+        if chunks_opt is not None:
+            chunks_opt = _retuple(chunks_opt, data.shape)
+        group.create_dataset(str(path), data=data, chunks=chunks_opt, **options)
         datasets.append({"path": str(path)})
 
     if coordinate_transformations is None:
@@ -364,6 +377,7 @@ def write_image(
     image: np.ndarray,
     group: zarr.Group,
     scaler: Scaler = Scaler(),
+    chunks: Union[Tuple[Any, ...], int] = None,
     fmt: Format = CurrentFormat(),
     axes: Union[str, List[str], List[Dict[str, str]]] = None,
     coordinate_transformations: List[List[Dict[str, Any]]] = None,
@@ -382,6 +396,10 @@ def write_image(
     scaler: Scaler
       Scaler implementation for downsampling the image argument. If None,
       no downsampling will be performed.
+    chunks: int or tuple of ints,
+      Size of the saved chunks to store the image.
+      This argument is deprecated and will be removed in a future version.
+      Use storage_options instead.
     fmt: Format
       The format of the ome_zarr data which should be used.
       Defaults to the most current.
@@ -424,6 +442,7 @@ def write_image(
     write_multiscale(
         mip,
         group,
+        chunks=chunks,
         fmt=fmt,
         axes=axes,
         coordinate_transformations=coordinate_transformations,
@@ -518,10 +537,10 @@ def write_multiscale_labels(
     write_multiscale(
         pyramid,
         sub_group,
-        fmt,
-        axes,
-        coordinate_transformations,
-        storage_options,
+        fmt=fmt,
+        axes=axes,
+        coordinate_transformations=coordinate_transformations,
+        storage_options=storage_options,
         name=name,
         **metadata,
     )
