@@ -1,3 +1,9 @@
+# 0.4.0 (Mar 2022)
+
+- Add API for writing data according to the `image-label` spec: `write_labels`, `write_multiscale_labels` & `write_label_metadata` ([#178](https://github.com/ome/ome-zarr-py/pull/178), [#184](https://github.com/ome/ome-zarr-py/pull/184))
+- Remove `byte_order` from `write_image` signature ([#184](https://github.com/ome/ome-zarr-py/pull/184))
+- Deprecate `chunks` argument in favor of `storage_options` ([#184](https://github.com/ome/ome-zarr-py/pull/184))
+
 # 0.3.0 (Feb 2022)
 
 ## Specification changes
