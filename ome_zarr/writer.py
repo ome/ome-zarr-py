@@ -181,30 +181,37 @@ def write_multiscale(
     """
     Write a pyramid with multiscale metadata to disk.
 
-    pyramid: List of np.ndarray
-      the image data to save. Largest level first
-      All image arrays MUST be up to 5-dimensional with dimensions
-      ordered (t, c, z, y, x)
-    group: zarr.Group
-      the group within the zarr store to store the data in
-    chunks: int or tuple of ints,
-      Size of the saved chunks to store the image.
-      This argument is deprecated and will be removed in a future version.
-      Use storage_options instead.
-    fmt: Format
-      The format of the ome_zarr data which should be used.
-      Defaults to the most current.
-    axes: str or list of str or list of dict
-      List of axes dicts, or names. Not needed for v0.1 or v0.2
-      or if 2D. Otherwise this must be provided
-    coordinate_transformations: 2Dlist of dict
-      For each path, we have a List of transformation Dicts.
-      Each list of dicts are added to each datasets in order
-      and must include a 'scale' transform.
-    storage_options: dict or list of dict
-      Options to be passed on to the storage backend. A list would need to match
-      the number of datasets in a multiresolution pyramid. One can provide
-      different chunk size for each level of a pyramind using this option.
+    :type pyramid: list of np.ndarray
+    :param pyramid:
+        The image data to save. Largest level first. All image arrays MUST be up to
+        5-dimensional with dimensions ordered (t, c, z, y, x)
+    :type group: :class:`zarr.Group`
+    :param group: The group within the zarr store to store the data in
+    :type chunks: int or tuple of ints, optional
+    :param chunks: The size of the saved chunks to store the image.
+
+        .. deprecated:: 0.4.0
+            This argument is deprecated and will be removed in a future version.
+            Use storage_options instead.
+    :type fmt: class:`ome_zarr.format.Format`, optional
+    :param fmt:
+        The format of the ome_zarr data which should be used.
+        Defaults to the most current.
+    :type axes: str list of str or list of dict, optional
+    :param axes:
+        List of axes dicts, or names. Not needed for v0.1 or v0.2 or if 2D. Otherwise
+        this must be provided
+    :type coordinate_transformations: 2Dlist of dict, optional
+    :param coordinate_transformations:
+        List of transformations for each path.
+        Each list of dicts are added to each datasets in order and must include a
+        'scale' transform.
+    :type storage_options: dict or list of dict, optional
+    :param storage_options:
+        Options to be passed on to the storage backend.
+        A list would need to match the number of datasets in a multiresolution pyramid.
+        One can provide different chunk size for each level of a pyramind using this
+        option.
     """
 
     dims = len(pyramid[0].shape)
