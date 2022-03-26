@@ -35,7 +35,7 @@ The following code creates a 3D Image in OME-Zarr with labels::
     # write the image data
     store = parse_url(path, mode="w").store
     root = zarr.group(store=store)
-    write_image(image=data, group=root, chunks=(1, size_xy, size_xy), axes="zyx")
+    write_image(image=data, group=root, axes="zyx", storage_options=dict(chunks=(1, size_xy, size_xy)))
     # optional rendering settings
     root.attrs["omero"] = {
         "channels": [{

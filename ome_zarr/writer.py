@@ -2,7 +2,8 @@
 
 """
 import logging
-from typing import Any, Dict, List, Tuple, Union
+import warnings
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import zarr
@@ -187,7 +188,9 @@ def write_multiscale(
     group: zarr.Group
       the group within the zarr store to store the data in
     chunks: int or tuple of ints,
-      size of the saved chunks to store the image
+      Size of the saved chunks to store the image.
+      This argument is deprecated and will be removed in a future version.
+      Use storage_options instead.
     fmt: Format
       The format of the ome_zarr data which should be used.
       Defaults to the most current.
@@ -207,6 +210,11 @@ def write_multiscale(
     dims = len(pyramid[0].shape)
     axes = _get_valid_axes(dims, axes, fmt)
 
+    if chunks is not None:
+        msg = """The 'chunks' argument is deprecated and will be removed in version 0.5.
+Please use the 'storage_options' argument instead."""
+        warnings.warn(msg, DeprecationWarning)
+
     datasets: List[dict] = []
     for path, data in enumerate(pyramid):
         options = {}
@@ -216,9 +224,15 @@ def write_multiscale(
                 if not isinstance(storage_options, list)
                 else storage_options[path]
             )
-        if "chunks" not in options:
-            options["chunks"] = chunks
-        group.create_dataset(str(path), data=data, **options)
+        # ensure that the chunk dimensions match the image dimensions
+        # (which might have been changed for versions 0.1 or 0.2)
+        # if chunks are explicitly set in the storage options
+        chunks_opt = options.pop("chunks", chunks)
+        # switch to this code in 0.5
+        # chunks_opt = options.pop("chunks", None)
+        if chunks_opt is not None:
+            chunks_opt = _retuple(chunks_opt, data.shape)
+        group.create_dataset(str(path), data=data, chunks=chunks_opt, **options)
         datasets.append({"path": str(path)})
 
     if coordinate_transformations is None:
@@ -362,9 +376,8 @@ def write_well_metadata(
 def write_image(
     image: np.ndarray,
     group: zarr.Group,
-    chunks: Union[Tuple[Any, ...], int] = None,
-    byte_order: Union[str, List[str]] = "tczyx",
     scaler: Scaler = Scaler(),
+    chunks: Union[Tuple[Any, ...], int] = None,
     fmt: Format = CurrentFormat(),
     axes: Union[str, List[str], List[Dict[str, str]]] = None,
     coordinate_transformations: List[List[Dict[str, Any]]] = None,
@@ -380,14 +393,13 @@ def write_image(
       ordered (t, c, z, y, x)
     group: zarr.Group
       the group within the zarr store to store the data in
-    chunks: int or tuple of ints,
-      size of the saved chunks to store the image
-    byte_order: str or list of str, default "tczyx"
-      combination of the letters defining the order
-      in which the dimensions are saved
     scaler: Scaler
       Scaler implementation for downsampling the image argument. If None,
       no downsampling will be performed.
+    chunks: int or tuple of ints,
+      Size of the saved chunks to store the image.
+      This argument is deprecated and will be removed in a future version.
+      Use storage_options instead.
     fmt: Format
       The format of the ome_zarr data which should be used.
       Defaults to the most current.
@@ -402,34 +414,7 @@ def write_image(
       the number of datasets in a multiresolution pyramid. One can provide
       different chunk size for each level of a pyramind using this option.
     """
-
-    if image.ndim > 5:
-        raise ValueError("Only images of 5D or less are supported")
-
-    if fmt.version in ("0.1", "0.2"):
-        # v0.1 and v0.2 are strictly 5D
-        shape_5d: Tuple[Any, ...] = (*(1,) * (5 - image.ndim), *image.shape)
-        image = image.reshape(shape_5d)
-        # and we don't need axes
-        axes = None
-
-    # check axes before trying to scale
-    _get_valid_axes(image.ndim, axes, fmt)
-
-    if chunks is not None:
-        chunks = _retuple(chunks, image.shape)
-
-    if scaler is not None:
-        if image.shape[-1] == 1 or image.shape[-2] == 1:
-            raise ValueError(
-                "Can't downsample if size of x or y dimension is 1. "
-                "Shape: %s" % (image.shape,)
-            )
-        mip = scaler.nearest(image)
-    else:
-        LOGGER.debug("disabling pyramid")
-        mip = [image]
-
+    mip, axes = _create_mip(image, fmt, scaler, axes)
     write_multiscale(
         mip,
         group,
@@ -509,7 +494,9 @@ def write_multiscale_labels(
     name: str
       the name of this labale data
     chunks: int or tuple of ints,
-      size of the saved chunks to store the image
+      Size of the saved chunks to store the image.
+      This argument is deprecated and will be removed in a future version.
+      Use storage_options instead.
     fmt: Format
       The format of the ome_zarr data which should be used.
       Defaults to the most current.
@@ -531,17 +518,116 @@ def write_multiscale_labels(
     write_multiscale(
         pyramid,
         sub_group,
-        chunks,
-        fmt,
-        axes,
-        coordinate_transformations,
-        storage_options,
+        chunks=chunks,
+        fmt=fmt,
+        axes=axes,
+        coordinate_transformations=coordinate_transformations,
+        storage_options=storage_options,
         name=name,
         **metadata,
     )
     write_label_metadata(
         group["labels"], name, **({} if label_metadata is None else label_metadata)
     )
+
+
+def write_labels(
+    labels: np.ndarray,
+    group: zarr.Group,
+    name: str,
+    scaler: Scaler = Scaler(),
+    chunks: Union[Tuple[Any, ...], int] = None,
+    fmt: Format = CurrentFormat(),
+    axes: Union[str, List[str], List[Dict[str, str]]] = None,
+    coordinate_transformations: List[List[Dict[str, Any]]] = None,
+    storage_options: Union[JSONDict, List[JSONDict]] = None,
+    label_metadata: JSONDict = None,
+    **metadata: JSONDict,
+) -> None:
+    """
+    Write image label data to disk.
+
+    Including the multiscales and image-label metadata.
+    Creates the label data in the sub-group "labels/{name}"
+
+    labels: np.ndarray
+      the label data to save. A downsampling of the data will be computed
+      if the scaler argument is non-None.
+      Label array MUST be up to 5-dimensional with dimensions
+      ordered (t, c, z, y, x)
+    group: zarr.Group
+      the group within the zarr store to store the data in
+    name: str
+      the name of this labale data
+    scaler: Scaler
+      Scaler implementation for downsampling the image argument. If None,
+      no downsampling will be performed.
+    chunks: int or tuple of ints,
+      Size of the saved chunks to store the image.
+      This argument is deprecated and will be removed in a future version.
+      Use storage_options instead.
+    fmt: Format
+      The format of the ome_zarr data which should be used.
+      Defaults to the most current.
+    axes: str or list of str or list of dict
+      List of axes dicts, or names. Not needed for v0.1 or v0.2
+      or if 2D. Otherwise this must be provided
+    coordinate_transformations: 2Dlist of dict
+      For each path, we have a List of transformation Dicts.
+      Each list of dicts are added to each datasets in order
+      and must include a 'scale' transform.
+    storage_options: dict or list of dict
+      Options to be passed on to the storage backend. A list would need to match
+      the number of datasets in a multiresolution pyramid. One can provide
+      different chunk size for each level of a pyramind using this option.
+    label_metadata: JSONDict
+      image label metadata. See 'write_label_metadata' for details
+    """
+    mip, axes = _create_mip(labels, fmt, scaler, axes)
+    write_multiscale_labels(
+        mip,
+        group,
+        name=name,
+        chunks=chunks,
+        fmt=fmt,
+        axes=axes,
+        coordinate_transformations=coordinate_transformations,
+        storage_options=storage_options,
+        label_metadata=label_metadata,
+        **metadata,
+    )
+
+
+def _create_mip(
+    image: np.ndarray,
+    fmt: Format,
+    scaler: Scaler,
+    axes: Optional[Union[str, List[str], List[Dict[str, str]]]],
+) -> Tuple[List[np.ndarray], Optional[Union[str, List[str], List[Dict[str, str]]]]]:
+    if image.ndim > 5:
+        raise ValueError("Only images of 5D or less are supported")
+
+    if fmt.version in ("0.1", "0.2"):
+        # v0.1 and v0.2 are strictly 5D
+        shape_5d: Tuple[Any, ...] = (*(1,) * (5 - image.ndim), *image.shape)
+        image = image.reshape(shape_5d)
+        # and we don't need axes
+        axes = None
+
+    # check axes before trying to scale
+    _get_valid_axes(image.ndim, axes, fmt)
+
+    if scaler is not None:
+        if image.shape[-1] == 1 or image.shape[-2] == 1:
+            raise ValueError(
+                "Can't downsample if size of x or y dimension is 1. "
+                "Shape: %s" % (image.shape,)
+            )
+        mip = scaler.nearest(image)
+    else:
+        LOGGER.debug("disabling pyramid")
+        mip = [image]
+    return mip, axes
 
 
 def _retuple(
