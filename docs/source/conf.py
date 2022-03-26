@@ -24,6 +24,7 @@ author = "Open Microscopy Environment"
 # use in refs e.g:
 # :ref:`comparison manual <python:comparisons>`
 intersphinx_mapping = {
-    'python':('https://docs.python.org/', None),
-    'numpy': ('https://numpy.org/doc/stable/', None),
-    'zarr': ('https://zarr.readthedocs.io/en/stable/', None)}
+    "python": ("https://docs.python.org/", None),
+    "numpy": ("https://numpy.org/doc/stable/", None),
+    "zarr": ("https://zarr.readthedocs.io/en/stable/", None),
+}
