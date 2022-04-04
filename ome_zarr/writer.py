@@ -193,7 +193,7 @@ def write_multiscale(
 
         .. deprecated:: 0.4.0
             This argument is deprecated and will be removed in a future version.
-            Use ``storage_options`` instead.
+            Use :attr:`storage_options` instead.
     :type fmt: :class:`ome_zarr.format.Format`, optional
     :param fmt:
         The format of the ome_zarr data which should be used.
@@ -415,7 +415,7 @@ def write_image(
 
         .. deprecated:: 0.4.0
             This argument is deprecated and will be removed in a future version.
-            Use ``storage_options`` instead.
+            Use :attr:`storage_options` instead.
     :type fmt: :class:`ome_zarr.format.Format`, optional
     :param fmt:
       The format of the ome_zarr data which should be used.
@@ -523,7 +523,7 @@ def write_multiscale_labels(
 
         .. deprecated:: 0.4.0
             This argument is deprecated and will be removed in a future version.
-            Use ``storage_options`` instead.
+            Use :attr:`storage_options` instead.
     :type fmt: :class:`ome_zarr.format.Format`, optional
     :param fmt:
       The format of the ome_zarr data which should be used.
@@ -602,7 +602,7 @@ def write_labels(
 
         .. deprecated:: 0.4.0
             This argument is deprecated and will be removed in a future version.
-            Use ``storage_options`` instead.
+            Use :attr:`storage_options` instead.
     :type fmt: :class:`ome_zarr.format.Format`, optional
     :param fmt:
       The format of the ome_zarr data which should be used.
