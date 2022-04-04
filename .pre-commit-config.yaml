@@ -60,7 +60,7 @@ repos:
           # Conflicts with black: E203 whitespace before ':'
           # Does not recognize deprecated directive in docstrings
           "--ignore=E203,RST303",
-          "--rst-roles=class,func,ref,mod,const",
+          "--rst-roles=class,func,ref,mod,meth,const",
         ]
 
   - repo: https://github.com/pre-commit/mirrors-mypy
