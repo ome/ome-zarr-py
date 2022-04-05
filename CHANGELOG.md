@@ -1,3 +1,7 @@
+# 0.4.1 (Mar 2022)
+
+- Unify docstrings in `ome_zarr.writer` module ([#185](https://github.com/ome/ome-zarr-py/pull/185))
+
 # 0.4.0 (Mar 2022)
 
 - Add API for writing data according to the `image-label` spec: `write_labels`, `write_multiscale_labels` & `write_label_metadata` ([#178](https://github.com/ome/ome-zarr-py/pull/178), [#184](https://github.com/ome/ome-zarr-py/pull/184))
