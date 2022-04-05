@@ -58,8 +58,9 @@ repos:
           # default black line length is 88
           "--max-line-length=88",
           # Conflicts with black: E203 whitespace before ':'
-          "--ignore=E203",
-          "--rst-roles=class,func,ref,mod,const",
+          # Does not recognize deprecated directive in docstrings
+          "--ignore=E203,RST303",
+          "--rst-roles=class,func,ref,mod,meth,const",
         ]
 
   - repo: https://github.com/pre-commit/mirrors-mypy
