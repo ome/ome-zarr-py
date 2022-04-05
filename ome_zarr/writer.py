@@ -181,7 +181,7 @@ def write_multiscale(
     """
     Write a pyramid with multiscale metadata to disk.
 
-    :type pyramid: list of :class:`np.ndarray`
+    :type pyramid: list of :class:`numpy.ndarray`
     :param pyramid:
         The image data to save. Largest level first. All image arrays MUST be up to
         5-dimensional with dimensions ordered (t, c, z, y, x)
@@ -397,7 +397,7 @@ def write_image(
 ) -> None:
     """Writes an image to the zarr store according to ome-zarr specification
 
-    :type image: :class:`np.ndarray`
+    :type image: :class:`numpy.ndarray`
     :param image:
       The image data to save. A downsampling of the data will be computed
       if the scaler argument is non-None.
@@ -508,7 +508,7 @@ def write_multiscale_labels(
     Including the multiscales and image-label metadata.
     Creates the label data in the sub-group "labels/{name}"
 
-    :type pyramid: list of :class:`np.ndarray`
+    :type pyramid: list of :class:`numpy.ndarray`
     :param pyramid:
       the image label data to save. Largest level first
       All image arrays MUST be up to 5-dimensional with dimensions
@@ -582,7 +582,7 @@ def write_labels(
     Including the multiscales and image-label metadata.
     Creates the label data in the sub-group "labels/{name}"
 
-    :type labels: :class:`np.ndarray`
+    :type labels: :class:`numpy.ndarray`
     :param labels:
       The label data to save. A downsampling of the data will be computed
       if the scaler argument is non-None.
