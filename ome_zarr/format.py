@@ -12,6 +12,11 @@ LOGGER = logging.getLogger("ome_zarr.format")
 def format_from_version(version: str) -> "Format":
 
     for fmt in format_implementations():
+
+        # Support floating-point versions like `0.2`
+        if isinstance(version, float):
+            version = str(version)
+
         if fmt.version == version:
             return fmt
     raise ValueError(f"Version {version} not recognized")
