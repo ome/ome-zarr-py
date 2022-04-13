@@ -91,11 +91,12 @@ class Node:
         if not found:
             self.specs.append(Implicit(self))
 
-        # Load up the hierarchy
-        if Leaf.matches(zarr):
-            self.specs.append(Leaf(self))
-        else:
-            self.specs.append(Root(self))
+        if False:  # Temporarily disable. See #174
+            # Load up the hierarchy
+            if Leaf.matches(zarr):
+                self.specs.append(Leaf(self))
+            else:
+                self.specs.append(Root(self))
 
     @overload
     def first(self, spectype: Type["Well"]) -> Optional["Well"]:
