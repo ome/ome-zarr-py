@@ -1,4 +1,11 @@
-"""Reading logic for ome-zarr."""
+"""Reading logic for ome-zarr.
+
+The main class (Reader) is initialitzed with an [ome_zarr.io.ZarrLocation]
+as returned by [ome_zarr.io.parse_url] and walks up and down the Zarr
+hierarchy parsing each array or group into a [Node] which is aware of all
+meta(data) specifications ([Spec] class) which are available in the current
+runtime.
+"""
 
 import logging
 import math
@@ -71,12 +78,16 @@ class Node:
             found.append(Well(self))
             self.specs.append(found[-1])
 
+        # Load all entrypoints and give them a chance
+        # to claim parse the current node.
         for key, value in entrypoints.get_group_named("ome_zarr.spec").items():
             cls = value.load()
             if cls.matches(zarr):
                 found.append(cls(self))
                 self.specs.append(found[-1])
 
+        # Anything that has not received a type at this point
+        # can be considered an implicit group.
         if not found:
             self.specs.append(Implicit(self))
 
