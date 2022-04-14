@@ -5,6 +5,7 @@ import logging
 import warnings
 from typing import Any, Dict, List, Optional, Tuple, Union
 
+import dask
 import numpy as np
 import zarr
 
@@ -240,7 +241,11 @@ Please use the 'storage_options' argument instead."""
         # chunks_opt = options.pop("chunks", None)
         if chunks_opt is not None:
             chunks_opt = _retuple(chunks_opt, data.shape)
-        group.create_dataset(str(path), data=data, chunks=chunks_opt, **options)
+        
+        if isinstance(data, dask.array.Array):
+            dask.array.to_zarr(data, url=group, component=str(path), storage_options=options, overwrite=False, region=None, compute=True, return_stored=False, chunks=chunks_opt)
+        else:
+            group.create_dataset(str(path), data=data, chunks=chunks_opt, **options)
         datasets.append({"path": str(path)})
 
     if coordinate_transformations is None:
