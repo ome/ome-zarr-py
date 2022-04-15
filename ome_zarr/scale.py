@@ -7,8 +7,9 @@ import logging
 import os
 from collections.abc import MutableMapping
 from dataclasses import dataclass
-from typing import Callable, Iterator, List
+from typing import Callable, Iterator, List, Union
 
+import dask
 import numpy as np
 import zarr
 from scipy.ndimage import zoom
@@ -23,6 +24,8 @@ from .io import parse_url
 
 LOGGER = logging.getLogger("ome_zarr.scale")
 
+ListOfArrayLike = Union[List[dask.array.Array], List[np.ndarray]]
+ArrayLike = Union[dask.array.Array, np.ndarray]
 
 @dataclass
 class Scaler:
@@ -68,6 +71,14 @@ class Scaler:
             if name.startswith("_"):
                 continue
             yield name
+
+    def scale_array(self, input_array: ArrayLike ) -> ListOfArrayLike:
+        """Perform downsampling to memory."""
+        func = getattr(self, self.method, None)
+        if not func:
+            raise Exception
+        ret = func(input_array)
+        return ret
 
     def scale(self, input_array: str, output_directory: str) -> None:
         """Perform downsampling to disk."""
@@ -125,7 +136,7 @@ class Scaler:
             series.append({"path": path})
         return grp
 
-    def nearest(self, base: np.ndarray) -> List[np.ndarray]:
+    def nearest(self, base: ArrayLike) -> ListOfArrayLike:
         """
         Downsample using :func:`skimage.transform.resize`.
 
@@ -133,15 +144,25 @@ class Scaler:
         """
         return self._by_plane(base, self.__nearest)
 
-    def __nearest(self, plane: np.ndarray, sizeY: int, sizeX: int) -> np.ndarray:
+    def __nearest(self, plane: ArrayLike, sizeY: int, sizeX: int) -> ArrayLike:
         """Apply the 2-dimensional transformation."""
-        return resize(
-            plane,
-            output_shape=(sizeY // self.downscale, sizeX // self.downscale),
-            order=0,
-            preserve_range=True,
-            anti_aliasing=False,
-        ).astype(plane.dtype)
+        if isinstance(plane, dask.array.Array):
+            resized = dask.array.map_blocks(resize, plane,
+                output_shape=(sizeY // self.downscale, sizeX // self.downscale),
+                order=0,
+                preserve_range=True,
+                anti_aliasing=False,
+                dtype=plane.dtype)
+            # resized_astype = dask.delayed(dask.array.Array.astype)(resized, plane.dtype)
+            return resized
+        else:
+            return resize(
+                plane,
+                output_shape=(sizeY // self.downscale, sizeX // self.downscale),
+                order=0,
+                preserve_range=True,
+                anti_aliasing=False,
+            ).astype(plane.dtype)
 
     def gaussian(self, base: np.ndarray) -> List[np.ndarray]:
         """Downsample using :func:`skimage.transform.pyramid_gaussian`."""
@@ -190,11 +211,12 @@ class Scaler:
 
     def _by_plane(
         self,
-        base: np.ndarray,
-        func: Callable[[np.ndarray, int, int], np.ndarray],
-    ) -> np.ndarray:
+        base: ArrayLike,
+        func: Callable[[ArrayLike, int, int], ArrayLike],
+    ) -> ListOfArrayLike:
         """Loop over 3 of the 5 dimensions and apply the func transform."""
 
+        # start by putting the original data as the first level
         rv = [base]
         for i in range(self.max_layer):
             stack_to_scale = rv[-1]
@@ -220,10 +242,14 @@ class Scaler:
                         if new_stack is None:
                             zct_dims = shape_5d[:-2]
                             shape_dims = zct_dims[-stack_dims:]
-                            new_stack = np.zeros(
-                                (*shape_dims, out.shape[0], out.shape[1]),
-                                dtype=base.dtype,
-                            )
+                            if isinstance(out, dask.array.Array):
+                                new_stack = dask.array.zeros((*shape_dims, out.shape[0], out.shape[1]),
+                                    dtype=base.dtype,)
+                            else:
+                                new_stack = np.zeros(
+                                    (*shape_dims, out.shape[0], out.shape[1]),
+                                    dtype=base.dtype,
+                                )
                         # insert resized plane into the stack at correct indices
                         new_stack[(dims_to_slice)] = out
             rv.append(new_stack)

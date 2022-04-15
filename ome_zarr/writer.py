@@ -243,7 +243,7 @@ Please use the 'storage_options' argument instead."""
             chunks_opt = _retuple(chunks_opt, data.shape)
         
         if isinstance(data, dask.array.Array):
-            dask.array.to_zarr(data, url=group, component=str(path), storage_options=options, overwrite=False, region=None, compute=True, return_stored=False, chunks=chunks_opt)
+            dask.array.to_zarr(data, url=group, component=str(path), storage_options=options, overwrite=True, region=None, compute=True, return_stored=False)
         else:
             group.create_dataset(str(path), data=data, chunks=chunks_opt, **options)
         datasets.append({"path": str(path)})
@@ -670,7 +670,7 @@ def _create_mip(
                 "Can't downsample if size of x or y dimension is 1. "
                 "Shape: %s" % (image.shape,)
             )
-        mip = scaler.nearest(image)
+        mip = scaler.scale_array(image)
     else:
         LOGGER.debug("disabling pyramid")
         mip = [image]
