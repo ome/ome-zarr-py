@@ -27,6 +27,7 @@ LOGGER = logging.getLogger("ome_zarr.scale")
 ListOfArrayLike = Union[List[dask.array.Array], List[np.ndarray]]
 ArrayLike = Union[dask.array.Array, np.ndarray]
 
+
 @dataclass
 class Scaler:
     """Helper class for performing various types of downsampling.
@@ -72,7 +73,7 @@ class Scaler:
                 continue
             yield name
 
-    def scale_array(self, input_array: ArrayLike ) -> ListOfArrayLike:
+    def scale_array(self, input_array: ArrayLike) -> ListOfArrayLike:
         """Perform downsampling to memory."""
         func = getattr(self, self.method, None)
         if not func:
@@ -155,7 +156,6 @@ class Scaler:
                 anti_aliasing=False,
                 dtype=plane.dtype,
                 chunks=(outsize[0], outsize[1]))
-            # resized_astype = dask.delayed(dask.array.Array.astype)(resized, plane.dtype)
             return resized
         else:
             return resize(
@@ -245,8 +245,10 @@ class Scaler:
                             zct_dims = shape_5d[:-2]
                             shape_dims = zct_dims[-stack_dims:]
                             if isinstance(out, dask.array.Array):
-                                new_stack = dask.array.zeros((*shape_dims, out.shape[0], out.shape[1]),
-                                    dtype=base.dtype,)
+                                new_stack = dask.array.zeros(
+                                    (*shape_dims, out.shape[0], out.shape[1]),
+                                    dtype=base.dtype,
+                                )
                             else:
                                 new_stack = np.zeros(
                                     (*shape_dims, out.shape[0], out.shape[1]),
