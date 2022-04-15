@@ -157,7 +157,6 @@ class Scaler:
                 anti_aliasing=False,
                 dtype=plane.dtype,
             )
-            # resized_astype = dask.delayed(dask.array.Array.astype)(resized, plane.dtype)
             return resized
         else:
             return resize(
