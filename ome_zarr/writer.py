@@ -243,16 +243,18 @@ Please use the 'storage_options' argument instead."""
             chunks_opt = _retuple(chunks_opt, data.shape)
 
         if isinstance(data, dask.array.Array):
-            a = group.create_dataset(str(path), shape=data.shape, chunks=data.chunksize, **options)
+            a = group.create_dataset(
+                str(path), shape=data.shape, chunks=data.chunksize, **options
+            )
             dask.array.to_zarr(
-                data, 
-                url=a, 
-                component=None, 
-                storage_options=options, 
-                overwrite=True, 
-                region=None, 
+                data,
+                url=a,
+                component=None,
+                storage_options=options,
+                overwrite=True,
+                region=None,
                 compute=True,
-                return_stored=False
+                return_stored=False,
             )
         else:
             group.create_dataset(str(path), data=data, chunks=chunks_opt, **options)
