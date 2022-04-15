@@ -147,12 +147,14 @@ class Scaler:
     def __nearest(self, plane: ArrayLike, sizeY: int, sizeX: int) -> ArrayLike:
         """Apply the 2-dimensional transformation."""
         if isinstance(plane, dask.array.Array):
+            outsize = (np.ceil(np.array([sizeY, sizeX])/self.downscale)).astype(int)
             resized = dask.array.map_blocks(resize, plane,
-                output_shape=(sizeY // self.downscale, sizeX // self.downscale),
+                output_shape=(outsize[0], outsize[1]),
                 order=0,
                 preserve_range=True,
                 anti_aliasing=False,
-                dtype=plane.dtype)
+                dtype=plane.dtype,
+                chunks=(outsize[0], outsize[1]))
             # resized_astype = dask.delayed(dask.array.Array.astype)(resized, plane.dtype)
             return resized
         else:
