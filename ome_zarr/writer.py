@@ -6,6 +6,7 @@ import warnings
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import dask
+import dask.array as da
 import numpy as np
 import zarr
 
@@ -225,6 +226,7 @@ Please use the 'storage_options' argument instead."""
         warnings.warn(msg, DeprecationWarning)
 
     datasets: List[dict] = []
+    delayed = []
     for path, data in enumerate(pyramid):
         options = {}
         if storage_options:
@@ -246,19 +248,23 @@ Please use the 'storage_options' argument instead."""
             sub_group = group.create_dataset(
                 str(path), shape=data.shape, chunks=chunks_opt, **options
             )
-            dask.array.to_zarr(
+            print('write_multiscale', data.shape, data.dtype)
+            delayed.append(dask.array.to_zarr(
                 data,
                 url=sub_group,
                 component=None,
                 storage_options=options,
                 overwrite=True,
                 region=None,
-                compute=True,
+                compute=False,
                 return_stored=False,
-            )
+            ))
         else:
             group.create_dataset(str(path), data=data, chunks=chunks_opt, **options)
         datasets.append({"path": str(path)})
+
+    print("compute()....")
+    da.compute(*delayed)
 
     if coordinate_transformations is None:
         shapes = [data.shape for data in pyramid]

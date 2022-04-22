@@ -28,6 +28,12 @@ ListOfArrayLike = Union[List[dask.array.Array], List[np.ndarray]]
 ArrayLike = Union[dask.array.Array, np.ndarray]
 
 
+def resize_wrapper(array, **kwargs):
+    print("resize_wrapper...", array.shape, kwargs)
+    rsp = resize(array, **kwargs)
+    print("resize_wrapper rsp", rsp.shape)
+    return rsp
+
 @dataclass
 class Scaler:
     """Helper class for performing various types of downsampling.
@@ -148,9 +154,13 @@ class Scaler:
     def __nearest(self, plane: ArrayLike, sizeY: int, sizeX: int) -> ArrayLike:
         """Apply the 2-dimensional transformation."""
         if isinstance(plane, dask.array.Array):
+            # print("downscale_nearest...", plane.shape, plane.dtype)
+            # return downscale_nearest(plane, factors=(self.downscale, self.downscale))
+            print("resize...", self.downscale, sizeX, sizeY)
             outsize = (np.ceil(np.array([sizeY, sizeX]) / self.downscale)).astype(int)
+            print("outsize", outsize)
             resized = dask.array.map_blocks(
-                resize,
+                resize_wrapper,
                 plane,
                 output_shape=(outsize[0], outsize[1]),
                 order=0,
@@ -159,6 +169,7 @@ class Scaler:
                 dtype=plane.dtype,
                 chunks=(outsize[0], outsize[1]),
             )
+            print("__nearest resized", resized.shape)
             return resized
         else:
             return resize(
@@ -227,6 +238,9 @@ class Scaler:
             stack_to_scale = rv[-1]
             shape_5d = (*(1,) * (5 - stack_to_scale.ndim), *stack_to_scale.shape)
             T, C, Z, Y, X = shape_5d
+            print("_by_plane stack_to_scale.shape", stack_to_scale.shape)
+            print("_by_plane prev shape_5d", shape_5d)
+            print("_by_plane, Y, X", Y, X)
 
             # If our data is already 2D, simply resize and add to pyramid
             if stack_to_scale.ndim == 2:
