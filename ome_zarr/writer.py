@@ -4,6 +4,7 @@
 import logging
 import warnings
 from typing import Any, Dict, List, Optional, Tuple, Union
+from pathlib import Path
 
 import dask
 import dask.array as da
@@ -243,21 +244,19 @@ Please use the 'storage_options' argument instead."""
         # chunks_opt = options.pop("chunks", None)
         if chunks_opt is not None:
             chunks_opt = _retuple(chunks_opt, data.shape)
+            image = da.array(data).rechunk(chunks=chunks)
+        else:
+            image = data
 
         if isinstance(data, dask.array.Array):
-            sub_group = group.create_dataset(
-                str(path), shape=data.shape, chunks=chunks_opt, **options
-            )
             print('write_multiscale', data.shape, data.dtype)
-            delayed.append(dask.array.to_zarr(
-                data,
-                url=sub_group,
-                component=None,
+
+            delayed.append(da.to_zarr(
+                arr=image,
+                url=group.store,
+                component=str(Path(group.path, str(path))),
                 storage_options=options,
-                overwrite=True,
-                region=None,
                 compute=False,
-                return_stored=False,
             ))
         else:
             group.create_dataset(str(path), data=data, chunks=chunks_opt, **options)
