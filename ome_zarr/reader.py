@@ -464,6 +464,7 @@ class Plate(Spec):
 
     def __init__(self, node: Node) -> None:
         super().__init__(node)
+        LOGGER.debug(f"Plate created with ZarrLocation fmt:{ self.zarr.fmt}")
         self.get_pyramid_lazy(node)
 
     def get_pyramid_lazy(self, node: Node) -> None:
