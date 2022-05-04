@@ -69,6 +69,9 @@ class Format(ABC):
         if multiscales:
             dataset = multiscales[0]
             return dataset.get("version", None)
+        plate = metadata.get("plate", [])
+        if plate:
+            return plate.get("version", None)
         return None
 
     def __repr__(self) -> str:
