@@ -121,7 +121,7 @@ class FormatV01(Format):
 
     def matches(self, metadata: dict) -> bool:
         version = self._get_multiscale_version(metadata)
-        LOGGER.debug(f"V01:{version} v. {self.version}")
+        LOGGER.debug(f"{self.version} matches {version}?")
         return version == self.version
 
     def init_store(self, path: str, mode: str = "r") -> FSStore:
@@ -167,11 +167,6 @@ class FormatV02(FormatV01):
     @property
     def version(self) -> str:
         return "0.2"
-
-    def matches(self, metadata: dict) -> bool:
-        version = self._get_multiscale_version(metadata)
-        LOGGER.debug(f"{self.version} matches {version}?")
-        return version == self.version
 
     def init_store(self, path: str, mode: str = "r") -> FSStore:
         """
