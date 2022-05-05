@@ -6,7 +6,6 @@ import warnings
 from typing import Any, Dict, List, Optional, Tuple, Union
 from pathlib import Path
 
-import dask
 import dask.array as da
 import numpy as np
 import zarr
@@ -15,9 +14,6 @@ from .axes import Axes
 from .format import CurrentFormat, Format
 from .scale import Scaler
 from .types import JSONDict
-
-from ngff_writer.array_utils import ngff_spatially_rescale
-from ngff_writer import dask_utils
 
 LOGGER = logging.getLogger("ome_zarr.writer")
 
@@ -76,7 +72,7 @@ def _validate_well_images(
             validated_images.append({"path": str(image)})
         elif isinstance(image, dict):
             if any(e not in VALID_KEYS for e in image.keys()):
-                LOGGER.debug("f{image} contains unspecified keys")
+                LOGGER.debug(f"{image} contains unspecified keys")
             if "path" not in image:
                 raise ValueError(f"{image} must contain a path key")
             if not isinstance(image["path"], str):
@@ -237,7 +233,7 @@ Please use the 'storage_options' argument instead."""
     max_layer: int = 3
     shapes = []
     for path in range(0, max_layer):
-        print("PATH", path)
+        LOGGER.debug(f"write_image path: {path}")
         path = str(path)
         options = {}
         if storage_options:
@@ -251,13 +247,7 @@ Please use the 'storage_options' argument instead."""
 
         # don't downsample top level of pyramid
         if path != "0":
-            # image = scaler.nearest(image)
-            # image = ngff_spatially_rescale(image, 0.5, axes_names=axes_names)
-            new_shape = list(image.shape)
-            new_shape[-1] = new_shape[-1] * 0.5
-            new_shape[-2] = new_shape[-2] * 0.5
-            print("resize to new shape", new_shape)
-            image = dask_utils.resize(image, tuple(new_shape))
+            image = scaler.nearest(image)
 
         # ensure that the chunk dimensions match the image dimensions
         # (which might have been changed for versions 0.1 or 0.2)
@@ -268,11 +258,14 @@ Please use the 'storage_options' argument instead."""
         if chunks_opt is not None:
             chunks_opt = _retuple(chunks_opt, image.shape)
             image = da.array(image).rechunk(chunks=chunks)
+            options["chunks"] = chunks_opt
+        else:
+            chunks_opt = (1, 256, 256)
+        LOGGER.debug(f"chunks_opt: {chunks_opt}")
 
         shapes.append(image.shape)
-        if isinstance(image, dask.array.Array):
-            print('write_multiscale', image.shape, image.dtype)
-
+        if isinstance(image, da.Array):
+            LOGGER.debug(f"write dask.array to_zarr shape:{image.shape}, dtype {image.dtype}")
             delayed.append(da.to_zarr(
                 array_key=path,
                 arr=image,
