@@ -259,8 +259,6 @@ Please use the 'storage_options' argument instead."""
             chunks_opt = _retuple(chunks_opt, image.shape)
             image = da.array(image).rechunk(chunks=chunks)
             options["chunks"] = chunks_opt
-        else:
-            chunks_opt = (1, 256, 256)
         LOGGER.debug(f"chunks_opt: {chunks_opt}")
 
         shapes.append(image.shape)
