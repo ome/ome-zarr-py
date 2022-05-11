@@ -4,8 +4,9 @@
 import logging
 import warnings
 from typing import Any, Dict, List, Optional, Tuple, Union
+from pathlib import Path
 
-import dask
+import dask.array as da
 import numpy as np
 import zarr
 
@@ -71,7 +72,7 @@ def _validate_well_images(
             validated_images.append({"path": str(image)})
         elif isinstance(image, dict):
             if any(e not in VALID_KEYS for e in image.keys()):
-                LOGGER.debug("f{image} contains unspecified keys")
+                LOGGER.debug(f"{image} contains unspecified keys")
             if "path" not in image:
                 raise ValueError(f"{image} must contain a path key")
             if not isinstance(image["path"], str):
@@ -169,9 +170,10 @@ def _validate_plate_wells(
     return validated_wells
 
 
-def write_multiscale(
-    pyramid: List,
+def write_image(
+    image: np.ndarray,
     group: zarr.Group,
+    scaler: Scaler = Scaler(),
     chunks: Union[Tuple[Any, ...], int] = None,
     fmt: Format = CurrentFormat(),
     axes: Union[str, List[str], List[Dict[str, str]]] = None,
@@ -216,7 +218,7 @@ def write_multiscale(
         option.
     """
 
-    dims = len(pyramid[0].shape)
+    dims = len(image.shape)
     axes = _get_valid_axes(dims, axes, fmt)
 
     if chunks is not None:
@@ -225,7 +227,14 @@ Please use the 'storage_options' argument instead."""
         warnings.warn(msg, DeprecationWarning)
 
     datasets: List[dict] = []
-    for path, data in enumerate(pyramid):
+    delayed = []
+
+    # for path, data in enumerate(pyramid):
+    max_layer: int = 3
+    shapes = []
+    for path in range(0, max_layer):
+        LOGGER.debug(f"write_image path: {path}")
+        path = str(path)
         options = {}
         if storage_options:
             options = (
@@ -233,6 +242,13 @@ Please use the 'storage_options' argument instead."""
                 if not isinstance(storage_options, list)
                 else storage_options[path]
             )
+
+        axes_names = [axis["name"] for axis in axes]
+
+        # don't downsample top level of pyramid
+        if path != "0":
+            image = scaler.nearest(image)
+
         # ensure that the chunk dimensions match the image dimensions
         # (which might have been changed for versions 0.1 or 0.2)
         # if chunks are explicitly set in the storage options
@@ -240,33 +256,35 @@ Please use the 'storage_options' argument instead."""
         # switch to this code in 0.5
         # chunks_opt = options.pop("chunks", None)
         if chunks_opt is not None:
-            chunks_opt = _retuple(chunks_opt, data.shape)
+            chunks_opt = _retuple(chunks_opt, image.shape)
+            image = da.array(image).rechunk(chunks=chunks)
+            options["chunks"] = chunks_opt
+        LOGGER.debug(f"chunks_opt: {chunks_opt}")
 
-        if isinstance(data, dask.array.Array):
-            sub_group = group.create_dataset(
-                str(path), shape=data.shape, chunks=chunks_opt, **options
-            )
-            dask.array.to_zarr(
-                data,
-                url=sub_group,
-                component=None,
+        shapes.append(image.shape)
+        if isinstance(image, da.Array):
+            LOGGER.debug(f"write dask.array to_zarr shape:{image.shape}, dtype {image.dtype}")
+            delayed.append(da.to_zarr(
+                array_key=path,
+                arr=image,
+                url=group.store,
+                component=str(Path(group.path, str(path))),
                 storage_options=options,
-                overwrite=True,
-                region=None,
-                compute=True,
-                return_stored=False,
-            )
+                compute=False,
+            ))
         else:
-            group.create_dataset(str(path), data=data, chunks=chunks_opt, **options)
+            group.create_dataset(str(path), data=image, chunks=chunks_opt, **options)
         datasets.append({"path": str(path)})
 
+    da.compute(*delayed)
+
     if coordinate_transformations is None:
-        shapes = [data.shape for data in pyramid]
+        # shapes = [data.shape for data in delayed]
         coordinate_transformations = fmt.generate_coordinate_transformations(shapes)
 
     # we validate again later, but this catches length mismatch before zip(datasets...)
     fmt.validate_coordinate_transformations(
-        dims, len(pyramid), coordinate_transformations
+        dims, len(delayed), coordinate_transformations
     )
     if coordinate_transformations is not None:
         for dataset, transform in zip(datasets, coordinate_transformations):
@@ -401,17 +419,17 @@ def write_well_metadata(
     group.attrs["well"] = well
 
 
-def write_image(
-    image: np.ndarray,
-    group: zarr.Group,
-    scaler: Scaler = Scaler(),
-    chunks: Union[Tuple[Any, ...], int] = None,
-    fmt: Format = CurrentFormat(),
-    axes: Union[str, List[str], List[Dict[str, str]]] = None,
-    coordinate_transformations: List[List[Dict[str, Any]]] = None,
-    storage_options: Union[JSONDict, List[JSONDict]] = None,
-    **metadata: Union[str, JSONDict, List[JSONDict]],
-) -> None:
+# def write_image(
+#     image: np.ndarray,
+#     group: zarr.Group,
+#     scaler: Scaler = Scaler(),
+#     chunks: Union[Tuple[Any, ...], int] = None,
+#     fmt: Format = CurrentFormat(),
+#     axes: Union[str, List[str], List[Dict[str, str]]] = None,
+#     coordinate_transformations: List[List[Dict[str, Any]]] = None,
+#     storage_options: Union[JSONDict, List[JSONDict]] = None,
+#     **metadata: Union[str, JSONDict, List[JSONDict]],
+# ) -> None:
     """Writes an image to the zarr store according to ome-zarr specification
 
     :type image: :class:`numpy.ndarray`
@@ -452,17 +470,19 @@ def write_image(
         One can provide different chunk size for each level of a pyramid using this
         option.
     """
-    mip, axes = _create_mip(image, fmt, scaler, axes)
-    write_multiscale(
-        mip,
-        group,
-        chunks=chunks,
-        fmt=fmt,
-        axes=axes,
-        coordinate_transformations=coordinate_transformations,
-        storage_options=storage_options,
-        **metadata,
-    )
+    # scaler.max_layer = 2
+    # mip, axes = _create_mip(image, fmt, scaler, axes)
+    # write_multiscale(
+    #     image,
+    #     group,
+    #     scaler,
+    #     chunks=chunks,
+    #     fmt=fmt,
+    #     axes=axes,
+    #     coordinate_transformations=coordinate_transformations,
+    #     storage_options=storage_options,
+    #     **metadata,
+    # )
 
 
 def write_label_metadata(
