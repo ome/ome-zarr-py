@@ -228,7 +228,7 @@ Please use the 'storage_options' argument instead."""
         options = {}
         if storage_options:
             options = (
-                storage_options
+                storage_options.copy()
                 if not isinstance(storage_options, list)
                 else storage_options[path]
             )
