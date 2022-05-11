@@ -13,15 +13,10 @@ import dask.array as da
 import numpy as np
 import zarr
 from scipy.ndimage import zoom
-from skimage.transform import (
-    downscale_local_mean,
-    pyramid_gaussian,
-    pyramid_laplacian
-)
-
+from skimage.transform import downscale_local_mean, pyramid_gaussian, pyramid_laplacian
 from skimage.transform import resize as skimage_resize
-from .dask_utils import resize as dask_resize
 
+from .dask_utils import resize as dask_resize
 from .io import parse_url
 
 LOGGER = logging.getLogger("ome_zarr.scale")
