@@ -230,11 +230,10 @@ Please use the 'storage_options' argument instead."""
     delayed = []
 
     # for path, data in enumerate(pyramid):
-    max_layer: int = 3
+    max_layer: int = scaler.max_layer  # 3
     shapes = []
-    for path in range(0, max_layer):
+    for path in range(0, max_layer + 1):
         LOGGER.debug(f"write_image path: {path}")
-        path = str(path)
         options = {}
         if storage_options:
             options = (
@@ -242,6 +241,7 @@ Please use the 'storage_options' argument instead."""
                 if not isinstance(storage_options, list)
                 else storage_options[path]
             )
+        path = str(path)
 
         axes_names = [axis["name"] for axis in axes]
 
@@ -257,7 +257,7 @@ Please use the 'storage_options' argument instead."""
         # chunks_opt = options.pop("chunks", None)
         if chunks_opt is not None:
             chunks_opt = _retuple(chunks_opt, image.shape)
-            image = da.array(image).rechunk(chunks=chunks)
+            image = da.array(image).rechunk(chunks=chunks_opt)
             options["chunks"] = chunks_opt
         LOGGER.debug(f"chunks_opt: {chunks_opt}")
 
