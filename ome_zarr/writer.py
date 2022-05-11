@@ -3,8 +3,8 @@
 """
 import logging
 import warnings
-from typing import Any, Dict, List, Optional, Tuple, Union
 from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import dask.array as da
 import numpy as np
@@ -263,15 +263,19 @@ Please use the 'storage_options' argument instead."""
 
         shapes.append(image.shape)
         if isinstance(image, da.Array):
-            LOGGER.debug(f"write dask.array to_zarr shape:{image.shape}, dtype {image.dtype}")
-            delayed.append(da.to_zarr(
-                array_key=path,
-                arr=image,
-                url=group.store,
-                component=str(Path(group.path, str(path))),
-                storage_options=options,
-                compute=False,
-            ))
+            LOGGER.debug(
+                f"write dask.array to_zarr shape:{image.shape}, dtype {image.dtype}"
+            )
+            delayed.append(
+                da.to_zarr(
+                    array_key=path,
+                    arr=image,
+                    url=group.store,
+                    component=str(Path(group.path, str(path))),
+                    storage_options=options,
+                    compute=False,
+                )
+            )
         else:
             group.create_dataset(str(path), data=image, chunks=chunks_opt, **options)
         datasets.append({"path": str(path)})
@@ -418,18 +422,17 @@ def write_well_metadata(
     }
     group.attrs["well"] = well
 
-
-# def write_image(
-#     image: np.ndarray,
-#     group: zarr.Group,
-#     scaler: Scaler = Scaler(),
-#     chunks: Union[Tuple[Any, ...], int] = None,
-#     fmt: Format = CurrentFormat(),
-#     axes: Union[str, List[str], List[Dict[str, str]]] = None,
-#     coordinate_transformations: List[List[Dict[str, Any]]] = None,
-#     storage_options: Union[JSONDict, List[JSONDict]] = None,
-#     **metadata: Union[str, JSONDict, List[JSONDict]],
-# ) -> None:
+    # def write_image(
+    #     image: np.ndarray,
+    #     group: zarr.Group,
+    #     scaler: Scaler = Scaler(),
+    #     chunks: Union[Tuple[Any, ...], int] = None,
+    #     fmt: Format = CurrentFormat(),
+    #     axes: Union[str, List[str], List[Dict[str, str]]] = None,
+    #     coordinate_transformations: List[List[Dict[str, Any]]] = None,
+    #     storage_options: Union[JSONDict, List[JSONDict]] = None,
+    #     **metadata: Union[str, JSONDict, List[JSONDict]],
+    # ) -> None:
     """Writes an image to the zarr store according to ome-zarr specification
 
     :type image: :class:`numpy.ndarray`
