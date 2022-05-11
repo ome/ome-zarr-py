@@ -241,12 +241,9 @@ Please use the 'storage_options' argument instead."""
                 if not isinstance(storage_options, list)
                 else storage_options[path]
             )
-        path = str(path)
-
-        axes_names = [axis["name"] for axis in axes]
 
         # don't downsample top level of pyramid
-        if path != "0":
+        if str(path) != "0":
             image = scaler.nearest(image)
 
         # ensure that the chunk dimensions match the image dimensions
@@ -587,7 +584,7 @@ def write_multiscale_labels(
       Image label metadata. See :meth:`write_label_metadata` for details
     """
     sub_group = group.require_group(f"labels/{name}")
-    write_multiscale(
+    write_image(
         pyramid,
         sub_group,
         chunks=chunks,
