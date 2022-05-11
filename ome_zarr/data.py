@@ -14,7 +14,7 @@ from skimage.segmentation import clear_border
 from .format import CurrentFormat, Format
 from .io import parse_url
 from .scale import Scaler
-from .writer import write_multiscale
+from .writer import write_image
 
 CHANNEL_DIMENSION = 1
 
@@ -136,7 +136,7 @@ def create_zarr(
                 chunks[zct] = 1
 
     storage_options = dict(chunks=tuple(chunks))
-    write_multiscale(pyramid, grp, axes=axes, storage_options=storage_options)
+    write_image(pyramid, grp, axes=axes, storage_options=storage_options)
 
     if size_c == 1:
         image_data = {
@@ -178,7 +178,7 @@ def create_zarr(
         if axes is not None:
             # remove channel axis for masks
             axes = axes.replace("c", "")
-        write_multiscale(labels, label_grp, axes=axes)
+        write_image(labels, label_grp, axes=axes)
 
         colors = []
         properties = []

@@ -584,17 +584,17 @@ def write_multiscale_labels(
       Image label metadata. See :meth:`write_label_metadata` for details
     """
     sub_group = group.require_group(f"labels/{name}")
-    write_image(
-        pyramid,
-        sub_group,
-        chunks=chunks,
-        fmt=fmt,
-        axes=axes,
-        coordinate_transformations=coordinate_transformations,
-        storage_options=storage_options,
-        name=name,
-        **metadata,
-    )
+    # write_image(
+    #     image=pyramid,
+    #     group=sub_group,
+    #     scaler=Scaler(),
+    #     chunks=chunks,
+    #     fmt=fmt,
+    #     axes=axes,
+    #     coordinate_transformations=coordinate_transformations,
+    #     storage_options=storage_options,
+    #     **metadata,
+    # )
     write_label_metadata(
         group["labels"], name, **({} if label_metadata is None else label_metadata)
     )
