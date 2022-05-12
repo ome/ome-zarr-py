@@ -18,6 +18,19 @@ It can be built locally with:
     pip install spinx
     sphinx-build -b html docs/source/ docs/build/html
 
+Tests
+-----
+
+Tests can be run locally via `tox` with:
+
+    $ pip install tox
+    $ tox
+
+To enable pre-commit code validation:
+
+    $ pip install pre-commit
+    $ pre-commit install
+
 Release process
 ---------------
 
