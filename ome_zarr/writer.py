@@ -504,7 +504,7 @@ Please use the 'storage_options' argument instead."""
 
     # we validate again later, but this catches length mismatch before zip(datasets...)
     fmt.validate_coordinate_transformations(
-        dims, len(delayed), coordinate_transformations
+        dims, len(datasets), coordinate_transformations
     )
     if coordinate_transformations is not None:
         for dataset, transform in zip(datasets, coordinate_transformations):
