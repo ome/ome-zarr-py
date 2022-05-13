@@ -7,7 +7,7 @@ import logging
 import os
 from collections.abc import MutableMapping
 from dataclasses import dataclass
-from typing import Callable, Iterator, List, Union
+from typing import Any, Iterator, List, Tuple, Union
 
 import dask.array as da
 import numpy as np
@@ -139,14 +139,18 @@ class Scaler:
         Downsample using :func:`skimage.transform.resize`.
         """
         if isinstance(image, da.Array):
-            _resize = lambda image, out_shape, **kwargs: dask_resize(image, out_shape)
+
+            def _resize(image: ArrayLike, out_shape: Tuple, **kwargs: Any) -> ArrayLike:
+                return dask_resize(image, out_shape, **kwargs)
+
         else:
             _resize = skimage_resize
 
         # only down-sample in X and Y dimensions for now...
-        out_shape = list(image.shape)
-        out_shape[-1] = np.ceil(float(image.shape[-1]) / self.downscale)
-        out_shape[-2] = np.ceil(float(image.shape[-2]) / self.downscale)
+        new_shape = list(image.shape)
+        new_shape[-1] = np.ceil(float(image.shape[-1]) / self.downscale)
+        new_shape[-2] = np.ceil(float(image.shape[-2]) / self.downscale)
+        out_shape = tuple(new_shape)
 
         dtype = image.dtype
         image = _resize(
