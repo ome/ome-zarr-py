@@ -14,7 +14,7 @@ from skimage.segmentation import clear_border
 from .format import CurrentFormat, Format
 from .io import parse_url
 from .scale import Scaler
-from .writer import write_image
+from .writer import write_multiscale
 
 CHANNEL_DIMENSION = 1
 
@@ -45,14 +45,14 @@ def astronaut() -> Tuple[List, List]:
     blue = astro[:, :, 2]
     astro = np.array([red, green, blue])
     pixels = np.tile(astro, (1, 2, 2))
-    pyramid = scaler.nearest(pixels)
+    pyramid = scaler.gaussian(pixels)
 
     shape = list(pyramid[0].shape)
     c, y, x = shape
     label = np.zeros((y, x), dtype=np.int8)
     make_circle(100, 100, 1, label[200:300, 200:300])
     make_circle(150, 150, 2, label[250:400, 250:400])
-    labels = scaler.nearest(label)
+    labels = scaler.gaussian(label)
 
     return pyramid, labels
 
@@ -136,7 +136,7 @@ def create_zarr(
                 chunks[zct] = 1
 
     storage_options = dict(chunks=tuple(chunks))
-    write_image(pyramid, grp, axes=axes, storage_options=storage_options)
+    write_multiscale(pyramid, grp, axes=axes, storage_options=storage_options)
 
     if size_c == 1:
         image_data = {
@@ -178,7 +178,7 @@ def create_zarr(
         if axes is not None:
             # remove channel axis for masks
             axes = axes.replace("c", "")
-        write_image(labels, label_grp, axes=axes)
+        write_multiscale(labels, label_grp, axes=axes)
 
         colors = []
         properties = []
