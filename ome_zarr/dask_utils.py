@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Any, Tuple
 
 import numpy as np
 import skimage.transform
@@ -9,7 +9,7 @@ from dask import array as da
 
 
 def resize(
-    image: da.Array, output_shape: Tuple[int, ...], *args: int, **kwargs: str
+    image: da.Array, output_shape: Tuple[int, ...], *args: Any, **kwargs: Any
 ) -> da.Array:
     r"""
     Wrapped copy of "skimage.transform.resize"
