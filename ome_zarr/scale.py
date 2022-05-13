@@ -7,8 +7,9 @@ import logging
 import os
 from collections.abc import MutableMapping
 from dataclasses import dataclass
-from typing import Callable, Iterator, List
+from typing import Any, Callable, Iterator, List, Tuple, Union
 
+import dask.array as da
 import numpy as np
 import zarr
 from scipy.ndimage import zoom
@@ -19,9 +20,13 @@ from skimage.transform import (
     resize,
 )
 
+from .dask_utils import resize as dask_resize
 from .io import parse_url
 
 LOGGER = logging.getLogger("ome_zarr.scale")
+
+ListOfArrayLike = Union[List[da.Array], List[np.ndarray]]
+ArrayLike = Union[da.Array, np.ndarray]
 
 
 @dataclass
@@ -124,6 +129,30 @@ class Scaler:
                 grp.create_dataset(path, data=pyramid[i])
             series.append({"path": path})
         return grp
+
+    def resize_image(self, image: ArrayLike) -> ArrayLike:
+        """
+        Resize a numpy array OR a dask array to a smaller array (not pyramid)
+        """
+        if isinstance(image, da.Array):
+
+            def _resize(image: ArrayLike, out_shape: Tuple, **kwargs: Any) -> ArrayLike:
+                return dask_resize(image, out_shape, **kwargs)
+
+        else:
+            _resize = resize
+
+        # only down-sample in X and Y dimensions for now...
+        new_shape = list(image.shape)
+        new_shape[-1] = np.ceil(float(image.shape[-1]) / self.downscale)
+        new_shape[-2] = np.ceil(float(image.shape[-2]) / self.downscale)
+        out_shape = tuple(new_shape)
+
+        dtype = image.dtype
+        image = _resize(
+            image.astype(float), out_shape, order=1, mode="reflect", anti_aliasing=False
+        )
+        return image.astype(dtype)
 
     def nearest(self, base: np.ndarray) -> List[np.ndarray]:
         """

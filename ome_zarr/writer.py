@@ -3,8 +3,10 @@
 """
 import logging
 import warnings
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
+import dask.array as da
 import numpy as np
 import zarr
 
@@ -435,17 +437,115 @@ def write_image(
         One can provide different chunk size for each level of a pyramid using this
         option.
     """
-    mip, axes = _create_mip(image, fmt, scaler, axes)
-    write_multiscale(
-        mip,
-        group,
-        chunks=chunks,
-        fmt=fmt,
-        axes=axes,
-        coordinate_transformations=coordinate_transformations,
-        storage_options=storage_options,
-        **metadata,
+    if isinstance(image, da.Array):
+        write_dask_image(
+            image,
+            group,
+            scaler,
+            chunks=chunks,
+            fmt=fmt,
+            axes=axes,
+            coordinate_transformations=coordinate_transformations,
+            storage_options=storage_options,
+            **metadata,
+        )
+    else:
+        mip, axes = _create_mip(image, fmt, scaler, axes)
+        write_multiscale(
+            mip,
+            group,
+            chunks=chunks,
+            fmt=fmt,
+            axes=axes,
+            coordinate_transformations=coordinate_transformations,
+            storage_options=storage_options,
+            **metadata,
+        )
+
+
+def write_dask_image(
+    image: np.ndarray,
+    group: zarr.Group,
+    scaler: Scaler = Scaler(),
+    chunks: Union[Tuple[Any, ...], int] = None,
+    fmt: Format = CurrentFormat(),
+    axes: Union[str, List[str], List[Dict[str, str]]] = None,
+    coordinate_transformations: List[List[Dict[str, Any]]] = None,
+    storage_options: Union[JSONDict, List[JSONDict]] = None,
+    **metadata: Union[str, JSONDict, List[JSONDict]],
+) -> None:
+
+    dims = len(image.shape)
+    axes = _get_valid_axes(dims, axes, fmt)
+
+    if chunks is not None:
+        msg = """The 'chunks' argument is deprecated and will be removed in version 0.5.
+Please use the 'storage_options' argument instead."""
+        warnings.warn(msg, DeprecationWarning)
+
+    datasets: List[dict] = []
+    delayed = []
+
+    # for path, data in enumerate(pyramid):
+    max_layer: int = scaler.max_layer  # 3
+    shapes = []
+    for path in range(0, max_layer + 1):
+        LOGGER.debug(f"write_image path: {path}")
+        options = {}
+        if storage_options:
+            options = (
+                storage_options
+                if not isinstance(storage_options, list)
+                else storage_options[path]
+            )
+
+        # don't downsample top level of pyramid
+        if str(path) != "0":
+            image = scaler.resize_image(image)
+
+        # ensure that the chunk dimensions match the image dimensions
+        # (which might have been changed for versions 0.1 or 0.2)
+        # if chunks are explicitly set in the storage options
+        chunks_opt = options.pop("chunks", chunks)
+        # switch to this code in 0.5
+        # chunks_opt = options.pop("chunks", None)
+        if chunks_opt is not None:
+            chunks_opt = _retuple(chunks_opt, image.shape)
+            image = da.array(image).rechunk(chunks=chunks_opt)
+            options["chunks"] = chunks_opt
+        LOGGER.debug(f"chunks_opt: {chunks_opt}")
+        shapes.append(image.shape)
+
+        LOGGER.debug(
+            f"write dask.array to_zarr shape:{image.shape}, dtype {image.dtype}"
+        )
+        delayed.append(
+            da.to_zarr(
+                array_key=path,
+                arr=image,
+                url=group.store,
+                component=str(Path(group.path, str(path))),
+                storage_options=options,
+                compute=False,
+            )
+        )
+        datasets.append({"path": str(path)})
+
+    da.compute(*delayed)
+
+    if coordinate_transformations is None:
+        # shapes = [data.shape for data in delayed]
+        coordinate_transformations = fmt.generate_coordinate_transformations(shapes)
+
+    # we validate again later, but this catches length mismatch before zip(datasets...)
+    fmt.validate_coordinate_transformations(
+        dims, len(datasets), coordinate_transformations
     )
+    if coordinate_transformations is not None:
+        for dataset, transform in zip(datasets, coordinate_transformations):
+            dataset["coordinateTransformations"] = transform
+
+    write_multiscales_metadata(group, datasets, fmt, axes, **metadata)
 
 
 def write_label_metadata(
