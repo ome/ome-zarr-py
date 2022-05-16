@@ -1,5 +1,6 @@
 import pathlib
 
+import dask.array as da
 import numpy as np
 import pytest
 import zarr
@@ -113,6 +114,22 @@ class TestWriter:
         shape = (64, 64, 64)
         data = self.create_data(shape)
         write_image(data, self.group, axes="zyx")
+        reader = Reader(parse_url(f"{self.path}/test"))
+        image_node = list(reader())[0]
+        for transfs in image_node.metadata["coordinateTransformations"]:
+            assert len(transfs) == 1
+            assert transfs[0]["type"] == "scale"
+            assert len(transfs[0]["scale"]) == len(shape)
+            # Scaler only downsamples x and y. z scale will be 1
+            assert transfs[0]["scale"][0] == 1
+            for value in transfs[0]["scale"]:
+                assert value >= 1
+
+    def test_write_image_dask(self):
+        shape = (128, 128, 128)
+        data = self.create_data(shape)
+        data_delayed = da.from_array(data)
+        write_image(data_delayed, self.group, axes="zyx")
         reader = Reader(parse_url(f"{self.path}/test"))
         image_node = list(reader())[0]
         for transfs in image_node.metadata["coordinateTransformations"]:
