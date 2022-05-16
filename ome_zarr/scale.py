@@ -7,14 +7,18 @@ import logging
 import os
 from collections.abc import MutableMapping
 from dataclasses import dataclass
-from typing import Any, Iterator, List, Tuple, Union
+from typing import Any, Callable, Iterator, List, Tuple, Union
 
 import dask.array as da
 import numpy as np
 import zarr
 from scipy.ndimage import zoom
-from skimage.transform import downscale_local_mean, pyramid_gaussian, pyramid_laplacian
-from skimage.transform import resize as skimage_resize
+from skimage.transform import (
+    downscale_local_mean,
+    pyramid_gaussian,
+    pyramid_laplacian,
+    resize,
+)
 
 from .dask_utils import resize as dask_resize
 from .io import parse_url
@@ -70,14 +74,6 @@ class Scaler:
                 continue
             yield name
 
-    def scale_array(self, input_array: ArrayLike) -> ListOfArrayLike:
-        """Perform downsampling to memory."""
-        func = getattr(self, self.method, None)
-        if not func:
-            raise Exception
-        ret = func(input_array)
-        return ret
-
     def scale(self, input_array: str, output_directory: str) -> None:
         """Perform downsampling to disk."""
         func = getattr(self, self.method, None)
@@ -130,13 +126,13 @@ class Scaler:
                 path = "base"
             else:
                 path = "%s" % i
-                grp.create_dataset(path, data=dataset)
+                grp.create_dataset(path, data=pyramid[i])
             series.append({"path": path})
         return grp
 
-    def nearest(self, image: ArrayLike) -> ArrayLike:
+    def resize_image(self, image: ArrayLike) -> ArrayLike:
         """
-        Downsample using :func:`skimage.transform.resize`.
+        Resize a numpy array OR a dask array to a smaller array (not pyramid)
         """
         if isinstance(image, da.Array):
 
@@ -144,7 +140,7 @@ class Scaler:
                 return dask_resize(image, out_shape, **kwargs)
 
         else:
-            _resize = skimage_resize
+            _resize = resize
 
         # only down-sample in X and Y dimensions for now...
         new_shape = list(image.shape)
@@ -157,6 +153,24 @@ class Scaler:
             image.astype(float), out_shape, order=1, mode="reflect", anti_aliasing=False
         )
         return image.astype(dtype)
+
+    def nearest(self, base: np.ndarray) -> List[np.ndarray]:
+        """
+        Downsample using :func:`skimage.transform.resize`.
+
+        The :const:`cvs2.INTER_NEAREST` interpolation method is used.
+        """
+        return self._by_plane(base, self.__nearest)
+
+    def __nearest(self, plane: np.ndarray, sizeY: int, sizeX: int) -> np.ndarray:
+        """Apply the 2-dimensional transformation."""
+        return resize(
+            plane,
+            output_shape=(sizeY // self.downscale, sizeX // self.downscale),
+            order=0,
+            preserve_range=True,
+            anti_aliasing=False,
+        ).astype(plane.dtype)
 
     def gaussian(self, base: np.ndarray) -> List[np.ndarray]:
         """Downsample using :func:`skimage.transform.pyramid_gaussian`."""
@@ -198,3 +212,48 @@ class Scaler:
             rv.append(zoom(base, self.downscale**i))
             print(rv[-1].shape)
         return list(reversed(rv))
+
+    #
+    # Helpers
+    #
+
+    def _by_plane(
+        self,
+        base: np.ndarray,
+        func: Callable[[np.ndarray, int, int], np.ndarray],
+    ) -> np.ndarray:
+        """Loop over 3 of the 5 dimensions and apply the func transform."""
+
+        rv = [base]
+        for i in range(self.max_layer):
+            stack_to_scale = rv[-1]
+            shape_5d = (*(1,) * (5 - stack_to_scale.ndim), *stack_to_scale.shape)
+            T, C, Z, Y, X = shape_5d
+
+            # If our data is already 2D, simply resize and add to pyramid
+            if stack_to_scale.ndim == 2:
+                rv.append(func(stack_to_scale, Y, X))
+                continue
+
+            # stack_dims is any dims over 2D
+            stack_dims = stack_to_scale.ndim - 2
+            new_stack = None
+            for t in range(T):
+                for c in range(C):
+                    for z in range(Z):
+                        dims_to_slice = (t, c, z)[-stack_dims:]
+                        # slice nd down to 2D
+                        plane = stack_to_scale[(dims_to_slice)][:]
+                        out = func(plane, Y, X)
+                        # first iteration of loop creates the new nd stack
+                        if new_stack is None:
+                            zct_dims = shape_5d[:-2]
+                            shape_dims = zct_dims[-stack_dims:]
+                            new_stack = np.zeros(
+                                (*shape_dims, out.shape[0], out.shape[1]),
+                                dtype=base.dtype,
+                            )
+                        # insert resized plane into the stack at correct indices
+                        new_stack[(dims_to_slice)] = out
+            rv.append(new_stack)
+        return rv

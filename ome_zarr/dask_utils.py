@@ -13,9 +13,7 @@ def resize(
 ) -> da.Array:
     r"""
     Wrapped copy of "skimage.transform.resize"
-
     Resize image to match a certain size.
-
     :type image: :class:`dask.array`
     :param image: The dask array to resize
     :type output_shape: tuple
@@ -55,7 +53,6 @@ def resize(
 def downscale_nearest(image: da.Array, factors: Tuple[int, ...]) -> da.Array:
     """
     Primitive downscaling by integer factors using stepped slicing.
-
     :type image: :class:`dask.array`
     :param image: The dask array to resize
     :type factors: tuple

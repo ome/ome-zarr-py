@@ -401,16 +401,16 @@ def write_image(
 
     :type image: :class:`numpy.ndarray`
     :param image:
-        The image data to save. A downsampling of the data will be computed
-        if the scaler argument is non-None.
-        Image array MUST be up to 5-dimensional with dimensions
-        ordered (t, c, z, y, x)
+      The image data to save. A downsampling of the data will be computed
+      if the scaler argument is non-None.
+      Image array MUST be up to 5-dimensional with dimensions
+      ordered (t, c, z, y, x)
     :type group: :class:`zarr.hierarchy.Group`
     :param group: The group within the zarr store to write the metadata in.
     :type scaler: :class:`ome_zarr.scale.Scaler`
     :param scaler:
-        Scaler implementation for downsampling the image argument. If None,
-        no downsampling will be performed.
+      Scaler implementation for downsampling the image argument. If None,
+      no downsampling will be performed.
     :type chunks: int or tuple of ints, optional
     :param chunks:
         The size of the saved chunks to store the image.
@@ -420,16 +420,16 @@ def write_image(
             Use :attr:`storage_options` instead.
     :type fmt: :class:`ome_zarr.format.Format`, optional
     :param fmt:
-        The format of the ome_zarr data which should be used.
-        Defaults to the most current.
+      The format of the ome_zarr data which should be used.
+      Defaults to the most current.
     :type axes: list of str or list of dicts, optional
     :param axes:
-        The names of the axes. e.g. ["t", "c", "z", "y", "x"].
-        Ignored for versions 0.1 and 0.2. Required for version 0.3 or greater.
+      The names of the axes. e.g. ["t", "c", "z", "y", "x"].
+      Ignored for versions 0.1 and 0.2. Required for version 0.3 or greater.
     :type coordinate_transformations: list of dict
     :param coordinate_transformations:
-        For each resolution, we have a List of transformation Dicts (not validated).
-        Each list of dicts are added to each datasets in order.
+      For each resolution, we have a List of transformation Dicts (not validated).
+      Each list of dicts are added to each datasets in order.
     :type storage_options: dict or list of dict, optional
     :param storage_options:
         Options to be passed on to the storage backend.
@@ -437,6 +437,44 @@ def write_image(
         One can provide different chunk size for each level of a pyramid using this
         option.
     """
+    if isinstance(image, da.Array):
+        write_dask_image(
+            image,
+            group,
+            scaler,
+            chunks=chunks,
+            fmt=fmt,
+            axes=axes,
+            coordinate_transformations=coordinate_transformations,
+            storage_options=storage_options,
+            **metadata,
+        )
+    else:
+        mip, axes = _create_mip(image, fmt, scaler, axes)
+        write_multiscale(
+            mip,
+            group,
+            chunks=chunks,
+            fmt=fmt,
+            axes=axes,
+            coordinate_transformations=coordinate_transformations,
+            storage_options=storage_options,
+            **metadata,
+        )
+
+
+def write_dask_image(
+    image: np.ndarray,
+    group: zarr.Group,
+    scaler: Scaler = Scaler(),
+    chunks: Union[Tuple[Any, ...], int] = None,
+    fmt: Format = CurrentFormat(),
+    axes: Union[str, List[str], List[Dict[str, str]]] = None,
+    coordinate_transformations: List[List[Dict[str, Any]]] = None,
+    storage_options: Union[JSONDict, List[JSONDict]] = None,
+    **metadata: Union[str, JSONDict, List[JSONDict]],
+) -> None:
+
     dims = len(image.shape)
     axes = _get_valid_axes(dims, axes, fmt)
 
@@ -463,7 +501,7 @@ Please use the 'storage_options' argument instead."""
 
         # don't downsample top level of pyramid
         if str(path) != "0":
-            image = scaler.nearest(image)
+            image = scaler.resize_image(image)
 
         # ensure that the chunk dimensions match the image dimensions
         # (which might have been changed for versions 0.1 or 0.2)
@@ -476,24 +514,21 @@ Please use the 'storage_options' argument instead."""
             image = da.array(image).rechunk(chunks=chunks_opt)
             options["chunks"] = chunks_opt
         LOGGER.debug(f"chunks_opt: {chunks_opt}")
-
         shapes.append(image.shape)
-        if isinstance(image, da.Array):
-            LOGGER.debug(
-                f"write dask.array to_zarr shape:{image.shape}, dtype {image.dtype}"
+
+        LOGGER.debug(
+            f"write dask.array to_zarr shape:{image.shape}, dtype {image.dtype}"
+        )
+        delayed.append(
+            da.to_zarr(
+                array_key=path,
+                arr=image,
+                url=group.store,
+                component=str(Path(group.path, str(path))),
+                storage_options=options,
+                compute=False,
             )
-            delayed.append(
-                da.to_zarr(
-                    array_key=path,
-                    arr=image,
-                    url=group.store,
-                    component=str(Path(group.path, str(path))),
-                    storage_options=options,
-                    compute=False,
-                )
-            )
-        else:
-            group.create_dataset(str(path), data=image, chunks=chunks_opt, **options)
+        )
         datasets.append({"path": str(path)})
 
     da.compute(*delayed)
@@ -612,15 +647,15 @@ def write_multiscale_labels(
       Image label metadata. See :meth:`write_label_metadata` for details
     """
     sub_group = group.require_group(f"labels/{name}")
-    write_image(
-        image=pyramid,
-        group=sub_group,
-        scaler=Scaler(),
+    write_multiscale(
+        pyramid,
+        sub_group,
         chunks=chunks,
         fmt=fmt,
         axes=axes,
         coordinate_transformations=coordinate_transformations,
         storage_options=storage_options,
+        name=name,
         **metadata,
     )
     write_label_metadata(
@@ -730,7 +765,7 @@ def _create_mip(
                 "Can't downsample if size of x or y dimension is 1. "
                 "Shape: %s" % (image.shape,)
             )
-        mip = scaler.scale_array(image)
+        mip = scaler.nearest(image)
     else:
         LOGGER.debug("disabling pyramid")
         mip = [image]
