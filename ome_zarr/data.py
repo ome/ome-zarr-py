@@ -45,14 +45,14 @@ def astronaut() -> Tuple[List, List]:
     blue = astro[:, :, 2]
     astro = np.array([red, green, blue])
     pixels = np.tile(astro, (1, 2, 2))
-    pyramid = scaler.gaussian(pixels)
+    pyramid = scaler.nearest(pixels)
 
     shape = list(pyramid[0].shape)
     c, y, x = shape
     label = np.zeros((y, x), dtype=np.int8)
     make_circle(100, 100, 1, label[200:300, 200:300])
     make_circle(150, 150, 2, label[250:400, 250:400])
-    labels = scaler.gaussian(label)
+    labels = scaler.nearest(label)
 
     return pyramid, labels
 
