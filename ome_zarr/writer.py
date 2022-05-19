@@ -775,6 +775,12 @@ def _create_mip(
 def _retuple(
     chunks: Union[Tuple[Any, ...], int], shape: Tuple[Any, ...]
 ) -> Tuple[Any, ...]:
+    """
+    Expand chunks to match shape.
+
+    E.g. if chunks is (64, 64) and shape is (3, 4, 5, 1028, 1028)
+    return (3, 4, 5, 64, 64)
+    """
 
     _chunks: Tuple[Any, ...]
     if isinstance(chunks, int):
