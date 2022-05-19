@@ -12,6 +12,7 @@ from ome_zarr.reader import Multiscales, Reader
 from ome_zarr.scale import Scaler
 from ome_zarr.writer import (
     _get_valid_axes,
+    _retuple,
     write_image,
     write_labels,
     write_multiscale_labels,
@@ -82,6 +83,7 @@ class TestWriter:
             )
         if scaler is None:
             transformations = [transformations[0]]
+        chunks = (128, 128)
         write_image(
             image=data,
             group=self.group,
@@ -89,7 +91,7 @@ class TestWriter:
             fmt=version,
             axes=axes,
             coordinate_transformations=transformations,
-            storage_options=dict(chunks=(128, 128)),
+            storage_options=dict(chunks=chunks),
         )
 
         # Verify
@@ -108,6 +110,8 @@ class TestWriter:
             ):
                 assert transf == expected
             assert len(node.metadata["coordinateTransformations"]) == len(node.data)
+        first_chunk = [c[0] for c in node.data[0].chunks]
+        assert tuple(first_chunk) == _retuple(chunks, node.data[0].shape)
         assert np.allclose(data, node.data[0][...].compute())
 
     def test_write_image_current(self):
@@ -129,9 +133,14 @@ class TestWriter:
         shape = (128, 128, 128)
         data = self.create_data(shape)
         data_delayed = da.from_array(data)
-        write_image(data_delayed, self.group, axes="zyx")
+        chunks = (64, 64)
+        write_image(
+            data_delayed, self.group, axes="zyx", storage_options={"chunks": chunks}
+        )
         reader = Reader(parse_url(f"{self.path}/test"))
         image_node = list(reader())[0]
+        first_chunk = [c[0] for c in image_node.data[0].chunks]
+        assert tuple(first_chunk) == _retuple(chunks, image_node.data[0].shape)
         for transfs in image_node.metadata["coordinateTransformations"]:
             assert len(transfs) == 1
             assert transfs[0]["type"] == "scale"
