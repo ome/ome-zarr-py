@@ -464,6 +464,7 @@ class Plate(Spec):
 
     def __init__(self, node: Node) -> None:
         super().__init__(node)
+        LOGGER.debug(f"Plate created with ZarrLocation fmt:{ self.zarr.fmt}")
         self.get_pyramid_lazy(node)
 
     def get_pyramid_lazy(self, node: Node) -> None:
@@ -496,33 +497,10 @@ class Plate(Spec):
         LOGGER.debug(f"img_pyramid_shapes: {well_spec.img_pyramid_shapes}")
 
         self.axes = well_spec.img_metadata["axes"]
-        size_y = well_spec.img_shape[len(self.axes) - 2]
-        size_x = well_spec.img_shape[len(self.axes) - 1]
 
-        # FIXME - if only returning a single stiched plate (not a pyramid)
-        # need to decide optimal size. E.g. longest side < 1500
-        TARGET_SIZE = 1500
-        plate_width = self.column_count * size_x
-        plate_height = self.row_count * size_y
-        longest_side = max(plate_width, plate_height)
-        target_level = 0
-        for level, shape in enumerate(well_spec.img_pyramid_shapes):
-            plate_width = self.column_count * shape[-1]
-            plate_height = self.row_count * shape[-2]
-            longest_side = max(plate_width, plate_height)
-            target_level = level
-            if longest_side <= TARGET_SIZE:
-                break
-
-        LOGGER.debug(f"target_level: {target_level}")
-
+        # Create a dask pyramid for the plate
         pyramid = []
-
-        # This should create a pyramid of levels, but causes seg faults!
-        # for level in range(5):
-        for level in [target_level]:
-
-            tile_shape = well_spec.img_pyramid_shapes[level]
+        for level, tile_shape in enumerate(well_spec.img_pyramid_shapes):
             lazy_plate = self.get_stitched_grid(level, tile_shape)
             pyramid.append(lazy_plate)
 
