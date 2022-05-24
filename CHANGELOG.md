@@ -1,3 +1,9 @@
+# 0.4.2 (May 2022)
+
+- Relax version detection ([#189](https://github.com/ome/ome-zarr-py/pull/189))
+- Fix format warning duplication ([#190](https://github.com/ome/ome-zarr-py/pull/190))
+- Fix plate pyramid loading ([#195](https://github.com/ome/ome-zarr-py/pull/195))
+
 # 0.4.1 (Mar 2022)
 
 - Unify docstrings in `ome_zarr.writer` module ([#185](https://github.com/ome/ome-zarr-py/pull/185))
