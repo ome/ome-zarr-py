@@ -555,13 +555,27 @@ class Plate(Spec):
 
 
 class PlateLabels(Plate):
+    def __init__(self, node: Node) -> None:
+        super().__init__(node)
+        # cache well/image/labels/.zattrs for first field of each well. Key is e.g. A/1
+        self.well_labels_zattrs: Dict[str, Dict] = {}
+
     def get_tile_path(self, level: int, row: int, col: int) -> str:  # pragma: no cover
-        """251.zarr/A/1/0/labels/0/3/"""
-        path = (
-            f"{self.row_names[row]}/{self.col_names[col]}/"
-            f"{self.first_field}/labels/segmentation/{level}"
-        )
-        return path
+        """Returns path to .zarray for Well labels, e.g. /A/1/0/labels/my_cells/3/"""
+        well_key = f"{self.row_names[row]}/{self.col_names[col]}"
+        labels_attrs = self.well_labels_zattrs.get(well_key)
+        if labels_attrs is None:
+            # if not cached, load...
+            path = f"{well_key}/{self.first_field}/labels/"
+            LOGGER.info("loading labels/.zattrs: %s.zattrs", path)
+            first_field_labels = self.zarr.create(path)
+            # loads labels/.zattrs when new ZarrLocation is created
+            labels_attrs = first_field_labels.root_attrs
+            self.well_labels_zattrs[well_key] = labels_attrs
+        label_paths = labels_attrs.get("labels", [])
+        if len(label_paths) > 0:
+            return f"{well_key}/{self.first_field}/labels/{label_paths[0]}/{level}/"
+        return ""
 
     def get_pyramid_lazy(self, node: Node) -> None:
         """
@@ -647,8 +661,13 @@ class PlateLabels(Plate):
         node.metadata["properties"] = properties
 
     def get_numpy_type(self, image_node: Node) -> np.dtype:  # pragma: no cover
-        # FIXME - don't assume Well A1 is valid
-        path = self.get_tile_path(0, 0, 0)
+        row_col = self.plate_data.get("wells")[0].get("path").split("/")
+        row_names = [row["name"] for row in self.plate_data.get("rows")]
+        col_names = [col["name"] for col in self.plate_data.get("columns")]
+        row_index = row_names.index(row_col[0])
+        col_index = col_names.index(row_col[1])
+        path = self.get_tile_path(row_index, col_index, 0)
+        # it's *possible* path is empty string if first Well has no labels
         label_zarr = self.zarr.load(path)
         return label_zarr.dtype
 
