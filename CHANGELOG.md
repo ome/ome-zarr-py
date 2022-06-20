@@ -1,3 +1,7 @@
+# 0.5.0 (June 2022)
+
+- Add `fmt` option to `write_label_metadata` and store version ([#206](https://github.com/ome/ome-zarr-py/pull/206))
+
 # 0.4.2 (May 2022)
 
 - Relax version detection ([#189](https://github.com/ome/ome-zarr-py/pull/189))
