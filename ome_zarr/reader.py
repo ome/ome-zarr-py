@@ -559,15 +559,69 @@ class PlateLabels(Plate):
         """251.zarr/A/1/0/labels/0/3/"""
         path = (
             f"{self.row_names[row]}/{self.col_names[col]}/"
-            f"{self.first_field}/labels/0/{level}"
+            f"{self.first_field}/labels/segmentation/{level}"
         )
         return path
 
-    def get_pyramid_lazy(self, node: Node) -> None:  # pragma: no cover
-        super().get_pyramid_lazy(node)
+    def get_pyramid_lazy(self, node: Node) -> None:
+        """
+        Return a pyramid of dask data, where the highest resolution is the
+        stitched full-resolution images.
+        """
+        self.plate_data = self.lookup("plate", {})
+        LOGGER.info("plate_data: %s", self.plate_data)
+        self.rows = self.plate_data.get("rows")
+        self.columns = self.plate_data.get("columns")
+        self.first_field = "0"
+        self.row_names = [row["name"] for row in self.rows]
+        self.col_names = [col["name"] for col in self.columns]
+
+        self.well_paths = [well["path"] for well in self.plate_data.get("wells")]
+        self.well_paths.sort()
+
+        self.row_count = len(self.rows)
+        self.column_count = len(self.columns)
+
+        # Get the first well...
+        well_zarr = self.zarr.create(self.well_paths[0])
+        well_node = Node(well_zarr, node)
+        well_spec: Optional[Well] = well_node.first(Well)
+        if well_spec is None:
+            raise Exception("could not find first well")
+        self.numpy_type = well_spec.numpy_type
+
+        LOGGER.debug(f"img_pyramid_shapes: {well_spec.img_pyramid_shapes}")
+
+        # TDDO - get axes from label, not WELL image
+        self.axes = well_spec.img_metadata["axes"][1:]
+        # ch_index = [a['type'] for a in self.axes].index('channel')
+        # print("CHANNEL INDEX", ch_index)
+        ch_index = 0
+
+        # Create a dask pyramid for the plate
+        pyramid = []
+        for level, tile_shape in enumerate(well_spec.img_pyramid_shapes):
+            # remove channel dimension from labels shape
+            # TODO: better to load label axes directly?
+            shape_copy = list(tile_shape[:])
+            del shape_copy[ch_index]
+            print(" SHAPE", level, shape_copy)
+            lazy_plate = self.get_stitched_grid(level, tuple(shape_copy))
+            pyramid.append(lazy_plate)
+
+        # Set the node.data to be pyramid view of the plate
+        node.data = pyramid
+        # Use the first image's metadata for viewing the whole Plate
+        node.metadata = well_spec.img_metadata
+
+        # "metadata" dict gets added to each 'plate' layer in napari
+        node.metadata.update({"metadata": {"plate": self.plate_data}})
+
+        print("PlateLabels", node, self, node.metadata)
         # pyramid data may be multi-channel, but we only have 1 labels channel
         # TODO: when PlateLabels are re-enabled, update the logic to handle
         # 0.4 axes (list of dictionaries)
+        print("PlateLabels self.axes", self.axes)
         if "c" in self.axes:
             c_index = self.axes.index("c")
             idx = [slice(None)] * len(self.axes)
