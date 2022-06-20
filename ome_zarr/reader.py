@@ -465,18 +465,17 @@ class Plate(Spec):
     def __init__(self, node: Node) -> None:
         super().__init__(node)
         LOGGER.debug(f"Plate created with ZarrLocation fmt:{ self.zarr.fmt}")
-        self.get_pyramid_lazy(node)
 
-    def get_pyramid_lazy(self, node: Node) -> None:
-        """
-        Return a pyramid of dask data, where the highest resolution is the
-        stitched full-resolution images.
-        """
+        self.first_field = "0"
         self.plate_data = self.lookup("plate", {})
+        first_well_path = self.plate_data["wells"][0]["path"]
+        image_zarr = self.zarr.create(self.get_image_path(first_well_path))
+        self.first_well_image = Node(image_zarr, node)
+        print("first_well_image", self.first_well_image)
+
         LOGGER.info("plate_data: %s", self.plate_data)
         self.rows = self.plate_data.get("rows")
         self.columns = self.plate_data.get("columns")
-        self.first_field = "0"
         self.row_names = [row["name"] for row in self.rows]
         self.col_names = [col["name"] for col in self.columns]
 
@@ -486,40 +485,44 @@ class Plate(Spec):
         self.row_count = len(self.rows)
         self.column_count = len(self.columns)
 
-        # Get the first well...
-        well_zarr = self.zarr.create(self.well_paths[0])
-        well_node = Node(well_zarr, node)
-        well_spec: Optional[Well] = well_node.first(Well)
-        if well_spec is None:
-            raise Exception("could not find first well")
-        self.numpy_type = well_spec.numpy_type
+        self.get_pyramid_lazy(node)
 
-        LOGGER.debug(f"img_pyramid_shapes: {well_spec.img_pyramid_shapes}")
+    def get_pyramid_lazy(self, node: Node) -> None:
+        """
+        Return a pyramid of dask data, where the highest resolution is the
+        stitched full-resolution images.
+        """
 
-        self.axes = well_spec.img_metadata["axes"]
+        # Use the first well for dtype and shapes
+        img_data = self.first_well_image.data
+        img_pyramid_shapes = [d.shape for d in img_data]
+        level = 0
+        self.numpy_type = img_data[level].dtype
+
+        LOGGER.debug(f"img_pyramid_shapes: {img_pyramid_shapes}")
+
+        self.axes = self.first_well_image.metadata["axes"]
 
         # Create a dask pyramid for the plate
         pyramid = []
-        for level, tile_shape in enumerate(well_spec.img_pyramid_shapes):
+        for level, tile_shape in enumerate(img_pyramid_shapes):
             lazy_plate = self.get_stitched_grid(level, tile_shape)
             pyramid.append(lazy_plate)
 
         # Set the node.data to be pyramid view of the plate
         node.data = pyramid
         # Use the first image's metadata for viewing the whole Plate
-        node.metadata = well_spec.img_metadata
+        node.metadata = self.first_well_image.metadata
 
         # "metadata" dict gets added to each 'plate' layer in napari
         node.metadata.update({"metadata": {"plate": self.plate_data}})
 
-    def get_numpy_type(self, image_node: Node) -> np.dtype:
-        return image_node.data[0].dtype
+    def get_image_path(self, well_path: str) -> str:
+        return f"{well_path}/{self.first_field}/"
 
     def get_tile_path(self, level: int, row: int, col: int) -> str:
-        return (
-            f"{self.row_names[row]}/"
-            f"{self.col_names[col]}/{self.first_field}/{level}"
-        )
+        well_path = f"{self.row_names[row]}/{self.col_names[col]}"
+        return f"{self.get_image_path(well_path)}{level}/"
 
     def get_stitched_grid(self, level: int, tile_shape: tuple) -> da.core.Array:
         LOGGER.debug(f"get_stitched_grid() level: {level}, tile_shape: {tile_shape}")
@@ -556,120 +559,43 @@ class Plate(Spec):
 
 class PlateLabels(Plate):
     def __init__(self, node: Node) -> None:
-        super().__init__(node)
         # cache well/image/labels/.zattrs for first field of each well. Key is e.g. A/1
         self.well_labels_zattrs: Dict[str, Dict] = {}
+        super().__init__(node)
 
-    def get_tile_path(self, level: int, row: int, col: int) -> str:  # pragma: no cover
-        """Returns path to .zarray for Well labels, e.g. /A/1/0/labels/my_cells/3/"""
-        well_key = f"{self.row_names[row]}/{self.col_names[col]}"
-        labels_attrs = self.well_labels_zattrs.get(well_key)
-        if labels_attrs is None:
-            # if not cached, load...
-            path = f"{well_key}/{self.first_field}/labels/"
-            LOGGER.info("loading labels/.zattrs: %s.zattrs", path)
-            first_field_labels = self.zarr.create(path)
-            # loads labels/.zattrs when new ZarrLocation is created
-            labels_attrs = first_field_labels.root_attrs
-            self.well_labels_zattrs[well_key] = labels_attrs
-        label_paths = labels_attrs.get("labels", [])
-        if len(label_paths) > 0:
-            return f"{well_key}/{self.first_field}/labels/{label_paths[0]}/{level}/"
-        return ""
-
-    def get_pyramid_lazy(self, node: Node) -> None:
-        """
-        Return a pyramid of dask data, where the highest resolution is the
-        stitched full-resolution images.
-        """
-        self.plate_data = self.lookup("plate", {})
-        LOGGER.info("plate_data: %s", self.plate_data)
-        self.rows = self.plate_data.get("rows")
-        self.columns = self.plate_data.get("columns")
-        self.first_field = "0"
-        self.row_names = [row["name"] for row in self.rows]
-        self.col_names = [col["name"] for col in self.columns]
-
-        self.well_paths = [well["path"] for well in self.plate_data.get("wells")]
-        self.well_paths.sort()
-
-        self.row_count = len(self.rows)
-        self.column_count = len(self.columns)
-
-        # Get the first well...
-        well_zarr = self.zarr.create(self.well_paths[0])
-        well_node = Node(well_zarr, node)
-        well_spec: Optional[Well] = well_node.first(Well)
-        if well_spec is None:
-            raise Exception("could not find first well")
-        self.numpy_type = well_spec.numpy_type
-
-        LOGGER.debug(f"img_pyramid_shapes: {well_spec.img_pyramid_shapes}")
-
-        # TDDO - get axes from label, not WELL image
-        self.axes = well_spec.img_metadata["axes"][1:]
-        # ch_index = [a['type'] for a in self.axes].index('channel')
-        # print("CHANNEL INDEX", ch_index)
-        ch_index = 0
-
-        # Create a dask pyramid for the plate
-        pyramid = []
-        for level, tile_shape in enumerate(well_spec.img_pyramid_shapes):
-            # remove channel dimension from labels shape
-            # TODO: better to load label axes directly?
-            shape_copy = list(tile_shape[:])
-            del shape_copy[ch_index]
-            print(" SHAPE", level, shape_copy)
-            lazy_plate = self.get_stitched_grid(level, tuple(shape_copy))
-            pyramid.append(lazy_plate)
-
-        # Set the node.data to be pyramid view of the plate
-        node.data = pyramid
-        # Use the first image's metadata for viewing the whole Plate
-        node.metadata = well_spec.img_metadata
-
-        # "metadata" dict gets added to each 'plate' layer in napari
-        node.metadata.update({"metadata": {"plate": self.plate_data}})
-
-        print("PlateLabels", node, self, node.metadata)
-        # pyramid data may be multi-channel, but we only have 1 labels channel
-        # TODO: when PlateLabels are re-enabled, update the logic to handle
-        # 0.4 axes (list of dictionaries)
-        print("PlateLabels self.axes", self.axes)
-        if "c" in self.axes:
-            c_index = self.axes.index("c")
-            idx = [slice(None)] * len(self.axes)
-            idx[c_index] = slice(0, 1)
-            node.data[0] = node.data[0][tuple(idx)]
         # remove image metadata
-        node.metadata = {}
+        # node.metadata = {}
 
         # combine 'properties' from each image
         # from https://github.com/ome/ome-zarr-py/pull/61/
         properties: Dict[int, Dict[str, Any]] = {}
-        for row in self.row_names:
-            for col in self.col_names:
-                path = f"{row}/{col}/{self.first_field}/labels/0/.zattrs"
-                labels_json = self.zarr.get_json(path).get("image-label", {})
-                # NB: assume that 'label_val' is unique across all images
-                props_list = labels_json.get("properties", [])
-                if props_list:
-                    for props in props_list:
-                        label_val = props["label-value"]
-                        properties[label_val] = dict(props)
-                        del properties[label_val]["label-value"]
+        for well_path in self.well_paths:
+            path = self.get_image_path(well_path) + ".zattrs"
+            labels_json = self.zarr.get_json(path).get("image-label", {})
+            # NB: assume that 'label_val' is unique across all images
+            props_list = labels_json.get("properties", [])
+            if props_list:
+                for props in props_list:
+                    label_val = props["label-value"]
+                    properties[label_val] = dict(props)
+                    del properties[label_val]["label-value"]
         node.metadata["properties"] = properties
 
-    def get_numpy_type(self, image_node: Node) -> np.dtype:  # pragma: no cover
-        row_col = self.plate_data.get("wells")[0].get("path").split("/")
-        row_names = [row["name"] for row in self.plate_data.get("rows")]
-        col_names = [col["name"] for col in self.plate_data.get("columns")]
-        row_index = row_names.index(row_col[0])
-        col_index = col_names.index(row_col[1])
-        path = self.get_tile_path(row_index, col_index, 0)
-        # it's *possible* path is empty string if first Well has no labels
-        label_zarr = self.zarr.load(path)
-        return label_zarr.dtype
+    def get_image_path(self, well_path: str) -> str:
+        """Returns path to .zattr for Well labels, e.g. /A/1/0/labels/my_cells/"""
+        labels_attrs = self.well_labels_zattrs.get(well_path)
+        if labels_attrs is None:
+            # if not cached, load...
+            path = f"{well_path}/{self.first_field}/labels/"
+            LOGGER.info("loading labels/.zattrs: %s.zattrs", path)
+            first_field_labels = self.zarr.create(path)
+            # loads labels/.zattrs when new ZarrLocation is created
+            labels_attrs = first_field_labels.root_attrs
+            self.well_labels_zattrs[well_path] = labels_attrs
+        label_paths = labels_attrs.get("labels", [])
+        if len(label_paths) > 0:
+            return f"{well_path}/{self.first_field}/labels/{label_paths[0]}/"
+        return ""
 
 
 class Reader:
