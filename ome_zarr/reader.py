@@ -57,7 +57,7 @@ class Node:
             self.specs.append(PlateLabels(self))
         elif Plate.matches(zarr):
             self.specs.append(Plate(self))
-            # self.add(zarr, plate_labels=True)
+            self.add(zarr, plate_labels=True)
         if Well.matches(zarr):
             self.specs.append(Well(self))
 
