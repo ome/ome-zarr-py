@@ -470,8 +470,8 @@ class Plate(Spec):
         self.plate_data = self.lookup("plate", {})
         first_well_path = self.plate_data["wells"][0]["path"]
         image_zarr = self.zarr.create(self.get_image_path(first_well_path))
-        self.first_well_image = Node(image_zarr, node)
-        print("first_well_image", self.first_well_image)
+        # Create a Node for image, with no 'root'
+        self.first_well_image = Node(image_zarr, [])
 
         LOGGER.info("plate_data: %s", self.plate_data)
         self.rows = self.plate_data.get("rows")
@@ -500,8 +500,6 @@ class Plate(Spec):
         self.numpy_type = img_data[level].dtype
 
         LOGGER.debug(f"img_pyramid_shapes: {img_pyramid_shapes}")
-
-        self.axes = self.first_well_image.metadata["axes"]
 
         # Create a dask pyramid for the plate
         pyramid = []
@@ -553,8 +551,8 @@ class Plate(Spec):
                     lazy_reader(tile_name), shape=tile_shape, dtype=self.numpy_type
                 )
                 lazy_row.append(lazy_tile)
-            lazy_rows.append(da.concatenate(lazy_row, axis=len(self.axes) - 1))
-        return da.concatenate(lazy_rows, axis=len(self.axes) - 2)
+            lazy_rows.append(da.concatenate(lazy_row, axis=len(tile_shape) - 1))
+        return da.concatenate(lazy_rows, axis=len(tile_shape) - 2)
 
 
 class PlateLabels(Plate):
