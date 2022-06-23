@@ -4,8 +4,13 @@ from numpy import zeros
 
 from ome_zarr.data import create_zarr
 from ome_zarr.io import parse_url
-from ome_zarr.reader import Node, Plate, Reader
-from ome_zarr.writer import write_image, write_plate_metadata, write_well_metadata
+from ome_zarr.reader import Node, Plate, PlateLabels, Reader
+from ome_zarr.writer import (
+    write_image,
+    write_labels,
+    write_plate_metadata,
+    write_well_metadata,
+)
 
 
 class TestReader:
@@ -68,12 +73,19 @@ class TestHCSReader:
             write_well_metadata(well, ["0", "1", "2"])
             for field in range(3):
                 image = well.require_group(str(field))
-                write_image(zeros((1, 1, 1, 256, 256)), image)
+                write_image(zeros((256, 256)), image)
+
+                write_labels(zeros((256, 256)), image, name="test_labels")
 
         reader = Reader(parse_url(str(self.path)))
         nodes = list(reader())
         assert len(nodes) == 2
         assert len(nodes[0].specs) == 1
         assert isinstance(nodes[0].specs[0], Plate)
-        # assert len(nodes[1].specs) == 1
-        # assert isinstance(nodes[1].specs[0], PlateLabels)
+        assert len(nodes[1].specs) == 1
+        assert isinstance(nodes[1].specs[0], PlateLabels)
+        # plate shape is the single image * grid dimensions
+        plate_shape = (256 * len(row_names), 256 * len(col_names))
+        # check largest data for image and labels
+        assert nodes[0].data[0].shape == plate_shape
+        assert nodes[1].data[0].shape == plate_shape
