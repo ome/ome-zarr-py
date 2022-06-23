@@ -50,8 +50,7 @@ class TestHCSReader:
 
         reader = Reader(parse_url(str(self.path)))
         nodes = list(reader())
-        # currently reading plate labels disabled. Only 1 node
-        assert len(nodes) == 1
+        assert len(nodes) == 2
         assert len(nodes[0].specs) == 1
         assert isinstance(nodes[0].specs[0], Plate)
         # assert len(nodes[1].specs) == 1
@@ -73,8 +72,7 @@ class TestHCSReader:
 
         reader = Reader(parse_url(str(self.path)))
         nodes = list(reader())
-        # currently reading plate labels disabled. Only 1 node
-        assert len(nodes) == 1
+        assert len(nodes) == 2
         assert len(nodes[0].specs) == 1
         assert isinstance(nodes[0].specs[0], Plate)
         # assert len(nodes[1].specs) == 1
