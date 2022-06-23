@@ -468,10 +468,6 @@ class Plate(Spec):
 
         self.first_field = "0"
         self.plate_data = self.lookup("plate", {})
-        first_well_path = self.plate_data["wells"][0]["path"]
-        image_zarr = self.zarr.create(self.get_image_path(first_well_path))
-        # Create a Node for image, with no 'root'
-        self.first_well_image = Node(image_zarr, [])
 
         LOGGER.info("plate_data: %s", self.plate_data)
         self.rows = self.plate_data.get("rows")
@@ -484,6 +480,14 @@ class Plate(Spec):
 
         self.row_count = len(self.rows)
         self.column_count = len(self.columns)
+
+        img_path = self.get_image_path(self.well_paths[0])
+        if not img_path:
+            # E.g. PlateLabels subclass has no Labels
+            return
+        image_zarr = self.zarr.create(img_path)
+        # Create a Node for image, with no 'root'
+        self.first_well_image = Node(image_zarr, [])
 
         self.get_pyramid_lazy(node)
 
@@ -515,7 +519,7 @@ class Plate(Spec):
         # "metadata" dict gets added to each 'plate' layer in napari
         node.metadata.update({"metadata": {"plate": self.plate_data}})
 
-    def get_image_path(self, well_path: str) -> str:
+    def get_image_path(self, well_path: str) -> Optional[str]:
         return f"{well_path}/{self.first_field}/"
 
     def get_tile_path(self, level: int, row: int, col: int) -> str:
@@ -568,8 +572,10 @@ class PlateLabels(Plate):
         # from https://github.com/ome/ome-zarr-py/pull/61/
         properties: Dict[int, Dict[str, Any]] = {}
         for well_path in self.well_paths:
-            path = self.get_image_path(well_path) + ".zattrs"
-            labels_json = self.zarr.get_json(path).get("image-label", {})
+            path = self.get_image_path(well_path)
+            if not path:
+                continue
+            labels_json = self.zarr.get_json(path + ".zattrs").get("image-label", {})
             # NB: assume that 'label_val' is unique across all images
             props_list = labels_json.get("properties", [])
             if props_list:
@@ -579,7 +585,7 @@ class PlateLabels(Plate):
                     del properties[label_val]["label-value"]
         node.metadata["properties"] = properties
 
-    def get_image_path(self, well_path: str) -> str:
+    def get_image_path(self, well_path: str) -> Optional[str]:
         """Returns path to .zattr for Well labels, e.g. /A/1/0/labels/my_cells/"""
         labels_attrs = self.well_labels_zattrs.get(well_path)
         if labels_attrs is None:
@@ -593,7 +599,7 @@ class PlateLabels(Plate):
         label_paths = labels_attrs.get("labels", [])
         if len(label_paths) > 0:
             return f"{well_path}/{self.first_field}/labels/{label_paths[0]}/"
-        return ""
+        return None
 
 
 class Reader:
