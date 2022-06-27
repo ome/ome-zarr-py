@@ -405,56 +405,63 @@ class Well(Spec):
         LOGGER.info("well_data: %s", self.well_data)
 
         image_paths = [image["path"] for image in self.well_data.get("images")]
-        field_count = len(image_paths)
-        column_count = math.ceil(math.sqrt(field_count))
-        row_count = math.ceil(field_count / column_count)
 
-        # Use first Field for rendering settings, shape etc.
+        # Construct a 2D almost-square grid
+        field_count = len(image_paths)
+        self.row_count = math.ceil(math.sqrt(field_count))
+        self.column_count = math.ceil(field_count / self.row_count)
+
+        # Use first Field and highest-resolution level for rendering settings,
+        # shapes etc.
         image_zarr = self.zarr.create(image_paths[0])
         image_node = Node(image_zarr, node)
-        x_index = len(image_node.metadata["axes"]) - 1
-        y_index = len(image_node.metadata["axes"]) - 2
-        level = 0  # load full resolution image
-        self.numpy_type = image_node.data[level].dtype
+        self.x_index = len(image_node.metadata["axes"]) - 1
+        self.y_index = len(image_node.metadata["axes"]) - 2
+        self.numpy_type = image_node.data[0].dtype
+        self.img_shape = image_node.data[0].shape
         self.img_metadata = image_node.metadata
-        self.img_shape = image_node.data[level].shape
         self.img_pyramid_shapes = [d.shape for d in image_node.data]
 
-        # stitch full-resolution images into a grid
-        def get_field(tile_name: str) -> np.ndarray:
-            """tile_name is 'row,col'"""
-            row, col = (int(n) for n in tile_name.split(","))
-            field_index = (column_count * row) + col
-            path = f"{field_index}/{level}"
-            LOGGER.debug(f"LOADING tile... {path}")
-            try:
-                data = self.zarr.load(path)
-            except ValueError:
-                LOGGER.error(f"Failed to load {path}")
-                data = np.zeros(self.img_shape, dtype=self.numpy_type)
-            return data
+        # Create a pyramid of layers at different resolutions
+        pyramid = []
+        for level, tile_shape in enumerate(self.img_pyramid_shapes):
+            lazy_well = self.get_lazy_well(level, tile_shape)
+            pyramid.append(lazy_well)
 
-        lazy_reader = delayed(get_field)
-
-        def get_lazy_well() -> da.Array:
-            lazy_rows = []
-            # For level 0, return whole image for each tile
-            for row in range(row_count):
-                lazy_row: List[da.Array] = []
-                for col in range(column_count):
-                    tile_name = f"{row},{col}"
-                    LOGGER.debug(f"creating lazy_reader. row:{row} col:{col}")
-                    lazy_tile = da.from_delayed(
-                        lazy_reader(tile_name),
-                        shape=self.img_shape,
-                        dtype=self.numpy_type,
-                    )
-                    lazy_row.append(lazy_tile)
-                lazy_rows.append(da.concatenate(lazy_row, axis=x_index))
-            return da.concatenate(lazy_rows, axis=y_index)
-
-        node.data = [get_lazy_well()]
+        # Set the node.data to be pyramid view of the plate
+        node.data = pyramid
         node.metadata = image_node.metadata
+
+    def get_field(self, tile_name: str, level: int) -> np.ndarray:
+        """tile_name is 'row,col'"""
+        row, col = (int(n) for n in tile_name.split(","))
+        field_index = (self.column_count * row) + col
+        path = f"{field_index}/{level}"
+        LOGGER.debug(f"LOADING tile... {path}")
+        try:
+            data = self.zarr.load(path)
+        except ValueError:
+            LOGGER.error(f"Failed to load {path}")
+            data = np.zeros(self.img_pyramid_shapes[level], dtype=self.numpy_type)
+        return data
+
+    def get_lazy_well(self, level: int, tile_shape: tuple) -> da.Array:
+        lazy_reader = delayed(self.get_field)
+
+        lazy_rows = []
+        for row in range(self.row_count):
+            lazy_row: List[da.Array] = []
+            for col in range(self.column_count):
+                tile_name = f"{row},{col}"
+                LOGGER.debug(f"creating lazy_reader. row:{row} col:{col} level:{level}")
+                lazy_tile = da.from_delayed(
+                    lazy_reader(tile_name, level),
+                    shape=tile_shape,
+                    dtype=self.numpy_type,
+                )
+                lazy_row.append(lazy_tile)
+            lazy_rows.append(da.concatenate(lazy_row, axis=self.x_index))
+        return da.concatenate(lazy_rows, axis=self.y_index)
 
 
 class Plate(Spec):
