@@ -501,13 +501,13 @@ class Plate(Spec):
         img_data = self.first_well_image.data
         img_pyramid_shapes = [d.shape for d in img_data]
         level = 0
-        self.numpy_type = img_data[level].dtype
 
         LOGGER.debug(f"img_pyramid_shapes: {img_pyramid_shapes}")
 
         # Create a dask pyramid for the plate
         pyramid = []
         for level, tile_shape in enumerate(img_pyramid_shapes):
+            self.numpy_type = img_data[level].dtype
             lazy_plate = self.get_stitched_grid(level, tile_shape)
             pyramid.append(lazy_plate)
 
