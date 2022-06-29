@@ -2,6 +2,7 @@
 
 import logging
 import math
+import os
 from abc import ABC
 from typing import Any, Dict, Iterator, List, Optional, Type, Union, cast, overload
 
@@ -579,8 +580,7 @@ class PlateLabels(Plate):
             return False
 
         # and the parent is a plate
-        path = zarr.path
-        parent_path = path[: path.rfind("/")]
+        parent_path = os.path.dirname(zarr.path)
         parent = zarr.create(parent_path)
         return "plate" in parent.root_attrs
 
@@ -610,10 +610,8 @@ class PlateLabels(Plate):
         node.metadata["properties"] = properties
 
     def get_plate_zarr(self) -> ZarrLocation:
-        # lookup parent plate
-        path = self.zarr.path
-        # remove the /labels
-        parent_path = path[: path.rfind("/")]
+        # lookup parent plate, remove the /labels
+        parent_path = os.path.dirname(self.zarr.path)
         return self.zarr.create(parent_path)
 
     def get_image_path(self, well_path: str) -> Optional[str]:
