@@ -26,7 +26,7 @@ class Node:
         zarr: ZarrLocation,
         root: Union["Node", "Reader", List[ZarrLocation]],
         visibility: bool = True,
-        plate_labels: bool = False,
+        # plate_labels: bool = False,
     ):
         self.zarr = zarr
         self.root = root
@@ -53,11 +53,11 @@ class Node:
             self.specs.append(Multiscales(self))
         if OMERO.matches(zarr):
             self.specs.append(OMERO(self))
-        if plate_labels:
+        # if plate_labels:
+        if PlateLabels.matches(zarr):
             self.specs.append(PlateLabels(self))
         elif Plate.matches(zarr):
             self.specs.append(Plate(self))
-            self.add(zarr, plate_labels=True)
         if Well.matches(zarr):
             self.specs.append(Well(self))
 
@@ -136,7 +136,7 @@ class Node:
             visibility = self.visible
 
         self.seen.append(zarr)
-        node = Node(zarr, self, visibility=visibility, plate_labels=plate_labels)
+        node = Node(zarr, self, visibility=visibility)
         if prepend:
             self.pre_nodes.append(node)
         else:
@@ -467,9 +467,10 @@ class Plate(Spec):
         LOGGER.debug(f"Plate created with ZarrLocation fmt:{ self.zarr.fmt}")
 
         self.first_field = "0"
-        self.plate_data = self.lookup("plate", {})
+        self.plate_data = self.get_plate_zarr().root_attrs.get("plate", {})
 
         LOGGER.info("plate_data: %s", self.plate_data)
+        print("Plate --- self.plate_data --> ", self.plate_data)
         self.rows = self.plate_data.get("rows")
         self.columns = self.plate_data.get("columns")
         self.row_names = [row["name"] for row in self.rows]
@@ -482,14 +483,23 @@ class Plate(Spec):
         self.column_count = len(self.columns)
 
         img_path = self.get_image_path(self.well_paths[0])
+        print("Plate.__init__ - img_path ------> ", img_path)
         if not img_path:
             # E.g. PlateLabels subclass has no Labels
             return
-        image_zarr = self.zarr.create(img_path)
+        image_zarr = self.get_plate_zarr().create(img_path)
         # Create a Node for image, with no 'root'
         self.first_well_image = Node(image_zarr, [])
 
         self.get_pyramid_lazy(node)
+
+        # Load possible node data
+        child_zarr = self.zarr.create("labels")
+        # This is a 'virtual' path to plate.zarr/labels
+        node.add(child_zarr, visibility=False)
+
+    def get_plate_zarr(self) -> ZarrLocation:
+        return self.zarr
 
     def get_pyramid_lazy(self, node: Node) -> None:
         """
@@ -560,6 +570,20 @@ class Plate(Spec):
 
 
 class PlateLabels(Plate):
+    @staticmethod
+    def matches(zarr: ZarrLocation) -> bool:
+        print("PlateLabels matches", zarr.path)
+        # If the path ends in plate/labels...
+        if not zarr.path.endswith("labels"):
+            return False
+
+        # and the parent is a plate
+        path = zarr.path
+        parent_path = path[: path.rfind("/")]
+        print("parent_path", parent_path)
+        parent = zarr.create(parent_path)
+        return "plate" in parent.root_attrs
+
     def __init__(self, node: Node) -> None:
         # cache well/image/labels/.zattrs for first field of each well. Key is e.g. A/1
         self.well_labels_zattrs: Dict[str, Dict] = {}
@@ -585,16 +609,30 @@ class PlateLabels(Plate):
                     del properties[label_val]["label-value"]
         node.metadata["properties"] = properties
 
+    def get_plate_zarr(self) -> ZarrLocation:
+        # lookup parent plate
+        path = self.zarr.path
+        # remove the /labels
+        parent_path = path[: path.rfind("/")]
+        print("get_plate_zarr parent_path", parent_path)
+        return self.zarr.create(parent_path)
+
     def get_image_path(self, well_path: str) -> Optional[str]:
         """Returns path to .zattr for Well labels, e.g. /A/1/0/labels/my_cells/"""
         labels_attrs = self.well_labels_zattrs.get(well_path)
+        print("PlateLabels get_image_path well_path", well_path)
         if labels_attrs is None:
             # if not cached, load...
             path = f"{well_path}/{self.first_field}/labels/"
             LOGGER.info("loading labels/.zattrs: %s.zattrs", path)
-            first_field_labels = self.zarr.create(path)
+            # print("labels_path", path)
+            plate_zarr = self.get_plate_zarr()
+            # print("check plate_zarr", plate_zarr.root_attrs.get("plate", {}))
+            first_field_labels = plate_zarr.create(path)
+            # print("first_field_labels zarr", first_field_labels)
             # loads labels/.zattrs when new ZarrLocation is created
             labels_attrs = first_field_labels.root_attrs
+            # print("labels_attrs", labels_attrs)
             self.well_labels_zattrs[well_path] = labels_attrs
         label_paths = labels_attrs.get("labels", [])
         if len(label_paths) > 0:
