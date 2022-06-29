@@ -467,10 +467,12 @@ class Plate(Spec):
         LOGGER.debug(f"Plate created with ZarrLocation fmt:{ self.zarr.fmt}")
 
         self.first_field = "0"
-        self.plate_data = self.get_plate_zarr().root_attrs.get("plate", {})
+        # For Plate, plate_zarr is same as self.zarr, but for PlateLabels
+        # (node at /plate.zarr/labels) this is the parent at /plate.zarr node.
+        self.plate_zarr = self.get_plate_zarr()
+        self.plate_data = self.plate_zarr.root_attrs.get("plate", {})
 
         LOGGER.info("plate_data: %s", self.plate_data)
-        print("Plate --- self.plate_data --> ", self.plate_data)
         self.rows = self.plate_data.get("rows")
         self.columns = self.plate_data.get("columns")
         self.row_names = [row["name"] for row in self.rows]
@@ -483,11 +485,10 @@ class Plate(Spec):
         self.column_count = len(self.columns)
 
         img_path = self.get_image_path(self.well_paths[0])
-        print("Plate.__init__ - img_path ------> ", img_path)
         if not img_path:
             # E.g. PlateLabels subclass has no Labels
             return
-        image_zarr = self.get_plate_zarr().create(img_path)
+        image_zarr = self.plate_zarr.create(img_path)
         # Create a Node for image, with no 'root'
         self.first_well_image = Node(image_zarr, [])
 
@@ -496,7 +497,7 @@ class Plate(Spec):
         # Load possible node data
         child_zarr = self.zarr.create("labels")
         # This is a 'virtual' path to plate.zarr/labels
-        node.add(child_zarr, visibility=False)
+        node.add(child_zarr)
 
     def get_plate_zarr(self) -> ZarrLocation:
         return self.zarr
@@ -546,7 +547,7 @@ class Plate(Spec):
             LOGGER.debug(f"LOADING tile... {path} with shape: {tile_shape}")
 
             try:
-                data = self.zarr.load(path)
+                data = self.plate_zarr.load(path)
             except ValueError as e:
                 LOGGER.error(f"Failed to load {path}")
                 LOGGER.debug(f"{e}")
@@ -572,7 +573,6 @@ class Plate(Spec):
 class PlateLabels(Plate):
     @staticmethod
     def matches(zarr: ZarrLocation) -> bool:
-        print("PlateLabels matches", zarr.path)
         # If the path ends in plate/labels...
         if not zarr.path.endswith("labels"):
             return False
@@ -580,7 +580,6 @@ class PlateLabels(Plate):
         # and the parent is a plate
         path = zarr.path
         parent_path = path[: path.rfind("/")]
-        print("parent_path", parent_path)
         parent = zarr.create(parent_path)
         return "plate" in parent.root_attrs
 
@@ -614,27 +613,22 @@ class PlateLabels(Plate):
         path = self.zarr.path
         # remove the /labels
         parent_path = path[: path.rfind("/")]
-        print("get_plate_zarr parent_path", parent_path)
         return self.zarr.create(parent_path)
 
     def get_image_path(self, well_path: str) -> Optional[str]:
         """Returns path to .zattr for Well labels, e.g. /A/1/0/labels/my_cells/"""
         labels_attrs = self.well_labels_zattrs.get(well_path)
-        print("PlateLabels get_image_path well_path", well_path)
         if labels_attrs is None:
             # if not cached, load...
             path = f"{well_path}/{self.first_field}/labels/"
             LOGGER.info("loading labels/.zattrs: %s.zattrs", path)
-            # print("labels_path", path)
             plate_zarr = self.get_plate_zarr()
-            # print("check plate_zarr", plate_zarr.root_attrs.get("plate", {}))
             first_field_labels = plate_zarr.create(path)
-            # print("first_field_labels zarr", first_field_labels)
             # loads labels/.zattrs when new ZarrLocation is created
             labels_attrs = first_field_labels.root_attrs
-            # print("labels_attrs", labels_attrs)
             self.well_labels_zattrs[well_path] = labels_attrs
         label_paths = labels_attrs.get("labels", [])
+        LOGGER.debug("label_paths: %s", label_paths)
         if len(label_paths) > 0:
             return f"{well_path}/{self.first_field}/labels/{label_paths[0]}/"
         return None
