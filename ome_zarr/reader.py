@@ -494,10 +494,11 @@ class Plate(Spec):
 
         self.get_pyramid_lazy(node)
 
-        # Load possible node data
-        child_zarr = self.zarr.create("labels")
-        # This is a 'virtual' path to plate.zarr/labels
-        node.add(child_zarr)
+        # Load possible node data IF this is a Plate
+        if Plate.matches(self.zarr):
+            child_zarr = self.zarr.create("labels")
+            # This is a 'virtual' path to plate.zarr/labels
+            node.add(child_zarr)
 
     def get_plate_zarr(self) -> ZarrLocation:
         return self.zarr
