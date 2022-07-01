@@ -408,8 +408,8 @@ class Well(Spec):
 
         # Construct a 2D almost-square grid
         field_count = len(image_paths)
-        self.row_count = math.ceil(math.sqrt(field_count))
-        self.column_count = math.ceil(field_count / self.row_count)
+        self.column_count = math.ceil(math.sqrt(field_count))
+        self.row_count = math.ceil(field_count / self.column_count)
 
         # Use first Field and highest-resolution level for rendering settings,
         # shapes etc.
