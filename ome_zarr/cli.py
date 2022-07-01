@@ -43,7 +43,7 @@ def download(args: argparse.Namespace) -> None:
 
 
 def create(args: argparse.Namespace) -> None:
-    """Chooses between data generation methods in :module:`ome_zarr.utils` like.
+    """Chooses between data generation methods in :mod:`ome_zarr.utils` like.
 
     :func:`~ome_zarr.data.coins` or :func:`~ome_zarr.data.astronaut`.
     """

@@ -12,6 +12,11 @@ LOGGER = logging.getLogger("ome_zarr.format")
 def format_from_version(version: str) -> "Format":
 
     for fmt in format_implementations():
+
+        # Support floating-point versions like `0.2`
+        if isinstance(version, float):
+            version = str(version)
+
         if fmt.version == version:
             return fmt
     raise ValueError(f"Version {version} not recognized")
@@ -27,10 +32,10 @@ def format_implementations() -> Iterator["Format"]:
     yield FormatV01()
 
 
-def detect_format(metadata: dict) -> "Format":
+def detect_format(metadata: dict, default: "Format") -> "Format":
     """
     Give each format implementation a chance to take ownership of the
-    given metadata. If none matches, a CurrentFormat is returned.
+    given metadata. If none matches, the default value will be returned.
     """
 
     if metadata:
@@ -38,7 +43,7 @@ def detect_format(metadata: dict) -> "Format":
             if fmt.matches(metadata):
                 return fmt
 
-    return CurrentFormat()
+    return default
 
 
 class Format(ABC):
@@ -59,11 +64,21 @@ class Format(ABC):
     def init_channels(self) -> None:  # pragma: no cover
         raise NotImplementedError()
 
-    def _get_multiscale_version(self, metadata: dict) -> Optional[str]:
+    def _get_metadata_version(self, metadata: dict) -> Optional[str]:
+        """
+        Checks the metadata dict for a version
+
+        Returns the version of the first object found in the metadata,
+        checking for 'multiscales', 'plate', 'well' etc
+        """
         multiscales = metadata.get("multiscales", [])
         if multiscales:
             dataset = multiscales[0]
             return dataset.get("version", None)
+        for name in ["plate", "well", "image-label"]:
+            obj = metadata.get(name, None)
+            if obj:
+                return obj.get("version", None)
         return None
 
     def __repr__(self) -> str:
@@ -112,8 +127,8 @@ class FormatV01(Format):
         return "0.1"
 
     def matches(self, metadata: dict) -> bool:
-        version = self._get_multiscale_version(metadata)
-        LOGGER.debug(f"V01:{version} v. {self.version}")
+        version = self._get_metadata_version(metadata)
+        LOGGER.debug(f"{self.version} matches {version}?")
         return version == self.version
 
     def init_store(self, path: str, mode: str = "r") -> FSStore:
@@ -159,11 +174,6 @@ class FormatV02(FormatV01):
     @property
     def version(self) -> str:
         return "0.2"
-
-    def matches(self, metadata: dict) -> bool:
-        version = self._get_multiscale_version(metadata)
-        LOGGER.debug(f"{self.version} matches {version}?")
-        return version == self.version
 
     def init_store(self, path: str, mode: str = "r") -> FSStore:
         """
@@ -267,7 +277,7 @@ class FormatV04(FormatV03):
         Validates that a list of dicts contains a 'scale' transformation
 
         Raises ValueError if no 'scale' found or doesn't match ndim
-        @param ndim:       Number of image dimensions
+        :param ndim:       Number of image dimensions
         """
 
         if coordinate_transformations is None:

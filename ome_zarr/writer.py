@@ -2,7 +2,8 @@
 
 """
 import logging
-from typing import Any, Dict, List, Tuple, Union
+import warnings
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import zarr
@@ -175,38 +176,52 @@ def write_multiscale(
     axes: Union[str, List[str], List[Dict[str, str]]] = None,
     coordinate_transformations: List[List[Dict[str, Any]]] = None,
     storage_options: Union[JSONDict, List[JSONDict]] = None,
+    **metadata: Union[str, JSONDict, List[JSONDict]],
 ) -> None:
     """
     Write a pyramid with multiscale metadata to disk.
 
-    Parameters
-    ----------
-    pyramid: List of np.ndarray
-      the image data to save. Largest level first
-      All image arrays MUST be up to 5-dimensional with dimensions
-      ordered (t, c, z, y, x)
-    group: zarr.Group
-      the group within the zarr store to store the data in
-    chunks: int or tuple of ints,
-      size of the saved chunks to store the image
-    fmt: Format
-      The format of the ome_zarr data which should be used.
-      Defaults to the most current.
-    axes: str or list of str or list of dict
-      List of axes dicts, or names. Not needed for v0.1 or v0.2
-      or if 2D. Otherwise this must be provided
-    coordinate_transformations: 2Dlist of dict
-      For each path, we have a List of transformation Dicts.
-      Each list of dicts are added to each datasets in order
-      and must include a 'scale' transform.
-    storage_options: dict or list of dict
-      Options to be passed on to the storage backend. A list would need to match
-      the number of datasets in a multiresolution pyramid. One can provide
-      different chunk size for each level of a pyramind using this option.
+    :type pyramid: list of :class:`numpy.ndarray`
+    :param pyramid:
+        The image data to save. Largest level first. All image arrays MUST be up to
+        5-dimensional with dimensions ordered (t, c, z, y, x)
+    :type group: :class:`zarr.hierarchy.Group`
+    :param group: The group within the zarr store to store the data in
+    :type chunks: int or tuple of ints, optional
+    :param chunks:
+        The size of the saved chunks to store the image.
+
+        .. deprecated:: 0.4.0
+            This argument is deprecated and will be removed in a future version.
+            Use :attr:`storage_options` instead.
+    :type fmt: :class:`ome_zarr.format.Format`, optional
+    :param fmt:
+        The format of the ome_zarr data which should be used.
+        Defaults to the most current.
+    :type axes: str list of str or list of dict, optional
+    :param axes:
+        List of axes dicts, or names. Not needed for v0.1 or v0.2 or if 2D. Otherwise
+        this must be provided
+    :type coordinate_transformations: 2Dlist of dict, optional
+    :param coordinate_transformations:
+        List of transformations for each path.
+        Each list of dicts are added to each datasets in order and must include a
+        'scale' transform.
+    :type storage_options: dict or list of dict, optional
+    :param storage_options:
+        Options to be passed on to the storage backend.
+        A list would need to match the number of datasets in a multiresolution pyramid.
+        One can provide different chunk size for each level of a pyramid using this
+        option.
     """
 
     dims = len(pyramid[0].shape)
     axes = _get_valid_axes(dims, axes, fmt)
+
+    if chunks is not None:
+        msg = """The 'chunks' argument is deprecated and will be removed in version 0.5.
+Please use the 'storage_options' argument instead."""
+        warnings.warn(msg, DeprecationWarning)
 
     datasets: List[dict] = []
     for path, data in enumerate(pyramid):
@@ -217,9 +232,15 @@ def write_multiscale(
                 if not isinstance(storage_options, list)
                 else storage_options[path]
             )
-        if "chunks" not in options:
-            options["chunks"] = chunks
-        group.create_dataset(str(path), data=data, **options)
+        # ensure that the chunk dimensions match the image dimensions
+        # (which might have been changed for versions 0.1 or 0.2)
+        # if chunks are explicitly set in the storage options
+        chunks_opt = options.pop("chunks", chunks)
+        # switch to this code in 0.5
+        # chunks_opt = options.pop("chunks", None)
+        if chunks_opt is not None:
+            chunks_opt = _retuple(chunks_opt, data.shape)
+        group.create_dataset(str(path), data=data, chunks=chunks_opt, **options)
         datasets.append({"path": str(path)})
 
     if coordinate_transformations is None:
@@ -234,7 +255,7 @@ def write_multiscale(
         for dataset, transform in zip(datasets, coordinate_transformations):
             dataset["coordinateTransformations"] = transform
 
-    write_multiscales_metadata(group, datasets, fmt, axes)
+    write_multiscales_metadata(group, datasets, fmt, axes, **metadata)
 
 
 def write_multiscales_metadata(
@@ -242,23 +263,25 @@ def write_multiscales_metadata(
     datasets: List[dict],
     fmt: Format = CurrentFormat(),
     axes: Union[str, List[str], List[Dict[str, str]]] = None,
+    **metadata: Union[str, JSONDict, List[JSONDict]],
 ) -> None:
     """
     Write the multiscales metadata in the group.
 
-    Parameters
-    ----------
-    group: zarr.Group
-      the group within the zarr store to write the metadata in.
-    datasets: list of dicts
+    :type group: :class:`zarr.hierarchy.Group`
+    :param group: The group within the zarr store to write the metadata in.
+    :type datasets: list of dicts
+    :param datasets:
       The list of datasets (dicts) for this multiscale image.
       Each dict must include 'path' and a 'coordinateTransformations'
       list for version 0.4 or later that must include a 'scale' transform.
-    fmt: Format
+    :type fmt: :class:`ome_zarr.format.Format`, optional
+    :param fmt:
       The format of the ome_zarr data which should be used.
       Defaults to the most current.
-    axes: list of str or list of dicts
-      the names of the axes. e.g. ["t", "c", "z", "y", "x"].
+    :type axes: list of str or list of dicts, optional
+    :param axes:
+      The names of the axes. e.g. ["t", "c", "z", "y", "x"].
       Ignored for versions 0.1 and 0.2. Required for version 0.3 or greater.
     """
 
@@ -272,11 +295,15 @@ def write_multiscales_metadata(
             if axes is not None:
                 ndim = len(axes)
 
+    # note: we construct the multiscale metadata via dict(), rather than {}
+    # to avoid duplication of protected keys like 'version' in **metadata
+    # (for {} this would silently over-write it, with dict() it explicitly fails)
     multiscales = [
-        {
-            "version": fmt.version,
-            "datasets": _validate_datasets(datasets, ndim, fmt),
-        }
+        dict(
+            version=fmt.version,
+            datasets=_validate_datasets(datasets, ndim, fmt),
+            **metadata,
+        )
     ]
     if axes is not None:
         multiscales[0]["axes"] = axes
@@ -297,25 +324,24 @@ def write_plate_metadata(
     """
     Write the plate metadata in the group.
 
-    Parameters
-    ----------
-    group: zarr.Group
-      the group within the zarr store to write the metadata in.
-    rows: list of str
-      The list of names for the plate rows
-    columns: list of str
-      The list of names for the plate columns
-    wells: list of str or dict
-      The list of paths for the well groups
-    fmt: Format
+    :type group: :class:`zarr.hierarchy.Group`
+    :param group: The group within the zarr store to write the metadata in.
+    :type rows: list of str
+    :param rows: The list of names for the plate rows.
+    :type columns: list of str
+    :param columns: The list of names for the plate columns.
+    :type wells: list of str or dict
+    :param wells: The list of paths for the well groups.
+    :type fmt: :class:`ome_zarr.format.Format`, optional
+    :param fmt:
       The format of the ome_zarr data which should be used.
       Defaults to the most current.
-    name: str
-      The plate name
-    field_count: int
-      The maximum number of fields per view across wells
-    acquisitions: list of dict
-      A list of the various plate acquisitions
+    :type acquisitions: list of dict, optional
+    :param acquisitions: A list of the various plate acquisitions.
+    :type name: str, optional
+    :param name: The plate name.
+    :type field_count: int, optional
+    :param field_count: The maximum number of fields per view across wells.
     """
 
     plate: Dict[str, Union[str, int, List[Dict]]] = {
@@ -341,15 +367,12 @@ def write_well_metadata(
     """
     Write the well metadata in the group.
 
-    Parameters
-    ----------
-    group: zarr.Group
-      the group within the zarr store to write the metadata in.
-    image_paths: list of str or dict
-      The list of paths for the well images
-    image_acquisitions: list of int
-      The list of acquisitions for the well images
-    fmt: Format
+    :type group: :class:`zarr.hierarchy.Group`
+    :param group: The group within the zarr store to write the metadata in.
+    :type images: list of dict
+    :param images: The list of dictionaries for all fields of views.
+    :type fmt: :class:`ome_zarr.format.Format`, optional
+    :param fmt:
       The format of the ome_zarr data which should be used.
       Defaults to the most current.
     """
@@ -364,49 +387,274 @@ def write_well_metadata(
 def write_image(
     image: np.ndarray,
     group: zarr.Group,
-    chunks: Union[Tuple[Any, ...], int] = None,
-    byte_order: Union[str, List[str]] = "tczyx",
     scaler: Scaler = Scaler(),
+    chunks: Union[Tuple[Any, ...], int] = None,
     fmt: Format = CurrentFormat(),
     axes: Union[str, List[str], List[Dict[str, str]]] = None,
     coordinate_transformations: List[List[Dict[str, Any]]] = None,
     storage_options: Union[JSONDict, List[JSONDict]] = None,
-    **metadata: JSONDict,
+    **metadata: Union[str, JSONDict, List[JSONDict]],
 ) -> None:
     """Writes an image to the zarr store according to ome-zarr specification
 
-    Parameters
-    ----------
-    image: np.ndarray
-      the image data to save. A downsampling of the data will be computed
+    :type image: :class:`numpy.ndarray`
+    :param image:
+      The image data to save. A downsampling of the data will be computed
       if the scaler argument is non-None.
       Image array MUST be up to 5-dimensional with dimensions
       ordered (t, c, z, y, x)
-    group: zarr.Group
-      the group within the zarr store to store the data in
-    chunks: int or tuple of ints,
-      size of the saved chunks to store the image
-    byte_order: str or list of str, default "tczyx"
-      combination of the letters defining the order
-      in which the dimensions are saved
-    scaler: Scaler
+    :type group: :class:`zarr.hierarchy.Group`
+    :param group: The group within the zarr store to write the metadata in.
+    :type scaler: :class:`ome_zarr.scale.Scaler`
+    :param scaler:
       Scaler implementation for downsampling the image argument. If None,
       no downsampling will be performed.
-    fmt: Format
+    :type chunks: int or tuple of ints, optional
+    :param chunks:
+        The size of the saved chunks to store the image.
+
+        .. deprecated:: 0.4.0
+            This argument is deprecated and will be removed in a future version.
+            Use :attr:`storage_options` instead.
+    :type fmt: :class:`ome_zarr.format.Format`, optional
+    :param fmt:
       The format of the ome_zarr data which should be used.
       Defaults to the most current.
-    axes: str or list of str or list of dict
-      List of axes dicts, or names. Not needed for v0.1 or v0.2
-      or if 2D. Otherwise this must be provided
-    coordinate_transformations: 2Dlist of dict
+    :type axes: list of str or list of dicts, optional
+    :param axes:
+      The names of the axes. e.g. ["t", "c", "z", "y", "x"].
+      Ignored for versions 0.1 and 0.2. Required for version 0.3 or greater.
+    :type coordinate_transformations: list of dict
+    :param coordinate_transformations:
       For each resolution, we have a List of transformation Dicts (not validated).
       Each list of dicts are added to each datasets in order.
-    storage_options: dict or list of dict
-      Options to be passed on to the storage backend. A list would need to match
-      the number of datasets in a multiresolution pyramid. One can provide
-      different chunk size for each level of a pyramind using this option.
+    :type storage_options: dict or list of dict, optional
+    :param storage_options:
+        Options to be passed on to the storage backend.
+        A list would need to match the number of datasets in a multiresolution pyramid.
+        One can provide different chunk size for each level of a pyramid using this
+        option.
     """
+    mip, axes = _create_mip(image, fmt, scaler, axes)
+    write_multiscale(
+        mip,
+        group,
+        chunks=chunks,
+        fmt=fmt,
+        axes=axes,
+        coordinate_transformations=coordinate_transformations,
+        storage_options=storage_options,
+        **metadata,
+    )
 
+
+def write_label_metadata(
+    group: zarr.Group,
+    name: str,
+    colors: List[JSONDict] = None,
+    properties: List[JSONDict] = None,
+    fmt: Format = CurrentFormat(),
+    **metadata: Union[List[JSONDict], JSONDict, str],
+) -> None:
+    """
+    Write image-label metadata to the group.
+
+    The label data must have been written to a sub-group,
+    with the same name as the second argument.
+
+    :type group: :class:`zarr.hierarchy.Group`
+    :param group: The group within the zarr store to write the metadata in.
+    :type name: str
+    :param name: The name of the label sub-group.
+    :type colors: list of JSONDict, optional
+    :param colors:
+      Fixed colors for (a subset of) the label values.
+      Each dict specifies the color for one label and must contain the fields
+      "label-value" and "rgba".
+    :type properties: list of JSONDict, optional
+    :param properties:
+      Additional properties for (a subset of) the label values.
+      Each dict specifies additional properties for one label.
+      It must contain the field "label-value"
+      and may contain arbitrary additional properties.
+    :type fmt: :class:`ome_zarr.format.Format`, optional
+    :param fmt:
+      The format of the ome_zarr data which should be used.
+      Defaults to the most current.
+    """
+    label_group = group[name]
+    image_label_metadata = {**metadata}
+    if colors is not None:
+        image_label_metadata["colors"] = colors
+    if properties is not None:
+        image_label_metadata["properties"] = properties
+    image_label_metadata["version"] = fmt.version
+    label_group.attrs["image-label"] = image_label_metadata
+
+    label_list = group.attrs.get("labels", [])
+    label_list.append(name)
+    group.attrs["labels"] = label_list
+
+
+def write_multiscale_labels(
+    pyramid: List,
+    group: zarr.Group,
+    name: str,
+    chunks: Union[Tuple[Any, ...], int] = None,
+    fmt: Format = CurrentFormat(),
+    axes: Union[str, List[str], List[Dict[str, str]]] = None,
+    coordinate_transformations: List[List[Dict[str, Any]]] = None,
+    storage_options: Union[JSONDict, List[JSONDict]] = None,
+    label_metadata: JSONDict = None,
+    **metadata: JSONDict,
+) -> None:
+    """
+    Write pyramidal image labels to disk.
+
+    Including the multiscales and image-label metadata.
+    Creates the label data in the sub-group "labels/{name}"
+
+    :type pyramid: list of :class:`numpy.ndarray`
+    :param pyramid:
+      the image label data to save. Largest level first
+      All image arrays MUST be up to 5-dimensional with dimensions
+      ordered (t, c, z, y, x)
+    :type group: :class:`zarr.hierarchy.Group`
+    :param group: The group within the zarr store to write the metadata in.
+    :type name: str, optional
+    :param name: The name of this labels data.
+    :type chunks: int or tuple of ints, optional
+    :param chunks:
+        The size of the saved chunks to store the image.
+
+        .. deprecated:: 0.4.0
+            This argument is deprecated and will be removed in a future version.
+            Use :attr:`storage_options` instead.
+    :type fmt: :class:`ome_zarr.format.Format`, optional
+    :param fmt:
+      The format of the ome_zarr data which should be used.
+      Defaults to the most current.
+    :type axes: list of str or list of dicts, optional
+    :param axes:
+      The names of the axes. e.g. ["t", "c", "z", "y", "x"].
+      Ignored for versions 0.1 and 0.2. Required for version 0.3 or greater.
+    :type coordinate_transformations: list of dict
+    :param coordinate_transformations:
+      For each resolution, we have a List of transformation Dicts (not validated).
+      Each list of dicts are added to each datasets in order.
+    :type storage_options: dict or list of dict, optional
+    :param storage_options:
+        Options to be passed on to the storage backend.
+        A list would need to match the number of datasets in a multiresolution pyramid.
+        One can provide different chunk size for each level of a pyramid using this
+        option.
+    :type label_metadata: dict, optional
+    :param label_metadata:
+      Image label metadata. See :meth:`write_label_metadata` for details
+    """
+    sub_group = group.require_group(f"labels/{name}")
+    write_multiscale(
+        pyramid,
+        sub_group,
+        chunks=chunks,
+        fmt=fmt,
+        axes=axes,
+        coordinate_transformations=coordinate_transformations,
+        storage_options=storage_options,
+        name=name,
+        **metadata,
+    )
+    write_label_metadata(
+        group["labels"],
+        name,
+        fmt=fmt,
+        **({} if label_metadata is None else label_metadata),
+    )
+
+
+def write_labels(
+    labels: np.ndarray,
+    group: zarr.Group,
+    name: str,
+    scaler: Scaler = Scaler(),
+    chunks: Union[Tuple[Any, ...], int] = None,
+    fmt: Format = CurrentFormat(),
+    axes: Union[str, List[str], List[Dict[str, str]]] = None,
+    coordinate_transformations: List[List[Dict[str, Any]]] = None,
+    storage_options: Union[JSONDict, List[JSONDict]] = None,
+    label_metadata: JSONDict = None,
+    **metadata: JSONDict,
+) -> None:
+    """
+    Write image label data to disk.
+
+    Including the multiscales and image-label metadata.
+    Creates the label data in the sub-group "labels/{name}"
+
+    :type labels: :class:`numpy.ndarray`
+    :param labels:
+      The label data to save. A downsampling of the data will be computed
+      if the scaler argument is non-None.
+      Label array MUST be up to 5-dimensional with dimensions
+      ordered (t, c, z, y, x)
+    :type group: :class:`zarr.hierarchy.Group`
+    :param group: The group within the zarr store to write the metadata in.
+    :type name: str, optional
+    :param name: The name of this labels data.
+    :type scaler: :class:`ome_zarr.scale.Scaler`
+    :param scaler:
+      Scaler implementation for downsampling the image argument. If None,
+      no downsampling will be performed.
+    :type chunks: int or tuple of ints, optional
+    :param chunks:
+        The size of the saved chunks to store the image.
+
+        .. deprecated:: 0.4.0
+            This argument is deprecated and will be removed in a future version.
+            Use :attr:`storage_options` instead.
+    :type fmt: :class:`ome_zarr.format.Format`, optional
+    :param fmt:
+      The format of the ome_zarr data which should be used.
+      Defaults to the most current.
+    :type axes: list of str or list of dicts, optional
+    :param axes:
+      The names of the axes. e.g. ["t", "c", "z", "y", "x"].
+      Ignored for versions 0.1 and 0.2. Required for version 0.3 or greater.
+    :type coordinate_transformations: list of dict
+    :param coordinate_transformations:
+      For each resolution, we have a List of transformation Dicts (not validated).
+      Each list of dicts are added to each datasets in order.
+    :type storage_options: dict or list of dict, optional
+    :param storage_options:
+        Options to be passed on to the storage backend.
+        A list would need to match the number of datasets in a multiresolution pyramid.
+        One can provide different chunk size for each level of a pyramid using this
+        option.
+    :type label_metadata: dict, optional
+    :param label_metadata:
+      Image label metadata. See :meth:`write_label_metadata` for details
+    """
+    mip, axes = _create_mip(labels, fmt, scaler, axes)
+    write_multiscale_labels(
+        mip,
+        group,
+        name=name,
+        chunks=chunks,
+        fmt=fmt,
+        axes=axes,
+        coordinate_transformations=coordinate_transformations,
+        storage_options=storage_options,
+        label_metadata=label_metadata,
+        **metadata,
+    )
+
+
+def _create_mip(
+    image: np.ndarray,
+    fmt: Format,
+    scaler: Scaler,
+    axes: Optional[Union[str, List[str], List[Dict[str, str]]]],
+) -> Tuple[List[np.ndarray], Optional[Union[str, List[str], List[Dict[str, str]]]]]:
     if image.ndim > 5:
         raise ValueError("Only images of 5D or less are supported")
 
@@ -420,30 +668,17 @@ def write_image(
     # check axes before trying to scale
     _get_valid_axes(image.ndim, axes, fmt)
 
-    if chunks is not None:
-        chunks = _retuple(chunks, image.shape)
-
     if scaler is not None:
         if image.shape[-1] == 1 or image.shape[-2] == 1:
             raise ValueError(
                 "Can't downsample if size of x or y dimension is 1. "
                 "Shape: %s" % (image.shape,)
             )
-        image = scaler.nearest(image)
+        mip = scaler.nearest(image)
     else:
         LOGGER.debug("disabling pyramid")
-        image = [image]
-
-    write_multiscale(
-        image,
-        group,
-        chunks=chunks,
-        fmt=fmt,
-        axes=axes,
-        coordinate_transformations=coordinate_transformations,
-        storage_options=storage_options,
-    )
-    group.attrs.update(metadata)
+        mip = [image]
+    return mip, axes
 
 
 def _retuple(

@@ -12,6 +12,8 @@ from ome_zarr.scale import Scaler
 from ome_zarr.writer import (
     _get_valid_axes,
     write_image,
+    write_labels,
+    write_multiscale_labels,
     write_multiscales_metadata,
     write_plate_metadata,
     write_well_metadata,
@@ -82,11 +84,11 @@ class TestWriter:
         write_image(
             image=data,
             group=self.group,
-            chunks=(128, 128),
             scaler=scaler,
             fmt=version,
             axes=axes,
             coordinate_transformations=transformations,
+            storage_options=dict(chunks=(128, 128)),
         )
 
         # Verify
@@ -823,3 +825,207 @@ class TestWellMetadata:
         assert "well" in self.root.attrs
         assert self.root.attrs["well"]["images"] == images
         assert self.root.attrs["well"]["version"] == CurrentFormat().version
+
+
+class TestLabelWriter:
+    @pytest.fixture(autouse=True)
+    def initdir(self, tmpdir):
+        self.path = pathlib.Path(tmpdir.mkdir("data.ome.zarr"))
+        self.store = parse_url(self.path, mode="w").store
+        self.root = zarr.group(store=self.store)
+
+    def create_image_data(self, shape, scaler, fmt, axes, transformations):
+        rng = np.random.default_rng(0)
+        data = rng.poisson(10, size=shape).astype(np.uint8)
+        write_image(
+            image=data,
+            group=self.root,
+            scaler=scaler,
+            fmt=fmt,
+            axes=axes,
+            coordinate_transformations=transformations,
+            storage_options=dict(chunks=(128, 128)),
+        )
+
+    @pytest.fixture(
+        params=(
+            (1, 2, 1, 256, 256),
+            (3, 512, 512),
+            (256, 256),
+        ),
+        ids=["5D", "3D", "2D"],
+    )
+    def shape(self, request):
+        return request.param
+
+    @pytest.fixture(params=[True, False], ids=["scale", "noop"])
+    def scaler(self, request):
+        if request.param:
+            return Scaler()
+        else:
+            return None
+
+    def verify_label_data(self, label_name, label_data, fmt, shape, transformations):
+        # Verify image data
+        reader = Reader(parse_url(f"{self.path}/labels/{label_name}"))
+        node = list(reader())[0]
+        assert Multiscales.matches(node.zarr)
+        if fmt.version in ("0.1", "0.2"):
+            # v0.1 and v0.2 MUST be 5D
+            assert node.data[0].ndim == 5
+        else:
+            assert node.data[0].shape == shape
+
+        if fmt.version not in ("0.1", "0.2", "0.3"):
+            for transf, expected in zip(
+                node.metadata["coordinateTransformations"], transformations
+            ):
+                assert transf == expected
+            assert len(node.metadata["coordinateTransformations"]) == len(node.data)
+        assert np.allclose(label_data, node.data[0][...].compute())
+
+        # Verify label metadata
+        label_root = zarr.open(f"{self.path}/labels", "r")
+        assert "labels" in label_root.attrs
+        assert label_name in label_root.attrs["labels"]
+
+        label_group = zarr.open(f"{self.path}/labels/{label_name}", "r")
+        assert "image-label" in label_group.attrs
+        assert label_group.attrs["image-label"]["version"] == fmt.version
+
+        # Verify multiscale metadata
+        name = label_group.attrs["multiscales"][0].get("name", "")
+        assert label_name == name
+
+    @pytest.mark.parametrize(
+        "format_version",
+        (
+            pytest.param(FormatV01, id="V01"),
+            pytest.param(FormatV02, id="V02"),
+            pytest.param(FormatV03, id="V03"),
+            pytest.param(FormatV04, id="V04"),
+        ),
+    )
+    def test_write_labels(self, shape, scaler, format_version):
+        fmt = format_version()
+        axes = "tczyx"[-len(shape) :]
+        transformations = []
+        for dataset_transfs in TRANSFORMATIONS:
+            transf = dataset_transfs[0]
+            # e.g. slice [1, 1, z, x, y] -> [z, x, y] for 3D
+            transformations.append(
+                [{"type": "scale", "scale": transf["scale"][-len(shape) :]}]
+            )
+            if scaler is None:
+                break
+
+        # create the actual label data
+        label_data = np.random.randint(0, 1000, size=shape)
+        if fmt.version in ("0.1", "0.2"):
+            # v0.1 and v0.2 require 5d
+            expand_dims = (np.s_[None],) * (5 - len(shape))
+            label_data = label_data[expand_dims]
+            assert label_data.ndim == 5
+        label_name = "my-labels"
+
+        # create the root level image data
+        self.create_image_data(shape, scaler, fmt, axes, transformations)
+
+        write_labels(
+            label_data,
+            self.root,
+            scaler=scaler,
+            name=label_name,
+            fmt=fmt,
+            axes=axes,
+            coordinate_transformations=transformations,
+        )
+        self.verify_label_data(label_name, label_data, fmt, shape, transformations)
+
+    @pytest.mark.parametrize(
+        "format_version",
+        (
+            pytest.param(FormatV01, id="V01"),
+            pytest.param(FormatV02, id="V02"),
+            pytest.param(FormatV03, id="V03"),
+            pytest.param(FormatV04, id="V04"),
+        ),
+    )
+    def test_write_multiscale_labels(self, shape, scaler, format_version):
+        fmt = format_version()
+        axes = "tczyx"[-len(shape) :]
+        transformations = []
+        for dataset_transfs in TRANSFORMATIONS:
+            transf = dataset_transfs[0]
+            # e.g. slice [1, 1, z, x, y] -> [z, x, y] for 3D
+            transformations.append(
+                [{"type": "scale", "scale": transf["scale"][-len(shape) :]}]
+            )
+
+        # create the actual label data
+        label_data = np.random.randint(0, 1000, size=shape)
+        if fmt.version in ("0.1", "0.2"):
+            # v0.1 and v0.2 require 5d
+            expand_dims = (np.s_[None],) * (5 - len(shape))
+            label_data = label_data[expand_dims]
+            assert label_data.ndim == 5
+        label_name = "my-labels"
+        if scaler is None:
+            transformations = [transformations[0]]
+            labels_mip = [label_data]
+        else:
+            labels_mip = scaler.nearest(label_data)
+
+        # create the root level image data
+        self.create_image_data(shape, scaler, fmt, axes, transformations)
+
+        write_multiscale_labels(
+            labels_mip,
+            self.root,
+            name=label_name,
+            fmt=fmt,
+            axes=axes,
+            coordinate_transformations=transformations,
+        )
+        self.verify_label_data(label_name, label_data, fmt, shape, transformations)
+
+    def test_two_label_images(self):
+        axes = "tczyx"
+        transformations = []
+        for dataset_transfs in TRANSFORMATIONS:
+            transf = dataset_transfs[0]
+            transformations.append([{"type": "scale", "scale": transf["scale"]}])
+
+        # create the root level image data
+        shape = (1, 2, 1, 256, 256)
+        scaler = Scaler()
+        fmt = FormatV04()
+        self.create_image_data(
+            shape,
+            scaler,
+            axes=axes,
+            fmt=fmt,
+            transformations=transformations,
+        )
+
+        label_names = ("first_labels", "second_labels")
+        for label_name in label_names:
+            label_data = np.random.randint(0, 1000, size=shape)
+            labels_mip = scaler.nearest(label_data)
+
+            write_multiscale_labels(
+                labels_mip,
+                self.root,
+                name=label_name,
+                axes=axes,
+                coordinate_transformations=transformations,
+            )
+            self.verify_label_data(label_name, label_data, fmt, shape, transformations)
+
+        # Verify label metadata
+        label_root = zarr.open(f"{self.path}/labels", "r")
+        assert "labels" in label_root.attrs
+        assert len(label_root.attrs["labels"]) == len(label_names)
+        assert all(
+            label_name in label_root.attrs["labels"] for label_name in label_names
+        )

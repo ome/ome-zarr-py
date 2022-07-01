@@ -31,6 +31,7 @@ class ZarrLocation:
         self, path: Union[Path, str], mode: str = "r", fmt: Format = CurrentFormat()
     ) -> None:
 
+        LOGGER.debug(f"ZarrLocation.__init__ path:{path}, fmt:{fmt.version}")
         self.__fmt = fmt
         self.__mode = mode
         if isinstance(path, Path):
@@ -46,7 +47,8 @@ class ZarrLocation:
         self.__store = loader.init_store(self.__path, mode)
 
         self.__init_metadata()
-        detected = detect_format(self.__metadata)
+        detected = detect_format(self.__metadata, loader)
+        LOGGER.debug(f"ZarrLocation.__init__ {path} detected:{detected}")
         if detected != fmt:
             LOGGER.warning(f"version mismatch: detected:{detected}, requested:{fmt}")
             self.__fmt = detected
