@@ -1,3 +1,7 @@
+# 0.5.1 (June 2022)
+
+- Read multi-resolution pyramids in `ome_zarr.reader.Well`, thanks to @tcompa ([#208](https://github.com/ome/ome-zarr-py/pull/208))
+
 # 0.5.0 (June 2022)
 
 - Add `fmt` option to `write_label_metadata` and store version ([#206](https://github.com/ome/ome-zarr-py/pull/206))
