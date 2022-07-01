@@ -26,6 +26,7 @@ install_requires += (["scikit-image"],)
 install_requires += (["toolz"],)
 install_requires += (["jsonschema"],)
 install_requires += (["ome_ngff"],)
+install_requires += (["cached_path"],)
 
 
 setup(

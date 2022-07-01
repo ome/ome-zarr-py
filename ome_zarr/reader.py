@@ -1,5 +1,6 @@
 """Reading logic for ome-zarr."""
 
+import json
 import logging
 import math
 from abc import ABC
@@ -7,10 +8,11 @@ from typing import Any, Dict, Iterator, List, Optional, Type, Union, cast, overl
 
 import dask.array as da
 import numpy as np
+from cached_path import cached_path
 from dask import delayed
+from jsonschema import Draft202012Validator as Validator
+from jsonschema import RefResolver
 from jsonschema import validate as jsonschema_validate
-from jsonschema.validators import validator_for
-from ome_ngff.schemas import LocalRefResolver, get_schema
 
 from .axes import Axes
 from .format import CurrentFormat, format_from_version
@@ -18,6 +20,15 @@ from .io import ZarrLocation
 from .types import JSONDict
 
 LOGGER = logging.getLogger("ome_zarr.reader")
+
+
+def get_schema(name: str, version: str, strict: bool = False) -> Dict:
+    pre = "strict_" if strict else ""
+    schema_url = f"https://ngff.openmicroscopy.org/{version}/schemas/{pre}{name}.schema"
+    local_path = cached_path(schema_url)
+    with open(local_path) as f:
+        sch_string = f.read()
+    return json.loads(sch_string)
 
 
 class Node:
@@ -342,7 +353,7 @@ class Multiscales(Spec):
         version = multiscales[0].get("version", CurrentFormat().version)
         LOGGER.info("Validating Multiscales spec at: %s" % self.zarr)
         LOGGER.info("Using Multiscales schema version: %s" % version)
-        image_schema = get_schema(version)
+        image_schema = get_schema("image", version)
 
         # Always do a validation with the MUST rules
         # Will throw ValidationException if it fails
@@ -352,12 +363,13 @@ class Multiscales(Spec):
         # If we're also checking for SHOULD rules,
         # we want to iterate all errors and show as "Warnings"
         if warnings:
-            strict_schema = get_schema(version, strict=True)
-            cls = validator_for(strict_schema)
-            cls.check_schema(strict_schema)
-            # Use our local resolver subclass to resolve local documents
-            localResolver = LocalRefResolver.from_schema(strict_schema)
-            validator = cls(strict_schema, resolver=localResolver)
+            strict_schema = get_schema("image", version, strict=True)
+            schema_store = {
+                image_schema["$id"]: image_schema,
+                strict_schema["$id"]: strict_schema,
+            }
+            resolver = RefResolver.from_schema(strict_schema, store=schema_store)
+            validator = Validator(strict_schema, resolver=resolver)
             for error in validator.iter_errors(json_data):
                 LOGGER.warn(error.message)
 
