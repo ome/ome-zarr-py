@@ -178,6 +178,7 @@ def write_multiscale(
     axes: Union[str, List[str], List[Dict[str, str]]] = None,
     coordinate_transformations: List[List[Dict[str, Any]]] = None,
     storage_options: Union[JSONDict, List[JSONDict]] = None,
+    name: str = None,
     **metadata: Union[str, JSONDict, List[JSONDict]],
 ) -> None:
     """
@@ -265,7 +266,7 @@ Please use the 'storage_options' argument instead."""
         for dataset, transform in zip(datasets, coordinate_transformations):
             dataset["coordinateTransformations"] = transform
 
-    write_multiscales_metadata(group, datasets, fmt, axes, **metadata)
+    write_multiscales_metadata(group, datasets, fmt, axes, name, **metadata)
 
 
 def write_multiscales_metadata(
@@ -273,6 +274,7 @@ def write_multiscales_metadata(
     datasets: List[dict],
     fmt: Format = CurrentFormat(),
     axes: Union[str, List[str], List[Dict[str, str]]] = None,
+    name: str = None,
     **metadata: Union[str, JSONDict, List[JSONDict]],
 ) -> None:
     """
@@ -312,6 +314,7 @@ def write_multiscales_metadata(
         dict(
             version=fmt.version,
             datasets=_validate_datasets(datasets, ndim, fmt),
+            name=name if name else group.name,
             **metadata,
         )
     ]
@@ -493,6 +496,7 @@ def _write_dask_image(
     axes: Union[str, List[str], List[Dict[str, str]]] = None,
     coordinate_transformations: List[List[Dict[str, Any]]] = None,
     storage_options: Union[JSONDict, List[JSONDict]] = None,
+    name: str = None,
     **metadata: Union[str, JSONDict, List[JSONDict]],
 ) -> None:
 
@@ -560,7 +564,7 @@ Please use the 'storage_options' argument instead."""
         for dataset, transform in zip(datasets, coordinate_transformations):
             dataset["coordinateTransformations"] = transform
 
-    write_multiscales_metadata(group, datasets, fmt, axes, **metadata)
+    write_multiscales_metadata(group, datasets, fmt, axes, name, **metadata)
 
 
 def write_label_metadata(
@@ -670,6 +674,7 @@ def write_multiscale_labels(
         axes=axes,
         coordinate_transformations=coordinate_transformations,
         storage_options=storage_options,
+        name=name,
         **metadata,
     )
     write_label_metadata(
@@ -750,7 +755,7 @@ def write_labels(
             axes=axes,
             coordinate_transformations=coordinate_transformations,
             storage_options=storage_options,
-            label_metadata=label_metadata,
+            name=name,
             **metadata,
         )
     else:
@@ -763,6 +768,7 @@ def write_labels(
             axes=axes,
             coordinate_transformations=coordinate_transformations,
             storage_options=storage_options,
+            name=name,
             **metadata,
         )
     write_label_metadata(
