@@ -387,7 +387,7 @@ def write_well_metadata(
 
 
 def write_image(
-    image: np.ndarray,
+    image: Union[np.ndarray, da.Array],
     group: zarr.Group,
     scaler: Scaler = Scaler(),
     chunks: Union[Tuple[Any, ...], int] = None,
@@ -399,12 +399,12 @@ def write_image(
 ) -> None:
     """Writes an image to the zarr store according to ome-zarr specification
 
-    :type image: :class:`numpy.ndarray`
+    :type image: :class:`numpy.ndarray` or `dask.array.Array`
     :param image:
       The image data to save. A downsampling of the data will be computed
       if the scaler argument is non-None.
       Image array MUST be up to 5-dimensional with dimensions
-      ordered (t, c, z, y, x)
+      ordered (t, c, z, y, x).  Image can be a numpy or dask Array.
     :type group: :class:`zarr.hierarchy.Group`
     :param group: The group within the zarr store to write the metadata in.
     :type scaler: :class:`ome_zarr.scale.Scaler`
@@ -438,7 +438,7 @@ def write_image(
         option.
     """
     if isinstance(image, da.Array):
-        write_dask_image(
+        _write_dask_image(
             image,
             group,
             scaler,
@@ -463,8 +463,8 @@ def write_image(
         )
 
 
-def write_dask_image(
-    image: np.ndarray,
+def _write_dask_image(
+    image: da.Array,
     group: zarr.Group,
     scaler: Scaler = Scaler(),
     chunks: Union[Tuple[Any, ...], int] = None,
