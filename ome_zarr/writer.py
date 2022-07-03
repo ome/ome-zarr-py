@@ -227,13 +227,8 @@ Please use the 'storage_options' argument instead."""
 
     datasets: List[dict] = []
     for path, data in enumerate(pyramid):
-        options = {}
-        if storage_options:
-            options = (
-                storage_options
-                if not isinstance(storage_options, list)
-                else storage_options[path]
-            )
+        options = _resolve_storage_options(storage_options, path)
+
         # ensure that the chunk dimensions match the image dimensions
         # (which might have been changed for versions 0.1 or 0.2)
         # if chunks are explicitly set in the storage options
@@ -242,7 +237,20 @@ Please use the 'storage_options' argument instead."""
         # chunks_opt = options.pop("chunks", None)
         if chunks_opt is not None:
             chunks_opt = _retuple(chunks_opt, data.shape)
-        group.create_dataset(str(path), data=data, chunks=chunks_opt, **options)
+
+        if isinstance(data, da.Array):
+            data = da.array(data).rechunk(chunks=chunks_opt)
+            options["chunks"] = chunks_opt
+            da.to_zarr(
+                array_key=path,
+                arr=data,
+                url=group.store,
+                component=str(Path(group.path, str(path))),
+                storage_options=options,
+            )
+        else:
+            group.create_dataset(str(path), data=data, chunks=chunks_opt, **options)
+
         datasets.append({"path": str(path)})
 
     if coordinate_transformations is None:
@@ -463,6 +471,19 @@ def write_image(
         )
 
 
+def _resolve_storage_options(
+    storage_options: Union[JSONDict, List[JSONDict]], path: int
+):
+    options = {}
+    if storage_options:
+        options = (
+            storage_options
+            if not isinstance(storage_options, list)
+            else storage_options[path]
+        )
+    return options
+
+
 def _write_dask_image(
     image: da.Array,
     group: zarr.Group,
@@ -487,20 +508,14 @@ Please use the 'storage_options' argument instead."""
     delayed = []
 
     # for path, data in enumerate(pyramid):
-    max_layer: int = scaler.max_layer  # 3
+    max_layer: int = scaler.max_layer if scaler is not None else 0
     shapes = []
     for path in range(0, max_layer + 1):
-        LOGGER.debug(f"write_image path: {path}")
-        options = {}
-        if storage_options:
-            options = (
-                storage_options
-                if not isinstance(storage_options, list)
-                else storage_options[path]
-            )
+        # LOGGER.debug(f"write_image path: {path}")
+        options = _resolve_storage_options(storage_options, path)
 
         # don't downsample top level of pyramid
-        if str(path) != "0":
+        if str(path) != "0" and scaler is not None:
             image = scaler.resize_image(image)
 
         # ensure that the chunk dimensions match the image dimensions
@@ -655,7 +670,6 @@ def write_multiscale_labels(
         axes=axes,
         coordinate_transformations=coordinate_transformations,
         storage_options=storage_options,
-        name=name,
         **metadata,
     )
     write_label_metadata(
@@ -664,7 +678,7 @@ def write_multiscale_labels(
 
 
 def write_labels(
-    labels: np.ndarray,
+    labels: Union[np.ndarray, da.Array],
     group: zarr.Group,
     name: str,
     scaler: Scaler = Scaler(),
@@ -725,18 +739,34 @@ def write_labels(
     :param label_metadata:
       Image label metadata. See :meth:`write_label_metadata` for details
     """
-    mip, axes = _create_mip(labels, fmt, scaler, axes)
-    write_multiscale_labels(
-        mip,
-        group,
-        name=name,
-        chunks=chunks,
-        fmt=fmt,
-        axes=axes,
-        coordinate_transformations=coordinate_transformations,
-        storage_options=storage_options,
-        label_metadata=label_metadata,
-        **metadata,
+    sub_group = group.require_group(f"labels/{name}")
+    if isinstance(labels, da.Array):
+        _write_dask_image(
+            labels,
+            sub_group,
+            scaler,
+            chunks=chunks,
+            fmt=fmt,
+            axes=axes,
+            coordinate_transformations=coordinate_transformations,
+            storage_options=storage_options,
+            label_metadata=label_metadata,
+            **metadata,
+        )
+    else:
+        mip, axes = _create_mip(labels, fmt, scaler, axes)
+        write_multiscale(
+            mip,
+            sub_group,
+            chunks=chunks,
+            fmt=fmt,
+            axes=axes,
+            coordinate_transformations=coordinate_transformations,
+            storage_options=storage_options,
+            **metadata,
+        )
+    write_label_metadata(
+        group["labels"], name, **({} if label_metadata is None else label_metadata)
     )
 
 
