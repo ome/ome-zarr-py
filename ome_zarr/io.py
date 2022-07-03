@@ -46,7 +46,7 @@ class ZarrLocation:
         self.__store = loader.init_store(self.__path, mode)
 
         self.__init_metadata()
-        detected = detect_format(self.__metadata)
+        detected = detect_format(self.__metadata, loader)
         if detected != fmt:
             LOGGER.warning(f"version mismatch: detected:{detected}, requested:{fmt}")
             self.__fmt = detected

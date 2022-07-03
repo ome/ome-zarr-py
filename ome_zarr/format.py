@@ -12,6 +12,11 @@ LOGGER = logging.getLogger("ome_zarr.format")
 def format_from_version(version: str) -> "Format":
 
     for fmt in format_implementations():
+
+        # Support floating-point versions like `0.2`
+        if isinstance(version, float):
+            version = str(version)
+
         if fmt.version == version:
             return fmt
     raise ValueError(f"Version {version} not recognized")
@@ -27,10 +32,10 @@ def format_implementations() -> Iterator["Format"]:
     yield FormatV01()
 
 
-def detect_format(metadata: dict) -> "Format":
+def detect_format(metadata: dict, default: "Format") -> "Format":
     """
     Give each format implementation a chance to take ownership of the
-    given metadata. If none matches, a CurrentFormat is returned.
+    given metadata. If none matches, the default value will be returned.
     """
 
     if metadata:
@@ -38,7 +43,7 @@ def detect_format(metadata: dict) -> "Format":
             if fmt.matches(metadata):
                 return fmt
 
-    return CurrentFormat()
+    return default
 
 
 class Format(ABC):
