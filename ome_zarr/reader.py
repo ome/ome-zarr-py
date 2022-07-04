@@ -28,7 +28,10 @@ def get_schema(name: str, version: str, strict: bool = False) -> Dict:
 
     # plate 404 at URL above
     if name in ("plate", "well"):
-        schema_url = f"https://raw.githubusercontent.com/ome/ngff/main/{version}/schemas/{pre}{name}.schema"
+        schema_url = (
+            f"https://raw.githubusercontent.com/ome/ngff/main/"
+            f"{version}/schemas/{pre}{name}.schema"
+        )
     local_path = cached_path(schema_url)
     with open(local_path) as f:
         sch_string = f.read()
@@ -201,7 +204,7 @@ class Spec(ABC):
     def lookup(self, key: str, default: Any) -> Any:
         return self.zarr.root_attrs.get(key, default)
 
-    def get_schema(self, strict: Optional[bool] = False) -> Optional[Dict]:
+    def get_schema(self, strict: bool = False) -> Optional[Dict]:
         # If not implemented then validate will be no-op
         return None
 
@@ -383,7 +386,7 @@ class Multiscales(Spec):
         # data.shape is (t, c, z, y, x) by convention
         return self.zarr.load(resolution)
 
-    def get_schema(self, strict: Optional[bool] = False) -> Optional[Dict]:
+    def get_schema(self, strict: bool = False) -> Optional[Dict]:
         multiscales = self.lookup("multiscales", [])
         version = multiscales[0].get("version", CurrentFormat().version)
         return get_schema("image", version, strict)
@@ -529,7 +532,7 @@ class Well(Spec):
         node.data = pyramid
         node.metadata = image_node.metadata
 
-    def get_schema(self, strict: Optional[bool] = False) -> Optional[Dict]:
+    def get_schema(self, strict: bool = False) -> Optional[Dict]:
         well = self.lookup("well", {})
         version = well.get("version", CurrentFormat().version)
         return get_schema("well", version, strict)
@@ -631,7 +634,7 @@ class Plate(Spec):
             lazy_rows.append(da.concatenate(lazy_row, axis=len(self.axes) - 1))
         return da.concatenate(lazy_rows, axis=len(self.axes) - 2)
 
-    def get_schema(self, strict: Optional[bool] = False) -> Optional[Dict]:
+    def get_schema(self, strict: bool = False) -> Optional[Dict]:
         plate = self.lookup("plate", {})
         version = plate.get("version", CurrentFormat().version)
         return get_schema("plate", version, strict)
