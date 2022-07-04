@@ -478,7 +478,7 @@ def write_image(
 
 def _resolve_storage_options(
     storage_options: Union[JSONDict, List[JSONDict], None], path: int
-):
+) -> JSONDict:
     options = {}
     if storage_options:
         options = (
