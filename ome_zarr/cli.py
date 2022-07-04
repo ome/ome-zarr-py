@@ -109,8 +109,9 @@ def main(args: List[str] = None) -> None:
     # validate
     parser_validate = subparsers.add_parser("validate")
     parser_validate.add_argument("path")
-    parser_validate.add_argument("--strict", action="store_true",
-        help="validate using a strict schema")
+    parser_validate.add_argument(
+        "--strict", action="store_true", help="validate using a strict schema"
+    )
     parser_validate.set_defaults(func=validate)
 
     # download
