@@ -25,6 +25,10 @@ LOGGER = logging.getLogger("ome_zarr.reader")
 def get_schema(name: str, version: str, strict: bool = False) -> Dict:
     pre = "strict_" if strict else ""
     schema_url = f"https://ngff.openmicroscopy.org/{version}/schemas/{pre}{name}.schema"
+
+    # plate 404 at URL above
+    if name in ("plate", "well"):
+        schema_url = f"https://raw.githubusercontent.com/ome/ngff/main/{version}/schemas/{pre}{name}.schema"
     local_path = cached_path(schema_url)
     with open(local_path) as f:
         sch_string = f.read()
@@ -197,9 +201,40 @@ class Spec(ABC):
     def lookup(self, key: str, default: Any) -> Any:
         return self.zarr.root_attrs.get(key, default)
 
-    def validate(self, warnings: bool = False) -> None:
-        # If not implemented, ignore for now
-        pass
+    def get_schema(self, strict: Optional[bool]=False) -> Optional[Dict]:
+        # If not implemented then validate will be no-op
+        return None
+
+    def validate(self, strict: bool = False) -> None:
+        # multiscales = self.lookup("multiscales", [])
+        # version = multiscales[0].get("version", CurrentFormat().version)
+        schema = self.get_schema()
+        if schema is None:
+            LOGGER.info("No schema for %s" % self.zarr)
+            return
+        LOGGER.info("Validating Multiscales spec at: %s" % self.zarr)
+
+        # Always do a validation with the MUST rules
+        # Will throw ValidationException if it fails
+        json_data = self.zarr.root_attrs
+        jsonschema_validate(instance=json_data, schema=schema)
+
+        # If we're also checking for SHOULD rules,
+        # we want to iterate all errors and show as Warnings
+        if strict:
+            strict_schema = self.get_schema(strict=True)
+            if strict_schema is None:
+                return
+            # we only need this store to allow use of cached schemas
+            # (and potential off-line use)
+            schema_store = {
+                schema["$id"]: schema,
+                strict_schema["$id"]: strict_schema,
+            }
+            resolver = RefResolver.from_schema(strict_schema, store=schema_store)
+            validator = Validator(strict_schema, resolver=resolver)
+            for error in validator.iter_errors(json_data):
+                LOGGER.warn(error.message)
 
 
 class Labels(Spec):
@@ -348,32 +383,10 @@ class Multiscales(Spec):
         # data.shape is (t, c, z, y, x) by convention
         return self.zarr.load(resolution)
 
-    def validate(self, warnings: bool = False) -> None:
+    def get_schema(self, strict: Optional[bool]=False) -> Optional[Dict]:
         multiscales = self.lookup("multiscales", [])
         version = multiscales[0].get("version", CurrentFormat().version)
-        LOGGER.info("Validating Multiscales spec at: %s" % self.zarr)
-        LOGGER.info("Using Multiscales schema version: %s" % version)
-        image_schema = get_schema("image", version)
-
-        # Always do a validation with the MUST rules
-        # Will throw ValidationException if it fails
-        json_data = self.zarr.root_attrs
-        jsonschema_validate(instance=json_data, schema=image_schema)
-
-        # If we're also checking for SHOULD rules,
-        # we want to iterate all errors and show as "Warnings"
-        if warnings:
-            strict_schema = get_schema("image", version, strict=True)
-            # we only need this store to allow use of cached schemas
-            # (and potential off-line use)
-            schema_store = {
-                image_schema["$id"]: image_schema,
-                strict_schema["$id"]: strict_schema,
-            }
-            resolver = RefResolver.from_schema(strict_schema, store=schema_store)
-            validator = Validator(strict_schema, resolver=resolver)
-            for error in validator.iter_errors(json_data):
-                LOGGER.warn(error.message)
+        return get_schema("image", version, strict)
 
 
 class OMERO(Spec):
@@ -516,6 +529,11 @@ class Well(Spec):
         node.data = pyramid
         node.metadata = image_node.metadata
 
+    def get_schema(self, strict: Optional[bool]=False) -> Optional[Dict]:
+        well = self.lookup("well", {})
+        version = well.get("version", CurrentFormat().version)
+        return get_schema("well", version, strict)
+
 
 class Plate(Spec):
     @staticmethod
@@ -613,6 +631,10 @@ class Plate(Spec):
             lazy_rows.append(da.concatenate(lazy_row, axis=len(self.axes) - 1))
         return da.concatenate(lazy_rows, axis=len(self.axes) - 2)
 
+    def get_schema(self, strict: Optional[bool]=False) -> Optional[Dict]:
+        plate = self.lookup("plate", {})
+        version = plate.get("version", CurrentFormat().version)
+        return get_schema("plate", version, strict)
 
 class PlateLabels(Plate):
     def get_tile_path(self, level: int, row: int, col: int) -> str:  # pragma: no cover

@@ -53,7 +53,7 @@ def info(path: str, stats: bool = False) -> Iterator[Node]:
     return visit(path, func)
 
 
-def validate(path: str, warnings: bool) -> Iterator[Node]:
+def validate(path: str, strict: bool) -> Iterator[Node]:
     """
     Validate OME-NGFF data
 
@@ -63,7 +63,7 @@ def validate(path: str, warnings: bool) -> Iterator[Node]:
 
     def func(node: Node) -> Node:
         if hasattr(node, "validate"):
-            node.validate(warnings)
+            node.validate(strict)
         return node
 
     return visit(path, func)
