@@ -458,6 +458,7 @@ def write_image(
             axes=axes,
             coordinate_transformations=coordinate_transformations,
             storage_options=storage_options,
+            name=None,
             **metadata,
         )
     else:
@@ -470,12 +471,13 @@ def write_image(
             axes=axes,
             coordinate_transformations=coordinate_transformations,
             storage_options=storage_options,
+            name=None,
             **metadata,
         )
 
 
 def _resolve_storage_options(
-    storage_options: Union[JSONDict, List[JSONDict]], path: int
+    storage_options: Union[JSONDict, List[JSONDict], None], path: int
 ):
     options = {}
     if storage_options:
