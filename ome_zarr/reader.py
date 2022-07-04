@@ -364,6 +364,8 @@ class Multiscales(Spec):
         # we want to iterate all errors and show as "Warnings"
         if warnings:
             strict_schema = get_schema("image", version, strict=True)
+            # we only need this store to allow use of cached schemas
+            # (and potential off-line use)
             schema_store = {
                 image_schema["$id"]: image_schema,
                 strict_schema["$id"]: strict_schema,

@@ -4,6 +4,7 @@ channels:
   - conda-forge
   - defaults
 dependencies:
+  - cached_path
   - flake8
   - ipython
   - jsonschema
