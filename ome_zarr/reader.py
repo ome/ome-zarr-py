@@ -182,6 +182,9 @@ class Spec(ABC):
     Multiple subclasses may apply.
     """
 
+    SCHEMA_NAME: str
+    version: str
+
     @staticmethod
     def matches(zarr: ZarrLocation) -> bool:
         raise NotImplementedError()
@@ -197,18 +200,12 @@ class Spec(ABC):
     def lookup(self, key: str, default: Any) -> Any:
         return self.zarr.root_attrs.get(key, default)
 
-    def get_schema(self, strict: bool = False) -> Optional[Dict]:
-        # If not implemented then validate will be no-op
-        return None
-
     def validate(self, strict: bool = False) -> None:
-        # multiscales = self.lookup("multiscales", [])
-        # version = multiscales[0].get("version", CurrentFormat().version)
-        schema = self.get_schema()
-        if schema is None:
+        if not hasattr(self, "SCHEMA_NAME"):
             LOGGER.info("No schema for %s" % self.zarr)
             return
         LOGGER.info("Validating Multiscales spec at: %s" % self.zarr)
+        schema = get_schema(self.SCHEMA_NAME, self.version)
 
         # Always do a validation with the MUST rules
         # Will throw ValidationException if it fails
@@ -218,7 +215,7 @@ class Spec(ABC):
         # If we're also checking for SHOULD rules,
         # we want to iterate all errors and show as Warnings
         if strict:
-            strict_schema = self.get_schema(strict=True)
+            strict_schema = get_schema(self.SCHEMA_NAME, self.version, strict=True)
             if strict_schema is None:
                 return
             # we only need this store to allow use of cached schemas
@@ -321,6 +318,9 @@ class Label(Spec):
 
 
 class Multiscales(Spec):
+
+    SCHEMA_NAME = "image"
+
     @staticmethod
     def matches(zarr: ZarrLocation) -> bool:
         """is multiscales metadata present?"""
@@ -334,12 +334,10 @@ class Multiscales(Spec):
 
         try:
             multiscales = self.lookup("multiscales", [])
-            version = multiscales[0].get(
-                "version", "0.1"
-            )  # should this be matched with Format.version?
+            self.version = multiscales[0].get("version", CurrentFormat().version)
             datasets = multiscales[0]["datasets"]
             axes = multiscales[0].get("axes")
-            fmt = format_from_version(version)
+            fmt = format_from_version(self.version)
             # Raises ValueError if not valid
             axes_obj = Axes(axes, fmt)
             node.metadata["axes"] = axes_obj.to_list()
@@ -354,7 +352,7 @@ class Multiscales(Spec):
             return  # EARLY EXIT
 
         for resolution in self.datasets:
-            data: da.core.Array = self.array(resolution, version)
+            data: da.core.Array = self.array(resolution, self.version)
             chunk_sizes = [
                 str(c[0]) + (" (+ %s)" % c[-1] if c[-1] != c[0] else "")
                 for c in data.chunks
@@ -378,11 +376,6 @@ class Multiscales(Spec):
     def array(self, resolution: str, version: str) -> da.core.Array:
         # data.shape is (t, c, z, y, x) by convention
         return self.zarr.load(resolution)
-
-    def get_schema(self, strict: bool = False) -> Optional[Dict]:
-        multiscales = self.lookup("multiscales", [])
-        version = multiscales[0].get("version", CurrentFormat().version)
-        return get_schema("image", version, strict)
 
 
 class OMERO(Spec):
@@ -455,6 +448,9 @@ class OMERO(Spec):
 
 
 class Well(Spec):
+
+    SCHEMA_NAME = "well"
+
     @staticmethod
     def matches(zarr: ZarrLocation) -> bool:
         return bool("well" in zarr.root_attrs)
@@ -462,6 +458,7 @@ class Well(Spec):
     def __init__(self, node: Node) -> None:
         super().__init__(node)
         self.well_data = self.lookup("well", {})
+        self.version = self.well_data.get("version", CurrentFormat().version)
         LOGGER.info("well_data: %s", self.well_data)
 
         image_paths = [image["path"] for image in self.well_data.get("images")]
@@ -525,13 +522,11 @@ class Well(Spec):
         node.data = pyramid
         node.metadata = image_node.metadata
 
-    def get_schema(self, strict: bool = False) -> Optional[Dict]:
-        well = self.lookup("well", {})
-        version = well.get("version", CurrentFormat().version)
-        return get_schema("well", version, strict)
-
 
 class Plate(Spec):
+
+    SCHEMA_NAME = "plate"
+
     @staticmethod
     def matches(zarr: ZarrLocation) -> bool:
         return bool("plate" in zarr.root_attrs)
@@ -539,6 +534,9 @@ class Plate(Spec):
     def __init__(self, node: Node) -> None:
         super().__init__(node)
         LOGGER.debug(f"Plate created with ZarrLocation fmt:{ self.zarr.fmt}")
+        self.plate_data = self.lookup("plate", {})
+        self.version = self.plate_data.get("version", CurrentFormat().version)
+        LOGGER.info("plate_data: %s", self.plate_data)
         self.get_pyramid_lazy(node)
 
     def get_pyramid_lazy(self, node: Node) -> None:
@@ -546,8 +544,6 @@ class Plate(Spec):
         Return a pyramid of dask data, where the highest resolution is the
         stitched full-resolution images.
         """
-        self.plate_data = self.lookup("plate", {})
-        LOGGER.info("plate_data: %s", self.plate_data)
         self.rows = self.plate_data.get("rows")
         self.columns = self.plate_data.get("columns")
         self.first_field = "0"
@@ -626,11 +622,6 @@ class Plate(Spec):
                 lazy_row.append(lazy_tile)
             lazy_rows.append(da.concatenate(lazy_row, axis=len(self.axes) - 1))
         return da.concatenate(lazy_rows, axis=len(self.axes) - 2)
-
-    def get_schema(self, strict: bool = False) -> Optional[Dict]:
-        plate = self.lookup("plate", {})
-        version = plate.get("version", CurrentFormat().version)
-        return get_schema("plate", version, strict)
 
 
 class PlateLabels(Plate):
