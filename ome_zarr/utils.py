@@ -2,12 +2,14 @@
 
 import json
 import logging
+import shutil
 from pathlib import Path
 from typing import Callable, Iterator, List
 
 import dask
 import dask.array as da
 import zarr
+from cached_path import get_cache_dir
 from dask.diagnostics import ProgressBar
 
 from .io import parse_url
@@ -53,13 +55,17 @@ def info(path: str, stats: bool = False) -> Iterator[Node]:
     return visit(path, func)
 
 
-def validate(path: str, strict: bool) -> Iterator[Node]:
+def validate(path: str, strict: bool, clear_cache: bool = False) -> Iterator[Node]:
     """
     Validate OME-NGFF data
 
     All :class:`Nodes <ome_utils.reader.Node>` that are found from the given path will
     be visited recursively.
     """
+
+    if clear_cache:
+        dir_path = get_cache_dir()
+        shutil.rmtree(dir_path, ignore_errors=True)
 
     def func(node: Node) -> Node:
         if hasattr(node, "validate"):

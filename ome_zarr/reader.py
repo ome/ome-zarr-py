@@ -25,13 +25,6 @@ LOGGER = logging.getLogger("ome_zarr.reader")
 def get_schema(name: str, version: str, strict: bool = False) -> Dict:
     pre = "strict_" if strict else ""
     schema_url = f"https://ngff.openmicroscopy.org/{version}/schemas/{pre}{name}.schema"
-
-    # plate 404 at URL above
-    if name in ("plate", "well"):
-        schema_url = (
-            f"https://raw.githubusercontent.com/ome/ngff/main/"
-            f"{version}/schemas/{pre}{name}.schema"
-        )
     local_path = cached_path(schema_url)
     with open(local_path) as f:
         sch_string = f.read()
@@ -127,11 +120,11 @@ class Node:
                 return spec
         return None
 
-    def validate(self, warnings: bool) -> None:
+    def validate(self, strict: bool) -> None:
         # Validation for a node is delegated to each spec
         # e.g. Labels may have spec for multiscales and labels
         for spec in self.specs:
-            spec.validate(warnings)
+            spec.validate(strict)
 
     def add(
         self,

@@ -33,7 +33,7 @@ def info(args: argparse.Namespace) -> None:
 def validate(args: argparse.Namespace) -> None:
     """Wrap the :func:`~ome_zarr.utils.validate` method."""
     config_logging(logging.WARN, args)
-    list(zarr_validate(args.path, args.strict))
+    list(zarr_validate(args.path, args.strict, args.clear_cache))
 
 
 def download(args: argparse.Namespace) -> None:
@@ -111,6 +111,11 @@ def main(args: List[str] = None) -> None:
     parser_validate.add_argument("path")
     parser_validate.add_argument(
         "--strict", action="store_true", help="validate using a strict schema"
+    )
+    parser_validate.add_argument(
+        "--clear_cache",
+        action="store_true",
+        help="Remove any cached schemas to force reload",
     )
     parser_validate.set_defaults(func=validate)
 
