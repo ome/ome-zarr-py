@@ -15,7 +15,7 @@ from jsonschema import RefResolver
 from jsonschema import validate as jsonschema_validate
 
 from .axes import Axes
-from .format import CurrentFormat, format_from_version
+from .format import CurrentFormat, detect_format, format_from_version
 from .io import ZarrLocation
 from .types import JSONDict
 
@@ -192,6 +192,9 @@ class Spec(ABC):
     def __init__(self, node: Node) -> None:
         self.node = node
         self.zarr = node.zarr
+        fmt = detect_format(self.zarr.root_attrs, CurrentFormat())
+        version = fmt.get_metadata_version(self.zarr.root_attrs)
+        self.version = version if version is not None else fmt.version
         LOGGER.debug(f"treating {self.zarr} as {self.__class__.__name__}")
         for k, v in self.zarr.root_attrs.items():
             LOGGER.info("root_attr: %s", k)
@@ -334,7 +337,6 @@ class Multiscales(Spec):
 
         try:
             multiscales = self.lookup("multiscales", [])
-            self.version = multiscales[0].get("version", CurrentFormat().version)
             datasets = multiscales[0]["datasets"]
             axes = multiscales[0].get("axes")
             fmt = format_from_version(self.version)
@@ -458,7 +460,6 @@ class Well(Spec):
     def __init__(self, node: Node) -> None:
         super().__init__(node)
         self.well_data = self.lookup("well", {})
-        self.version = self.well_data.get("version", CurrentFormat().version)
         LOGGER.info("well_data: %s", self.well_data)
 
         image_paths = [image["path"] for image in self.well_data.get("images")]
@@ -535,7 +536,6 @@ class Plate(Spec):
         super().__init__(node)
         LOGGER.debug(f"Plate created with ZarrLocation fmt:{ self.zarr.fmt}")
         self.plate_data = self.lookup("plate", {})
-        self.version = self.plate_data.get("version", CurrentFormat().version)
         LOGGER.info("plate_data: %s", self.plate_data)
         self.get_pyramid_lazy(node)
 

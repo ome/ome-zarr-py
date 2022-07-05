@@ -64,7 +64,7 @@ class Format(ABC):
     def init_channels(self) -> None:  # pragma: no cover
         raise NotImplementedError()
 
-    def _get_metadata_version(self, metadata: dict) -> Optional[str]:
+    def get_metadata_version(self, metadata: dict) -> Optional[str]:
         """
         Checks the metadata dict for a version
 
@@ -127,7 +127,7 @@ class FormatV01(Format):
         return "0.1"
 
     def matches(self, metadata: dict) -> bool:
-        version = self._get_metadata_version(metadata)
+        version = self.get_metadata_version(metadata)
         LOGGER.debug(f"{self.version} matches {version}?")
         return version == self.version
 
