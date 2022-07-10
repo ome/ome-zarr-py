@@ -248,9 +248,7 @@ Please use the 'storage_options' argument instead."""
                 url=group.store,
                 component=str(Path(group.path, str(path))),
                 storage_options=options,
-                # TODO distinguish between storage_options and
-                # other options like compressor
-                **options,
+                compressor=options.get("compressor"),
             )
         else:
             group.create_dataset(str(path), data=data, chunks=chunks_opt, **options)
@@ -558,9 +556,7 @@ Please use the 'storage_options' argument instead."""
                 component=str(Path(group.path, str(path))),
                 storage_options=options,
                 compute=False,
-                # TODO distinguish between storage_options and
-                # other options like compressor
-                **options,
+                compressor=options.get("compressor"),
             )
         )
         datasets.append({"path": str(path)})
