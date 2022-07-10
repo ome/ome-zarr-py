@@ -796,7 +796,10 @@ def write_labels(
             **metadata,
         )
     write_label_metadata(
-        group["labels"], name, **({} if label_metadata is None else label_metadata)
+        group=group["labels"],
+        name=name,
+        fmt=fmt,
+        **({} if label_metadata is None else label_metadata),
     )
 
 
