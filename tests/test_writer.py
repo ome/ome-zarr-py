@@ -69,9 +69,11 @@ class TestWriter:
             pytest.param(FormatV04, id="V04"),
         ),
     )
-    def test_writer(self, shape, scaler, format_version):
+    @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])
+    def test_writer(self, shape, scaler, format_version, array_constructor):
 
         data = self.create_data(shape)
+        data = array_constructor(data)
         version = format_version()
         axes = "tczyx"[-len(shape) :]
         transformations = []
@@ -114,9 +116,11 @@ class TestWriter:
         assert tuple(first_chunk) == _retuple(chunks, node.data[0].shape)
         assert np.allclose(data, node.data[0][...].compute())
 
-    def test_write_image_current(self):
+    @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])
+    def test_write_image_current(self, array_constructor):
         shape = (64, 64, 64)
         data = self.create_data(shape)
+        data = array_constructor(data)
         write_image(data, self.group, axes="zyx")
         reader = Reader(parse_url(f"{self.path}/test"))
         image_node = list(reader())[0]
@@ -150,9 +154,11 @@ class TestWriter:
             for value in transfs[0]["scale"]:
                 assert value >= 1
 
-    def test_write_image_compressed(self):
+    @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])
+    def test_write_image_compressed(self, array_constructor):
         shape = (64, 64, 64)
         data = self.create_data(shape)
+        data = array_constructor(data)
         compressor = Blosc(cname="zstd", clevel=5, shuffle=Blosc.SHUFFLE)
         write_image(
             data, self.group, axes="zyx", storage_options={"compressor": compressor}
@@ -933,7 +939,8 @@ class TestLabelWriter:
             pytest.param(FormatV04, id="V04"),
         ),
     )
-    def test_write_labels(self, shape, scaler, format_version):
+    @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])
+    def test_write_labels(self, shape, scaler, format_version, array_constructor):
         version = format_version()
         axes = "tczyx"[-len(shape) :]
         transformations = []
@@ -954,6 +961,7 @@ class TestLabelWriter:
             label_data = label_data[expand_dims]
             assert label_data.ndim == 5
         label_name = "my-labels"
+        label_data = array_constructor(label_data)
 
         # create the root level image data
         self.create_image_data(shape, scaler, version, axes, transformations)
@@ -978,7 +986,10 @@ class TestLabelWriter:
             pytest.param(FormatV04, id="V04"),
         ),
     )
-    def test_write_multiscale_labels(self, shape, scaler, format_version):
+    @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])
+    def test_write_multiscale_labels(
+        self, shape, scaler, format_version, array_constructor
+    ):
         version = format_version()
         axes = "tczyx"[-len(shape) :]
         transformations = []
@@ -996,6 +1007,8 @@ class TestLabelWriter:
             expand_dims = (np.s_[None],) * (5 - len(shape))
             label_data = label_data[expand_dims]
             assert label_data.ndim == 5
+        label_data = array_constructor(label_data)
+
         label_name = "my-labels"
         if scaler is None:
             transformations = [transformations[0]]
@@ -1016,7 +1029,8 @@ class TestLabelWriter:
         )
         self.verify_label_data(label_name, label_data, version, shape, transformations)
 
-    def test_two_label_images(self):
+    @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])
+    def test_two_label_images(self, array_constructor):
         axes = "tczyx"
         transformations = []
         for dataset_transfs in TRANSFORMATIONS:
@@ -1038,6 +1052,7 @@ class TestLabelWriter:
         label_names = ("first_labels", "second_labels")
         for label_name in label_names:
             label_data = np.random.randint(0, 1000, size=shape)
+            label_data = array_constructor(label_data)
             labels_mip = scaler.nearest(label_data)
 
             write_multiscale_labels(

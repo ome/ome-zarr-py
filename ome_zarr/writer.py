@@ -217,7 +217,6 @@ def write_multiscale(
         One can provide different chunk size for each level of a pyramid using this
         option.
     """
-
     dims = len(pyramid[0].shape)
     axes = _get_valid_axes(dims, axes, fmt)
 
@@ -240,14 +239,18 @@ Please use the 'storage_options' argument instead."""
             chunks_opt = _retuple(chunks_opt, data.shape)
 
         if isinstance(data, da.Array):
-            data = da.array(data).rechunk(chunks=chunks_opt)
-            options["chunks"] = chunks_opt
+            if chunks_opt is not None:
+                data = da.array(data).rechunk(chunks=chunks_opt)
+                options["chunks"] = chunks_opt
             da.to_zarr(
                 array_key=path,
                 arr=data,
                 url=group.store,
                 component=str(Path(group.path, str(path))),
                 storage_options=options,
+                # TODO distinguish between storage_options and
+                # other options like compressor
+                **options,
             )
         else:
             group.create_dataset(str(path), data=data, chunks=chunks_opt, **options)
@@ -502,6 +505,13 @@ def _write_dask_image(
     **metadata: Union[str, JSONDict, List[JSONDict]],
 ) -> None:
 
+    if fmt.version in ("0.1", "0.2"):
+        # v0.1 and v0.2 are strictly 5D
+        shape_5d: Tuple[Any, ...] = (*(1,) * (5 - image.ndim), *image.shape)
+        image = image.reshape(shape_5d)
+        # and we don't need axes
+        axes = None
+
     dims = len(image.shape)
     axes = _get_valid_axes(dims, axes, fmt)
 
@@ -548,6 +558,9 @@ Please use the 'storage_options' argument instead."""
                 component=str(Path(group.path, str(path))),
                 storage_options=options,
                 compute=False,
+                # TODO distinguish between storage_options and
+                # other options like compressor
+                **options,
             )
         )
         datasets.append({"path": str(path)})

@@ -162,9 +162,21 @@ class Scaler:
         """
         return self._by_plane(base, self.__nearest)
 
-    def __nearest(self, plane: np.ndarray, sizeY: int, sizeX: int) -> np.ndarray:
+    def __nearest(
+        self, plane: Union[np.ndarray, da.Array], sizeY: int, sizeX: int
+    ) -> np.ndarray:
         """Apply the 2-dimensional transformation."""
-        return resize(
+        if isinstance(plane, da.Array):
+
+            def _resize(
+                image: ArrayLike, output_shape: Tuple, **kwargs: Any
+            ) -> ArrayLike:
+                return dask_resize(image, output_shape, **kwargs)
+
+        else:
+            _resize = resize
+
+        return _resize(
             plane,
             output_shape=(sizeY // self.downscale, sizeX // self.downscale),
             order=0,
@@ -209,7 +221,7 @@ class Scaler:
         print(base.shape)
         for i in range(self.max_layer):
             print(i, self.downscale)
-            rv.append(zoom(base, self.downscale**i))
+            rv.append(zoom(base, self.downscale ** i))
             print(rv[-1].shape)
         return list(reversed(rv))
 
