@@ -866,14 +866,14 @@ class TestLabelWriter:
         self.store = parse_url(self.path, mode="w").store
         self.root = zarr.group(store=self.store)
 
-    def create_image_data(self, shape, scaler, version, axes, transformations):
+    def create_image_data(self, shape, scaler, fmt, axes, transformations):
         rng = np.random.default_rng(0)
         data = rng.poisson(10, size=shape).astype(np.uint8)
         write_image(
             image=data,
             group=self.root,
             scaler=scaler,
-            fmt=version,
+            fmt=fmt,
             axes=axes,
             coordinate_transformations=transformations,
             storage_options=dict(chunks=(128, 128)),
@@ -897,20 +897,18 @@ class TestLabelWriter:
         else:
             return None
 
-    def verify_label_data(
-        self, label_name, label_data, version, shape, transformations
-    ):
+    def verify_label_data(self, label_name, label_data, fmt, shape, transformations):
         # Verify image data
         reader = Reader(parse_url(f"{self.path}/labels/{label_name}"))
         node = list(reader())[0]
         assert Multiscales.matches(node.zarr)
-        if version.version in ("0.1", "0.2"):
+        if fmt.version in ("0.1", "0.2"):
             # v0.1 and v0.2 MUST be 5D
             assert node.data[0].ndim == 5
         else:
             assert node.data[0].shape == shape
 
-        if version.version not in ("0.1", "0.2", "0.3"):
+        if fmt.version not in ("0.1", "0.2", "0.3"):
             for transf, expected in zip(
                 node.metadata["coordinateTransformations"], transformations
             ):
@@ -925,6 +923,7 @@ class TestLabelWriter:
 
         label_group = zarr.open(f"{self.path}/labels/{label_name}", "r")
         assert "image-label" in label_group.attrs
+        assert label_group.attrs["image-label"]["version"] == fmt.version
 
         # Verify multiscale metadata
         name = label_group.attrs["multiscales"][0].get("name", "")
@@ -941,7 +940,7 @@ class TestLabelWriter:
     )
     @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])
     def test_write_labels(self, shape, scaler, format_version, array_constructor):
-        version = format_version()
+        fmt = format_version()
         axes = "tczyx"[-len(shape) :]
         transformations = []
         for dataset_transfs in TRANSFORMATIONS:
@@ -955,7 +954,7 @@ class TestLabelWriter:
 
         # create the actual label data
         label_data = np.random.randint(0, 1000, size=shape)
-        if version.version in ("0.1", "0.2"):
+        if fmt.version in ("0.1", "0.2"):
             # v0.1 and v0.2 require 5d
             expand_dims = (np.s_[None],) * (5 - len(shape))
             label_data = label_data[expand_dims]
@@ -964,18 +963,18 @@ class TestLabelWriter:
         label_data = array_constructor(label_data)
 
         # create the root level image data
-        self.create_image_data(shape, scaler, version, axes, transformations)
+        self.create_image_data(shape, scaler, fmt, axes, transformations)
 
         write_labels(
             label_data,
             self.root,
             scaler=scaler,
             name=label_name,
-            fmt=version,
+            fmt=fmt,
             axes=axes,
             coordinate_transformations=transformations,
         )
-        self.verify_label_data(label_name, label_data, version, shape, transformations)
+        self.verify_label_data(label_name, label_data, fmt, shape, transformations)
 
     @pytest.mark.parametrize(
         "format_version",
@@ -990,7 +989,7 @@ class TestLabelWriter:
     def test_write_multiscale_labels(
         self, shape, scaler, format_version, array_constructor
     ):
-        version = format_version()
+        fmt = format_version()
         axes = "tczyx"[-len(shape) :]
         transformations = []
         for dataset_transfs in TRANSFORMATIONS:
@@ -1002,7 +1001,7 @@ class TestLabelWriter:
 
         # create the actual label data
         label_data = np.random.randint(0, 1000, size=shape)
-        if version.version in ("0.1", "0.2"):
+        if fmt.version in ("0.1", "0.2"):
             # v0.1 and v0.2 require 5d
             expand_dims = (np.s_[None],) * (5 - len(shape))
             label_data = label_data[expand_dims]
@@ -1017,17 +1016,17 @@ class TestLabelWriter:
             labels_mip = scaler.nearest(label_data)
 
         # create the root level image data
-        self.create_image_data(shape, scaler, version, axes, transformations)
+        self.create_image_data(shape, scaler, fmt, axes, transformations)
 
         write_multiscale_labels(
             labels_mip,
             self.root,
             name=label_name,
-            fmt=version,
+            fmt=fmt,
             axes=axes,
             coordinate_transformations=transformations,
         )
-        self.verify_label_data(label_name, label_data, version, shape, transformations)
+        self.verify_label_data(label_name, label_data, fmt, shape, transformations)
 
     @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])
     def test_two_label_images(self, array_constructor):
@@ -1040,12 +1039,12 @@ class TestLabelWriter:
         # create the root level image data
         shape = (1, 2, 1, 256, 256)
         scaler = Scaler()
-        version = FormatV04()
+        fmt = FormatV04()
         self.create_image_data(
             shape,
             scaler,
             axes=axes,
-            version=version,
+            fmt=fmt,
             transformations=transformations,
         )
 
@@ -1062,9 +1061,7 @@ class TestLabelWriter:
                 axes=axes,
                 coordinate_transformations=transformations,
             )
-            self.verify_label_data(
-                label_name, label_data, version, shape, transformations
-            )
+            self.verify_label_data(label_name, label_data, fmt, shape, transformations)
 
         # Verify label metadata
         label_root = zarr.open(f"{self.path}/labels", "r")

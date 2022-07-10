@@ -64,11 +64,21 @@ class Format(ABC):
     def init_channels(self) -> None:  # pragma: no cover
         raise NotImplementedError()
 
-    def _get_multiscale_version(self, metadata: dict) -> Optional[str]:
+    def _get_metadata_version(self, metadata: dict) -> Optional[str]:
+        """
+        Checks the metadata dict for a version
+
+        Returns the version of the first object found in the metadata,
+        checking for 'multiscales', 'plate', 'well' etc
+        """
         multiscales = metadata.get("multiscales", [])
         if multiscales:
             dataset = multiscales[0]
             return dataset.get("version", None)
+        for name in ["plate", "well", "image-label"]:
+            obj = metadata.get(name, None)
+            if obj:
+                return obj.get("version", None)
         return None
 
     def __repr__(self) -> str:
@@ -117,8 +127,8 @@ class FormatV01(Format):
         return "0.1"
 
     def matches(self, metadata: dict) -> bool:
-        version = self._get_multiscale_version(metadata)
-        LOGGER.debug(f"V01:{version} v. {self.version}")
+        version = self._get_metadata_version(metadata)
+        LOGGER.debug(f"{self.version} matches {version}?")
         return version == self.version
 
     def init_store(self, path: str, mode: str = "r") -> FSStore:
@@ -164,11 +174,6 @@ class FormatV02(FormatV01):
     @property
     def version(self) -> str:
         return "0.2"
-
-    def matches(self, metadata: dict) -> bool:
-        version = self._get_multiscale_version(metadata)
-        LOGGER.debug(f"{self.version} matches {version}?")
-        return version == self.version
 
     def init_store(self, path: str, mode: str = "r") -> FSStore:
         """

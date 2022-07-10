@@ -587,6 +587,7 @@ def write_label_metadata(
     name: str,
     colors: List[JSONDict] = None,
     properties: List[JSONDict] = None,
+    fmt: Format = CurrentFormat(),
     **metadata: Union[List[JSONDict], JSONDict, str],
 ) -> None:
     """
@@ -610,6 +611,10 @@ def write_label_metadata(
       Each dict specifies additional properties for one label.
       It must contain the field "label-value"
       and may contain arbitrary additional properties.
+    :type fmt: :class:`ome_zarr.format.Format`, optional
+    :param fmt:
+      The format of the ome_zarr data which should be used.
+      Defaults to the most current.
     """
     label_group = group[name]
     image_label_metadata = {**metadata}
@@ -617,6 +622,7 @@ def write_label_metadata(
         image_label_metadata["colors"] = colors
     if properties is not None:
         image_label_metadata["properties"] = properties
+    image_label_metadata["version"] = fmt.version
     label_group.attrs["image-label"] = image_label_metadata
 
     label_list = group.attrs.get("labels", [])
@@ -693,7 +699,10 @@ def write_multiscale_labels(
         **metadata,
     )
     write_label_metadata(
-        group["labels"], name, **({} if label_metadata is None else label_metadata)
+        group["labels"],
+        name,
+        fmt=fmt,
+        **({} if label_metadata is None else label_metadata),
     )
 
 
