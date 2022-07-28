@@ -1,3 +1,7 @@
+# 0.5.2 (July 2022)
+
+- Disable auto_mkdir when path begins with s3, thanks to @colobas ([#212](https://github.com/ome/ome-zarr-py/pull/212))
+
 # 0.5.1 (June 2022)
 
 - Read multi-resolution pyramids in `ome_zarr.reader.Well`, thanks to @tcompa ([#208](https://github.com/ome/ome-zarr-py/pull/208))
