@@ -162,9 +162,7 @@ class Scaler:
         """
         return self._by_plane(base, self.__nearest)
 
-    def __nearest(
-        self, plane: Union[np.ndarray, da.Array], sizeY: int, sizeX: int
-    ) -> np.ndarray:
+    def __nearest(self, plane: ArrayLike, sizeY: int, sizeX: int) -> np.ndarray:
         """Apply the 2-dimensional transformation."""
         if isinstance(plane, da.Array):
 

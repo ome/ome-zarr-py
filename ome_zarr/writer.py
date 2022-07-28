@@ -17,6 +17,9 @@ from .types import JSONDict
 
 LOGGER = logging.getLogger("ome_zarr.writer")
 
+ListOfArrayLike = Union[List[da.Array], List[np.ndarray]]
+ArrayLike = Union[da.Array, np.ndarray]
+
 
 def _get_valid_axes(
     ndim: int = None,
@@ -171,7 +174,7 @@ def _validate_plate_wells(
 
 
 def write_multiscale(
-    pyramid: List,
+    pyramid: ListOfArrayLike,
     group: zarr.Group,
     chunks: Union[Tuple[Any, ...], int] = None,
     fmt: Format = CurrentFormat(),
@@ -184,7 +187,7 @@ def write_multiscale(
     """
     Write a pyramid with multiscale metadata to disk.
 
-    :type pyramid: list of :class:`numpy.ndarray`
+    :type pyramid: list of :class:`numpy.ndarray` or :class:`dask.array.Array`
     :param pyramid:
         The image data to save. Largest level first. All image arrays MUST be up to
         5-dimensional with dimensions ordered (t, c, z, y, x)
@@ -399,7 +402,7 @@ def write_well_metadata(
 
 
 def write_image(
-    image: Union[np.ndarray, da.Array],
+    image: ArrayLike,
     group: zarr.Group,
     scaler: Scaler = Scaler(),
     chunks: Union[Tuple[Any, ...], int] = None,
