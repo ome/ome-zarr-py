@@ -288,6 +288,8 @@ class Multiscales(Spec):
             # Raises ValueError if not valid
             axes_obj = Axes(axes, fmt)
             node.metadata["axes"] = axes_obj.to_list()
+            # This will get overwritten by 'omero' metadata if present
+            node.metadata["name"] = multiscales[0].get("name")
             paths = [d["path"] for d in datasets]
             self.datasets: List[str] = paths
             transformations = [d.get("coordinateTransformations") for d in datasets]
