@@ -31,7 +31,7 @@ class ZarrLocation:
         self, path: Union[Path, str], mode: str = "r", fmt: Format = CurrentFormat()
     ) -> None:
 
-        LOGGER.debug(f"ZarrLocation.__init__ path:{path}, fmt:{fmt.version}")
+        LOGGER.debug("ZarrLocation.__init__ path: %s, fmt: %s", path, fmt.version)
         self.__fmt = fmt
         self.__mode = mode
         if isinstance(path, Path):
@@ -48,9 +48,11 @@ class ZarrLocation:
 
         self.__init_metadata()
         detected = detect_format(self.__metadata, loader)
-        LOGGER.debug(f"ZarrLocation.__init__ {path} detected:{detected}")
+        LOGGER.debug("ZarrLocation.__init__ %s detected: %s", path, detected)
         if detected != fmt:
-            LOGGER.warning(f"version mismatch: detected:{detected}, requested:{fmt}")
+            LOGGER.warning(
+                "version mismatch: detected: %s, requested: %s", detected, fmt
+            )
             self.__fmt = detected
             self.__store = detected.init_store(self.__path, mode)
             self.__init_metadata()
@@ -134,7 +136,7 @@ class ZarrLocation:
     def create(self, path: str) -> "ZarrLocation":
         """Create a new Zarr location for the given path."""
         subpath = self.subpath(path)
-        LOGGER.debug(f"open({self.__class__.__name__}({subpath}))")
+        LOGGER.debug("open(%s(%s))", self.__class__.__name__, subpath)
         return self.__class__(subpath, mode=self.__mode, fmt=self.__fmt)
 
     def get_json(self, subpath: str) -> JSONDict:
@@ -151,10 +153,10 @@ class ZarrLocation:
                 return {}
             return json.loads(data)
         except KeyError:
-            LOGGER.debug(f"JSON not found: {subpath}")
+            LOGGER.debug("JSON not found: %s", subpath)
             return {}
         except Exception as e:
-            LOGGER.exception(f"{e}")
+            LOGGER.exception("%s", e)
             return {}
 
     def parts(self) -> List[str]:
@@ -189,6 +191,6 @@ def parse_url(
         else:
             return loc
     except Exception as e:
-        LOGGER.warning(f"exception on parsing: {e} (stacktrace at DEBUG)")
+        LOGGER.warning("exception on parsing: %s (stacktrace at DEBUG)", e)
         LOGGER.debug("stacktrace:", exc_info=True)
         return None

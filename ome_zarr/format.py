@@ -128,12 +128,12 @@ class FormatV01(Format):
 
     def matches(self, metadata: dict) -> bool:
         version = self._get_metadata_version(metadata)
-        LOGGER.debug(f"{self.version} matches {version}?")
+        LOGGER.debug("%s matches %s?", self.version, version)
         return version == self.version
 
     def init_store(self, path: str, mode: str = "r") -> FSStore:
         store = FSStore(path, mode=mode, dimension_separator=".")
-        LOGGER.debug(f"Created legacy flat FSStore({path}, {mode})")
+        LOGGER.debug("Created legacy flat FSStore(%s, %s)", path, mode)
         return store
 
     def generate_well_dict(
@@ -145,12 +145,14 @@ class FormatV01(Format):
         self, well: dict, rows: List[str], columns: List[str]
     ) -> None:
         if any(e not in self.REQUIRED_PLATE_WELL_KEYS for e in well.keys()):
-            LOGGER.debug("f{well} contains unspecified keys")
+            LOGGER.debug("%s contains unspecified keys", well)
         for key, key_type in self.REQUIRED_PLATE_WELL_KEYS.items():
             if key not in well:
-                raise ValueError(f"{well} must contain a {key} key of type {key_type}")
+                raise ValueError(
+                    "%s must contain a %s key of type %s", well, key, key_type
+                )
             if not isinstance(well[key], key_type):
-                raise ValueError(f"{well} path must be of {key_type} type")
+                raise ValueError("%s path must be of %s type", well, key_type)
 
     def generate_coordinate_transformations(
         self, shapes: List[tuple]
@@ -198,7 +200,7 @@ class FormatV02(FormatV01):
             mode=mode,
             **kwargs,
         )  # TODO: open issue for using Path
-        LOGGER.debug(f"Created nested FSStore({path}, {mode}, {kwargs})")
+        LOGGER.debug("Created nested FSStore(%s, %s, %s)", path, mode, kwargs)
         return store
 
 
@@ -230,10 +232,10 @@ class FormatV04(FormatV03):
     ) -> dict:
         row, column = well.split("/")
         if row not in rows:
-            raise ValueError(f"{row} is not defined in the list of rows")
+            raise ValueError("%s is not defined in the list of rows", row)
         rowIndex = rows.index(row)
         if column not in columns:
-            raise ValueError(f"{column} is not defined in the list of columns")
+            raise ValueError("%s is not defined in the list of columns", column)
         columnIndex = columns.index(column)
         return {"path": str(well), "rowIndex": rowIndex, "columnIndex": columnIndex}
 
@@ -242,16 +244,16 @@ class FormatV04(FormatV03):
     ) -> None:
         super().validate_well_dict(well, rows, columns)
         if len(well["path"].split("/")) != 2:
-            raise ValueError(f"{well} path must exactly be composed of 2 groups")
+            raise ValueError("%s path must exactly be composed of 2 groups", well)
         row, column = well["path"].split("/")
         if row not in rows:
-            raise ValueError(f"{row} is not defined in the plate rows")
+            raise ValueError("%s is not defined in the plate rows", row)
         if well["rowIndex"] != rows.index(row):
-            raise ValueError(f"Mismatching row index for {well}")
+            raise ValueError("Mismatching row index for %s", well)
         if column not in columns:
-            raise ValueError(f"{column} is not defined in the plate columns")
+            raise ValueError("%s is not defined in the plate columns", column)
         if well["columnIndex"] != columns.index(column):
-            raise ValueError(f"Mismatching column index for {well}")
+            raise ValueError("Mismatching column index for %s", well)
 
     def generate_coordinate_transformations(
         self, shapes: List[tuple]
