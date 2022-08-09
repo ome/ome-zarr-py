@@ -155,8 +155,8 @@ class ZarrLocation:
         except KeyError:
             LOGGER.debug("JSON not found: %s", subpath)
             return {}
-        except Exception as e:
-            LOGGER.exception("%s", e)
+        except Exception:
+            LOGGER.exception("Error while loading JSON")
             return {}
 
     def parts(self) -> List[str]:
@@ -190,7 +190,7 @@ def parse_url(
             return None
         else:
             return loc
-    except Exception as e:
-        LOGGER.warning("exception on parsing: %s (stacktrace at DEBUG)", e)
+    except Exception:
+        LOGGER.exception("exception on parsing (stacktrace at DEBUG)")
         LOGGER.debug("stacktrace:", exc_info=True)
         return None

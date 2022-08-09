@@ -240,8 +240,8 @@ class Label(Spec):
                     else:
                         raise Exception("not bool or int")
 
-                except Exception as e:
-                    LOGGER.error("invalid color - %s: %s", color, e)
+                except Exception:
+                    LOGGER.exception("invalid color - %s", color)
 
         properties: Dict[int, Dict[str, str]] = {}
         props_list = image_label.get("properties", [])
@@ -296,8 +296,8 @@ class Multiscales(Spec):
             if any(trans is not None for trans in transformations):
                 node.metadata["coordinateTransformations"] = transformations
             LOGGER.info("datasets %s", datasets)
-        except Exception as e:
-            LOGGER.error("failed to parse multiscale metadata: %s", e)
+        except Exception:
+            LOGGER.exception("Failed to parse multiscale metadata")
             return  # EARLY EXIT
 
         for resolution in self.datasets:
@@ -392,8 +392,8 @@ class OMERO(Spec):
             node.metadata["contrast_limits"] = contrast_limits
             node.metadata["colormap"] = colormaps
 
-        except Exception as e:
-            LOGGER.error("failed to parse metadata: %s", e)
+        except Exception:
+            LOGGER.exception("Failed to parse metadata")
 
 
 class Well(Spec):
@@ -546,9 +546,8 @@ class Plate(Spec):
 
             try:
                 data = self.zarr.load(path)
-            except ValueError as e:
-                LOGGER.error("Failed to load %s", path)
-                LOGGER.debug("%s", e)
+            except ValueError:
+                LOGGER.exception("Failed to load %s", path)
                 data = np.zeros(tile_shape, dtype=self.numpy_type)
             return data
 
