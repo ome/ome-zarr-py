@@ -502,7 +502,7 @@ class Plate(Spec):
         well_node = Node(well_zarr, node)
         well_spec: Optional[Well] = well_node.first(Well)
         if well_spec is None:
-            raise Exception("could not find first well")
+            raise Exception("Could not find first well")
         self.numpy_type = well_spec.numpy_type
 
         LOGGER.debug(f"img_pyramid_shapes: {well_spec.img_pyramid_shapes}")
