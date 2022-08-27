@@ -75,7 +75,7 @@ def _validate_well_images(
             validated_images.append({"path": str(image)})
         elif isinstance(image, dict):
             if any(e not in VALID_KEYS for e in image.keys()):
-                LOGGER.debug(f"{image} contains unspecified keys")
+                LOGGER.debug("%s contains unspecified keys", image)
             if "path" not in image:
                 raise ValueError(f"{image} must contain a path key")
             if not isinstance(image["path"], str):
@@ -105,7 +105,7 @@ def _validate_plate_acquisitions(
         if not isinstance(acquisition, dict):
             raise ValueError(f"{acquisition} must be a dictionary")
         if any(e not in VALID_KEYS for e in acquisition.keys()):
-            LOGGER.debug("f{acquisition} contains unspecified keys")
+            LOGGER.debug("%s contains unspecified keys", acquisition)
         if "id" not in acquisition:
             raise ValueError(f"{acquisition} must contain an id key")
         if not isinstance(acquisition["id"], int):
@@ -545,11 +545,11 @@ Please use the 'storage_options' argument instead."""
             chunks_opt = _retuple(chunks_opt, image.shape)
             image = da.array(image).rechunk(chunks=chunks_opt)
             options["chunks"] = chunks_opt
-        LOGGER.debug(f"chunks_opt: {chunks_opt}")
+        LOGGER.debug("chunks_opt: %s", chunks_opt)
         shapes.append(image.shape)
 
         LOGGER.debug(
-            f"write dask.array to_zarr shape:{image.shape}, dtype {image.dtype}"
+            "write dask.array to_zarr shape: %s, dtype: %s", image.shape, image.dtype
         )
         delayed.append(
             da.to_zarr(
