@@ -18,7 +18,7 @@ repos:
         args: [--target-version=py36]
 
   - repo: https://github.com/asottile/pyupgrade
-    rev: v2.37.2
+    rev: v2.37.3
     hooks:
       - id: pyupgrade
         args:
@@ -45,7 +45,7 @@ repos:
           - --autofix
 
   - repo: https://github.com/PyCQA/flake8
-    rev: 4.0.1
+    rev: 5.0.4
     hooks:
       - id: flake8
         additional_dependencies: [

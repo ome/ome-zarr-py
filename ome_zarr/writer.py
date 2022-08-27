@@ -37,10 +37,10 @@ def _get_valid_axes(
     if axes is None:
         if ndim == 2:
             axes = ["y", "x"]
-            LOGGER.info("Auto using axes %s for 2D data" % axes)
+            LOGGER.info("Auto using axes %s for 2D data", axes)
         elif ndim == 5:
             axes = ["t", "c", "z", "y", "x"]
-            LOGGER.info("Auto using axes %s for 5D data" % axes)
+            LOGGER.info("Auto using axes %s for 5D data", axes)
         else:
             raise ValueError(
                 "axes must be provided. Can't be guessed for 3D or 4D data"

@@ -129,7 +129,7 @@ class Node:
         """
 
         if zarr in self.seen and not plate_labels:
-            LOGGER.debug(f"already seen {zarr}; stopping recursion")
+            LOGGER.debug("already seen  %s; stopping recursion", zarr)
             return None
 
         if visibility is None:
@@ -169,7 +169,7 @@ class Spec(ABC):
     def __init__(self, node: Node) -> None:
         self.node = node
         self.zarr = node.zarr
-        LOGGER.debug(f"treating {self.zarr} as {self.__class__.__name__}")
+        LOGGER.debug("treating %s as %s", self.zarr, self.__class__.__name__)
         for k, v in self.zarr.root_attrs.items():
             LOGGER.info("root_attr: %s", k)
             LOGGER.debug(v)
@@ -217,12 +217,12 @@ class Label(Spec):
             # This is an ome mask, load the image
             parent_zarr = self.zarr.create(image)
             if parent_zarr.exists():
-                LOGGER.debug(f"delegating to parent image: {parent_zarr}")
+                LOGGER.debug("delegating to parent image: %s", parent_zarr)
                 node.add(parent_zarr, prepend=True, visibility=False)
             else:
                 parent_zarr = None
         if parent_zarr is None:
-            LOGGER.warn(f"no parent found for {self}: {image}")
+            LOGGER.warning("no parent found for %s: %s", self, image)
 
         # Metadata: TODO move to a class
         colors: Dict[Union[int, bool], List[float]] = {}
@@ -240,8 +240,8 @@ class Label(Spec):
                     else:
                         raise Exception("not bool or int")
 
-                except Exception as e:
-                    LOGGER.error(f"invalid color - {color}: {e}")
+                except Exception:
+                    LOGGER.exception("invalid color - %s", color)
 
         properties: Dict[int, Dict[str, str]] = {}
         props_list = image_label.get("properties", [])
@@ -296,8 +296,8 @@ class Multiscales(Spec):
             if any(trans is not None for trans in transformations):
                 node.metadata["coordinateTransformations"] = transformations
             LOGGER.info("datasets %s", datasets)
-        except Exception as e:
-            LOGGER.error(f"failed to parse multiscale metadata: {e}")
+        except Exception:
+            LOGGER.exception("Failed to parse multiscale metadata")
             return  # EARLY EXIT
 
         for resolution in self.datasets:
@@ -350,7 +350,7 @@ class OMERO(Spec):
             try:
                 len(channels)
             except Exception:
-                LOGGER.warn(f"error counting channels: {channels}")
+                LOGGER.warning("error counting channels: %s", channels)
                 return  # EARLY EXIT
 
             colormaps = []
@@ -392,8 +392,8 @@ class OMERO(Spec):
             node.metadata["contrast_limits"] = contrast_limits
             node.metadata["colormap"] = colormaps
 
-        except Exception as e:
-            LOGGER.error(f"failed to parse metadata: {e}")
+        except Exception:
+            LOGGER.exception("Failed to parse metadata")
 
 
 class Well(Spec):
@@ -429,11 +429,11 @@ class Well(Spec):
             row, col = (int(n) for n in tile_name.split(","))
             field_index = (column_count * row) + col
             path = f"{field_index}/{level}"
-            LOGGER.debug(f"LOADING tile... {path}")
+            LOGGER.debug("LOADING tile... %s", path)
             try:
                 data = self.zarr.load(path)
             except ValueError:
-                LOGGER.error(f"Failed to load {path}")
+                LOGGER.error("Failed to load %s", path)
                 data = np.zeros(self.img_pyramid_shapes[level], dtype=self.numpy_type)
             return data
 
@@ -446,7 +446,10 @@ class Well(Spec):
                 for col in range(column_count):
                     tile_name = f"{row},{col}"
                     LOGGER.debug(
-                        f"creating lazy_reader. row:{row} col:{col} level:{level}"
+                        "creating lazy_reader. row: %s col: %s level: %s",
+                        row,
+                        col,
+                        level,
                     )
                     lazy_tile = da.from_delayed(
                         lazy_reader(tile_name, level),
@@ -475,7 +478,7 @@ class Plate(Spec):
 
     def __init__(self, node: Node) -> None:
         super().__init__(node)
-        LOGGER.debug(f"Plate created with ZarrLocation fmt:{ self.zarr.fmt}")
+        LOGGER.debug("Plate created with ZarrLocation fmt: %s", self.zarr.fmt)
         self.get_pyramid_lazy(node)
 
     def get_pyramid_lazy(self, node: Node) -> None:
@@ -505,7 +508,7 @@ class Plate(Spec):
             raise Exception("Could not find first well")
         self.numpy_type = well_spec.numpy_type
 
-        LOGGER.debug(f"img_pyramid_shapes: {well_spec.img_pyramid_shapes}")
+        LOGGER.debug("img_pyramid_shapes: %s", well_spec.img_pyramid_shapes)
 
         self.axes = well_spec.img_metadata["axes"]
 
@@ -533,19 +536,18 @@ class Plate(Spec):
         )
 
     def get_stitched_grid(self, level: int, tile_shape: tuple) -> da.core.Array:
-        LOGGER.debug(f"get_stitched_grid() level: {level}, tile_shape: {tile_shape}")
+        LOGGER.debug("get_stitched_grid() level: %s, tile_shape: %s", level, tile_shape)
 
         def get_tile(tile_name: str) -> np.ndarray:
             """tile_name is 'level,z,c,t,row,col'"""
             row, col = (int(n) for n in tile_name.split(","))
             path = self.get_tile_path(level, row, col)
-            LOGGER.debug(f"LOADING tile... {path} with shape: {tile_shape}")
+            LOGGER.debug("LOADING tile... %s with shape: %s", path, tile_shape)
 
             try:
                 data = self.zarr.load(path)
-            except ValueError as e:
-                LOGGER.error(f"Failed to load {path}")
-                LOGGER.debug(f"{e}")
+            except ValueError:
+                LOGGER.exception("Failed to load %s", path)
                 data = np.zeros(tile_shape, dtype=self.numpy_type)
             return data
 
@@ -627,7 +629,7 @@ class Reader:
         node = Node(self.zarr, self)
         if node.specs:  # Something has matched
 
-            LOGGER.debug(f"treating {self.zarr} as ome-zarr")
+            LOGGER.debug("treating %s as ome-zarr", self.zarr)
             yield from self.descend(node)
 
             # TODO: API thoughts for the Spec type
@@ -635,12 +637,12 @@ class Reader:
             # - ask for "provides data", "overrides data"
 
         elif self.zarr.zarray:  # Nothing has matched
-            LOGGER.debug(f"treating {self.zarr} as raw zarr")
+            LOGGER.debug("treating %s as raw zarr", self.zarr)
             node.data.append(self.zarr.load())
             yield node
 
         else:
-            LOGGER.debug(f"ignoring {self.zarr}")
+            LOGGER.debug("ignoring %s", self.zarr)
             # yield nothing
 
     def descend(self, node: Node, depth: int = 0) -> Iterator[Node]:
@@ -648,7 +650,7 @@ class Reader:
         for pre_node in node.pre_nodes:
             yield from self.descend(pre_node, depth + 1)
 
-        LOGGER.debug(f"returning {node}")
+        LOGGER.debug("returning %s", node)
         yield node
 
         for post_node in node.post_nodes:
