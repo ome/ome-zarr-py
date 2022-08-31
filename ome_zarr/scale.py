@@ -144,8 +144,8 @@ class Scaler:
 
         # only down-sample in X and Y dimensions for now...
         new_shape = list(image.shape)
-        new_shape[-1] = np.ceil(float(image.shape[-1]) / self.downscale)
-        new_shape[-2] = np.ceil(float(image.shape[-2]) / self.downscale)
+        new_shape[-1] = image.shape[-1] // self.downscale
+        new_shape[-2] = image.shape[-2] // self.downscale
         out_shape = tuple(new_shape)
 
         dtype = image.dtype
