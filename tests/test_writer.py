@@ -112,8 +112,10 @@ class TestWriter:
             ):
                 assert transf == expected
             assert len(node.metadata["coordinateTransformations"]) == len(node.data)
-        first_chunk = [c[0] for c in node.data[0].chunks]
-        assert tuple(first_chunk) == _retuple(chunks, node.data[0].shape)
+        # check chunks for first 2 resolutions (before shape gets smaller than chunk)
+        for nd_array in node.data[:2]:
+            first_chunk = [c[0] for c in nd_array.chunks]
+            assert tuple(first_chunk) == _retuple(chunks, nd_array.shape)
         assert np.allclose(data, node.data[0][...].compute())
 
     @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])
