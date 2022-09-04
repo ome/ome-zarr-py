@@ -246,7 +246,6 @@ Please use the 'storage_options' argument instead."""
                 data = da.array(data).rechunk(chunks=chunks_opt)
                 options["chunks"] = chunks_opt
             da.to_zarr(
-                array_key=path,
                 arr=data,
                 url=group.store,
                 component=str(Path(group.path, str(path))),
@@ -553,7 +552,6 @@ Please use the 'storage_options' argument instead."""
         )
         delayed.append(
             da.to_zarr(
-                array_key=path,
                 arr=image,
                 url=group.store,
                 component=str(Path(group.path, str(path))),
