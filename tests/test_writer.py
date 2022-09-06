@@ -137,10 +137,10 @@ class TestWriter:
     @pytest.mark.parametrize("read_from_zarr", [True, False])
     def test_write_image_dask(self, read_from_zarr):
         # Size 100 tests resize shapes: https://github.com/ome/ome-zarr-py/issues/219
-        shape = (128, 100, 100)
+        shape = (128, 200, 200)
         data = self.create_data(shape)
         data_delayed = da.from_array(data)
-        chunks = (64, 64)
+        chunks = (32, 32)
         opts = {"chunks": chunks, "compressor": None}
         if read_from_zarr:
             # write to zarr and re-read as dask...
@@ -176,7 +176,9 @@ class TestWriter:
             assert transfs[0]["scale"][0] == 1
             for value in transfs[0]["scale"]:
                 assert value >= 1
-            if read_from_zarr:
+            if read_from_zarr and level < 3:
+                # if shape smaller than chunk, dask writer uses chunk == shape
+                # so we only compare larger resolutions
                 assert filecmp.cmp(
                     f"{self.path}/temp/test/{level}/.zarray",
                     f"{self.path}/test/{level}/.zarray",
