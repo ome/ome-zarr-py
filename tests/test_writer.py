@@ -71,7 +71,10 @@ class TestWriter:
         ),
     )
     @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])
-    def test_writer(self, shape, scaler, format_version, array_constructor):
+    @pytest.mark.parametrize("storage_options_list", [True, False])
+    def test_writer(
+        self, shape, scaler, format_version, array_constructor, storage_options_list
+    ):
 
         data = self.create_data(shape)
         data = array_constructor(data)
@@ -86,7 +89,10 @@ class TestWriter:
             )
         if scaler is None:
             transformations = [transformations[0]]
-        chunks = (128, 128)
+        chunks = [(128, 128), (50, 50), (25, 25), (25, 25), (25, 25), (25, 25)]
+        storage_options = {"chunks": chunks[0]}
+        if storage_options_list:
+            storage_options = [{"chunks": chunk} for chunk in chunks]
         write_image(
             image=data,
             group=self.group,
@@ -94,7 +100,7 @@ class TestWriter:
             fmt=version,
             axes=axes,
             coordinate_transformations=transformations,
-            storage_options=dict(chunks=chunks),
+            storage_options=storage_options,
         )
 
         # Verify
@@ -113,8 +119,11 @@ class TestWriter:
             ):
                 assert transf == expected
             assert len(node.metadata["coordinateTransformations"]) == len(node.data)
-        first_chunk = [c[0] for c in node.data[0].chunks]
-        assert tuple(first_chunk) == _retuple(chunks, node.data[0].shape)
+        # check chunks for first 2 resolutions (before shape gets smaller than chunk)
+        for level, nd_array in enumerate(node.data[:2]):
+            expected = chunks[level] if storage_options_list else chunks[0]
+            first_chunk = [c[0] for c in nd_array.chunks]
+            assert tuple(first_chunk) == _retuple(expected, nd_array.shape)
         assert np.allclose(data, node.data[0][...].compute())
 
     @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])

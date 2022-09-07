@@ -157,8 +157,6 @@ class Scaler:
     def nearest(self, base: np.ndarray) -> List[np.ndarray]:
         """
         Downsample using :func:`skimage.transform.resize`.
-
-        The :const:`cvs2.INTER_NEAREST` interpolation method is used.
         """
         return self._by_plane(base, self.__nearest)
 
