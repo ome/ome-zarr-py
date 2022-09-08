@@ -85,7 +85,7 @@ Reading OME-NGFF images
 
 This sample code reads an image stored on remote s3 server, but the same
 code can be used to read data on a local file system. In either case,
-the data is available as `dask` arrays:
+the data is available as `dask` arrays::
 
     from ome_zarr.io import parse_url
     from ome_zarr.reader import Reader
