@@ -1,3 +1,4 @@
+import filecmp
 import pathlib
 
 import dask.array as da
@@ -7,7 +8,7 @@ import zarr
 from numcodecs import Blosc
 
 from ome_zarr.format import CurrentFormat, FormatV01, FormatV02, FormatV03, FormatV04
-from ome_zarr.io import parse_url
+from ome_zarr.io import ZarrLocation, parse_url
 from ome_zarr.reader import Multiscales, Reader
 from ome_zarr.scale import Scaler
 from ome_zarr.writer import (
@@ -142,19 +143,41 @@ class TestWriter:
             for value in transfs[0]["scale"]:
                 assert value >= 1
 
-    def test_write_image_dask(self):
-        shape = (128, 128, 128)
+    @pytest.mark.parametrize("read_from_zarr", [True, False])
+    def test_write_image_dask(self, read_from_zarr):
+        # Size 100 tests resize shapes: https://github.com/ome/ome-zarr-py/issues/219
+        shape = (128, 200, 200)
         data = self.create_data(shape)
         data_delayed = da.from_array(data)
-        chunks = (64, 64)
+        chunks = (32, 32)
+        opts = {"chunks": chunks, "compressor": None}
+        if read_from_zarr:
+            # write to zarr and re-read as dask...
+            path = f"{self.path}/temp/"
+            store = parse_url(path, mode="w").store
+            temp_group = zarr.group(store=store).create_group("test")
+            write_image(data, temp_group, axes="zyx", storage_options=opts)
+            loc = ZarrLocation(f"{self.path}/temp/test")
+            reader = Reader(loc)()
+            nodes = list(reader)
+            data_delayed = (
+                nodes[0]
+                .load(Multiscales)
+                .array(resolution="0", version=CurrentFormat().version)
+            )
         write_image(
-            data_delayed, self.group, axes="zyx", storage_options={"chunks": chunks}
+            data_delayed,
+            self.group,
+            axes="zyx",
+            storage_options={"chunks": chunks, "compressor": None},
         )
         reader = Reader(parse_url(f"{self.path}/test"))
         image_node = list(reader())[0]
         first_chunk = [c[0] for c in image_node.data[0].chunks]
         assert tuple(first_chunk) == _retuple(chunks, image_node.data[0].shape)
-        for transfs in image_node.metadata["coordinateTransformations"]:
+        for level, transfs in enumerate(
+            image_node.metadata["coordinateTransformations"]
+        ):
             assert len(transfs) == 1
             assert transfs[0]["type"] == "scale"
             assert len(transfs[0]["scale"]) == len(shape)
@@ -162,6 +185,22 @@ class TestWriter:
             assert transfs[0]["scale"][0] == 1
             for value in transfs[0]["scale"]:
                 assert value >= 1
+            if read_from_zarr and level < 3:
+                # if shape smaller than chunk, dask writer uses chunk == shape
+                # so we only compare larger resolutions
+                assert filecmp.cmp(
+                    f"{self.path}/temp/test/{level}/.zarray",
+                    f"{self.path}/test/{level}/.zarray",
+                    shallow=False,
+                )
+
+        if read_from_zarr:
+            # .zattrs should be the same
+            assert filecmp.cmp(
+                f"{self.path}/temp/test/.zattrs",
+                f"{self.path}/test/.zattrs",
+                shallow=False,
+            )
 
     @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])
     def test_write_image_compressed(self, array_constructor):
