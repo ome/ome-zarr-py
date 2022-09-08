@@ -4,7 +4,6 @@
 - Fix a bug in using `storage_options` with `write_images`, thanks to [Marc Claesen](https://github.com/claesenm) ([#221](https://github.com/ome/ome-zarr-py/pull/221))
 - Use multiscales name for node metadata ([#214](https://github.com/ome/ome-zarr-py/pull/214))
 
-
 # 0.5.2 (July 2022)
 
 - Disable auto_mkdir when path begins with s3, thanks to @colobas ([#212](https://github.com/ome/ome-zarr-py/pull/212))
