@@ -50,6 +50,7 @@ setup(
     ],
     entry_points={
         "console_scripts": ["ome_zarr = ome_zarr.cli:main"],
+        "ome_zarr.spec": ["bioformats2raw = ome_zarr.bioformats2raw:bioformats2raw"],
     },
     tests_require=["pytest"],
 )
