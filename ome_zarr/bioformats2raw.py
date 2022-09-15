@@ -9,7 +9,6 @@ import tempfile
 from xml.etree import ElementTree as ET
 
 import ome_types
-from ome_zarr_metadata import __version__  # noqa
 
 from ome_zarr.io import ZarrLocation
 from ome_zarr.reader import Node
