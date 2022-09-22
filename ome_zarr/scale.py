@@ -7,8 +7,9 @@ import logging
 import os
 from collections.abc import MutableMapping
 from dataclasses import dataclass
-from typing import Callable, Iterator, List
+from typing import Any, Callable, Iterator, List, Tuple, Union
 
+import dask.array as da
 import numpy as np
 import zarr
 from scipy.ndimage import zoom
@@ -19,9 +20,13 @@ from skimage.transform import (
     resize,
 )
 
+from .dask_utils import resize as dask_resize
 from .io import parse_url
 
 LOGGER = logging.getLogger("ome_zarr.scale")
+
+ListOfArrayLike = Union[List[da.Array], List[np.ndarray]]
+ArrayLike = Union[da.Array, np.ndarray]
 
 
 @dataclass
@@ -125,17 +130,49 @@ class Scaler:
             series.append({"path": path})
         return grp
 
+    def resize_image(self, image: ArrayLike) -> ArrayLike:
+        """
+        Resize a numpy array OR a dask array to a smaller array (not pyramid)
+        """
+        if isinstance(image, da.Array):
+
+            def _resize(image: ArrayLike, out_shape: Tuple, **kwargs: Any) -> ArrayLike:
+                return dask_resize(image, out_shape, **kwargs)
+
+        else:
+            _resize = resize
+
+        # only down-sample in X and Y dimensions for now...
+        new_shape = list(image.shape)
+        new_shape[-1] = image.shape[-1] // self.downscale
+        new_shape[-2] = image.shape[-2] // self.downscale
+        out_shape = tuple(new_shape)
+
+        dtype = image.dtype
+        image = _resize(
+            image.astype(float), out_shape, order=1, mode="reflect", anti_aliasing=False
+        )
+        return image.astype(dtype)
+
     def nearest(self, base: np.ndarray) -> List[np.ndarray]:
         """
         Downsample using :func:`skimage.transform.resize`.
-
-        The :const:`cvs2.INTER_NEAREST` interpolation method is used.
         """
         return self._by_plane(base, self.__nearest)
 
-    def __nearest(self, plane: np.ndarray, sizeY: int, sizeX: int) -> np.ndarray:
+    def __nearest(self, plane: ArrayLike, sizeY: int, sizeX: int) -> np.ndarray:
         """Apply the 2-dimensional transformation."""
-        return resize(
+        if isinstance(plane, da.Array):
+
+            def _resize(
+                image: ArrayLike, output_shape: Tuple, **kwargs: Any
+            ) -> ArrayLike:
+                return dask_resize(image, output_shape, **kwargs)
+
+        else:
+            _resize = resize
+
+        return _resize(
             plane,
             output_shape=(sizeY // self.downscale, sizeX // self.downscale),
             order=0,

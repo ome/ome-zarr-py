@@ -12,6 +12,11 @@ LOGGER = logging.getLogger("ome_zarr.format")
 def format_from_version(version: str) -> "Format":
 
     for fmt in format_implementations():
+
+        # Support floating-point versions like `0.2`
+        if isinstance(version, float):
+            version = str(version)
+
         if fmt.version == version:
             return fmt
     raise ValueError(f"Version {version} not recognized")
@@ -27,10 +32,10 @@ def format_implementations() -> Iterator["Format"]:
     yield FormatV01()
 
 
-def detect_format(metadata: dict) -> "Format":
+def detect_format(metadata: dict, default: "Format") -> "Format":
     """
     Give each format implementation a chance to take ownership of the
-    given metadata. If none matches, a CurrentFormat is returned.
+    given metadata. If none matches, the default value will be returned.
     """
 
     if metadata:
@@ -38,7 +43,7 @@ def detect_format(metadata: dict) -> "Format":
             if fmt.matches(metadata):
                 return fmt
 
-    return CurrentFormat()
+    return default
 
 
 class Format(ABC):
@@ -59,11 +64,21 @@ class Format(ABC):
     def init_channels(self) -> None:  # pragma: no cover
         raise NotImplementedError()
 
-    def _get_multiscale_version(self, metadata: dict) -> Optional[str]:
+    def _get_metadata_version(self, metadata: dict) -> Optional[str]:
+        """
+        Checks the metadata dict for a version
+
+        Returns the version of the first object found in the metadata,
+        checking for 'multiscales', 'plate', 'well' etc
+        """
         multiscales = metadata.get("multiscales", [])
         if multiscales:
             dataset = multiscales[0]
             return dataset.get("version", None)
+        for name in ["plate", "well", "image-label"]:
+            obj = metadata.get(name, None)
+            if obj:
+                return obj.get("version", None)
         return None
 
     def __repr__(self) -> str:
@@ -112,13 +127,13 @@ class FormatV01(Format):
         return "0.1"
 
     def matches(self, metadata: dict) -> bool:
-        version = self._get_multiscale_version(metadata)
-        LOGGER.debug(f"V01:{version} v. {self.version}")
+        version = self._get_metadata_version(metadata)
+        LOGGER.debug("%s matches %s?", self.version, version)
         return version == self.version
 
     def init_store(self, path: str, mode: str = "r") -> FSStore:
         store = FSStore(path, mode=mode, dimension_separator=".")
-        LOGGER.debug(f"Created legacy flat FSStore({path}, {mode})")
+        LOGGER.debug("Created legacy flat FSStore(%s, %s)", path, mode)
         return store
 
     def generate_well_dict(
@@ -130,12 +145,14 @@ class FormatV01(Format):
         self, well: dict, rows: List[str], columns: List[str]
     ) -> None:
         if any(e not in self.REQUIRED_PLATE_WELL_KEYS for e in well.keys()):
-            LOGGER.debug("f{well} contains unspecified keys")
+            LOGGER.debug("%s contains unspecified keys", well)
         for key, key_type in self.REQUIRED_PLATE_WELL_KEYS.items():
             if key not in well:
-                raise ValueError(f"{well} must contain a {key} key of type {key_type}")
+                raise ValueError(
+                    "%s must contain a %s key of type %s", well, key, key_type
+                )
             if not isinstance(well[key], key_type):
-                raise ValueError(f"{well} path must be of {key_type} type")
+                raise ValueError("%s path must be of %s type", well, key_type)
 
     def generate_coordinate_transformations(
         self, shapes: List[tuple]
@@ -160,11 +177,6 @@ class FormatV02(FormatV01):
     def version(self) -> str:
         return "0.2"
 
-    def matches(self, metadata: dict) -> bool:
-        version = self._get_multiscale_version(metadata)
-        LOGGER.debug(f"{self.version} matches {version}?")
-        return version == self.version
-
     def init_store(self, path: str, mode: str = "r") -> FSStore:
         """
         Not ideal. Stores should remain hidden
@@ -177,7 +189,7 @@ class FormatV02(FormatV01):
         }
 
         mkdir = True
-        if "r" in mode or path.startswith("http"):
+        if "r" in mode or path.startswith("http") or path.startswith("s3"):
             # Could be simplified on the fsspec side
             mkdir = False
         if mkdir:
@@ -188,7 +200,7 @@ class FormatV02(FormatV01):
             mode=mode,
             **kwargs,
         )  # TODO: open issue for using Path
-        LOGGER.debug(f"Created nested FSStore({path}, {mode}, {kwargs})")
+        LOGGER.debug("Created nested FSStore(%s, %s, %s)", path, mode, kwargs)
         return store
 
 
@@ -220,10 +232,10 @@ class FormatV04(FormatV03):
     ) -> dict:
         row, column = well.split("/")
         if row not in rows:
-            raise ValueError(f"{row} is not defined in the list of rows")
+            raise ValueError("%s is not defined in the list of rows", row)
         rowIndex = rows.index(row)
         if column not in columns:
-            raise ValueError(f"{column} is not defined in the list of columns")
+            raise ValueError("%s is not defined in the list of columns", column)
         columnIndex = columns.index(column)
         return {"path": str(well), "rowIndex": rowIndex, "columnIndex": columnIndex}
 
@@ -232,16 +244,16 @@ class FormatV04(FormatV03):
     ) -> None:
         super().validate_well_dict(well, rows, columns)
         if len(well["path"].split("/")) != 2:
-            raise ValueError(f"{well} path must exactly be composed of 2 groups")
+            raise ValueError("%s path must exactly be composed of 2 groups", well)
         row, column = well["path"].split("/")
         if row not in rows:
-            raise ValueError(f"{row} is not defined in the plate rows")
+            raise ValueError("%s is not defined in the plate rows", row)
         if well["rowIndex"] != rows.index(row):
-            raise ValueError(f"Mismatching row index for {well}")
+            raise ValueError("Mismatching row index for %s", well)
         if column not in columns:
-            raise ValueError(f"{column} is not defined in the plate columns")
+            raise ValueError("%s is not defined in the plate columns", column)
         if well["columnIndex"] != columns.index(column):
-            raise ValueError(f"Mismatching column index for {well}")
+            raise ValueError("Mismatching column index for %s", well)
 
     def generate_coordinate_transformations(
         self, shapes: List[tuple]
@@ -267,7 +279,7 @@ class FormatV04(FormatV03):
         Validates that a list of dicts contains a 'scale' transformation
 
         Raises ValueError if no 'scale' found or doesn't match ndim
-        @param ndim:       Number of image dimensions
+        :param ndim:       Number of image dimensions
         """
 
         if coordinate_transformations is None:

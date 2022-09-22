@@ -31,6 +31,7 @@ class ZarrLocation:
         self, path: Union[Path, str], mode: str = "r", fmt: Format = CurrentFormat()
     ) -> None:
 
+        LOGGER.debug("ZarrLocation.__init__ path: %s, fmt: %s", path, fmt.version)
         self.__fmt = fmt
         self.__mode = mode
         if isinstance(path, Path):
@@ -46,9 +47,12 @@ class ZarrLocation:
         self.__store = loader.init_store(self.__path, mode)
 
         self.__init_metadata()
-        detected = detect_format(self.__metadata)
+        detected = detect_format(self.__metadata, loader)
+        LOGGER.debug("ZarrLocation.__init__ %s detected: %s", path, detected)
         if detected != fmt:
-            LOGGER.warning(f"version mismatch: detected:{detected}, requested:{fmt}")
+            LOGGER.warning(
+                "version mismatch: detected: %s, requested: %s", detected, fmt
+            )
             self.__fmt = detected
             self.__store = detected.init_store(self.__path, mode)
             self.__init_metadata()
@@ -132,7 +136,7 @@ class ZarrLocation:
     def create(self, path: str) -> "ZarrLocation":
         """Create a new Zarr location for the given path."""
         subpath = self.subpath(path)
-        LOGGER.debug(f"open({self.__class__.__name__}({subpath}))")
+        LOGGER.debug("open(%s(%s))", self.__class__.__name__, subpath)
         return self.__class__(subpath, mode=self.__mode, fmt=self.__fmt)
 
     def get_json(self, subpath: str) -> JSONDict:
@@ -149,10 +153,10 @@ class ZarrLocation:
                 return {}
             return json.loads(data)
         except KeyError:
-            LOGGER.debug(f"JSON not found: {subpath}")
+            LOGGER.debug("JSON not found: %s", subpath)
             return {}
-        except Exception as e:
-            LOGGER.exception(f"{e}")
+        except Exception:
+            LOGGER.exception("Error while loading JSON")
             return {}
 
     def parts(self) -> List[str]:
@@ -186,7 +190,7 @@ def parse_url(
             return None
         else:
             return loc
-    except Exception as e:
-        LOGGER.warning(f"exception on parsing: {e} (stacktrace at DEBUG)")
+    except Exception:
+        LOGGER.exception("exception on parsing (stacktrace at DEBUG)")
         LOGGER.debug("stacktrace:", exc_info=True)
         return None

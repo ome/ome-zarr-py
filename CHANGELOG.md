@@ -1,3 +1,37 @@
+# 0.6.0 (September 2022)
+
+- Add support for writing `dask` arrays. Thanks to [Daniel Toloudis](https://github.com/toloudis), with code contributions from [Andreas Eisenbarth](https://github.com/aeisenbarth) ([#192](https://github.com/ome/ome-zarr-py/pull/192))
+- Fix a bug in using `storage_options` with `write_images`, thanks to [Marc Claesen](https://github.com/claesenm) ([#221](https://github.com/ome/ome-zarr-py/pull/221))
+- Use multiscales name for node metadata ([#214](https://github.com/ome/ome-zarr-py/pull/214))
+
+# 0.5.2 (July 2022)
+
+- Disable auto_mkdir when path begins with s3, thanks to @colobas ([#212](https://github.com/ome/ome-zarr-py/pull/212))
+
+# 0.5.1 (June 2022)
+
+- Read multi-resolution pyramids in `ome_zarr.reader.Well`, thanks to @tcompa ([#209](https://github.com/ome/ome-zarr-py/pull/209))
+
+# 0.5.0 (June 2022)
+
+- Add `fmt` option to `write_label_metadata` and store version ([#206](https://github.com/ome/ome-zarr-py/pull/206))
+
+# 0.4.2 (May 2022)
+
+- Relax version detection ([#189](https://github.com/ome/ome-zarr-py/pull/189))
+- Fix format warning duplication ([#190](https://github.com/ome/ome-zarr-py/pull/190))
+- Fix plate pyramid loading ([#195](https://github.com/ome/ome-zarr-py/pull/195))
+
+# 0.4.1 (Mar 2022)
+
+- Unify docstrings in `ome_zarr.writer` module ([#185](https://github.com/ome/ome-zarr-py/pull/185))
+
+# 0.4.0 (Mar 2022)
+
+- Add API for writing data according to the `image-label` spec: `write_labels`, `write_multiscale_labels` & `write_label_metadata` ([#178](https://github.com/ome/ome-zarr-py/pull/178), [#184](https://github.com/ome/ome-zarr-py/pull/184))
+- Remove `byte_order` from `write_image` signature ([#184](https://github.com/ome/ome-zarr-py/pull/184))
+- Deprecate `chunks` argument in favor of `storage_options` ([#184](https://github.com/ome/ome-zarr-py/pull/184))
+
 # 0.3.0 (Feb 2022)
 
 ## Specification changes

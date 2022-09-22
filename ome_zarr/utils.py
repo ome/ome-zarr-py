@@ -93,7 +93,7 @@ def download(input_path: str, output_dir: str = ".") -> None:
                 if datasets and resolutions:
                     pbar = ProgressBar()
                     for dataset, data in reversed(list(zip(datasets, resolutions))):
-                        LOGGER.info(f"resolution {dataset}...")
+                        LOGGER.info("resolution %s...", dataset)
                         with pbar:
                             data.to_zarr(str(target_path / dataset))
             else:
