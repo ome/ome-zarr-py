@@ -34,6 +34,11 @@ class bioformats2raw(Base):
             if data.plates:
                 _logger.info("Plates detected. Skipping implicit loading")
             else:
+
+                series = node.zarr.root_attrs.get("series", None)
+                if series is not None:
+                    node.metadata["series"] = series
+
                 for idx, image in enumerate(data.images):
                     series = node.zarr.create(str(idx))
                     assert series.exists(), f"{series} is missing"
