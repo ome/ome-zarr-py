@@ -1,5 +1,13 @@
-"""
-Spec definitions
+"""Spec extension for reading bioformats2raw.layout.
+
+This specification detects and reads filesets which were created by
+bioformats2raw and therefore can have multiple multiscale image groups
+present. Each such image will be returned by the [ome_zarr.reader.Reader]
+as a separate [ome_zarr.reader.Node], but metadata which has been parsed
+from the OME-XML metadata associated with the specific image will be
+attached.
+
+TBD: Example
 """
 
 import logging
@@ -22,6 +30,10 @@ _logger = logging.getLogger(__name__)
 
 
 class bioformats2raw(Base):
+    """A spec-type for reading multi-image filesets OME-XML
+    metadata.
+    """
+
     @staticmethod
     def matches(zarr: ZarrLocation) -> bool:
         layout = zarr.root_attrs.get("bioformats2raw.layout", None)
@@ -30,7 +42,7 @@ class bioformats2raw(Base):
     def __init__(self, node: Node) -> None:
         super().__init__(node)
         try:
-            data = self.handle(node)
+            data = self._handle(node)
             if data.plates:
                 _logger.info("Plates detected. Skipping implicit loading")
             else:
@@ -51,8 +63,12 @@ class bioformats2raw(Base):
         except Exception:
             _logger.exception("failed to parse metadata")
 
-    def fix_xml(self, ns: str, elem: ET.Element) -> None:
-        """
+    def _fix_xml(self, ns: str, elem: ET.Element) -> None:
+        """Correct invalid OME-XML.
+
+        Some versions of bioformats2raw did not include a MetadataOnly
+        tag.
+
         Note: elem.insert() was not updating the object correctly.
         """
 
@@ -79,7 +95,8 @@ class bioformats2raw(Base):
             if remove:
                 elem.remove(remove)
 
-    def parse_xml(self, filename: str) -> ome_types.model.OME:
+    def _parse_xml(self, filename: str) -> ome_types.model.OME:
+        """Generate [ome_types.model.OME] from OME-XML"""
         # Parse the file and find the current schema
         root = ET.parse(filename)
         m = re.match(r"\{.*\}", root.getroot().tag)
@@ -87,7 +104,7 @@ class bioformats2raw(Base):
 
         # Update the XML to include MetadataOnly
         for child in list(root.iter()):
-            self.fix_xml(ns, child)
+            self._fix_xml(ns, child)
         fixed = ET.tostring(root.getroot()).decode()
 
         # Write file out for ome_types
@@ -96,8 +113,9 @@ class bioformats2raw(Base):
             t.flush()
             return ome_types.from_xml(t.name)
 
-    def handle(self, node: Node) -> ome_types.model.OME:
+    def _handle(self, node: Node) -> ome_types.model.OME:
+        """Main parsing method which looks for OME/METADATA.ome.xml"""
         metadata = node.zarr.subpath("OME/METADATA.ome.xml")
         _logger.info("Looking for metadata in %s", metadata)
         if os.path.exists(metadata):
-            return self.parse_xml(metadata)
+            return self._parse_xml(metadata)
