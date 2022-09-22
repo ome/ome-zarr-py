@@ -5,6 +5,7 @@ API
     :maxdepth: 3
 
     api/cli
+    api/bioformats2raw
     api/csv
     api/data
     api/format
