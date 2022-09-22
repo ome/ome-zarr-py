@@ -1,13 +1,9 @@
-import pathlib
-
 import numpy as np
 import pytest
-import zarr
 
 from ome_zarr.bioformats2raw import bioformats2raw
 from ome_zarr.io import parse_url
 from ome_zarr.reader import Multiscales, Reader
-from ome_zarr.writer import write_image
 
 
 class TestBf2raw:
