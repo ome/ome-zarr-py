@@ -208,7 +208,7 @@ class Scaler:
         stack_dims = base.ndim - 2
         factors = (*(1,) * stack_dims, *(self.downscale, self.downscale))
         for i in range(self.max_layer):
-            rv.append(downscale_local_mean(rv[-1], factors=factors))
+            rv.append(downscale_local_mean(rv[-1], factors=factors).astype(base.dtype))
         return rv
 
     def zoom(self, base: np.ndarray) -> List[np.ndarray]:
