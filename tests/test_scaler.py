@@ -24,6 +24,7 @@ class TestScaler:
         expected_shape = shape
         for data in downscaled:
             assert data.shape == expected_shape
+            assert data.dtype == downscaled[0].dtype
             expected_shape = expected_shape[:-2] + tuple(
                 sh // scale_factor for sh in expected_shape[-2:]
             )
