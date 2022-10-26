@@ -1,3 +1,6 @@
+# 0.6.1 (October 2022)
+
+- Fix pyramid dtype for scaler.local_mean ([#233](https://github.com/ome/ome-zarr-py/pull/233))
 # 0.6.0 (September 2022)
 
 - Add support for writing `dask` arrays. Thanks to [Daniel Toloudis](https://github.com/toloudis), with code contributions from [Andreas Eisenbarth](https://github.com/aeisenbarth) ([#192](https://github.com/ome/ome-zarr-py/pull/192))
