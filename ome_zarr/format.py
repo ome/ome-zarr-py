@@ -183,10 +183,14 @@ class FormatV02(FormatV01):
         TODO: could also check dimension_separator
         """
 
-        kwargs = {
-            "dimension_separator": "/",
+        kwargs: Dict[str, Any] = {
             "normalize_keys": False,
         }
+
+        # if creating a store, use / by default. If reading, use the
+        # dimension_separator specified in the .zarray
+        if mode == "w":
+            kwargs["dimension_separator"] = "/"
 
         mkdir = True
         if "r" in mode or path.startswith("http") or path.startswith("s3"):
