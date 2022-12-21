@@ -36,21 +36,34 @@ class bioformats2raw(Base):
 
     @staticmethod
     def matches(zarr: ZarrLocation) -> bool:
+        """Pass if the metadata for the zgroup contains
+        `{"bioformats2raw.layout": 3}`"""
         layout = zarr.root_attrs.get("bioformats2raw.layout", None)
+        _logger.error(f"layout={layout == 3} zarr={zarr}")
         return layout == 3
 
     def __init__(self, node: Node) -> None:
+        """Load metadata from the three sources associated with this
+        specification: the OME zgroup metadata, the OME-XML file, and
+        the images zgroups themselves.
+        """
         super().__init__(node)
         try:
+
+            # Load OME/METADATA.ome.xml
             data = self._handle(node)
             if data.plates:
                 _logger.info("Plates detected. Skipping implicit loading")
             else:
 
-                series = node.zarr.root_attrs.get("series", None)
-                if series is not None:
-                    node.metadata["series"] = series
+                # Load the OME/ zgroup metadata
+                ome = node.zarr.create("OME")
+                if ome.exists:
+                    series_metadata = ome.zarr.root_attrs.get("series", None)
+                    if series_metadata is not None:
+                        node.metadata["series"] = series_metadata
 
+                # Load each individual image
                 for idx, image in enumerate(data.images):
                     series = node.zarr.create(str(idx))
                     assert series.exists(), f"{series} is missing"
@@ -59,7 +72,9 @@ class bioformats2raw(Base):
                     if subnode:
                         subnode.metadata["ome-xml:index"] = idx
                         subnode.metadata["ome-xml:image"] = image
+
             node.metadata["ome-xml"] = data
+
         except Exception:
             _logger.exception("failed to parse metadata")
 
