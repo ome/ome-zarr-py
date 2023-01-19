@@ -481,7 +481,7 @@ class Plate(Spec):
         LOGGER.debug("Plate created with ZarrLocation fmt: %s", self.zarr.fmt)
         self.get_pyramid_lazy(node)
 
-    def get_pyramid_lazy(self, node: Node) -> None:
+    def get_pyramid_lazy(self, node: Node, loading: str = "new") -> None:
         """
         Return a pyramid of dask data, where the highest resolution is the
         stitched full-resolution images.
@@ -490,73 +490,61 @@ class Plate(Spec):
         LOGGER.info("plate_data: %s", self.plate_data)
         self.rows = self.plate_data.get("rows")
         self.columns = self.plate_data.get("columns")
-        # TODO: Check which acquisitions are present
-        # Acquisitions are already stored at the plate level, 
-        # so easy to get an overview about!
-        # load_multi_acquisition = True
-        # if load_multi_acquisition:
-        #     pass
 
         self.row_names = [row["name"] for row in self.rows]
         self.col_names = [col["name"] for col in self.columns]
-        print(self.row_names)
-        print(self.col_names)
 
-        self.well_paths = [well["path"] for well in self.plate_data.get("wells")]
+        self.well_paths = [well["path"] for well in 
+                                self.plate_data.get("wells")]
         self.well_paths.sort()
 
         self.row_count = len(self.rows)
         self.column_count = len(self.columns)
 
-        # 1) Get the dimensions for each well => dict of well specs?
-        # Current setup: Just get 1 well, assume this is always fitting
-        # Make this general: Currently just the dimension for first image in the well
-        # But could be generalized: Either when many FOVs are loaded. Or for multiplexing
-        # And could be loaded from aggregated metadata instead of loaded from each well
+        # Default loading path
+        if loading == "default":
+            self.first_field = "0"
+            # Get the first well...
+            well_zarr = self.zarr.create(self.well_paths[0])
+            well_node = Node(well_zarr, node)
+            well_spec: Optional[Well] = well_node.first(Well)
+            if well_spec is None:
+                raise Exception("Could not find first well")
+            self.numpy_type = well_spec.numpy_type
 
-        # Loop over well self.well_paths
-        well_specs = self.get_plate_well_specs(node)
-        print(well_specs)
-        # Get the numpy type for the first well
-        self.numpy_type = well_specs[self.well_paths[0]].numpy_type
-        # img_pyramid_shapes are for a single well
-        print("img_pyramid_shapes: %s", well_specs[self.well_paths[0]].img_pyramid_shapes)
-        well_spec = well_specs[self.well_paths[0]]
-        self.axes = well_spec.img_metadata["axes"]
+            LOGGER.debug("img_pyramid_shapes: %s", well_spec.img_pyramid_shapes)
 
-        # TODO: Find a better way to calculate this
-        self.levels = len(well_spec.img_pyramid_shapes)
-        # 2) Create the pyramid: list of dask arrays at different resolutions
-        # Currently: get_stitched_grid creates this, shape is simple because all wells are the same
-        # Going forward: get_stitched_grid function becomes more complex
-        # Do we need to get the max well size and pad all the wells? Or how do we do the layout?
-        # Easiest with a max well size (max in x & y)
+            self.axes = well_spec.img_metadata["axes"]
+            # Create a dask pyramid for the plate
+            pyramid = []
+            for level, tile_shape in enumerate(well_spec.img_pyramid_shapes):
+                lazy_plate = self.get_stitched_grid(level, tile_shape)
+                pyramid.append(lazy_plate)
 
-        pyramid = []
-        for level in range(self.levels):
-            lazy_plate = self.get_stiched_plate(level, well_specs)
-            pyramid.append(lazy_plate)
+        # New loading path that handles wells with different shapes
+        elif loading == "new":
+            # Get all the well specs
+            # TODO: Find a way to speed up this loading, i.e. discussion here:
+            # https://github.com/ome/ngff/issues/141
+            well_specs = self.get_plate_well_specs(node)
+            
+            # Assumption: The following information is consistent across wells
+            # Get the numpy type for the first well
+            well_spec = well_specs[self.well_paths[0]]
+            self.numpy_type = well_spec.numpy_type
+            LOGGER.debug("img_pyramid_shapes: %s", well_spec.img_pyramid_shapes)
+            self.axes = well_spec.img_metadata["axes"]
+            self.levels = len(well_spec.img_pyramid_shapes)
+            # FIXME: Figure out the real downsampling factor
+            self.downsampling_factor = 2
 
-
-        # Get the first well...
-        # For loading plates of different shapes: Start here! Not just first well
-        # well_zarr = self.zarr.create(self.well_paths[0])
-        # well_node = Node(well_zarr, node)
-        # well_spec: Optional[Well] = well_node.first(Well)
-        # if well_spec is None:
-        #     raise Exception("Could not find first well")
-        # self.numpy_type = well_spec.numpy_type
-
-        # LOGGER.debug("img_pyramid_shapes: %s", well_spec.img_pyramid_shapes)
-
-        # self.axes = well_spec.img_metadata["axes"]
-
-        # Create a dask pyramid for the plate
-        # pyramid = []
-        # for level, tile_shape in enumerate(well_spec.img_pyramid_shapes):
-        #     lazy_plate = self.get_stitched_grid(level, tile_shape)
-        #     pyramid.append(lazy_plate)
-
+            pyramid = []
+            for level in range(self.levels):
+                lazy_plate = self.get_stiched_plate(level, well_specs)
+                pyramid.append(lazy_plate)
+        
+        else:
+            raise Exception('No valid loading path specified')
 
         # Set the node.data to be pyramid view of the plate
         node.data = pyramid
@@ -567,7 +555,7 @@ class Plate(Spec):
         node.metadata.update({"metadata": {"plate": self.plate_data}})
 
     def get_stiched_plate(self, level: int, well_specs: Dict):
-        print(f"get_stiched_plate() level: {level}")
+        LOGGER.debug(f"get_stiched_plate() level: {level}")
         # New method to replace get_stitched_grid that can load a different 
         # shape for each well
         def get_tile(tile_name: str) -> np.ndarray:
@@ -578,6 +566,9 @@ class Plate(Spec):
             try:
                 data = self.zarr.load(path)
             except ValueError:
+                # With the new loading scheme, I don't think we hit this 
+                # part anymore, but maybe there are exceptions where it still 
+                # occurs?
                 LOGGER.exception("Failed to load %s", path)
                 data = np.zeros(tile_shape, dtype=self.numpy_type)
             return data
@@ -590,24 +581,16 @@ class Plate(Spec):
             :param padding: xy padding to be added between wells
 
             """
-            # FIXME: Figure out the real downsampling factor
-            downsampling_factor = 2
-            # FIXME: Get max pyramid level
-            max_level = 4
-            max_well_dims = list(list(well_specs.values())[0].img_pyramid_shapes[level])
-            # for well_spec in well_specs.values():
-            #     new_dims = well_spec.img_pyramid_shapes[level]
-            #     for dim in range(len(max_well_dims)):
-            #         if new_dims[dim] > max_well_dims[dim]:
-            #             max_well_dims[dim] = new_dims[dim]
-            # return max_well_dims
+            max_well_dims = list(list(well_specs.values())[0] \
+                .img_pyramid_shapes[level])
             for well_spec in well_specs.values():
                 new_dims = well_spec.img_pyramid_shapes[level]
                 for dim in range(len(max_well_dims) - 2):
                     if new_dims[dim] > max_well_dims[dim]:
                         max_well_dims[dim] = new_dims[dim]
                 for dim in range(len(max_well_dims) - 2, len(max_well_dims)):
-                    real_padding = padding * downsampling_factor ** -(level - max_level)
+                    real_padding = padding * \
+                        self.downsampling_factor ** -(level - self.levels)
                     if new_dims[dim] + real_padding > max_well_dims[dim]:
                         max_well_dims[dim] = new_dims[dim] + real_padding
             return max_well_dims
@@ -631,18 +614,15 @@ class Plate(Spec):
                 padding.append((0, diff_size[i]))
             
             for i in range(len(max_well_dims)-2, len(max_well_dims)):
-                padding.append((int(diff_size[i]/2), round(diff_size[i]/2 + 0.1)))
+                padding.append((int(diff_size[i]/2), 
+                    round(diff_size[i]/2 + 0.1)))
             
             return tuple(padding)
 
         max_well_dims = get_max_well_size(well_specs)
-        print(f'Max well dims: {max_well_dims}')
 
         lazy_reader = delayed(get_tile)
 
-        # TODO: Test different Z levels
-
-        # TODO: Test different channels
         lazy_rows = []
         for row_name in self.row_names:
             lazy_row: List[da.Array] = []
@@ -679,7 +659,7 @@ class Plate(Spec):
     def get_plate_well_specs(self, node) -> Dict:
         well_specs = {}
         for well_path in self.well_paths:
-            print(f'Loading Well spec for {well_path}')
+            LOGGER.info(f'Loading Well spec for {well_path}')
             well_zarr = self.zarr.create(well_path)
             well_node = Node(well_zarr, node)
             well_spec: Optional[Well] = well_node.first(Well)
@@ -689,15 +669,20 @@ class Plate(Spec):
     def get_numpy_type(self, image_node: Node) -> np.dtype:
         return image_node.data[0].dtype
 
-    def get_new_tile_path(self, level: int, tile_name: str, image_index: int = 0) -> str:
+    def get_new_tile_path(
+        self, 
+        level: int, 
+        tile_name: str, 
+        image_index: int = 0
+    ) -> str:
         return (
             f"{tile_name}/{image_index}/{level}"
         )
 
-    def get_tile_path(self, level: int, row: int, col: int, image_index: int = 0) -> str:
+    def get_tile_path(self, level: int, row: int, col: int) -> str:
         return (
             f"{self.row_names[row]}/"
-            f"{self.col_names[col]}/{image_index}/{level}"
+            f"{self.col_names[col]}/{self.first_field}/{level}"
         )
 
     def get_stitched_grid(self, level: int, tile_shape: tuple) -> da.core.Array:
@@ -724,13 +709,13 @@ class Plate(Spec):
             lazy_row: List[da.Array] = []
             for col in range(self.column_count):
                 tile_name = f"{row},{col}"
-                print(f"Loading tile {tile_name}, level {level}")
                 lazy_tile = da.from_delayed(
                     lazy_reader(tile_name), shape=tile_shape, dtype=self.numpy_type
                 )
                 lazy_row.append(lazy_tile)
             lazy_rows.append(da.concatenate(lazy_row, axis=len(self.axes) - 1))
         return da.concatenate(lazy_rows, axis=len(self.axes) - 2)
+
 
 
 class PlateLabels(Plate):
