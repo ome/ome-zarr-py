@@ -499,6 +499,8 @@ class Plate(Spec):
 
         self.row_names = [row["name"] for row in self.rows]
         self.col_names = [col["name"] for col in self.columns]
+        print(self.row_names)
+        print(self.col_names)
 
         self.well_paths = [well["path"] for well in self.plate_data.get("wells")]
         self.well_paths.sort()
@@ -580,14 +582,78 @@ class Plate(Spec):
                 data = np.zeros(tile_shape, dtype=self.numpy_type)
             return data
 
+        def get_max_well_size(well_specs, padding: int = 5):
+            """
+            Calculates the max size of any of the wells
+
+            :param well_specs: Dict of well_spec (Well Node)
+            :param padding: xy padding to be added between wells in x & y
+
+            """
+            # FIXME: Figure out the real downsampling factor
+            downsampling_factor = 2
+            # FIXME: Get max pyramid level
+            max_level = 4
+            # max_well_dims = list(list(well_specs.values())[0].img_pyramid_shapes[level])
+            # for well_spec in well_specs.values():
+            #     new_dims = well_spec.img_pyramid_shapes[level]
+            #     for dim in range(len(max_well_dims)):
+            #         if new_dims[dim] > max_well_dims[dim]:
+            #             max_well_dims[dim] = new_dims[dim]
+            # return max_well_dims
+            for well_spec in well_specs.values():
+                new_dims = well_spec.img_pyramid_shapes[level]
+                for dim in range(len(max_well_dims) - 2):
+                    if new_dims[dim] > max_well_dims[dim]:
+                        max_well_dims[dim] = new_dims[dim]
+                for dim in range(len(max_well_dims) - 2, len(max_well_dims)):
+                    real_padding = padding * downsampling_factor ** -(level - max_level)
+                    if new_dims[dim] + real_padding > max_well_dims[dim]:
+                        max_well_dims[dim] = new_dims[dim] + real_padding
+            return max_well_dims
+
+        def calculate_required_padding(max_well_dims, tile_shape):
+            # Calculate the required padding by dimension
+            diff_size = []
+            for i in range(len(max_well_dims)):
+                diff_size.append(max_well_dims[i] - tile_shape[i])
+            
+            # Decide which side gets padded
+            # Logic: 
+            # 1. Pad x & y equally on both sides
+            # 2. Pad z, c, t on right side (keep aligned at the same 0)
+            # Limitations:
+            # 1. Does not take into account transformations
+            # 2. FIXME: Padding of channels is not optimal, could make a 
+            # channel appear as something that its not in the viewer
+            padding = []
+            for i in range(len(max_well_dims)-2):
+                padding.append((0, diff_size[i]))
+            
+            for i in range(len(max_well_dims)-2, len(max_well_dims)):
+                padding.append((int(diff_size[i]/2), round(diff_size[i]/2 + 0.1)))
+            
+            return tuple(padding)
+
+        max_well_dims = get_max_well_size(well_specs)
+        print(f'Max well dims: {max_well_dims}')
+
         lazy_reader = delayed(get_tile)
 
         lazy_rows = []
-        # For level 0, return whole image for each tile
-        # We should not just try to load every row & column, but only the ones that are present
-        # Thus, loop over the dict
-        # BUT: How do we place them in the big array afterwards? => gets more complex
-        # Just concatenate all of them for now
+        # TODO: Figure out how to recreate a plate layout from this and lazily build it
+        
+        # TODO: Fill "empty" columns/rows as well? i.e. only loop over existing rows & cols 
+        # or also whole columns / rows those that don't exist? 
+        # [Check spec: Is it always letters for rows and int for columns]
+
+        # TODO: Handle different Z levels (I actually have this in the 23 well data) => where to pad?
+
+        # TODO: Handle the case where different wells have a different number of channels?
+        # i.e. how do we handle the case where one well has fewer channels than another
+        # Problem: Hard to know what would need to be padded! May put the channel in the wrong place...
+        # => initial scope only xyz?
+
         for tile_name, well_spec in well_specs.items():
             print(f"Loading tile {tile_name}, level {level}")
             tile_shape = well_spec.img_pyramid_shapes[level]
@@ -595,24 +661,11 @@ class Plate(Spec):
             lazy_tile = da.from_delayed(
                 lazy_reader(tile_name), shape=tile_shape, dtype=self.numpy_type
             )
-            lazy_rows.append(lazy_tile)
-        return da.concatenate(lazy_rows, axis=len(self.axes) - 2)
-
-        # for row in range(self.row_count):
-        #     lazy_row: List[da.Array] = []
-        #     for col in range(self.column_count):
-        #         tile_name = f"{row},{col}"
-        #         # tile_shape = 
-        #         print(f"Loading tile {tile_name}, level {level}")
-        #         lazy_tile = da.from_delayed(
-        #             lazy_reader(tile_name), shape=tile_shape, dtype=self.numpy_type
-        #         )
-        #         lazy_row.append(lazy_tile)
-        #     lazy_rows.append(da.concatenate(lazy_row, axis=len(self.axes) - 1))
-        # print(lazy_rows)
-        # return da.concatenate(lazy_rows, axis=len(self.axes) - 2)
-
-
+            # Calculate required padding
+            padding = calculate_required_padding(max_well_dims, tile_shape)
+            padded_lazy_tile = da.pad(lazy_tile, pad_width = padding, mode = 'constant', constant_values = 0)
+            lazy_rows.append(padded_lazy_tile)
+        return da.concatenate(lazy_rows, axis=len(self.axes) - 1)
 
     def get_plate_well_specs(self, node) -> Dict:
         well_specs = {}
