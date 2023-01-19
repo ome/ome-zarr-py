@@ -582,19 +582,19 @@ class Plate(Spec):
                 data = np.zeros(tile_shape, dtype=self.numpy_type)
             return data
 
-        def get_max_well_size(well_specs, padding: int = 5):
+        def get_max_well_size(well_specs, padding: int = 10):
             """
             Calculates the max size of any of the wells
 
             :param well_specs: Dict of well_spec (Well Node)
-            :param padding: xy padding to be added between wells in x & y
+            :param padding: xy padding to be added between wells
 
             """
             # FIXME: Figure out the real downsampling factor
             downsampling_factor = 2
             # FIXME: Get max pyramid level
             max_level = 4
-            # max_well_dims = list(list(well_specs.values())[0].img_pyramid_shapes[level])
+            max_well_dims = list(list(well_specs.values())[0].img_pyramid_shapes[level])
             # for well_spec in well_specs.values():
             #     new_dims = well_spec.img_pyramid_shapes[level]
             #     for dim in range(len(max_well_dims)):
@@ -640,32 +640,41 @@ class Plate(Spec):
 
         lazy_reader = delayed(get_tile)
 
+        # TODO: Test different Z levels
+
+        # TODO: Test different channels
         lazy_rows = []
-        # TODO: Figure out how to recreate a plate layout from this and lazily build it
-        
-        # TODO: Fill "empty" columns/rows as well? i.e. only loop over existing rows & cols 
-        # or also whole columns / rows those that don't exist? 
-        # [Check spec: Is it always letters for rows and int for columns]
-
-        # TODO: Handle different Z levels (I actually have this in the 23 well data) => where to pad?
-
-        # TODO: Handle the case where different wells have a different number of channels?
-        # i.e. how do we handle the case where one well has fewer channels than another
-        # Problem: Hard to know what would need to be padded! May put the channel in the wrong place...
-        # => initial scope only xyz?
-
-        for tile_name, well_spec in well_specs.items():
-            print(f"Loading tile {tile_name}, level {level}")
-            tile_shape = well_spec.img_pyramid_shapes[level]
-            print(f'Tile shape: {tile_shape}')
-            lazy_tile = da.from_delayed(
-                lazy_reader(tile_name), shape=tile_shape, dtype=self.numpy_type
-            )
-            # Calculate required padding
-            padding = calculate_required_padding(max_well_dims, tile_shape)
-            padded_lazy_tile = da.pad(lazy_tile, pad_width = padding, mode = 'constant', constant_values = 0)
-            lazy_rows.append(padded_lazy_tile)
-        return da.concatenate(lazy_rows, axis=len(self.axes) - 1)
+        for row_name in self.row_names:
+            lazy_row: List[da.Array] = []
+            for col_name in self.col_names:
+                tile_name = f"{row_name}/{col_name}"
+                if tile_name in well_specs:
+                    tile_shape = well_specs[tile_name].img_pyramid_shapes[level]
+                    lazy_tile = da.from_delayed(
+                        lazy_reader(tile_name), 
+                        shape=tile_shape, 
+                        dtype=self.numpy_type
+                    )
+                    padding = calculate_required_padding(
+                        max_well_dims, 
+                        tile_shape
+                    )
+                    padded_lazy_tile = da.pad(
+                        lazy_tile, 
+                        pad_width = padding, 
+                        mode = 'constant', 
+                        constant_values = 0
+                    )
+                else:
+                    # If a well does not exist on disk, 
+                    # just get an array of 0s of the fitting size
+                    padded_lazy_tile = da.zeros(
+                        max_well_dims, 
+                        dtype=self.numpy_type
+                    )
+                lazy_row.append(padded_lazy_tile)
+            lazy_rows.append(da.concatenate(lazy_row, axis=len(self.axes) - 1))                
+        return da.concatenate(lazy_rows, axis=len(self.axes) - 2)
 
     def get_plate_well_specs(self, node) -> Dict:
         well_specs = {}
@@ -721,7 +730,6 @@ class Plate(Spec):
                 )
                 lazy_row.append(lazy_tile)
             lazy_rows.append(da.concatenate(lazy_row, axis=len(self.axes) - 1))
-        print(lazy_rows)
         return da.concatenate(lazy_rows, axis=len(self.axes) - 2)
 
 
