@@ -39,8 +39,13 @@ def resize(
 
     # Map overlap
     def resize_block(image_block: da.Array, block_info: dict) -> da.Array:
+        # if the input block is smaller than a 'regular' chunk (e.g. edge of image)
+        # we need to calculate target size for each chunk...
+        chunk_output_shape = tuple(
+            np.floor(np.array(image_block.shape) * factors).astype(int)
+        )
         return skimage.transform.resize(
-            image_block, block_output_shape, *args, **kwargs
+            image_block, chunk_output_shape, *args, **kwargs
         ).astype(image_block.dtype)
 
     output_slices = tuple(slice(0, d) for d in output_shape)
