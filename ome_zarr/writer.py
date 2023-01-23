@@ -558,6 +558,7 @@ Please use the 'storage_options' argument instead."""
                 storage_options=options,
                 compute=False,
                 compressor=options.get("compressor"),
+                dimension_separator=group._store._dimension_separator,
             )
         )
         datasets.append({"path": str(path)})
