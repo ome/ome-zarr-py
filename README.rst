@@ -15,7 +15,7 @@ Documentation will be automatically built with `readthedocs`.
 
 It can be built locally with::
 
-    $ pip install spinx
+    $ pip install sphinx
     $ sphinx-build -b html docs/source/ docs/build/html
 
 Tests
