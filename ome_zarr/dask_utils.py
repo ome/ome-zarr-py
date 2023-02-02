@@ -33,8 +33,15 @@ def resize(
         )
     )
     image_prepared = image.rechunk(better_chunksize)
+
+    # If E.g. we resize image from 6675 by 0.5 to 3337, factor is 0.49992509 so each
+    # chunk of size e.g. 1000 will resize to 499. When assumbled into a new array, the
+    # array will now be of size 3331 instead of 3337 because each of 6 chunks was
+    # smaller by 1. When we compute() this, dask will read 6 chunks of 1000 and expect
+    # last chunk to be 337 but instead it will only be 331.
+    # So we use ceil() here (and in resize_block) to round 499.925 up to chunk of 500
     block_output_shape = tuple(
-        np.floor(np.array(better_chunksize) * factors).astype(int)
+        np.ceil(np.array(better_chunksize) * factors).astype(int)
     )
 
     # Map overlap
@@ -42,7 +49,7 @@ def resize(
         # if the input block is smaller than a 'regular' chunk (e.g. edge of image)
         # we need to calculate target size for each chunk...
         chunk_output_shape = tuple(
-            np.floor(np.array(image_block.shape) * factors).astype(int)
+            np.ceil(np.array(image_block.shape) * factors).astype(int)
         )
         return skimage.transform.resize(
             image_block, chunk_output_shape, *args, **kwargs
