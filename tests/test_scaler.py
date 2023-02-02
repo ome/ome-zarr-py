@@ -79,3 +79,16 @@ class TestScaler:
         resized_dask = scaler.resize_image(data_delayed)
 
         assert np.array_equal(resized_data, resized_dask)
+
+    def test_big_dask_pyramid(self, tmpdir):
+        # from https://github.com/ome/omero-cli-zarr/pull/134
+        shape = (6675, 9560)
+        data = self.create_data(shape)
+        data_delayed = da.from_array(data, chunks=(1000, 1000))
+        print("data_delayed", data_delayed)
+        scaler = Scaler()
+        level_1 = scaler.resize_image(data_delayed)
+        print("level_1", level_1)
+        # to zarr invokes compute
+        data_dir = tmpdir.mkdir("test_big_dask_pyramid")
+        da.to_zarr(level_1, data_dir)
