@@ -251,6 +251,7 @@ Please use the 'storage_options' argument instead."""
                 component=str(Path(group.path, str(path))),
                 storage_options=options,
                 compressor=options.get("compressor"),
+                dimension_separator=group._store._dimension_separator,
             )
         else:
             group.create_dataset(str(path), data=data, chunks=chunks_opt, **options)
@@ -558,6 +559,7 @@ Please use the 'storage_options' argument instead."""
                 storage_options=options,
                 compute=False,
                 compressor=options.get("compressor"),
+                dimension_separator=group._store._dimension_separator,
             )
         )
         datasets.append({"path": str(path)})
