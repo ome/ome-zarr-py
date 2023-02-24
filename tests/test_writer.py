@@ -234,14 +234,14 @@ class TestWriter:
         arr_np[0, 0, 0, 0] = 1
         # 4MB chunks, trivially compressible
         arr = da.from_array(arr_np, chunks=(1, 50, 200, 400))
-        with TemporaryDirectory(suffix='.ome.zarr') as tempdir:
+        with TemporaryDirectory(suffix=".ome.zarr") as tempdir:
             path = tempdir
-            store = parse_url(path, mode='w').store
+            store = parse_url(path, mode="w").store
             root = zarr.group(store=store)
             # no compressor options, we are checking default
-            write_multiscale([arr], group=root, axes='tzyx')
+            write_multiscale([arr], group=root, axes="tzyx")
             # check chunk: multiscale level 0, 4D chunk at (0, 0, 0, 0)
-            chunk_size = (pathlib.Path(path) / '0/0/0/0/0').stat().st_size
+            chunk_size = (pathlib.Path(path) / "0/0/0/0/0").stat().st_size
             assert chunk_size < 4e6
 
     def test_validate_coordinate_transforms(self):
