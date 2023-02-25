@@ -250,7 +250,7 @@ Please use the 'storage_options' argument instead."""
                 url=group.store,
                 component=str(Path(group.path, str(path))),
                 storage_options=options,
-                compressor=options.get("compressor"),
+                compressor=options.get("compressor", zarr.storage.default_compressor),
                 dimension_separator=group._store._dimension_separator,
             )
         else:
@@ -558,7 +558,7 @@ Please use the 'storage_options' argument instead."""
                 component=str(Path(group.path, str(path))),
                 storage_options=options,
                 compute=False,
-                compressor=options.get("compressor"),
+                compressor=options.get("compressor", zarr.storage.default_compressor),
                 dimension_separator=group._store._dimension_separator,
             )
         )
