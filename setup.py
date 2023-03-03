@@ -13,6 +13,7 @@ def read(fname):
 
 
 install_requires: List[List[str]] = []
+install_requires += (["anndata"],)
 install_requires += (["dataclasses;python_version<'3.7'"],)
 install_requires += (["tifffile<2020.09.22;python_version<'3.7'"],)
 install_requires += (["numpy"],)

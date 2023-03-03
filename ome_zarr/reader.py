@@ -2,11 +2,17 @@
 
 import logging
 import math
+import os
 from abc import ABC
 from typing import Any, Dict, Iterator, List, Optional, Type, Union, cast, overload
 
 import dask.array as da
 import numpy as np
+
+# experimental failed to import
+# from anndata.experimental import read_dispatched, write_dispatched, read_elem
+from anndata import AnnData
+from anndata._io import read_zarr
 from dask import delayed
 
 from .axes import Axes
@@ -40,11 +46,14 @@ class Node:
         # Likely to be updated by specs
         self.metadata: JSONDict = dict()
         self.data: List[da.core.Array] = list()
+        self.tables: Dict[str, AnnData] = {}
         self.specs: List[Spec] = []
         self.pre_nodes: List[Node] = []
         self.post_nodes: List[Node] = []
 
         # TODO: this should be some form of plugin infra over subclasses
+        if Tables.matches(zarr):
+            self.specs.append(Tables(self))
         if Labels.matches(zarr):
             self.specs.append(Labels(self))
         if Label.matches(zarr):
@@ -176,6 +185,56 @@ class Spec(ABC):
 
     def lookup(self, key: str, default: Any) -> Any:
         return self.zarr.root_attrs.get(key, default)
+
+
+# From https://anndata.readthedocs.io/en/latest/tutorials/
+# notebooks/%7Bread,write%7D_dispatched.html
+
+# def read_dask(store, path):
+#     f = zarr.open(store, path=path, mode="r")
+
+#     def callback(func, elem_name: str, elem, iospec):
+#         print("callback", iospec.encoding_type)
+#         if iospec.encoding_type in (
+#             "dataframe",
+#             "csr_matrix",
+#             "csc_matrix",
+#             "awkward-array",
+#         ):
+#             # Preventing recursing inside of these types
+#             return read_elem(elem)
+#         elif iospec.encoding_type == "array":
+#             return da.from_zarr(elem)
+#         else:
+#             return func(elem)
+
+#     adata = read_dispatched(f, callback=callback)
+
+#     return adata
+
+
+class Tables(Spec):
+    """Class to represent a "tables" group which only
+    contains the name of subgroups which should be loaded as labeled images."""
+
+    @staticmethod
+    def matches(zarr: ZarrLocation) -> bool:
+        """Does the Zarr Image group also include a /tables sub-group?"""
+        return bool("tables" in zarr.root_attrs)
+
+    def __init__(self, node: Node) -> None:
+        super().__init__(node)
+        table_names = self.lookup("tables", [])
+        node.tables = {}
+        store = self.zarr.store
+        for name in table_names:
+            child_zarr = self.zarr.create(name)
+            if child_zarr.exists():
+                node.add(child_zarr)
+
+                # node.tables[name] = read_dask(store, name)
+                full_path = os.path.join(store.path, name)
+                node.tables[name] = read_zarr(full_path)
 
 
 class Labels(Spec):
@@ -321,6 +380,9 @@ class Multiscales(Spec):
         child_zarr = self.zarr.create("labels")
         if child_zarr.exists():
             node.add(child_zarr, visibility=False)
+        table_zarr = self.zarr.create("tables")
+        if table_zarr.exists():
+            node.add(table_zarr, visibility=False)
 
     def array(self, resolution: str, version: str) -> da.core.Array:
         # data.shape is (t, c, z, y, x) by convention
