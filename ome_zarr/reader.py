@@ -2,22 +2,17 @@
 
 import logging
 import math
-import os
 from abc import ABC
 from typing import Any, Dict, Iterator, List, Optional, Type, Union, cast, overload
 
 import dask.array as da
 import numpy as np
-
-# experimental failed to import
-# from anndata.experimental import read_dispatched, write_dispatched, read_elem
 from anndata import AnnData
-from anndata._io import read_zarr
 from dask import delayed
 
 from .axes import Axes
 from .format import format_from_version
-from .io import ZarrLocation
+from .io import ZarrLocation, read_remote_anndata
 from .types import JSONDict
 
 LOGGER = logging.getLogger("ome_zarr.reader")
@@ -187,32 +182,6 @@ class Spec(ABC):
         return self.zarr.root_attrs.get(key, default)
 
 
-# From https://anndata.readthedocs.io/en/latest/tutorials/
-# notebooks/%7Bread,write%7D_dispatched.html
-
-# def read_dask(store, path):
-#     f = zarr.open(store, path=path, mode="r")
-
-#     def callback(func, elem_name: str, elem, iospec):
-#         print("callback", iospec.encoding_type)
-#         if iospec.encoding_type in (
-#             "dataframe",
-#             "csr_matrix",
-#             "csc_matrix",
-#             "awkward-array",
-#         ):
-#             # Preventing recursing inside of these types
-#             return read_elem(elem)
-#         elif iospec.encoding_type == "array":
-#             return da.from_zarr(elem)
-#         else:
-#             return func(elem)
-
-#     adata = read_dispatched(f, callback=callback)
-
-#     return adata
-
-
 class Tables(Spec):
     """Class to represent a "tables" group which only
     contains the name of subgroups which should be loaded as labeled images."""
@@ -226,15 +195,13 @@ class Tables(Spec):
         super().__init__(node)
         table_names = self.lookup("tables", [])
         node.tables = {}
-        store = self.zarr.store
         for name in table_names:
             child_zarr = self.zarr.create(name)
             if child_zarr.exists():
                 node.add(child_zarr)
-
-                # node.tables[name] = read_dask(store, name)
-                full_path = os.path.join(store.path, name)
-                node.tables[name] = read_zarr(full_path)
+                LOGGER.info("Reading anndata table: %s", name)
+                anndata_obj = read_remote_anndata(node.zarr.store, name)
+                node.tables[name] = anndata_obj
 
 
 class Labels(Spec):

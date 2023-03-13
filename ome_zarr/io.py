@@ -6,15 +6,23 @@ Primary entry point is the :func:`~ome_zarr.io.parse_url` method.
 import json
 import logging
 from pathlib import Path
-from typing import List, Optional, Union
+from typing import Callable, List, Optional, Union
 from urllib.parse import urljoin
 
 import dask.array as da
+import zarr as zarrlib
+from anndata import AnnData
+from anndata._io.specs import IOSpec
+from anndata.compat import H5Array, H5Group, ZarrArray, ZarrGroup
+
+# ** requires anndata==0.9.0.rc1
+from anndata.experimental import read_dispatched, read_elem
 from zarr.storage import FSStore
 
 from .format import CurrentFormat, Format, detect_format
 from .types import JSONDict
 
+StorageType = Union[H5Array, H5Group, ZarrArray, ZarrGroup]
 LOGGER = logging.getLogger("ome_zarr.io")
 
 
@@ -194,3 +202,30 @@ def parse_url(
         LOGGER.exception("exception on parsing (stacktrace at DEBUG)")
         LOGGER.debug("stacktrace:", exc_info=True)
         return None
+
+
+# From https://anndata.readthedocs.io/en/latest/tutorials/
+# notebooks/%7Bread,write%7D_dispatched.html
+
+
+def read_remote_anndata(store: FSStore, name: str) -> AnnData:
+    table_group = zarrlib.group(store=store, path=name)
+
+    def callback(
+        func: Callable, elem_name: str, elem: StorageType, iospec: IOSpec
+    ) -> AnnData:
+        if iospec.encoding_type in (
+            "dataframe",
+            "csr_matrix",
+            "csc_matrix",
+            "awkward-array",
+        ):
+            # Preventing recursing inside of these types
+            return read_elem(elem)
+        elif iospec.encoding_type == "array":
+            return da.from_zarr(elem)
+        else:
+            return func(elem)
+
+    adata = read_dispatched(table_group, callback=callback)
+    return adata
