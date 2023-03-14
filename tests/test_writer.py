@@ -1,6 +1,7 @@
 import filecmp
 import pathlib
 from tempfile import TemporaryDirectory
+from typing import Any
 
 import dask.array as da
 import numpy as np
@@ -548,6 +549,27 @@ class TestMultiscalesMetadata:
         ]
         with pytest.raises(ValueError):
             write_multiscales_metadata(self.root, datasets, axes=axes)
+
+    @pytest.mark.parametrize(
+        "metadata",
+        [
+            {"channels": [{"color": "FF0000", "window": {"start": 0, "end": 255}}]},
+            {"channels": [{"color": "FF0000"}]},
+        ],
+    )
+    def test_omero_metadata(self, metadata: dict[str, Any]):
+        datasets = []
+        for level, transf in enumerate(TRANSFORMATIONS):
+            datasets.append({"path": str(level), "coordinateTransformations": transf})
+        if metadata["channels"][0].get("window") is None:
+            with pytest.raises(KeyError):
+                write_multiscales_metadata(
+                    self.root, datasets, axes="tczyx", metadata={"omero": metadata}
+                )
+        else:
+            write_multiscales_metadata(
+                self.root, datasets, axes="tczyx", metadata={"omero": metadata}
+            )
 
 
 class TestPlateMetadata:

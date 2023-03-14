@@ -4,7 +4,7 @@
 import logging
 import warnings
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
 
 import dask.array as da
 import numpy as np
@@ -310,6 +310,19 @@ def write_multiscales_metadata(
             axes = _get_valid_axes(axes=axes, fmt=fmt)
             if axes is not None:
                 ndim = len(axes)
+
+    if isinstance(metadata, dict) and "omero" in metadata["metadata"]:
+        if TYPE_CHECKING:
+            assert isinstance(metadata["metadata"], dict)
+        omero_metadata = metadata["metadata"].get("omero")
+        if omero_metadata is None:
+            raise KeyError("If `'omero'` is present, value cannot be `None`.")
+        for c in omero_metadata["channels"]:
+            if "color" not in c:
+                raise KeyError("`'color'` not found in `'channels'`.")
+            if "window" not in c:
+                raise KeyError("`'window'` not found in `'channels'`.")
+            group.attrs["omero"] = omero_metadata
 
     # note: we construct the multiscale metadata via dict(), rather than {}
     # to avoid duplication of protected keys like 'version' in **metadata
