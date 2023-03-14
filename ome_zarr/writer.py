@@ -4,7 +4,7 @@
 import logging
 import warnings
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import dask.array as da
 import numpy as np
@@ -311,9 +311,7 @@ def write_multiscales_metadata(
             if axes is not None:
                 ndim = len(axes)
 
-    if isinstance(metadata, dict) and "omero" in metadata["metadata"]:
-        if TYPE_CHECKING:
-            assert isinstance(metadata["metadata"], dict)
+    if isinstance(metadata["metadata"], dict) and "omero" in metadata["metadata"]:
         omero_metadata = metadata["metadata"].get("omero")
         if omero_metadata is None:
             raise KeyError("If `'omero'` is present, value cannot be `None`.")
