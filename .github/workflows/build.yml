@@ -50,7 +50,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - uses: actions/setup-python@v1
+      - uses: actions/setup-python@v4
         name: Install Python '3.7'
         with:
           python-version: '3.7'
