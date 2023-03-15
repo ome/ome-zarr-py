@@ -41,7 +41,7 @@ class Node:
         # Likely to be updated by specs
         self.metadata: JSONDict = dict()
         self.data: List[da.core.Array] = list()
-        self.tables: Dict[str, AnnData] = {}
+        self.table: AnnData = None
         self.specs: List[Spec] = []
         self.pre_nodes: List[Node] = []
         self.post_nodes: List[Node] = []
@@ -194,14 +194,16 @@ class Tables(Spec):
     def __init__(self, node: Node) -> None:
         super().__init__(node)
         table_names = self.lookup("tables", [])
-        node.tables = {}
         for name in table_names:
+            # child node for each table...
             child_zarr = self.zarr.create(name)
             if child_zarr.exists():
-                node.add(child_zarr)
-                LOGGER.info("Reading anndata table: %s", name)
-                anndata_obj = read_remote_anndata(node.zarr.store, name)
-                node.tables[name] = anndata_obj
+                table_node = node.add(child_zarr)
+                if table_node is not None:
+                    LOGGER.info("Reading anndata table: %s", name)
+                    anndata_obj = read_remote_anndata(node.zarr.store, name)
+                    table_node.table = anndata_obj
+                    table_node.metadata = child_zarr.root_attrs
 
 
 class Labels(Spec):
