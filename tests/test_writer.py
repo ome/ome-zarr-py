@@ -6,6 +6,8 @@ import dask.array as da
 import numpy as np
 import pytest
 import zarr
+from dask import persist
+from distributed import wait
 from numcodecs import Blosc
 
 from ome_zarr.format import CurrentFormat, FormatV01, FormatV02, FormatV03, FormatV04
@@ -146,7 +148,8 @@ class TestWriter:
                 assert value >= 1
 
     @pytest.mark.parametrize("read_from_zarr", [True, False])
-    def test_write_image_dask(self, read_from_zarr):
+    @pytest.mark.parametrize("compute", [True, False])
+    def test_write_image_dask(self, read_from_zarr, compute):
         # Size 100 tests resize shapes: https://github.com/ome/ome-zarr-py/issues/219
         shape = (128, 200, 200)
         data = self.create_data(shape)
@@ -167,12 +170,21 @@ class TestWriter:
                 .load(Multiscales)
                 .array(resolution="0", version=CurrentFormat().version)
             )
-        write_image(
+
+        dask_delayed_jobs = write_image(
             data_delayed,
             self.group,
             axes="zyx",
             storage_options={"chunks": chunks, "compressor": None},
+            compute=compute,
         )
+
+        if not len(dask_delayed_jobs):
+            # can be configured to use a Local or Slurm cluster
+            # before persisting the jobs
+            dask_delayed_jobs = persist(*dask_delayed_jobs)
+            wait(dask_delayed_jobs)
+
         reader = Reader(parse_url(f"{self.path}/test"))
         image_node = list(reader())[0]
         first_chunk = [c[0] for c in image_node.data[0].chunks]
