@@ -49,7 +49,7 @@ class TestWriter:
         params=(
             (1, 2, 1, 256, 256),
             (3, 512, 512),
-            (256, 256),
+            (300, 500),  # test edge chunks of different shapes
         ),
         ids=["5D", "3D", "2D"],
     )
