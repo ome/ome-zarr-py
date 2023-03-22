@@ -1,3 +1,9 @@
+# 0.6.2 (March 2023)
+
+- Use default compressor by default: thanks to Juan Nunez-Iglesias ([#253](https://github.com/ome/ome-zarr-py/pull/253))
+- Fix bug in dask resizing of edge chunks ([#244](https://github.com/ome/ome-zarr-py/pull/244))
+- Fix dimension separator used in dask array to_zarr: thanks to Luca Marconato ([#243](https://github.com/ome/ome-zarr-py/pull/243))
+
 # 0.6.1 (October 2022)
 
 - Fix pyramid dtype for scaler.local_mean ([#233](https://github.com/ome/ome-zarr-py/pull/233))
