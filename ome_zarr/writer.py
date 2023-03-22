@@ -590,6 +590,7 @@ Please use the 'storage_options' argument instead."""
     # Computing delayed jobs if necessary
     if compute:
         da.compute(*delayed)
+        delayed = []
 
     if coordinate_transformations is None:
         # shapes = [data.shape for data in delayed]

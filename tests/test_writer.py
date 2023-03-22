@@ -7,7 +7,6 @@ import numpy as np
 import pytest
 import zarr
 from dask import persist
-from distributed import wait
 from numcodecs import Blosc
 
 from ome_zarr.format import CurrentFormat, FormatV01, FormatV02, FormatV03, FormatV04
@@ -179,11 +178,12 @@ class TestWriter:
             compute=compute,
         )
 
+        assert not compute == len(dask_delayed_jobs)
+
         if not len(dask_delayed_jobs):
             # can be configured to use a Local or Slurm cluster
             # before persisting the jobs
             dask_delayed_jobs = persist(*dask_delayed_jobs)
-            wait(dask_delayed_jobs)
 
         reader = Reader(parse_url(f"{self.path}/test"))
         image_node = list(reader())[0]
