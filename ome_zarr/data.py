@@ -170,7 +170,6 @@ def create_zarr(
     grp.attrs["omero"] = image_data
 
     if labels:
-
         labels_grp = grp.create_group("labels")
         labels_grp.attrs["labels"] = [label_name]
 

@@ -64,7 +64,6 @@ def _get_valid_axes(
 def _validate_well_images(
     images: List[Union[str, dict]], fmt: Format = CurrentFormat()
 ) -> List[dict]:
-
     VALID_KEYS = [
         "acquisition",
         "path",
@@ -91,7 +90,6 @@ def _validate_well_images(
 def _validate_plate_acquisitions(
     acquisitions: List[Dict], fmt: Format = CurrentFormat()
 ) -> List[Dict]:
-
     VALID_KEYS = [
         "id",
         "name",
@@ -117,7 +115,6 @@ def _validate_plate_rows_columns(
     rows_or_columns: List[str],
     fmt: Format = CurrentFormat(),
 ) -> List[dict]:
-
     if len(set(rows_or_columns)) != len(rows_or_columns):
         raise ValueError(f"{rows_or_columns} must contain unique elements")
     validated_list = []
@@ -131,7 +128,6 @@ def _validate_plate_rows_columns(
 def _validate_datasets(
     datasets: List[dict], dims: int, fmt: Format = CurrentFormat()
 ) -> List[Dict]:
-
     if datasets is None or len(datasets) == 0:
         raise ValueError("Empty datasets list")
     transformations = []
@@ -156,7 +152,6 @@ def _validate_plate_wells(
     columns: List[str],
     fmt: Format = CurrentFormat(),
 ) -> List[dict]:
-
     validated_wells = []
     if wells is None or len(wells) == 0:
         raise ValueError("Empty wells list")
@@ -505,7 +500,6 @@ def _write_dask_image(
     name: str = None,
     **metadata: Union[str, JSONDict, List[JSONDict]],
 ) -> None:
-
     if fmt.version in ("0.1", "0.2"):
         # v0.1 and v0.2 are strictly 5D
         shape_5d: Tuple[Any, ...] = (*(1,) * (5 - image.ndim), *image.shape)

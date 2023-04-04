@@ -628,7 +628,6 @@ class Reader:
     def __call__(self) -> Iterator[Node]:
         node = Node(self.zarr, self)
         if node.specs:  # Something has matched
-
             LOGGER.debug("treating %s as ome-zarr", self.zarr)
             yield from self.descend(node)
 
@@ -646,7 +645,6 @@ class Reader:
             # yield nothing
 
     def descend(self, node: Node, depth: int = 0) -> Iterator[Node]:
-
         for pre_node in node.pre_nodes:
             yield from self.descend(pre_node, depth + 1)
 
