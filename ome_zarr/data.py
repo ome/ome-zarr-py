@@ -104,7 +104,7 @@ def create_zarr(
     label_name: str = "coins",
     fmt: Format = CurrentFormat(),
     chunks: Optional[Union[Tuple, List]] = None,
-) -> None:
+) -> zarr.Group:
     """Generate a synthetic image pyramid with labels."""
     pyramid, labels = method()
 
@@ -191,3 +191,5 @@ def create_zarr(
             "properties": properties,
             "source": {"image": "../../"},
         }
+
+    return grp

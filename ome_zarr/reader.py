@@ -277,28 +277,24 @@ class Multiscales(Spec):
     def __init__(self, node: Node) -> None:
         super().__init__(node)
 
-        try:
-            multiscales = self.lookup("multiscales", [])
-            version = multiscales[0].get(
-                "version", "0.1"
-            )  # should this be matched with Format.version?
-            datasets = multiscales[0]["datasets"]
-            axes = multiscales[0].get("axes")
-            fmt = format_from_version(version)
-            # Raises ValueError if not valid
-            axes_obj = Axes(axes, fmt)
-            node.metadata["axes"] = axes_obj.to_list()
-            # This will get overwritten by 'omero' metadata if present
-            node.metadata["name"] = multiscales[0].get("name")
-            paths = [d["path"] for d in datasets]
-            self.datasets: List[str] = paths
-            transformations = [d.get("coordinateTransformations") for d in datasets]
-            if any(trans is not None for trans in transformations):
-                node.metadata["coordinateTransformations"] = transformations
-            LOGGER.info("datasets %s", datasets)
-        except Exception:
-            LOGGER.exception("Failed to parse multiscale metadata")
-            return  # EARLY EXIT
+        multiscales = self.lookup("multiscales", [])
+        version = multiscales[0].get(
+            "version", "0.1"
+        )  # should this be matched with Format.version?
+        datasets = multiscales[0]["datasets"]
+        axes = multiscales[0].get("axes")
+        fmt = format_from_version(version)
+        # Raises ValueError if not valid
+        axes_obj = Axes(axes, fmt)
+        node.metadata["axes"] = axes_obj.to_list()
+        # This will get overwritten by 'omero' metadata if present
+        node.metadata["name"] = multiscales[0].get("name")
+        paths = [d["path"] for d in datasets]
+        self.datasets: List[str] = paths
+        transformations = [d.get("coordinateTransformations") for d in datasets]
+        if any(trans is not None for trans in transformations):
+            node.metadata["coordinateTransformations"] = transformations
+        LOGGER.info("datasets %s", datasets)
 
         for resolution in self.datasets:
             data: da.core.Array = self.array(resolution, version)

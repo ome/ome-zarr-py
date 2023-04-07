@@ -33,6 +33,24 @@ class TestReader:
         assert len(list(reader())) == 3
 
 
+class TestInvalid:
+    @pytest.fixture(autouse=True)
+    def initdir(self, tmpdir):
+        self.path = tmpdir.mkdir("data")
+
+    def test_invalid_version(self):
+        grp = create_zarr(str(self.path))
+        # update version to something invalid
+        attrs = grp.attrs.asdict()
+        attrs["multiscales"][0]["version"] = "invalid"
+        grp.attrs.put(attrs)
+        # should raise exception
+        with pytest.raises(ValueError) as exe:
+            reader = Reader(parse_url(str(self.path)))
+            assert len(list(reader())) == 2
+        assert str(exe.value) == "Version invalid not recognized"
+
+
 class TestHCSReader:
     @pytest.fixture(autouse=True)
     def initdir(self, tmpdir):
