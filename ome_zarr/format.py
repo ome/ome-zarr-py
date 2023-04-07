@@ -108,7 +108,7 @@ class Format(ABC):
         self,
         ndim: int,
         nlevels: int,
-        coordinate_transformations: List[List[Dict[str, Any]]] = None,
+        coordinate_transformations: Optional[List[List[Dict[str, Any]]]] = None,
     ) -> Optional[List[List[Dict[str, Any]]]]:  # pragma: no cover
         raise NotImplementedError()
 
@@ -161,7 +161,7 @@ class FormatV01(Format):
         self,
         ndim: int,
         nlevels: int,
-        coordinate_transformations: List[List[Dict[str, Any]]] = None,
+        coordinate_transformations: Optional[List[List[Dict[str, Any]]]] = None,
     ) -> None:
         return None
 
@@ -270,7 +270,7 @@ class FormatV04(FormatV03):
         self,
         ndim: int,
         nlevels: int,
-        coordinate_transformations: List[List[Dict[str, Any]]] = None,
+        coordinate_transformations: Optional[List[List[Dict[str, Any]]]] = None,
     ) -> None:
         """
         Validates that a list of dicts contains a 'scale' transformation

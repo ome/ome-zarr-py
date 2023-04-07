@@ -22,8 +22,8 @@ ArrayLike = Union[da.Array, np.ndarray]
 
 
 def _get_valid_axes(
-    ndim: int = None,
-    axes: Union[str, List[str], List[Dict[str, str]]] = None,
+    ndim: Optional[int] = None,
+    axes: Optional[Union[str, List[str], List[Dict[str, str]]]] = None,
     fmt: Format = CurrentFormat(),
 ) -> Union[None, List[str], List[Dict[str, str]]]:
     """Returns list of axes valid for fmt.version or raise exception if invalid"""
@@ -171,12 +171,12 @@ def _validate_plate_wells(
 def write_multiscale(
     pyramid: ListOfArrayLike,
     group: zarr.Group,
-    chunks: Union[Tuple[Any, ...], int] = None,
+    chunks: Optional[Union[Tuple[Any, ...], int]] = None,
     fmt: Format = CurrentFormat(),
-    axes: Union[str, List[str], List[Dict[str, str]]] = None,
-    coordinate_transformations: List[List[Dict[str, Any]]] = None,
-    storage_options: Union[JSONDict, List[JSONDict]] = None,
-    name: str = None,
+    axes: Optional[Union[str, List[str], List[Dict[str, str]]]] = None,
+    coordinate_transformations: Optional[List[List[Dict[str, Any]]]] = None,
+    storage_options: Optional[Union[JSONDict, List[JSONDict]]] = None,
+    name: Optional[str] = None,
     **metadata: Union[str, JSONDict, List[JSONDict]],
 ) -> None:
     """
@@ -272,8 +272,8 @@ def write_multiscales_metadata(
     group: zarr.Group,
     datasets: List[dict],
     fmt: Format = CurrentFormat(),
-    axes: Union[str, List[str], List[Dict[str, str]]] = None,
-    name: str = None,
+    axes: Optional[Union[str, List[str], List[Dict[str, str]]]] = None,
+    name: Optional[str] = None,
     **metadata: Union[str, JSONDict, List[JSONDict]],
 ) -> None:
     """
@@ -329,9 +329,9 @@ def write_plate_metadata(
     columns: List[str],
     wells: List[Union[str, dict]],
     fmt: Format = CurrentFormat(),
-    acquisitions: List[dict] = None,
-    field_count: int = None,
-    name: str = None,
+    acquisitions: Optional[List[dict]] = None,
+    field_count: Optional[int] = None,
+    name: Optional[str] = None,
 ) -> None:
     """
     Write the plate metadata in the group.
@@ -400,11 +400,11 @@ def write_image(
     image: ArrayLike,
     group: zarr.Group,
     scaler: Scaler = Scaler(),
-    chunks: Union[Tuple[Any, ...], int] = None,
+    chunks: Optional[Union[Tuple[Any, ...], int]] = None,
     fmt: Format = CurrentFormat(),
-    axes: Union[str, List[str], List[Dict[str, str]]] = None,
-    coordinate_transformations: List[List[Dict[str, Any]]] = None,
-    storage_options: Union[JSONDict, List[JSONDict]] = None,
+    axes: Optional[Union[str, List[str], List[Dict[str, str]]]] = None,
+    coordinate_transformations: Optional[List[List[Dict[str, Any]]]] = None,
+    storage_options: Optional[Union[JSONDict, List[JSONDict]]] = None,
     **metadata: Union[str, JSONDict, List[JSONDict]],
 ) -> None:
     """Writes an image to the zarr store according to ome-zarr specification
@@ -492,12 +492,12 @@ def _write_dask_image(
     image: da.Array,
     group: zarr.Group,
     scaler: Scaler = Scaler(),
-    chunks: Union[Tuple[Any, ...], int] = None,
+    chunks: Optional[Union[Tuple[Any, ...], int]] = None,
     fmt: Format = CurrentFormat(),
-    axes: Union[str, List[str], List[Dict[str, str]]] = None,
-    coordinate_transformations: List[List[Dict[str, Any]]] = None,
-    storage_options: Union[JSONDict, List[JSONDict]] = None,
-    name: str = None,
+    axes: Optional[Union[str, List[str], List[Dict[str, str]]]] = None,
+    coordinate_transformations: Optional[List[List[Dict[str, Any]]]] = None,
+    storage_options: Optional[Union[JSONDict, List[JSONDict]]] = None,
+    name: Optional[str] = None,
     **metadata: Union[str, JSONDict, List[JSONDict]],
 ) -> None:
     if fmt.version in ("0.1", "0.2"):
@@ -578,8 +578,8 @@ Please use the 'storage_options' argument instead."""
 def write_label_metadata(
     group: zarr.Group,
     name: str,
-    colors: List[JSONDict] = None,
-    properties: List[JSONDict] = None,
+    colors: Optional[List[JSONDict]] = None,
+    properties: Optional[List[JSONDict]] = None,
     fmt: Format = CurrentFormat(),
     **metadata: Union[List[JSONDict], JSONDict, str],
 ) -> None:
@@ -627,12 +627,12 @@ def write_multiscale_labels(
     pyramid: List,
     group: zarr.Group,
     name: str,
-    chunks: Union[Tuple[Any, ...], int] = None,
+    chunks: Optional[Union[Tuple[Any, ...], int]] = None,
     fmt: Format = CurrentFormat(),
-    axes: Union[str, List[str], List[Dict[str, str]]] = None,
-    coordinate_transformations: List[List[Dict[str, Any]]] = None,
-    storage_options: Union[JSONDict, List[JSONDict]] = None,
-    label_metadata: JSONDict = None,
+    axes: Optional[Union[str, List[str], List[Dict[str, str]]]] = None,
+    coordinate_transformations: Optional[List[List[Dict[str, Any]]]] = None,
+    storage_options: Optional[Union[JSONDict, List[JSONDict]]] = None,
+    label_metadata: Optional[JSONDict] = None,
     **metadata: JSONDict,
 ) -> None:
     """
@@ -704,12 +704,12 @@ def write_labels(
     group: zarr.Group,
     name: str,
     scaler: Scaler = Scaler(),
-    chunks: Union[Tuple[Any, ...], int] = None,
+    chunks: Optional[Union[Tuple[Any, ...], int]] = None,
     fmt: Format = CurrentFormat(),
-    axes: Union[str, List[str], List[Dict[str, str]]] = None,
-    coordinate_transformations: List[List[Dict[str, Any]]] = None,
-    storage_options: Union[JSONDict, List[JSONDict]] = None,
-    label_metadata: JSONDict = None,
+    axes: Optional[Union[str, List[str], List[Dict[str, str]]]] = None,
+    coordinate_transformations: Optional[List[List[Dict[str, Any]]]] = None,
+    storage_options: Optional[Union[JSONDict, List[JSONDict]]] = None,
+    label_metadata: Optional[JSONDict] = None,
     **metadata: JSONDict,
 ) -> None:
     """

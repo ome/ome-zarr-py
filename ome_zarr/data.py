@@ -1,6 +1,6 @@
 """Functions for generating synthetic data."""
 from random import randrange
-from typing import Callable, List, Tuple, Union
+from typing import Callable, List, Optional, Tuple, Union
 
 import numpy as np
 import zarr
@@ -103,7 +103,7 @@ def create_zarr(
     method: Callable[..., Tuple[List, List]] = coins,
     label_name: str = "coins",
     fmt: Format = CurrentFormat(),
-    chunks: Union[Tuple, List] = None,
+    chunks: Optional[Union[Tuple, List]] = None,
 ) -> None:
     """Generate a synthetic image pyramid with labels."""
     pyramid, labels = method()
