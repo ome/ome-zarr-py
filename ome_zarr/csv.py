@@ -126,7 +126,6 @@ def dict_to_zarr(
         labels_paths.append(os.path.join(zarr_path, "labels", "0"))
 
     for path_to_labels in labels_paths:
-
         label_group = zarr_open(path_to_labels)
         attrs = label_group.attrs.asdict()
         properties = attrs.get("image-label", {}).get("properties")

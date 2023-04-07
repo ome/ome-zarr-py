@@ -30,7 +30,6 @@ class ZarrLocation:
     def __init__(
         self, path: Union[Path, str], mode: str = "r", fmt: Format = CurrentFormat()
     ) -> None:
-
         LOGGER.debug("ZarrLocation.__init__ path: %s, fmt: %s", path, fmt.version)
         self.__fmt = fmt
         self.__mode = mode
