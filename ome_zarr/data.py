@@ -1,6 +1,6 @@
 """Functions for generating synthetic data."""
 from random import randrange
-from typing import Callable, List, Tuple, Union
+from typing import Callable, List, Optional, Tuple, Union
 
 import numpy as np
 import zarr
@@ -103,8 +103,8 @@ def create_zarr(
     method: Callable[..., Tuple[List, List]] = coins,
     label_name: str = "coins",
     fmt: Format = CurrentFormat(),
-    chunks: Union[Tuple, List] = None,
-) -> None:
+    chunks: Optional[Union[Tuple, List]] = None,
+) -> zarr.Group:
     """Generate a synthetic image pyramid with labels."""
     pyramid, labels = method()
 
@@ -170,7 +170,6 @@ def create_zarr(
     grp.attrs["omero"] = image_data
 
     if labels:
-
         labels_grp = grp.create_group("labels")
         labels_grp.attrs["labels"] = [label_name]
 
@@ -192,3 +191,5 @@ def create_zarr(
             "properties": properties,
             "source": {"image": "../../"},
         }
+
+    return grp

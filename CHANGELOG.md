@@ -1,3 +1,24 @@
+# 0.6.1 (October 2022)
+
+- Fix pyramid dtype for scaler.local_mean ([#233](https://github.com/ome/ome-zarr-py/pull/233))
+# 0.6.0 (September 2022)
+
+- Add support for writing `dask` arrays. Thanks to [Daniel Toloudis](https://github.com/toloudis), with code contributions from [Andreas Eisenbarth](https://github.com/aeisenbarth) ([#192](https://github.com/ome/ome-zarr-py/pull/192))
+- Fix a bug in using `storage_options` with `write_images`, thanks to [Marc Claesen](https://github.com/claesenm) ([#221](https://github.com/ome/ome-zarr-py/pull/221))
+- Use multiscales name for node metadata ([#214](https://github.com/ome/ome-zarr-py/pull/214))
+
+# 0.5.2 (July 2022)
+
+- Disable auto_mkdir when path begins with s3, thanks to @colobas ([#212](https://github.com/ome/ome-zarr-py/pull/212))
+
+# 0.5.1 (June 2022)
+
+- Read multi-resolution pyramids in `ome_zarr.reader.Well`, thanks to @tcompa ([#209](https://github.com/ome/ome-zarr-py/pull/209))
+
+# 0.5.0 (June 2022)
+
+- Add `fmt` option to `write_label_metadata` and store version ([#206](https://github.com/ome/ome-zarr-py/pull/206))
+
 # 0.4.2 (May 2022)
 
 - Relax version detection ([#189](https://github.com/ome/ome-zarr-py/pull/189))

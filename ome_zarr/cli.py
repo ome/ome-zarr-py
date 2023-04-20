@@ -73,7 +73,7 @@ def csv_to_labels(args: argparse.Namespace) -> None:
     csv_to_zarr(args.csv_path, args.csv_id, args.csv_keys, args.zarr_path, args.zarr_id)
 
 
-def main(args: List[str] = None) -> None:
+def main(args: List[str]) -> None:
     """Run appropriate function with argparse arguments, handling errors."""
     parser = argparse.ArgumentParser()
     parser.add_argument(

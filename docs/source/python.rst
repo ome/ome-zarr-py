@@ -5,7 +5,7 @@ Writing OME-NGFF images
 -----------------------
 
 The principle entry-point for writing OME-NGFF images is :py:func:`ome_zarr.writer.write_image`.
-This takes an n-dimensional `numpy` array and writes it to the specified `zarr group` according
+This takes an n-dimensional `numpy` array or `dask` array and writes it to the specified `zarr group` according
 to the OME-NGFF specification.
 By default, a pyramid of resolution levels will be created by down-sampling the data by a factor
 of 2 in the X and Y dimensions.
@@ -23,7 +23,7 @@ The following code creates a 3D Image in OME-Zarr with labels::
     from ome_zarr.io import parse_url
     from ome_zarr.writer import write_image
 
-    path = "test_ngff_image"
+    path = "test_ngff_image.zarr"
     os.mkdir(path)
 
     mean_val=10
@@ -77,4 +77,35 @@ The following code creates a 3D Image in OME-Zarr with labels::
 This image can be viewed in `napari` using the
 `napari-ome-zarr <https://github.com/ome/napari-ome-zarr>`_ plugin::
 
-    $ napari test_ngff_image
+    $ napari test_ngff_image.zarr
+
+
+Reading OME-NGFF images
+-----------------------
+
+This sample code reads an image stored on remote s3 server, but the same
+code can be used to read data on a local file system. In either case,
+the data is available as `dask` arrays::
+
+    from ome_zarr.io import parse_url
+    from ome_zarr.reader import Reader
+    import napari
+
+    url = "https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.4/idr0062A/6001240.zarr"
+
+    # read the image data
+    store = parse_url(url, mode="r").store
+
+    reader = Reader(parse_url(url))
+    # nodes may include images, labels etc
+    nodes = list(reader())
+    # first node will be the image pixel data
+    image_node = nodes[0]
+
+    dask_data = image_node.data
+
+    # We can view this in napari
+    # NB: image axes are CZYX: split channels by C axis=0
+    viewer = napari.view_image(dask_data, channel_axis=0)
+    if __name__ == '__main__':
+        napari.run()

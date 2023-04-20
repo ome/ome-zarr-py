@@ -1,18 +1,23 @@
+import filecmp
 import pathlib
+from tempfile import TemporaryDirectory
 
+import dask.array as da
 import numpy as np
 import pytest
 import zarr
 from numcodecs import Blosc
 
 from ome_zarr.format import CurrentFormat, FormatV01, FormatV02, FormatV03, FormatV04
-from ome_zarr.io import parse_url
+from ome_zarr.io import ZarrLocation, parse_url
 from ome_zarr.reader import Multiscales, Reader
 from ome_zarr.scale import Scaler
 from ome_zarr.writer import (
     _get_valid_axes,
+    _retuple,
     write_image,
     write_labels,
+    write_multiscale,
     write_multiscale_labels,
     write_multiscales_metadata,
     write_plate_metadata,
@@ -44,7 +49,7 @@ class TestWriter:
         params=(
             (1, 2, 1, 256, 256),
             (3, 512, 512),
-            (256, 256),
+            (300, 500),  # test edge chunks of different shapes
         ),
         ids=["5D", "3D", "2D"],
     )
@@ -67,9 +72,13 @@ class TestWriter:
             pytest.param(FormatV04, id="V04"),
         ),
     )
-    def test_writer(self, shape, scaler, format_version):
-
+    @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])
+    @pytest.mark.parametrize("storage_options_list", [True, False])
+    def test_writer(
+        self, shape, scaler, format_version, array_constructor, storage_options_list
+    ):
         data = self.create_data(shape)
+        data = array_constructor(data)
         version = format_version()
         axes = "tczyx"[-len(shape) :]
         transformations = []
@@ -81,6 +90,10 @@ class TestWriter:
             )
         if scaler is None:
             transformations = [transformations[0]]
+        chunks = [(128, 128), (50, 50), (25, 25), (25, 25), (25, 25), (25, 25)]
+        storage_options = {"chunks": chunks[0]}
+        if storage_options_list:
+            storage_options = [{"chunks": chunk} for chunk in chunks]
         write_image(
             image=data,
             group=self.group,
@@ -88,7 +101,7 @@ class TestWriter:
             fmt=version,
             axes=axes,
             coordinate_transformations=transformations,
-            storage_options=dict(chunks=(128, 128)),
+            storage_options=storage_options,
         )
 
         # Verify
@@ -107,11 +120,18 @@ class TestWriter:
             ):
                 assert transf == expected
             assert len(node.metadata["coordinateTransformations"]) == len(node.data)
+        # check chunks for first 2 resolutions (before shape gets smaller than chunk)
+        for level, nd_array in enumerate(node.data[:2]):
+            expected = chunks[level] if storage_options_list else chunks[0]
+            first_chunk = [c[0] for c in nd_array.chunks]
+            assert tuple(first_chunk) == _retuple(expected, nd_array.shape)
         assert np.allclose(data, node.data[0][...].compute())
 
-    def test_write_image_current(self):
+    @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])
+    def test_write_image_current(self, array_constructor):
         shape = (64, 64, 64)
         data = self.create_data(shape)
+        data = array_constructor(data)
         write_image(data, self.group, axes="zyx")
         reader = Reader(parse_url(f"{self.path}/test"))
         image_node = list(reader())[0]
@@ -124,9 +144,70 @@ class TestWriter:
             for value in transfs[0]["scale"]:
                 assert value >= 1
 
-    def test_write_image_compressed(self):
+    @pytest.mark.parametrize("read_from_zarr", [True, False])
+    def test_write_image_dask(self, read_from_zarr):
+        # Size 100 tests resize shapes: https://github.com/ome/ome-zarr-py/issues/219
+        shape = (128, 200, 200)
+        data = self.create_data(shape)
+        data_delayed = da.from_array(data)
+        chunks = (32, 32)
+        opts = {"chunks": chunks, "compressor": None}
+        if read_from_zarr:
+            # write to zarr and re-read as dask...
+            path = f"{self.path}/temp/"
+            store = parse_url(path, mode="w").store
+            temp_group = zarr.group(store=store).create_group("test")
+            write_image(data, temp_group, axes="zyx", storage_options=opts)
+            loc = ZarrLocation(f"{self.path}/temp/test")
+            reader = Reader(loc)()
+            nodes = list(reader)
+            data_delayed = (
+                nodes[0]
+                .load(Multiscales)
+                .array(resolution="0", version=CurrentFormat().version)
+            )
+        write_image(
+            data_delayed,
+            self.group,
+            axes="zyx",
+            storage_options={"chunks": chunks, "compressor": None},
+        )
+        reader = Reader(parse_url(f"{self.path}/test"))
+        image_node = list(reader())[0]
+        first_chunk = [c[0] for c in image_node.data[0].chunks]
+        assert tuple(first_chunk) == _retuple(chunks, image_node.data[0].shape)
+        for level, transfs in enumerate(
+            image_node.metadata["coordinateTransformations"]
+        ):
+            assert len(transfs) == 1
+            assert transfs[0]["type"] == "scale"
+            assert len(transfs[0]["scale"]) == len(shape)
+            # Scaler only downsamples x and y. z scale will be 1
+            assert transfs[0]["scale"][0] == 1
+            for value in transfs[0]["scale"]:
+                assert value >= 1
+            if read_from_zarr and level < 3:
+                # if shape smaller than chunk, dask writer uses chunk == shape
+                # so we only compare larger resolutions
+                assert filecmp.cmp(
+                    f"{self.path}/temp/test/{level}/.zarray",
+                    f"{self.path}/test/{level}/.zarray",
+                    shallow=False,
+                )
+
+        if read_from_zarr:
+            # .zattrs should be the same
+            assert filecmp.cmp(
+                f"{self.path}/temp/test/.zattrs",
+                f"{self.path}/test/.zattrs",
+                shallow=False,
+            )
+
+    @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])
+    def test_write_image_compressed(self, array_constructor):
         shape = (64, 64, 64)
         data = self.create_data(shape)
+        data = array_constructor(data)
         compressor = Blosc(cname="zstd", clevel=5, shuffle=Blosc.SHUFFLE)
         write_image(
             data, self.group, axes="zyx", storage_options={"compressor": compressor}
@@ -140,8 +221,29 @@ class TestWriter:
             "blocksize": 0,
         }
 
-    def test_validate_coordinate_transforms(self):
+    def test_default_compression(self):
+        """Test that the default compression is not None.
 
+        We make an array of zeros which should compress trivially easily,
+        write out the chunks, and check that they are smaller than the raw
+        data.
+        """
+        arr_np = np.zeros((2, 50, 200, 400), dtype=np.uint8)
+        # avoid empty chunks so they are guaranteed to be written out to disk
+        arr_np[0, 0, 0, 0] = 1
+        # 4MB chunks, trivially compressible
+        arr = da.from_array(arr_np, chunks=(1, 50, 200, 400))
+        with TemporaryDirectory(suffix=".ome.zarr") as tempdir:
+            path = tempdir
+            store = parse_url(path, mode="w").store
+            root = zarr.group(store=store)
+            # no compressor options, we are checking default
+            write_multiscale([arr], group=root, axes="tzyx")
+            # check chunk: multiscale level 0, 4D chunk at (0, 0, 0, 0)
+            chunk_size = (pathlib.Path(path) / "0/0/0/0/0").stat().st_size
+            assert chunk_size < 4e6
+
+    def test_validate_coordinate_transforms(self):
         fmt = FormatV04()
 
         transformations = [
@@ -183,7 +285,6 @@ class TestWriter:
             fmt.validate_coordinate_transformations(2, 2, scale_then_trans2)
 
     def test_dim_names(self):
-
         v03 = FormatV03()
 
         # v0.3 MUST specify axes for 3D or 4D data
@@ -231,7 +332,6 @@ class TestWriter:
             )
 
     def test_axes_dicts(self):
-
         v04 = FormatV04()
 
         # ALL axes must specify 'name'
@@ -834,14 +934,14 @@ class TestLabelWriter:
         self.store = parse_url(self.path, mode="w").store
         self.root = zarr.group(store=self.store)
 
-    def create_image_data(self, shape, scaler, version, axes, transformations):
+    def create_image_data(self, shape, scaler, fmt, axes, transformations):
         rng = np.random.default_rng(0)
         data = rng.poisson(10, size=shape).astype(np.uint8)
         write_image(
             image=data,
             group=self.root,
             scaler=scaler,
-            fmt=version,
+            fmt=fmt,
             axes=axes,
             coordinate_transformations=transformations,
             storage_options=dict(chunks=(128, 128)),
@@ -865,20 +965,18 @@ class TestLabelWriter:
         else:
             return None
 
-    def verify_label_data(
-        self, label_name, label_data, version, shape, transformations
-    ):
+    def verify_label_data(self, label_name, label_data, fmt, shape, transformations):
         # Verify image data
         reader = Reader(parse_url(f"{self.path}/labels/{label_name}"))
         node = list(reader())[0]
         assert Multiscales.matches(node.zarr)
-        if version.version in ("0.1", "0.2"):
+        if fmt.version in ("0.1", "0.2"):
             # v0.1 and v0.2 MUST be 5D
             assert node.data[0].ndim == 5
         else:
             assert node.data[0].shape == shape
 
-        if version.version not in ("0.1", "0.2", "0.3"):
+        if fmt.version not in ("0.1", "0.2", "0.3"):
             for transf, expected in zip(
                 node.metadata["coordinateTransformations"], transformations
             ):
@@ -893,6 +991,7 @@ class TestLabelWriter:
 
         label_group = zarr.open(f"{self.path}/labels/{label_name}", "r")
         assert "image-label" in label_group.attrs
+        assert label_group.attrs["image-label"]["version"] == fmt.version
 
         # Verify multiscale metadata
         name = label_group.attrs["multiscales"][0].get("name", "")
@@ -907,8 +1006,9 @@ class TestLabelWriter:
             pytest.param(FormatV04, id="V04"),
         ),
     )
-    def test_write_labels(self, shape, scaler, format_version):
-        version = format_version()
+    @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])
+    def test_write_labels(self, shape, scaler, format_version, array_constructor):
+        fmt = format_version()
         axes = "tczyx"[-len(shape) :]
         transformations = []
         for dataset_transfs in TRANSFORMATIONS:
@@ -922,26 +1022,27 @@ class TestLabelWriter:
 
         # create the actual label data
         label_data = np.random.randint(0, 1000, size=shape)
-        if version.version in ("0.1", "0.2"):
+        if fmt.version in ("0.1", "0.2"):
             # v0.1 and v0.2 require 5d
             expand_dims = (np.s_[None],) * (5 - len(shape))
             label_data = label_data[expand_dims]
             assert label_data.ndim == 5
         label_name = "my-labels"
+        label_data = array_constructor(label_data)
 
         # create the root level image data
-        self.create_image_data(shape, scaler, version, axes, transformations)
+        self.create_image_data(shape, scaler, fmt, axes, transformations)
 
         write_labels(
             label_data,
             self.root,
             scaler=scaler,
             name=label_name,
-            fmt=version,
+            fmt=fmt,
             axes=axes,
             coordinate_transformations=transformations,
         )
-        self.verify_label_data(label_name, label_data, version, shape, transformations)
+        self.verify_label_data(label_name, label_data, fmt, shape, transformations)
 
     @pytest.mark.parametrize(
         "format_version",
@@ -952,8 +1053,11 @@ class TestLabelWriter:
             pytest.param(FormatV04, id="V04"),
         ),
     )
-    def test_write_multiscale_labels(self, shape, scaler, format_version):
-        version = format_version()
+    @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])
+    def test_write_multiscale_labels(
+        self, shape, scaler, format_version, array_constructor
+    ):
+        fmt = format_version()
         axes = "tczyx"[-len(shape) :]
         transformations = []
         for dataset_transfs in TRANSFORMATIONS:
@@ -965,11 +1069,13 @@ class TestLabelWriter:
 
         # create the actual label data
         label_data = np.random.randint(0, 1000, size=shape)
-        if version.version in ("0.1", "0.2"):
+        if fmt.version in ("0.1", "0.2"):
             # v0.1 and v0.2 require 5d
             expand_dims = (np.s_[None],) * (5 - len(shape))
             label_data = label_data[expand_dims]
             assert label_data.ndim == 5
+        label_data = array_constructor(label_data)
+
         label_name = "my-labels"
         if scaler is None:
             transformations = [transformations[0]]
@@ -978,19 +1084,20 @@ class TestLabelWriter:
             labels_mip = scaler.nearest(label_data)
 
         # create the root level image data
-        self.create_image_data(shape, scaler, version, axes, transformations)
+        self.create_image_data(shape, scaler, fmt, axes, transformations)
 
         write_multiscale_labels(
             labels_mip,
             self.root,
             name=label_name,
-            fmt=version,
+            fmt=fmt,
             axes=axes,
             coordinate_transformations=transformations,
         )
-        self.verify_label_data(label_name, label_data, version, shape, transformations)
+        self.verify_label_data(label_name, label_data, fmt, shape, transformations)
 
-    def test_two_label_images(self):
+    @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])
+    def test_two_label_images(self, array_constructor):
         axes = "tczyx"
         transformations = []
         for dataset_transfs in TRANSFORMATIONS:
@@ -1000,18 +1107,19 @@ class TestLabelWriter:
         # create the root level image data
         shape = (1, 2, 1, 256, 256)
         scaler = Scaler()
-        version = FormatV04()
+        fmt = FormatV04()
         self.create_image_data(
             shape,
             scaler,
             axes=axes,
-            version=version,
+            fmt=fmt,
             transformations=transformations,
         )
 
         label_names = ("first_labels", "second_labels")
         for label_name in label_names:
             label_data = np.random.randint(0, 1000, size=shape)
+            label_data = array_constructor(label_data)
             labels_mip = scaler.nearest(label_data)
 
             write_multiscale_labels(
@@ -1021,9 +1129,7 @@ class TestLabelWriter:
                 axes=axes,
                 coordinate_transformations=transformations,
             )
-            self.verify_label_data(
-                label_name, label_data, version, shape, transformations
-            )
+            self.verify_label_data(label_name, label_data, fmt, shape, transformations)
 
         # Verify label metadata
         label_root = zarr.open(f"{self.path}/labels", "r")
