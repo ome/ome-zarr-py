@@ -1,4 +1,5 @@
 [codespell]
 skip = .git,*.pdf,*.svg
-# 
-# ignore-words-list = 
+# nd - for N-dimensional
+# visibles - plural variable for visible
+ignore-words-list = nd,visibles
