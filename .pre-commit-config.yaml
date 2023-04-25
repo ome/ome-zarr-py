@@ -18,7 +18,7 @@ repos:
         args: [--target-version=py36]
 
   - repo: https://github.com/asottile/pyupgrade
-    rev: v3.3.1
+    rev: v3.3.2
     hooks:
       - id: pyupgrade
         args:
@@ -79,7 +79,7 @@ repos:
         exclude: tests/|setup.py
 
   - repo: https://github.com/adrienverge/yamllint.git
-    rev: v1.30.0
+    rev: v1.31.0
     hooks:
       - id: yamllint
         # args: [--config-data=relaxed]
