@@ -50,7 +50,7 @@ class TestWriter:
         params=(
             (1, 2, 1, 256, 256),
             (3, 512, 512),
-            (256, 256),
+            (300, 500),  # test edge chunks of different shapes
         ),
         ids=["5D", "3D", "2D"],
     )
@@ -78,7 +78,6 @@ class TestWriter:
     def test_writer(
         self, shape, scaler, format_version, array_constructor, storage_options_list
     ):
-
         data = self.create_data(shape)
         data = array_constructor(data)
         version = format_version()
@@ -246,7 +245,6 @@ class TestWriter:
             assert chunk_size < 4e6
 
     def test_validate_coordinate_transforms(self):
-
         fmt = FormatV04()
 
         transformations = [
@@ -288,7 +286,6 @@ class TestWriter:
             fmt.validate_coordinate_transformations(2, 2, scale_then_trans2)
 
     def test_dim_names(self):
-
         v03 = FormatV03()
 
         # v0.3 MUST specify axes for 3D or 4D data
@@ -336,7 +333,6 @@ class TestWriter:
             )
 
     def test_axes_dicts(self):
-
         v04 = FormatV04()
 
         # ALL axes must specify 'name'
