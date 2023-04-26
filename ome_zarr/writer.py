@@ -223,6 +223,10 @@ def write_multiscale(
     :param compute:
         If true compute immediately otherwise a list of :class:`dask.delayed.Delayed`
         is returned.
+    :return:
+        Empty list if the compute flag is True, otherwise it returns a list of
+        :class:`dask.delayed.Delayed` representing the value to be computed by
+        dask.
     """
     dims = len(pyramid[0].shape)
     axes = _get_valid_axes(dims, axes, fmt)
@@ -467,6 +471,10 @@ def write_image(
     :param compute:
         If true compute immediately otherwise a list of :class:`dask.delayed.Delayed`
         is returned.
+    :return:
+        Empty list if the compute flag is True, otherwise it returns a list of
+        :class:`dask.delayed.Delayed` representing the value to be computed by
+        dask.
     """
     dask_delayed_jobs = []
 
@@ -716,6 +724,10 @@ def write_multiscale_labels(
     :param compute:
         If true compute immediately otherwise a list of :class:`dask.delayed.Delayed`
         is returned.
+    :return:
+        Empty list if the compute flag is True, otherwise it returns a list of
+        :class:`dask.delayed.Delayed` representing the value to be computed by
+        dask.
     """
     sub_group = group.require_group(f"labels/{name}")
     dask_delayed_jobs = write_multiscale(
@@ -805,6 +817,10 @@ def write_labels(
     :param compute:
         If true compute immediately otherwise a list of :class:`dask.delayed.Delayed`
         is returned.
+    :return:
+        Empty list if the compute flag is True, otherwise it returns a list of
+        :class:`dask.delayed.Delayed` representing the value to be computed by
+        dask.
     """
     sub_group = group.require_group(f"labels/{name}")
     dask_delayed_jobs = []
