@@ -305,9 +305,13 @@ def write_multiscales_metadata(
             axes = _get_valid_axes(axes=axes, fmt=fmt)
             if axes is not None:
                 ndim = len(axes)
-
-    if isinstance(metadata, dict) and "omero" in metadata["metadata"]:
-        assert isinstance(metadata["metadata"], dict), "metadata must be a `dict`"
+    print(metadata)
+    if (
+        isinstance(metadata, dict)
+        and isinstance(metadata["metadata"], dict)
+        and metadata.get("metadata")
+        and "omero" in metadata["metadata"]
+    ):
         omero_metadata = metadata["metadata"].get("omero")
         if omero_metadata is None:
             raise KeyError("If `'omero'` is present, value cannot be `None`.")
