@@ -1,7 +1,7 @@
 import filecmp
 import pathlib
 from tempfile import TemporaryDirectory
-from typing import Any, Optional
+from typing import Any, Dict, Optional
 
 import dask.array as da
 import numpy as np
@@ -561,7 +561,7 @@ class TestMultiscalesMetadata:
             None,
         ],
     )
-    def test_omero_metadata(self, metadata: Optional[dict[str, Any]]):
+    def test_omero_metadata(self, metadata: Optional[Dict[str, Any]]):
         datasets = []
         for level, transf in enumerate(TRANSFORMATIONS):
             datasets.append({"path": str(level), "coordinateTransformations": transf})

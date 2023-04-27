@@ -4,7 +4,7 @@ from numpy import zeros
 
 from ome_zarr.data import create_zarr
 from ome_zarr.io import parse_url
-from ome_zarr.reader import Node, Plate, Reader
+from ome_zarr.reader import Multiscales, Node, Plate, Reader
 from ome_zarr.writer import write_image, write_plate_metadata, write_well_metadata
 
 
@@ -31,6 +31,17 @@ class TestReader:
         filename = str(self.path.join("labels", "coins"))
         reader = Reader(parse_url(filename))
         assert len(list(reader())) == 3
+
+    def test_omero(self):
+        reader = Reader(parse_url(str(self.path)))()
+        image_node = list(reader)[0]
+        omero = image_node.load(Multiscales).zarr.root_attrs.get("omero")
+        assert "channels" in omero
+        assert isinstance(omero["channels"], list)
+        assert len(omero["channels"]) == 1
+        assert omero["channels"][0]["color"] == "FF0000"
+        for i in ["min", "max", "start", "end"]:
+            assert i in omero["channels"][0]["window"]
 
 
 class TestInvalid:

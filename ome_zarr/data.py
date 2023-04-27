@@ -136,11 +136,15 @@ def create_zarr(
                 chunks[zct] = 1
 
     storage_options = dict(chunks=tuple(chunks))
-    write_multiscale(pyramid, grp, axes=axes, storage_options=storage_options)
 
     if size_c == 1:
         image_data = {
-            "channels": [{"window": {"start": 0, "end": 255}, "color": "FF0000"}],
+            "channels": [
+                {
+                    "window": {"start": 0, "end": 255, "min": 0, "max": 255},
+                    "color": "FF0000",
+                }
+            ],
             "rdefs": {"model": "greyscale"},
         }
     else:
@@ -148,26 +152,32 @@ def create_zarr(
             "channels": [
                 {
                     "color": "FF0000",
-                    "window": {"start": 0, "end": 255},
+                    "window": {"start": 0, "end": 255, "min": 0, "max": 255},
                     "label": "Red",
                     "active": True,
                 },
                 {
                     "color": "00FF00",
-                    "window": {"start": 0, "end": 255},
+                    "window": {"start": 0, "end": 255, "min": 0, "max": 255},
                     "label": "Green",
                     "active": True,
                 },
                 {
                     "color": "0000FF",
-                    "window": {"start": 0, "end": 255},
+                    "window": {"start": 0, "end": 255, "min": 0, "max": 255},
                     "label": "Blue",
                     "active": True,
                 },
             ],
             "rdefs": {"model": "color"},
         }
-    grp.attrs["omero"] = image_data
+    write_multiscale(
+        pyramid,
+        grp,
+        axes=axes,
+        storage_options=storage_options,
+        metadata={"omero": image_data},
+    )
 
     if labels:
         labels_grp = grp.create_group("labels")
