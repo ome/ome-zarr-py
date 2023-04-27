@@ -549,7 +549,14 @@ class TestMultiscalesMetadata:
     @pytest.mark.parametrize(
         "metadata",
         [
-            {"channels": [{"color": "FF0000", "window": {"start": 0, "end": 255}}]},
+            {
+                "channels": [
+                    {
+                        "color": "FF0000",
+                        "window": {"start": 0, "end": 255, "min": 0, "max": 255},
+                    }
+                ]
+            },
             {"channels": [{"color": "FF0000"}]},
             None,
         ],
