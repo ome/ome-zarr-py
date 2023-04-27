@@ -318,8 +318,17 @@ def write_multiscales_metadata(
         for c in omero_metadata["channels"]:
             if "color" not in c:
                 raise KeyError("`'color'` not found in `'channels'`.")
+            if not isinstance(c["color"], str):
+                raise TypeError("`'color'` must be a string.")
             if "window" not in c:
                 raise KeyError("`'window'` not found in `'channels'`.")
+            if not isinstance(c["window"], dict):
+                raise TypeError("`'window'` must be a dict.")
+            for p in ["min", "max", "start", "end"]:
+                if p not in c["window"]:
+                    raise KeyError(f"`'{p}'` not found in `'window'`.")
+                if not isinstance(c["window"][p], int):
+                    raise TypeError(f"`'{p}'` must be an int.")
             group.attrs["omero"] = omero_metadata
 
     # note: we construct the multiscale metadata via dict(), rather than {}
