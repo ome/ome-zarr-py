@@ -308,8 +308,8 @@ def write_multiscales_metadata(
     print(metadata)
     if (
         isinstance(metadata, dict)
-        and isinstance(metadata["metadata"], dict)
         and metadata.get("metadata")
+        and isinstance(metadata["metadata"], dict)
         and "omero" in metadata["metadata"]
     ):
         omero_metadata = metadata["metadata"].get("omero")
