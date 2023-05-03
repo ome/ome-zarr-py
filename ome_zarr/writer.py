@@ -531,7 +531,6 @@ def _write_dask_image(
     compute: Optional[bool] = True,
     **metadata: Union[str, JSONDict, List[JSONDict]],
 ) -> List:
-
     if fmt.version in ("0.1", "0.2"):
         # v0.1 and v0.2 are strictly 5D
         shape_5d: Tuple[Any, ...] = (*(1,) * (5 - image.ndim), *image.shape)
