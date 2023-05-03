@@ -97,7 +97,6 @@ class Axes:
         return axes_names
 
     def _validate_03(self) -> None:
-
         val_axes = tuple(self._get_names())
         if len(val_axes) == 2:
             if val_axes != ("y", "x"):
