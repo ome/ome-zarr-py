@@ -49,13 +49,11 @@ class bioformats2raw(Base):
         """
         super().__init__(node)
         try:
-
             # Load OME/METADATA.ome.xml
             data = self._handle(node)
             if data.plates:
                 _logger.info("Plates detected. Skipping implicit loading")
             else:
-
                 # Load the OME/ zgroup metadata
                 ome = node.zarr.create("OME")
                 if ome.exists:
@@ -88,7 +86,6 @@ class bioformats2raw(Base):
         """
 
         if elem.tag == f"{ns}Pixels":
-
             must_have = {f"{ns}BinData", f"{ns}TiffData", f"{ns}MetadataOnly"}
             children = {x.tag for x in elem}
 
