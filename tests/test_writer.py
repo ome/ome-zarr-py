@@ -1,5 +1,6 @@
 import filecmp
 import pathlib
+from tempfile import TemporaryDirectory
 
 import dask.array as da
 import numpy as np
@@ -16,6 +17,7 @@ from ome_zarr.writer import (
     _retuple,
     write_image,
     write_labels,
+    write_multiscale,
     write_multiscale_labels,
     write_multiscales_metadata,
     write_plate_metadata,
@@ -47,7 +49,7 @@ class TestWriter:
         params=(
             (1, 2, 1, 256, 256),
             (3, 512, 512),
-            (256, 256),
+            (300, 500),  # test edge chunks of different shapes
         ),
         ids=["5D", "3D", "2D"],
     )
@@ -75,7 +77,6 @@ class TestWriter:
     def test_writer(
         self, shape, scaler, format_version, array_constructor, storage_options_list
     ):
-
         data = self.create_data(shape)
         data = array_constructor(data)
         version = format_version()
@@ -220,8 +221,29 @@ class TestWriter:
             "blocksize": 0,
         }
 
-    def test_validate_coordinate_transforms(self):
+    def test_default_compression(self):
+        """Test that the default compression is not None.
 
+        We make an array of zeros which should compress trivially easily,
+        write out the chunks, and check that they are smaller than the raw
+        data.
+        """
+        arr_np = np.zeros((2, 50, 200, 400), dtype=np.uint8)
+        # avoid empty chunks so they are guaranteed to be written out to disk
+        arr_np[0, 0, 0, 0] = 1
+        # 4MB chunks, trivially compressible
+        arr = da.from_array(arr_np, chunks=(1, 50, 200, 400))
+        with TemporaryDirectory(suffix=".ome.zarr") as tempdir:
+            path = tempdir
+            store = parse_url(path, mode="w").store
+            root = zarr.group(store=store)
+            # no compressor options, we are checking default
+            write_multiscale([arr], group=root, axes="tzyx")
+            # check chunk: multiscale level 0, 4D chunk at (0, 0, 0, 0)
+            chunk_size = (pathlib.Path(path) / "0/0/0/0/0").stat().st_size
+            assert chunk_size < 4e6
+
+    def test_validate_coordinate_transforms(self):
         fmt = FormatV04()
 
         transformations = [
@@ -263,7 +285,6 @@ class TestWriter:
             fmt.validate_coordinate_transformations(2, 2, scale_then_trans2)
 
     def test_dim_names(self):
-
         v03 = FormatV03()
 
         # v0.3 MUST specify axes for 3D or 4D data
@@ -311,7 +332,6 @@ class TestWriter:
             )
 
     def test_axes_dicts(self):
-
         v04 = FormatV04()
 
         # ALL axes must specify 'name'

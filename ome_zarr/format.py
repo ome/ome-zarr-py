@@ -10,9 +10,7 @@ LOGGER = logging.getLogger("ome_zarr.format")
 
 
 def format_from_version(version: str) -> "Format":
-
     for fmt in format_implementations():
-
         # Support floating-point versions like `0.2`
         if isinstance(version, float):
             version = str(version)
@@ -110,7 +108,7 @@ class Format(ABC):
         self,
         ndim: int,
         nlevels: int,
-        coordinate_transformations: List[List[Dict[str, Any]]] = None,
+        coordinate_transformations: Optional[List[List[Dict[str, Any]]]] = None,
     ) -> Optional[List[List[Dict[str, Any]]]]:  # pragma: no cover
         raise NotImplementedError()
 
@@ -163,7 +161,7 @@ class FormatV01(Format):
         self,
         ndim: int,
         nlevels: int,
-        coordinate_transformations: List[List[Dict[str, Any]]] = None,
+        coordinate_transformations: Optional[List[List[Dict[str, Any]]]] = None,
     ) -> None:
         return None
 
@@ -258,7 +256,6 @@ class FormatV04(FormatV03):
     def generate_coordinate_transformations(
         self, shapes: List[tuple]
     ) -> Optional[List[List[Dict[str, Any]]]]:
-
         data_shape = shapes[0]
         coordinate_transformations: List[List[Dict[str, Any]]] = []
         # calculate minimal 'scale' transform based on pyramid dims
@@ -273,7 +270,7 @@ class FormatV04(FormatV03):
         self,
         ndim: int,
         nlevels: int,
-        coordinate_transformations: List[List[Dict[str, Any]]] = None,
+        coordinate_transformations: Optional[List[List[Dict[str, Any]]]] = None,
     ) -> None:
         """
         Validates that a list of dicts contains a 'scale' transformation

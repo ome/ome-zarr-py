@@ -27,7 +27,6 @@ def info(path: str, stats: bool = False) -> Iterator[Node]:
     assert zarr, f"not a zarr: {zarr}"
     reader = Reader(zarr)
     for node in reader():
-
         if not node.specs:
             print(f"not an ome-zarr node: {node}")
             continue
@@ -73,7 +72,6 @@ def download(input_path: str, output_dir: str = ".") -> None:
     print(f"to {output_dir}")
 
     for path, node in sorted(zip(paths, nodes)):
-
         target_path = output_path / Path(*path)
         target_path.mkdir(parents=True)
 
