@@ -1,9 +1,10 @@
 # 0.7.0 (May 2023)
 
-- Use default compressor by default: thanks to Juan Nunez-Iglesias ([#253](https://github.com/ome/ome-zarr-py/pull/253))
+- Optimize zarr multiscale writing by permitting delayed execution: thanks to Camilo Laiton ([#257](https://github.com/ome/ome-zarr-py/pull/257))
+- Use default compressor by default; thanks to Juan Nunez-Iglesias ([#253](https://github.com/ome/ome-zarr-py/pull/253))
 - Fix bug in dask resizing of edge chunks ([#244](https://github.com/ome/ome-zarr-py/pull/244))
-- Fix dimension separator used in dask array to_zarr: thanks to Luca Marconato ([#243](https://github.com/ome/ome-zarr-py/pull/243))
-- Add `compute` option to image writing methods: thanks to Camilo Laiton ([#257](https://github.com/ome/ome-zarr-py/pull/257))
+- Fix dimension separator used in dask array to_zarr; thanks to Luca Marconato ([#243](https://github.com/ome/ome-zarr-py/pull/243))
+- Add `compute` option to image writing methods; thanks to Camilo Laiton ([#257](https://github.com/ome/ome-zarr-py/pull/257))
 - Allow errors to be raised when reading Multiscales data ([#266](https://github.com/ome/ome-zarr-py/pull/266))
 - Add a pre-commit configuration for codespell; thanks to Yaroslav Halchenko ([#272](https://github.com/ome/ome-zarr-py/pull/272))
 
