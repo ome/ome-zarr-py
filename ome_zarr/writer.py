@@ -177,8 +177,9 @@ def write_multiscale(
     coordinate_transformations: Optional[List[List[Dict[str, Any]]]] = None,
     storage_options: Optional[Union[JSONDict, List[JSONDict]]] = None,
     name: Optional[str] = None,
+    compute: Optional[bool] = True,
     **metadata: Union[str, JSONDict, List[JSONDict]],
-) -> None:
+) -> List:
     """
     Write a pyramid with multiscale metadata to disk.
 
@@ -214,9 +215,17 @@ def write_multiscale(
         A list would need to match the number of datasets in a multiresolution pyramid.
         One can provide different chunk size for each level of a pyramid using this
         option.
+    :param compute:
+        If true compute immediately otherwise a list of :class:`dask.delayed.Delayed`
+        is returned.
+    :return:
+        Empty list if the compute flag is True, otherwise it returns a list of
+        :class:`dask.delayed.Delayed` representing the value to be computed by
+        dask.
     """
     dims = len(pyramid[0].shape)
     axes = _get_valid_axes(dims, axes, fmt)
+    dask_delayed = []
 
     if chunks is not None:
         msg = """The 'chunks' argument is deprecated and will be removed in version 0.5.
@@ -240,14 +249,19 @@ Please use the 'storage_options' argument instead."""
             if chunks_opt is not None:
                 data = da.array(data).rechunk(chunks=chunks_opt)
                 options["chunks"] = chunks_opt
-            da.to_zarr(
+            da_delayed = da.to_zarr(
                 arr=data,
                 url=group.store,
                 component=str(Path(group.path, str(path))),
                 storage_options=options,
                 compressor=options.get("compressor", zarr.storage.default_compressor),
                 dimension_separator=group._store._dimension_separator,
+                compute=compute,
             )
+
+            if not compute:
+                dask_delayed.append(da_delayed)
+
         else:
             group.create_dataset(str(path), data=data, chunks=chunks_opt, **options)
 
@@ -266,6 +280,8 @@ Please use the 'storage_options' argument instead."""
             dataset["coordinateTransformations"] = transform
 
     write_multiscales_metadata(group, datasets, fmt, axes, name, **metadata)
+
+    return dask_delayed
 
 
 def write_multiscales_metadata(
@@ -405,8 +421,9 @@ def write_image(
     axes: Optional[Union[str, List[str], List[Dict[str, str]]]] = None,
     coordinate_transformations: Optional[List[List[Dict[str, Any]]]] = None,
     storage_options: Optional[Union[JSONDict, List[JSONDict]]] = None,
+    compute: Optional[bool] = True,
     **metadata: Union[str, JSONDict, List[JSONDict]],
-) -> None:
+) -> List:
     """Writes an image to the zarr store according to ome-zarr specification
 
     :type image: :class:`numpy.ndarray` or `dask.array.Array`
@@ -446,9 +463,18 @@ def write_image(
         A list would need to match the number of datasets in a multiresolution pyramid.
         One can provide different chunk size for each level of a pyramid using this
         option.
+    :param compute:
+        If true compute immediately otherwise a list of :class:`dask.delayed.Delayed`
+        is returned.
+    :return:
+        Empty list if the compute flag is True, otherwise it returns a list of
+        :class:`dask.delayed.Delayed` representing the value to be computed by
+        dask.
     """
+    dask_delayed_jobs = []
+
     if isinstance(image, da.Array):
-        _write_dask_image(
+        dask_delayed_jobs = _write_dask_image(
             image,
             group,
             scaler,
@@ -458,11 +484,12 @@ def write_image(
             coordinate_transformations=coordinate_transformations,
             storage_options=storage_options,
             name=None,
+            compute=compute,
             **metadata,
         )
     else:
         mip, axes = _create_mip(image, fmt, scaler, axes)
-        write_multiscale(
+        dask_delayed_jobs = write_multiscale(
             mip,
             group,
             chunks=chunks,
@@ -471,8 +498,11 @@ def write_image(
             coordinate_transformations=coordinate_transformations,
             storage_options=storage_options,
             name=None,
+            compute=compute,
             **metadata,
         )
+
+    return dask_delayed_jobs
 
 
 def _resolve_storage_options(
@@ -498,8 +528,9 @@ def _write_dask_image(
     coordinate_transformations: Optional[List[List[Dict[str, Any]]]] = None,
     storage_options: Optional[Union[JSONDict, List[JSONDict]]] = None,
     name: Optional[str] = None,
+    compute: Optional[bool] = True,
     **metadata: Union[str, JSONDict, List[JSONDict]],
-) -> None:
+) -> List:
     if fmt.version in ("0.1", "0.2"):
         # v0.1 and v0.2 are strictly 5D
         shape_5d: Tuple[Any, ...] = (*(1,) * (5 - image.ndim), *image.shape)
@@ -558,7 +589,10 @@ Please use the 'storage_options' argument instead."""
         )
         datasets.append({"path": str(path)})
 
-    da.compute(*delayed)
+    # Computing delayed jobs if necessary
+    if compute:
+        da.compute(*delayed)
+        delayed = []
 
     if coordinate_transformations is None:
         # shapes = [data.shape for data in delayed]
@@ -573,6 +607,8 @@ Please use the 'storage_options' argument instead."""
             dataset["coordinateTransformations"] = transform
 
     write_multiscales_metadata(group, datasets, fmt, axes, name, **metadata)
+
+    return delayed
 
 
 def write_label_metadata(
@@ -633,8 +669,9 @@ def write_multiscale_labels(
     coordinate_transformations: Optional[List[List[Dict[str, Any]]]] = None,
     storage_options: Optional[Union[JSONDict, List[JSONDict]]] = None,
     label_metadata: Optional[JSONDict] = None,
+    compute: Optional[bool] = True,
     **metadata: JSONDict,
-) -> None:
+) -> List:
     """
     Write pyramidal image labels to disk.
 
@@ -678,9 +715,16 @@ def write_multiscale_labels(
     :type label_metadata: dict, optional
     :param label_metadata:
       Image label metadata. See :meth:`write_label_metadata` for details
+    :param compute:
+        If true compute immediately otherwise a list of :class:`dask.delayed.Delayed`
+        is returned.
+    :return:
+        Empty list if the compute flag is True, otherwise it returns a list of
+        :class:`dask.delayed.Delayed` representing the value to be computed by
+        dask.
     """
     sub_group = group.require_group(f"labels/{name}")
-    write_multiscale(
+    dask_delayed_jobs = write_multiscale(
         pyramid,
         sub_group,
         chunks=chunks,
@@ -689,6 +733,7 @@ def write_multiscale_labels(
         coordinate_transformations=coordinate_transformations,
         storage_options=storage_options,
         name=name,
+        compute=compute,
         **metadata,
     )
     write_label_metadata(
@@ -697,6 +742,8 @@ def write_multiscale_labels(
         fmt=fmt,
         **({} if label_metadata is None else label_metadata),
     )
+
+    return dask_delayed_jobs
 
 
 def write_labels(
@@ -710,8 +757,9 @@ def write_labels(
     coordinate_transformations: Optional[List[List[Dict[str, Any]]]] = None,
     storage_options: Optional[Union[JSONDict, List[JSONDict]]] = None,
     label_metadata: Optional[JSONDict] = None,
+    compute: Optional[bool] = True,
     **metadata: JSONDict,
-) -> None:
+) -> List:
     """
     Write image label data to disk.
 
@@ -760,10 +808,19 @@ def write_labels(
     :type label_metadata: dict, optional
     :param label_metadata:
       Image label metadata. See :meth:`write_label_metadata` for details
+    :param compute:
+        If true compute immediately otherwise a list of :class:`dask.delayed.Delayed`
+        is returned.
+    :return:
+        Empty list if the compute flag is True, otherwise it returns a list of
+        :class:`dask.delayed.Delayed` representing the value to be computed by
+        dask.
     """
     sub_group = group.require_group(f"labels/{name}")
+    dask_delayed_jobs = []
+
     if isinstance(labels, da.Array):
-        _write_dask_image(
+        dask_delayed_jobs = _write_dask_image(
             labels,
             sub_group,
             scaler,
@@ -773,11 +830,12 @@ def write_labels(
             coordinate_transformations=coordinate_transformations,
             storage_options=storage_options,
             name=name,
+            compute=compute,
             **metadata,
         )
     else:
         mip, axes = _create_mip(labels, fmt, scaler, axes)
-        write_multiscale(
+        dask_delayed_jobs = write_multiscale(
             mip,
             sub_group,
             chunks=chunks,
@@ -786,6 +844,7 @@ def write_labels(
             coordinate_transformations=coordinate_transformations,
             storage_options=storage_options,
             name=name,
+            compute=compute,
             **metadata,
         )
     write_label_metadata(
@@ -794,6 +853,8 @@ def write_labels(
         fmt=fmt,
         **({} if label_metadata is None else label_metadata),
     )
+
+    return dask_delayed_jobs
 
 
 def _create_mip(
