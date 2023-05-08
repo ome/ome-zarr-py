@@ -2,7 +2,7 @@
 import argparse
 import logging
 import sys
-from typing import List
+from typing import List, Union
 
 from .csv import csv_to_zarr
 from .data import astronaut, coins, create_zarr
@@ -73,7 +73,7 @@ def csv_to_labels(args: argparse.Namespace) -> None:
     csv_to_zarr(args.csv_path, args.csv_id, args.csv_keys, args.zarr_path, args.zarr_id)
 
 
-def main(args: List[str]) -> None:
+def main(args: Union[List[str], None] = None) -> None:
     """Run appropriate function with argparse arguments, handling errors."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
