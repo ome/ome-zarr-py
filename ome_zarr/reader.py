@@ -298,8 +298,9 @@ class Multiscales(Spec):
         LOGGER.info("datasets %s", datasets)
 
         for multi in multiscales:
-            # raises Exception if can't be parsed
-            Multiscale.parse_obj(multi)
+            # raises Exception if can't be parsed. Only v0.4 supported
+            if multi.get("version") == "0.4":
+                Multiscale.parse_obj(multi)
 
         for resolution in self.datasets:
             data: da.core.Array = self.array(resolution, version)
