@@ -25,6 +25,7 @@ install_requires += (["aiohttp<4"],)
 install_requires += (["requests"],)
 install_requires += (["scikit-image"],)
 install_requires += (["toolz"],)
+install_requires += (["pydantic-ome-ngff"],)
 
 
 setup(

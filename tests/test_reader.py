@@ -1,3 +1,5 @@
+import random
+
 import pytest
 import zarr
 from numpy import zeros
@@ -49,6 +51,32 @@ class TestInvalid:
             reader = Reader(parse_url(str(self.path)))
             assert len(list(reader())) == 2
         assert str(exe.value) == "Version invalid not recognized"
+
+    @pytest.mark.parametrize(
+        "axes",
+        [
+            [{"type": "space", "name": "x"}, {"type": "space", "name": "x"}],
+            [{"type": "time", "name": "t"}, {"type": "space", "name": "x"}],
+            [
+                {"type": "time", "name": "t"},
+                {"type": "time", "name": "time"},
+                {"type": "space", "name": "y"},
+                {"type": "space", "name": "x"},
+            ],
+        ],
+    )
+    def test_invalid_axes(self, tmpdir, axes):
+        # new dir each time - otherwise repeated read gives different node count
+        tmp_dir = tmpdir.mkdir(str(random.random()))
+        grp = create_zarr(str(tmp_dir))
+        attrs = grp.attrs.asdict()
+        attrs["multiscales"][0]["axes"] = axes
+        grp.attrs.put(attrs)
+        # should raise exception
+        with pytest.raises(ValueError):
+            reader = Reader(parse_url(str(tmp_dir)))
+            nodes = list(reader())
+            assert len(nodes) == 3
 
 
 class TestHCSReader:

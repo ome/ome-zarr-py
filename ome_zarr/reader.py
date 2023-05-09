@@ -8,6 +8,7 @@ from typing import Any, Dict, Iterator, List, Optional, Type, Union, cast, overl
 import dask.array as da
 import numpy as np
 from dask import delayed
+from pydantic_ome_ngff.v04.multiscales import Multiscale
 
 from .axes import Axes
 from .format import format_from_version
@@ -295,6 +296,10 @@ class Multiscales(Spec):
         if any(trans is not None for trans in transformations):
             node.metadata["coordinateTransformations"] = transformations
         LOGGER.info("datasets %s", datasets)
+
+        for multi in multiscales:
+            # raises Exception if can't be parsed
+            Multiscale.parse_obj(multi)
 
         for resolution in self.datasets:
             data: da.core.Array = self.array(resolution, version)
