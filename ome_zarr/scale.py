@@ -187,7 +187,7 @@ class Scaler:
                 base,
                 downscale=self.downscale,
                 max_layer=self.max_layer,
-                multichannel=False,
+                channel_axis=None,
             )
         )
 
@@ -198,7 +198,7 @@ class Scaler:
                 base,
                 downscale=self.downscale,
                 max_layer=self.max_layer,
-                multichannel=False,
+                channel_axis=None,
             )
         )
 
