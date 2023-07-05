@@ -1,3 +1,8 @@
+# 0.8.0 (June 2023)
+
+- Add `ome_zarr view image.zarr` to server and view in browser ([#285](https://github.com/ome/ome-zarr-py/pull/285))
+- Allow `main` with empty args: thanks to Dominik Kutra ([#279](https://github.com/ome/ome-zarr-py/pull/279))
+
 # 0.7.0 (May 2023)
 
 - Optimize zarr multiscale writing by permitting delayed execution: thanks to Camilo Laiton ([#257](https://github.com/ome/ome-zarr-py/pull/257))
