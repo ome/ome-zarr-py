@@ -1,3 +1,18 @@
+# 0.8.0 (June 2023)
+
+- Add `ome_zarr view image.zarr` to server and view in browser ([#285](https://github.com/ome/ome-zarr-py/pull/285))
+- Allow `main` with empty args: thanks to Dominik Kutra ([#279](https://github.com/ome/ome-zarr-py/pull/279))
+
+# 0.7.0 (May 2023)
+
+- Optimize zarr multiscale writing by permitting delayed execution: thanks to Camilo Laiton ([#257](https://github.com/ome/ome-zarr-py/pull/257))
+- Use default compressor by default; thanks to Juan Nunez-Iglesias ([#253](https://github.com/ome/ome-zarr-py/pull/253))
+- Fix bug in dask resizing of edge chunks ([#244](https://github.com/ome/ome-zarr-py/pull/244))
+- Fix dimension separator used in dask array to_zarr; thanks to Luca Marconato ([#243](https://github.com/ome/ome-zarr-py/pull/243))
+- Add `compute` option to image writing methods; thanks to Camilo Laiton ([#257](https://github.com/ome/ome-zarr-py/pull/257))
+- Allow errors to be raised when reading Multiscales data ([#266](https://github.com/ome/ome-zarr-py/pull/266))
+- Add a pre-commit configuration for codespell; thanks to Yaroslav Halchenko ([#272](https://github.com/ome/ome-zarr-py/pull/272))
+
 # 0.6.1 (October 2022)
 
 - Fix pyramid dtype for scaler.local_mean ([#233](https://github.com/ome/ome-zarr-py/pull/233))

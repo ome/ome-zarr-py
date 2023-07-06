@@ -2,13 +2,14 @@
 import argparse
 import logging
 import sys
-from typing import List
+from typing import List, Union
 
 from .csv import csv_to_zarr
 from .data import astronaut, coins, create_zarr
 from .scale import Scaler
 from .utils import download as zarr_download
 from .utils import info as zarr_info
+from .utils import view as zarr_view
 
 
 def config_logging(loglevel: int, args: argparse.Namespace) -> None:
@@ -27,6 +28,12 @@ def info(args: argparse.Namespace) -> None:
     """Wrap the :func:`~ome_zarr.utils.info` method."""
     config_logging(logging.WARN, args)
     list(zarr_info(args.path, stats=args.stats))
+
+
+def view(args: argparse.Namespace) -> None:
+    """Wrap the :func:`~ome_zarr.utils.view` method."""
+    config_logging(logging.WARN, args)
+    zarr_view(args.path, args.port)
 
 
 def download(args: argparse.Namespace) -> None:
@@ -73,7 +80,7 @@ def csv_to_labels(args: argparse.Namespace) -> None:
     csv_to_zarr(args.csv_path, args.csv_id, args.csv_keys, args.zarr_path, args.zarr_id)
 
 
-def main(args: List[str]) -> None:
+def main(args: Union[List[str], None] = None) -> None:
     """Run appropriate function with argparse arguments, handling errors."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -104,6 +111,12 @@ def main(args: List[str]) -> None:
     parser_download.add_argument("path")
     parser_download.add_argument("--output", default=".")
     parser_download.set_defaults(func=download)
+
+    # view (in ome-ngff-validator in a browser)
+    parser_view = subparsers.add_parser("view")
+    parser_view.add_argument("path")
+    parser_view.add_argument("--port", type=int, default=8000)
+    parser_view.set_defaults(func=view)
 
     # create
     parser_create = subparsers.add_parser("create")

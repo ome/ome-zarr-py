@@ -21,6 +21,14 @@ Use the `ome_zarr` command to interrogate Zarr datasets::
     # Local data (after downloading as below)
     $ ome_zarr info 6001240.zarr/
 
+view
+====
+
+Use the `ome_zarr` command to view Zarr data in the https://ome.github.io/ome-ngff-validator::
+
+    # Local data (after downloading as below)
+    $ ome_zarr view 6001240.zarr/
+
 download
 ========
 

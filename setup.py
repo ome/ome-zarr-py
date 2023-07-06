@@ -17,6 +17,7 @@ install_requires += (["dataclasses;python_version<'3.7'"],)
 install_requires += (["tifffile<2020.09.22;python_version<'3.7'"],)
 install_requires += (["numpy"],)
 install_requires += (["dask"],)
+install_requires += (["distributed"],)
 install_requires += (["zarr>=2.8.1"],)
 install_requires += (["fsspec[s3]!=2021.07.0"],)
 # See https://github.com/fsspec/filesystem_spec/issues/819
@@ -28,7 +29,7 @@ install_requires += (["toolz"],)
 
 setup(
     name="ome-zarr",
-    version="0.6.2.dev0",
+    version="0.8.1.dev0",
     author="The Open Microscopy Team",
     url="https://github.com/ome/ome-zarr-py",
     description="Implementation of images in Zarr files.",
