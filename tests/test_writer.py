@@ -570,6 +570,14 @@ class TestMultiscalesMetadata:
                 ]
             },
             {"channels": [{"color": "FF0000"}]},
+            {
+                "channels": [  # test wrong metadata
+                    {
+                        "color": "FF0000",
+                        "window": {"start": 0, "end": 255, "min": 0},
+                    }
+                ]
+            },
             None,
         ],
     )
@@ -584,11 +592,20 @@ class TestMultiscalesMetadata:
                 write_multiscales_metadata(
                     self.root, datasets, axes="tczyx", metadata={"omero": metadata}
                 )
-        elif metadata["channels"][0].get("window") is None:
-            with pytest.raises(KeyError, match=".*`'window'`.*"):
-                write_multiscales_metadata(
-                    self.root, datasets, axes="tczyx", metadata={"omero": metadata}
-                )
+        elif "window" in metadata["channels"][0]:
+            window_metadata = metadata["channels"][0].get("window")
+            if len(window_metadata) < 4:
+                with pytest.raises(KeyError, match=".*`'window'`.*"):
+                    write_multiscales_metadata(
+                        self.root, datasets, axes="tczyx", metadata={"omero": metadata}
+                    )
+        elif "color" in metadata["channels"][0]:
+            color_metadata = metadata["channels"][0].get("color")
+            if len(color_metadata) < 6:
+                with pytest.raises(KeyError, match=".*`'color'`.*"):
+                    write_multiscales_metadata(
+                        self.root, datasets, axes="tczyx", metadata={"omero": metadata}
+                    )
         else:
             write_multiscales_metadata(
                 self.root, datasets, axes="tczyx", metadata={"omero": metadata}

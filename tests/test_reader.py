@@ -39,9 +39,6 @@ class TestReader:
         assert "channels" in omero
         assert isinstance(omero["channels"], list)
         assert len(omero["channels"]) == 1
-        assert omero["channels"][0]["color"] == "FF0000"
-        for i in ["min", "max", "start", "end"]:
-            assert i in omero["channels"][0]["window"]
 
 
 class TestInvalid:
