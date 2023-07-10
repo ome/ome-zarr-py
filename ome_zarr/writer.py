@@ -321,7 +321,6 @@ def write_multiscales_metadata(
             axes = _get_valid_axes(axes=axes, fmt=fmt)
             if axes is not None:
                 ndim = len(axes)
-    print(metadata)
     if (
         isinstance(metadata, dict)
         and metadata.get("metadata")
@@ -341,7 +340,7 @@ def write_multiscales_metadata(
                 for p in ["min", "max", "start", "end"]:
                     if p not in c["window"]:
                         raise KeyError(f"`'{p}'` not found in `'window'`.")
-                    if not isinstance(c["window"][p], int):
+                    if not isinstance(c["window"][p], (int, float)):
                         raise TypeError(f"`'{p}'` must be an int.")
             group.attrs["omero"] = omero_metadata
 
