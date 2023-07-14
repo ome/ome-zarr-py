@@ -342,7 +342,7 @@ def write_multiscales_metadata(
                         raise KeyError(f"`'{p}'` not found in `'window'`.")
                     if not isinstance(c["window"][p], (int, float)):
                         raise TypeError(f"`'{p}'` must be an int or float.")
-        
+
         group.attrs["omero"] = omero_metadata
 
     # note: we construct the multiscale metadata via dict(), rather than {}
