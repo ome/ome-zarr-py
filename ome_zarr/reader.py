@@ -541,7 +541,8 @@ class Plate(Spec):
             LOGGER.debug("LOADING tile... %s with shape: %s", path, tile_shape)
 
             try:
-                data = self.zarr.load(path)
+                # compute() to get the data from dask - we want to return array
+                data = self.zarr.load(path).compute()
             except ValueError:
                 LOGGER.exception("Failed to load %s", path)
                 data = np.zeros(tile_shape, dtype=self.numpy_type)
