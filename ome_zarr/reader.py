@@ -534,21 +534,19 @@ class Plate(Spec):
     def get_stitched_grid(self, level: int, tile_shape: tuple) -> da.core.Array:
         LOGGER.debug("get_stitched_grid() level: %s, tile_shape: %s", level, tile_shape)
 
-        def get_tile(tile_name: str) -> np.ndarray:
+        def get_tile(tile_name: str) -> da.core.Array:
             """tile_name is 'level,z,c,t,row,col'"""
             row, col = (int(n) for n in tile_name.split(","))
             path = self.get_tile_path(level, row, col)
-            LOGGER.debug("LOADING tile... %s with shape: %s", path, tile_shape)
+            LOGGER.debug("creating tile... %s with shape: %s", path, tile_shape)
 
             try:
-                # compute() to get the data from dask - we want to return array
-                data = self.zarr.load(path).compute()
+                # this is a dask array - data not loaded from source yet
+                data = self.zarr.load(path)
             except ValueError:
                 LOGGER.exception("Failed to load %s", path)
-                data = np.zeros(tile_shape, dtype=self.numpy_type)
+                data = da.zeros(tile_shape, dtype=self.numpy_type)
             return data
-
-        lazy_reader = delayed(get_tile)
 
         lazy_rows = []
         # For level 0, return whole image for each tile
@@ -556,10 +554,7 @@ class Plate(Spec):
             lazy_row: List[da.Array] = []
             for col in range(self.column_count):
                 tile_name = f"{row},{col}"
-                lazy_tile = da.from_delayed(
-                    lazy_reader(tile_name), shape=tile_shape, dtype=self.numpy_type
-                )
-                lazy_row.append(lazy_tile)
+                lazy_row.append(get_tile(tile_name))
             lazy_rows.append(da.concatenate(lazy_row, axis=len(self.axes) - 1))
         return da.concatenate(lazy_rows, axis=len(self.axes) - 2)
 
