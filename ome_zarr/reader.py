@@ -424,7 +424,8 @@ class Well(Spec):
             """tile_name is 'row,col'"""
             row, col = (int(n) for n in tile_name.split(","))
             field_index = (column_count * row) + col
-            path = f"{field_index}/{level}"
+            image_path = image_paths[field_index]
+            path = f"{image_path}/{level}"
             LOGGER.debug("LOADING tile... %s", path)
             try:
                 data = self.zarr.load(path)
@@ -486,7 +487,6 @@ class Plate(Spec):
         LOGGER.info("plate_data: %s", self.plate_data)
         self.rows = self.plate_data.get("rows")
         self.columns = self.plate_data.get("columns")
-        self.first_field = "0"
         self.row_names = [row["name"] for row in self.rows]
         self.col_names = [col["name"] for col in self.columns]
 
@@ -502,6 +502,7 @@ class Plate(Spec):
         well_spec: Optional[Well] = well_node.first(Well)
         if well_spec is None:
             raise Exception("Could not find first well")
+        self.first_field = well_spec.well_data["images"][0]["path"]
         self.numpy_type = well_spec.numpy_type
 
         LOGGER.debug("img_pyramid_shapes: %s", well_spec.img_pyramid_shapes)
