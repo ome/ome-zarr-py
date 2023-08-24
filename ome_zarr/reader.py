@@ -7,7 +7,6 @@ from typing import Any, Dict, Iterator, List, Optional, Type, Union, cast, overl
 
 import dask.array as da
 import numpy as np
-from dask import delayed
 
 from .axes import Axes
 from .format import format_from_version
@@ -420,7 +419,7 @@ class Well(Spec):
         self.img_metadata = image_node.metadata
         self.img_pyramid_shapes = [d.shape for d in image_node.data]
 
-        def get_field(tile_name: str, level: int) -> np.ndarray:
+        def get_field(tile_name: str, level: int) -> da.core.Array:
             """tile_name is 'row,col'"""
             row, col = (int(n) for n in tile_name.split(","))
             field_index = (column_count * row) + col
@@ -430,10 +429,8 @@ class Well(Spec):
                 data = self.zarr.load(path)
             except ValueError:
                 LOGGER.error("Failed to load %s", path)
-                data = np.zeros(self.img_pyramid_shapes[level], dtype=self.numpy_type)
+                data = da.zeros(self.img_pyramid_shapes[level], dtype=self.numpy_type)
             return data
-
-        lazy_reader = delayed(get_field)
 
         def get_lazy_well(level: int, tile_shape: tuple) -> da.Array:
             lazy_rows = []
@@ -447,11 +444,7 @@ class Well(Spec):
                         col,
                         level,
                     )
-                    lazy_tile = da.from_delayed(
-                        lazy_reader(tile_name, level),
-                        shape=tile_shape,
-                        dtype=self.numpy_type,
-                    )
+                    lazy_tile = get_field(tile_name, level)
                     lazy_row.append(lazy_tile)
                 lazy_rows.append(da.concatenate(lazy_row, axis=x_index))
             return da.concatenate(lazy_rows, axis=y_index)
