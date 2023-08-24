@@ -9,6 +9,7 @@ extensions = [
     "sphinx.ext.doctest",
     "sphinx.ext.autodoc",
     "sphinx.ext.intersphinx",
+    "sphinx_rtd_theme",
 ]
 
 # use index.rst instead of contents.rst
