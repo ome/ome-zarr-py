@@ -1,10 +1,12 @@
+import dask.array as da
+import numpy as np
 import pytest
 import zarr
 from numpy import zeros
 
 from ome_zarr.data import create_zarr
 from ome_zarr.io import parse_url
-from ome_zarr.reader import Node, Plate, Reader
+from ome_zarr.reader import Node, Plate, Reader, Well
 from ome_zarr.writer import write_image, write_plate_metadata, write_well_metadata
 
 
@@ -95,5 +97,19 @@ class TestHCSReader:
         assert len(nodes) == 1
         assert len(nodes[0].specs) == 1
         assert isinstance(nodes[0].specs[0], Plate)
+        # data should be a Dask array
+        pyramid = nodes[0].data
+        assert isinstance(pyramid[0], da.Array)
+        # if we compute(), expect to get numpy array
+        result = pyramid[0].compute()
+        assert isinstance(result, np.ndarray)
         # assert len(nodes[1].specs) == 1
         # assert isinstance(nodes[1].specs[0], PlateLabels)
+
+        reader = Reader(parse_url(f"{self.path}/{well_paths[0]}"))
+        nodes = list(reader())
+        assert isinstance(nodes[0].specs[0], Well)
+        pyramid = nodes[0].data
+        assert isinstance(pyramid[0], da.Array)
+        result = pyramid[0].compute()
+        assert isinstance(result, np.ndarray)
