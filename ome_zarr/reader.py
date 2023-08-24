@@ -419,9 +419,8 @@ class Well(Spec):
         self.img_metadata = image_node.metadata
         self.img_pyramid_shapes = [d.shape for d in image_node.data]
 
-        def get_field(tile_name: str, level: int) -> da.core.Array:
+        def get_field(row: int, col: int, level: int) -> da.core.Array:
             """tile_name is 'row,col'"""
-            row, col = (int(n) for n in tile_name.split(","))
             field_index = (column_count * row) + col
             path = f"{field_index}/{level}"
             LOGGER.debug("LOADING tile... %s", path)
@@ -437,14 +436,13 @@ class Well(Spec):
             for row in range(row_count):
                 lazy_row: List[da.Array] = []
                 for col in range(column_count):
-                    tile_name = f"{row},{col}"
                     LOGGER.debug(
                         "creating lazy_reader. row: %s col: %s level: %s",
                         row,
                         col,
                         level,
                     )
-                    lazy_tile = get_field(tile_name, level)
+                    lazy_tile = get_field(row, col, level)
                     lazy_row.append(lazy_tile)
                 lazy_rows.append(da.concatenate(lazy_row, axis=x_index))
             return da.concatenate(lazy_rows, axis=y_index)
@@ -527,9 +525,8 @@ class Plate(Spec):
     def get_stitched_grid(self, level: int, tile_shape: tuple) -> da.core.Array:
         LOGGER.debug("get_stitched_grid() level: %s, tile_shape: %s", level, tile_shape)
 
-        def get_tile(tile_name: str) -> da.core.Array:
+        def get_tile(row: int, col: int) -> da.core.Array:
             """tile_name is 'level,z,c,t,row,col'"""
-            row, col = (int(n) for n in tile_name.split(","))
             path = self.get_tile_path(level, row, col)
             LOGGER.debug("creating tile... %s with shape: %s", path, tile_shape)
 
@@ -546,8 +543,7 @@ class Plate(Spec):
         for row in range(self.row_count):
             lazy_row: List[da.Array] = []
             for col in range(self.column_count):
-                tile_name = f"{row},{col}"
-                lazy_row.append(get_tile(tile_name))
+                lazy_row.append(get_tile(row, col))
             lazy_rows.append(da.concatenate(lazy_row, axis=len(self.axes) - 1))
         return da.concatenate(lazy_rows, axis=len(self.axes) - 2)
 
