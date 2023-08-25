@@ -29,3 +29,6 @@ intersphinx_mapping = {
     "numpy": ("https://numpy.org/doc/stable/", None),
     "zarr": ("https://zarr.readthedocs.io/en/stable/", None),
 }
+
+# https://github.com/readthedocs/sphinx_rtd_theme
+html_theme = "sphinx_rtd_theme"
