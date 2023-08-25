@@ -4,4 +4,4 @@ zarr
 dask
 numpy
 scipy
-skimage
+scikit-image
