@@ -4,3 +4,4 @@ zarr
 dask
 numpy
 scipy
+skimage
