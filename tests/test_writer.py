@@ -573,7 +573,7 @@ class TestMultiscalesMetadata:
             {
                 "channels": [  # test wrong metadata
                     {
-                        "color": "FF0000",
+                        "color": "FF00000",
                         "window": {"start": 0, "end": 255, "min": 0},
                     }
                 ]
@@ -599,7 +599,7 @@ class TestMultiscalesMetadata:
                     write_multiscales_metadata(
                         self.root, datasets, axes="tczyx", metadata={"omero": metadata}
                     )
-        elif "color" in metadata["channels"][0]:
+        if "color" in metadata["channels"][0]:
             color_metadata = metadata["channels"][0].get("color")
             if len(color_metadata) < 6:
                 with pytest.raises(KeyError, match=".*`'color'`.*"):
