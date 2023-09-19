@@ -40,7 +40,7 @@ The following code creates a 3D Image in OME-Zarr with labels::
     root.attrs["omero"] = {
         "channels": [{
             "color": "00FFFF",
-            "window": {"start": 0, "end": 20},
+            "window": {"start": 0, "end": 20, "min": 0, "max": 255},
             "label": "random",
             "active": True,
         }]
