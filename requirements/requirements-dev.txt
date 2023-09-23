@@ -2,6 +2,8 @@ fsspec==2023.6.0
 black
 cython >= 0.29.16
 numpy >= 1.16.0
+entrypoints
+ome-types
 pre-commit
 tox
 wheel

@@ -25,6 +25,8 @@ install_requires += (["aiohttp<4"],)
 install_requires += (["requests"],)
 install_requires += (["scikit-image"],)
 install_requires += (["toolz"],)
+install_requires += (["entrypoints"],)
+install_requires += (["ome-types"],)
 
 
 setup(
@@ -50,6 +52,7 @@ setup(
     ],
     entry_points={
         "console_scripts": ["ome_zarr = ome_zarr.cli:main"],
+        "ome_zarr.spec": ["bioformats2raw = ome_zarr.bioformats2raw:bioformats2raw"],
     },
     tests_require=["pytest"],
 )

@@ -109,3 +109,13 @@ the data is available as `dask` arrays::
     viewer = napari.view_image(dask_data, channel_axis=0)
     if __name__ == '__main__':
         napari.run()
+
+Reading bioformats2raw filesets
+-------------------------------
+
+The output from bioformats2raw encapsulates _multiple_ OME-NGFF images.
+This structure has been added to the OME-NGFF specification as transitional
+`"bioformats2raw.layout" <https://ngff.openmicroscopy.org/0.4/index.html#bf2raw>`_
+metadata. To read such filesets:
+
+TBD

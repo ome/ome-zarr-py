@@ -1,0 +1,28 @@
+{
+  "bioformats2raw.layout" : 3,
+  "plate" : {
+    "columns" : [ {
+      "name" : "1"
+    } ],
+    "name" : "Plate Name 0",
+    "wells" : [ {
+      "path" : "A/1",
+      "rowIndex" : 0,
+      "columnIndex" : 0
+    }, {
+      "path" : "B/1",
+      "rowIndex" : 1,
+      "columnIndex" : 0
+    } ],
+    "field_count" : 1,
+    "rows" : [ {
+      "name" : "A"
+    }, {
+      "name" : "B"
+    } ],
+    "acquisitions" : [ {
+      "id" : 0
+    } ],
+    "version" : "0.4"
+  }
+}
