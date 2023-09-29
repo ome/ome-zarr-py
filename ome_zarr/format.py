@@ -48,6 +48,7 @@ class Format(ABC):
     """
     Abstract base class for format implementations.
     """
+
     @property
     @abstractmethod
     def version(self) -> str:  # pragma: no cover
