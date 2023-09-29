@@ -7,7 +7,6 @@ from typing import Any, Dict, Iterator, List, Optional, Type, Union, cast, overl
 
 import dask.array as da
 import numpy as np
-from dask import delayed
 
 from .axes import Axes
 from .format import format_from_version
@@ -420,39 +419,34 @@ class Well(Spec):
         self.img_metadata = image_node.metadata
         self.img_pyramid_shapes = [d.shape for d in image_node.data]
 
-        def get_field(tile_name: str, level: int) -> np.ndarray:
+        def get_field(row: int, col: int, level: int) -> da.core.Array:
             """tile_name is 'row,col'"""
-            row, col = (int(n) for n in tile_name.split(","))
             field_index = (column_count * row) + col
-            image_path = image_paths[field_index]
-            path = f"{image_path}/{level}"
-            LOGGER.debug("LOADING tile... %s", path)
+            data = None
             try:
-                data = self.zarr.load(path)
+                # handle e.g. 2x2 grid with only 3 images/fields
+                if field_index < len(image_paths):
+                    image_path = image_paths[field_index]
+                    path = f"{image_path}/{level}"
+                    data = self.zarr.load(path)
             except ValueError:
                 LOGGER.error("Failed to load %s", path)
-                data = np.zeros(self.img_pyramid_shapes[level], dtype=self.numpy_type)
+            if data is None:
+                data = da.zeros(self.img_pyramid_shapes[level], dtype=self.numpy_type)
             return data
-
-        lazy_reader = delayed(get_field)
 
         def get_lazy_well(level: int, tile_shape: tuple) -> da.Array:
             lazy_rows = []
             for row in range(row_count):
                 lazy_row: List[da.Array] = []
                 for col in range(column_count):
-                    tile_name = f"{row},{col}"
                     LOGGER.debug(
                         "creating lazy_reader. row: %s col: %s level: %s",
                         row,
                         col,
                         level,
                     )
-                    lazy_tile = da.from_delayed(
-                        lazy_reader(tile_name, level),
-                        shape=tile_shape,
-                        dtype=self.numpy_type,
-                    )
+                    lazy_tile = get_field(row, col, level)
                     lazy_row.append(lazy_tile)
                 lazy_rows.append(da.concatenate(lazy_row, axis=x_index))
             return da.concatenate(lazy_rows, axis=y_index)
@@ -535,31 +529,25 @@ class Plate(Spec):
     def get_stitched_grid(self, level: int, tile_shape: tuple) -> da.core.Array:
         LOGGER.debug("get_stitched_grid() level: %s, tile_shape: %s", level, tile_shape)
 
-        def get_tile(tile_name: str) -> np.ndarray:
+        def get_tile(row: int, col: int) -> da.core.Array:
             """tile_name is 'level,z,c,t,row,col'"""
-            row, col = (int(n) for n in tile_name.split(","))
             path = self.get_tile_path(level, row, col)
-            LOGGER.debug("LOADING tile... %s with shape: %s", path, tile_shape)
+            LOGGER.debug("creating tile... %s with shape: %s", path, tile_shape)
 
             try:
+                # this is a dask array - data not loaded from source yet
                 data = self.zarr.load(path)
             except ValueError:
                 LOGGER.exception("Failed to load %s", path)
-                data = np.zeros(tile_shape, dtype=self.numpy_type)
+                data = da.zeros(tile_shape, dtype=self.numpy_type)
             return data
-
-        lazy_reader = delayed(get_tile)
 
         lazy_rows = []
         # For level 0, return whole image for each tile
         for row in range(self.row_count):
             lazy_row: List[da.Array] = []
             for col in range(self.column_count):
-                tile_name = f"{row},{col}"
-                lazy_tile = da.from_delayed(
-                    lazy_reader(tile_name), shape=tile_shape, dtype=self.numpy_type
-                )
-                lazy_row.append(lazy_tile)
+                lazy_row.append(get_tile(row, col))
             lazy_rows.append(da.concatenate(lazy_row, axis=len(self.axes) - 1))
         return da.concatenate(lazy_rows, axis=len(self.axes) - 2)
 

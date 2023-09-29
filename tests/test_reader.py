@@ -1,3 +1,4 @@
+import dask.array as da
 import numpy as np
 import pytest
 import zarr
@@ -5,7 +6,7 @@ from numpy import ones, zeros
 
 from ome_zarr.data import create_zarr
 from ome_zarr.io import parse_url
-from ome_zarr.reader import Node, Plate, Reader
+from ome_zarr.reader import Node, Plate, Reader, Well
 from ome_zarr.writer import write_image, write_plate_metadata, write_well_metadata
 
 
@@ -95,16 +96,32 @@ class TestHCSReader:
         nodes = list(reader())
         # currently reading plate labels disabled. Only 1 node
         assert len(nodes) == 1
+
         plate_node = nodes[0]
         assert len(plate_node.specs) == 1
         assert isinstance(plate_node.specs[0], Plate)
+        # data should be a Dask array
+        pyramid = plate_node.data
+        assert isinstance(pyramid[0], da.Array)
+        # if we compute(), expect to get numpy array
+        result = pyramid[0].compute()
+        assert isinstance(result, np.ndarray)
+
         # Get the plate node's array. It should be fused from the first field of all
         # well arrays (which in this test are non-zero), with zero values for wells
         # that failed to load (not expected) or the surplus area not filled by a well.
         expected_num_pixels = (
             len(well_paths) * len(field_paths[:1]) * np.prod((1, 1, 1, 256, 256))
         )
-        pyramid_0 = plate_node.data[0]
+        pyramid_0 = pyramid[0]
         assert np.asarray(pyramid_0).sum() == expected_num_pixels
-        # assert len(nodes[1].specs) == 1
+
         # assert isinstance(nodes[1].specs[0], PlateLabels)
+
+        reader = Reader(parse_url(f"{self.path}/{well_paths[0]}"))
+        nodes = list(reader())
+        assert isinstance(nodes[0].specs[0], Well)
+        pyramid = nodes[0].data
+        assert isinstance(pyramid[0], da.Array)
+        result = pyramid[0].compute()
+        assert isinstance(result, np.ndarray)
