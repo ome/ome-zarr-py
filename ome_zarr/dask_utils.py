@@ -81,7 +81,7 @@ def downscale_nearest(image: da.Array, factors: Tuple[int, ...]) -> da.Array:
     ):
         raise ValueError(
             f"All scale factors must not be greater than the dimension length: "
-            f"({tuple(factors)}) <= ({tuple(image.shape)})"
+            f"({factors}) <= ({tuple(image.shape)})"
         )
     slices = tuple(slice(None, None, factor) for factor in factors)
     return image[slices]
