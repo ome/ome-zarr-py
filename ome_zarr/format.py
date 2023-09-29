@@ -187,7 +187,7 @@ class FormatV02(FormatV01):
         }
 
         mkdir = True
-        if "r" in mode or path.startswith("http") or path.startswith("s3"):
+        if "r" in mode or path.startswith(("http", "s3")):
             # Could be simplified on the fsspec side
             mkdir = False
         if mkdir:

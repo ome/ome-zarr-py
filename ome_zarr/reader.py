@@ -30,7 +30,7 @@ class Node:
         self.zarr = zarr
         self.root = root
         self.seen: List[ZarrLocation] = []
-        if isinstance(root, Node) or isinstance(root, Reader):
+        if isinstance(root, (Node, Reader)):
             self.seen = root.seen
         else:
             self.seen = cast(List[ZarrLocation], root)
@@ -234,7 +234,7 @@ class Label(Spec):
                     if rgba:
                         rgba = [x / 255 for x in rgba]
 
-                    if isinstance(label_value, bool) or isinstance(label_value, int):
+                    if isinstance(label_value, (bool, int)):
                         colors[label_value] = rgba
                     else:
                         raise Exception("not bool or int")
@@ -422,7 +422,8 @@ class Well(Spec):
         def get_field(row: int, col: int, level: int) -> da.core.Array:
             """tile_name is 'row,col'"""
             field_index = (column_count * row) + col
-            path = f"{field_index}/{level}"
+            image_path = image_paths[field_index]
+            path = f"{image_path}/{level}"
             LOGGER.debug("LOADING tile... %s", path)
             try:
                 data = self.zarr.load(path)
@@ -477,7 +478,6 @@ class Plate(Spec):
         LOGGER.info("plate_data: %s", self.plate_data)
         self.rows = self.plate_data.get("rows")
         self.columns = self.plate_data.get("columns")
-        self.first_field = "0"
         self.row_names = [row["name"] for row in self.rows]
         self.col_names = [col["name"] for col in self.columns]
 
@@ -493,6 +493,7 @@ class Plate(Spec):
         well_spec: Optional[Well] = well_node.first(Well)
         if well_spec is None:
             raise Exception("Could not find first well")
+        self.first_field_path = well_spec.well_data["images"][0]["path"]
         self.numpy_type = well_spec.numpy_type
 
         LOGGER.debug("img_pyramid_shapes: %s", well_spec.img_pyramid_shapes)
@@ -519,7 +520,7 @@ class Plate(Spec):
     def get_tile_path(self, level: int, row: int, col: int) -> str:
         return (
             f"{self.row_names[row]}/"
-            f"{self.col_names[col]}/{self.first_field}/{level}"
+            f"{self.col_names[col]}/{self.first_field_path}/{level}"
         )
 
     def get_stitched_grid(self, level: int, tile_shape: tuple) -> da.core.Array:
@@ -553,7 +554,7 @@ class PlateLabels(Plate):
         """251.zarr/A/1/0/labels/0/3/"""
         path = (
             f"{self.row_names[row]}/{self.col_names[col]}/"
-            f"{self.first_field}/labels/0/{level}"
+            f"{self.first_field_path}/labels/0/{level}"
         )
         return path
 
@@ -575,7 +576,7 @@ class PlateLabels(Plate):
         properties: Dict[int, Dict[str, Any]] = {}
         for row in self.row_names:
             for col in self.col_names:
-                path = f"{row}/{col}/{self.first_field}/labels/0/.zattrs"
+                path = f"{row}/{col}/{self.first_field_path}/labels/0/.zattrs"
                 labels_json = self.zarr.get_json(path).get("image-label", {})
                 # NB: assume that 'label_val' is unique across all images
                 props_list = labels_json.get("properties", [])
