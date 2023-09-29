@@ -31,7 +31,7 @@ class Node:
         self.zarr = zarr
         self.root = root
         self.seen: List[ZarrLocation] = []
-        if isinstance(root, Node) or isinstance(root, Reader):
+        if isinstance(root, (Node, Reader)):
             self.seen = root.seen
         else:
             self.seen = cast(List[ZarrLocation], root)
@@ -235,7 +235,7 @@ class Label(Spec):
                     if rgba:
                         rgba = [x / 255 for x in rgba]
 
-                    if isinstance(label_value, bool) or isinstance(label_value, int):
+                    if isinstance(label_value, (bool, int)):
                         colors[label_value] = rgba
                     else:
                         raise Exception("not bool or int")
