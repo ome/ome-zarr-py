@@ -422,13 +422,16 @@ class Well(Spec):
         def get_field(row: int, col: int, level: int) -> da.core.Array:
             """tile_name is 'row,col'"""
             field_index = (column_count * row) + col
-            image_path = image_paths[field_index]
-            path = f"{image_path}/{level}"
-            LOGGER.debug("LOADING tile... %s", path)
+            data = None
             try:
-                data = self.zarr.load(path)
+                # handle e.g. 2x2 grid with only 3 images/fields
+                if field_index < len(image_paths):
+                    image_path = image_paths[field_index]
+                    path = f"{image_path}/{level}"
+                    data = self.zarr.load(path)
             except ValueError:
                 LOGGER.error("Failed to load %s", path)
+            if data is None:
                 data = da.zeros(self.img_pyramid_shapes[level], dtype=self.numpy_type)
             return data
 
