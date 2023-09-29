@@ -1,6 +1,7 @@
+import numpy as np
 import pytest
 import zarr
-from numpy import zeros
+from numpy import ones, zeros
 
 from ome_zarr.data import create_zarr
 from ome_zarr.io import parse_url
@@ -75,7 +76,8 @@ class TestHCSReader:
         # assert len(nodes[1].specs) == 1
         # assert isinstance(nodes[1].specs[0], PlateLabels)
 
-    def test_multiwells_plate(self):
+    @pytest.mark.parametrize("field_paths", [["0", "1", "2"], ["img1", "img2", "img3"]])
+    def test_multiwells_plate(self, field_paths):
         row_names = ["A", "B", "C"]
         col_names = ["1", "2", "3", "4"]
         well_paths = ["A/1", "A/2", "A/4", "B/2", "B/3", "C/1", "C/3", "C/4"]
@@ -84,16 +86,25 @@ class TestHCSReader:
             row, col = wp.split("/")
             row_group = self.root.require_group(row)
             well = row_group.require_group(col)
-            write_well_metadata(well, ["0", "1", "2"])
-            for field in range(3):
+            write_well_metadata(well, field_paths)
+            for field in field_paths:
                 image = well.require_group(str(field))
-                write_image(zeros((1, 1, 1, 256, 256)), image)
+                write_image(ones((1, 1, 1, 256, 256)), image)
 
         reader = Reader(parse_url(str(self.path)))
         nodes = list(reader())
         # currently reading plate labels disabled. Only 1 node
         assert len(nodes) == 1
-        assert len(nodes[0].specs) == 1
-        assert isinstance(nodes[0].specs[0], Plate)
+        plate_node = nodes[0]
+        assert len(plate_node.specs) == 1
+        assert isinstance(plate_node.specs[0], Plate)
+        # Get the plate node's array. It should be fused from the first field of all
+        # well arrays (which in this test are non-zero), with zero values for wells
+        # that failed to load (not expected) or the surplus area not filled by a well.
+        expected_num_pixels = (
+            len(well_paths) * len(field_paths[:1]) * np.prod((1, 1, 1, 256, 256))
+        )
+        pyramid_0 = plate_node.data[0]
+        assert np.asarray(pyramid_0).sum() == expected_num_pixels
         # assert len(nodes[1].specs) == 1
         # assert isinstance(nodes[1].specs[0], PlateLabels)
