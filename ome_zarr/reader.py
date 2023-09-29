@@ -531,6 +531,13 @@ class Plate(Spec):
 
         def get_tile(row: int, col: int) -> da.core.Array:
             """tile_name is 'level,z,c,t,row,col'"""
+
+            # check whether the Well exists at this row/column
+            well_path = f"{self.row_names[row]}/{self.col_names[col]}"
+            if well_path not in self.well_paths:
+                LOGGER.debug("empty well: %s", well_path)
+                return np.zeros(tile_shape, dtype=self.numpy_type)
+
             path = self.get_tile_path(level, row, col)
             LOGGER.debug("creating tile... %s with shape: %s", path, tile_shape)
 
