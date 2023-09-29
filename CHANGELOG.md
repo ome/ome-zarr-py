@@ -1,5 +1,5 @@
 
-# 0.8.2 (June 2023)
+# 0.8.2 (September 2023)
 
 - Fix compute on plate grid ([#299](https://github.com/ome/ome-zarr-py/pull/299))
 - Check Well exists before trying to load data ([#296](https://github.com/ome/ome-zarr-py/pull/296))
