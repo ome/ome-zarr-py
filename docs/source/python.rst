@@ -11,7 +11,7 @@ By default, a pyramid of resolution levels will be created by down-sampling the 
 of 2 in the X and Y dimensions.
 
 Alternatively, the :py:func:`ome_zarr.writer.write_multiscale` can be used, which takes a
-"pyramid" `numpy` arrays.
+"pyramid" of pre-computed `numpy` arrays.
 
 The following code creates a 3D Image in OME-Zarr with labels::
 
