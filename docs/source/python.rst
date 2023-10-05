@@ -80,8 +80,8 @@ This image can be viewed in `napari` using the
     $ napari test_ngff_image.zarr
 
 
-Writing HCS OME-NGFF images
-===========================
+Writing HCS datasets to OME-NGFF
+================================
 
 This sample code shows how to write a high-content screening dataset (i.e. culture plate with multiple wells) to a OME-NGFF file::
 
@@ -91,7 +91,7 @@ This sample code shows how to write a high-content screening dataset (i.e. cultu
     from ome_zarr.io import parse_url
     from ome_zarr.writer import write_image, write_plate_metadata, write_well_metadata
 
-    path = "test_ngff_image.zarr"
+    path = "test_ngff_plate.zarr"
     row_names = ["A", "B"]
     col_names = ["1", "2", "3"]
     well_paths = ["A/2", "B/3"]
@@ -107,7 +107,7 @@ This sample code shows how to write a high-content screening dataset (i.e. cultu
     data = rng.poisson(mean_val, size=(num_wells, num_fields, size_z, size_xy, size_xy)).astype(np.uint8)
 
     # write the plate of images and corresponding metadata
-    store = parse_url(str(file_path), mode="w").store
+    store = parse_url(path, mode="w").store
     root = zarr.group(store=store)
     write_plate_metadata(root, row_names, col_names, well_paths)
     for wi, wp in enumerate(well_paths):
