@@ -20,6 +20,9 @@ Install the latest release of `ome-zarr`_ from PyPI::
 
     pip install ome-zarr
 
+or from conda-forge::
+
+    conda install -c conda-forge ome-zarr
 
 Installation for developers::
 

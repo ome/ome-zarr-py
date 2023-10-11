@@ -45,6 +45,10 @@ def detect_format(metadata: dict, default: "Format") -> "Format":
 
 
 class Format(ABC):
+    """
+    Abstract base class for format implementations.
+    """
+
     @property
     @abstractmethod
     def version(self) -> str:  # pragma: no cover
@@ -187,7 +191,7 @@ class FormatV02(FormatV01):
         }
 
         mkdir = True
-        if "r" in mode or path.startswith("http") or path.startswith("s3"):
+        if "r" in mode or path.startswith(("http", "s3")):
             # Could be simplified on the fsspec side
             mkdir = False
         if mkdir:
@@ -275,8 +279,9 @@ class FormatV04(FormatV03):
         """
         Validates that a list of dicts contains a 'scale' transformation
 
-        Raises ValueError if no 'scale' found or doesn't match ndim
-        :param ndim:       Number of image dimensions
+        Raises ValueError if no 'scale' found or doesn't match ndim.
+
+        :param ndim: Number of image dimensions.
         """
 
         if coordinate_transformations is None:
