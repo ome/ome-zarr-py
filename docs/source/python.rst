@@ -1,4 +1,4 @@
-ome_zarr python library
+ome_zarr Python library
 =======================
 
 Writing OME-NGFF images
