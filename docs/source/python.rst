@@ -1,4 +1,4 @@
-ome_zarr python library
+ome_zarr Python library
 =======================
 
 Writing OME-NGFF images
@@ -81,7 +81,7 @@ This image can be viewed in `napari` using the
 
 
 Writing HCS datasets to OME-NGFF
-================================
+--------------------------------
 
 This sample code shows how to write a high-content screening dataset (i.e. culture plate with multiple wells) to a OME-NGFF file::
 
