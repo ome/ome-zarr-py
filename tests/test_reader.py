@@ -37,7 +37,7 @@ class TestReader:
     def test_omero(self):
         reader = Reader(parse_url(str(self.path)))()
         image_node = list(reader)[0]
-        omero = image_node.load(Multiscales).zarr.root_attrs.get("omero")
+        omero = image_node.zarr.root_attrs.get("omero")
         assert "channels" in omero
         assert isinstance(omero["channels"], list)
         assert len(omero["channels"]) == 1
