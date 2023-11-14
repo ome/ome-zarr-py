@@ -1,3 +1,9 @@
+# 0.8.3 (November 2023)
+
+- Fix reading HCS file on AWS S3 ([#322](https://github.com/ome/ome-zarr-py/pull/322))
+- Update docs to include write example for HCS dataset ([#317](https://github.com/ome/ome-zarr-py/pull/317))
+- Minor improvements to format docs ([#316](https://github.com/ome/ome-zarr-py/pull/316))
+- Add dask to intersphinx mapping ([#315](https://github.com/ome/ome-zarr-py/pull/315))
 
 # 0.8.2 (September 2023)
 
