@@ -13,6 +13,52 @@ of 2 in the X and Y dimensions.
 Alternatively, the :py:func:`ome_zarr.writer.write_multiscale` can be used, which takes a
 "pyramid" `numpy` arrays.
 
+The following code creates a 3D Image in OME-Zarr::
+
+    import numpy as np
+    import zarr
+    import os
+
+    from ome_zarr.io import parse_url
+    from ome_zarr.writer import write_image
+
+    path = "test_ngff_image.zarr"
+    os.mkdir(path)
+
+    size_xy = 128
+    size_z = 10
+    rng = np.random.default_rng(0)
+    data = rng.poisson(lam=10, size=(size_z, size_xy, size_xy)).astype(np.uint8)
+
+    # write the image data
+    store = parse_url(path, mode="w").store
+    root = zarr.group(store=store)
+    write_image(image=data, group=root, axes="zyx", storage_options=dict(chunks=(1, size_xy, size_xy)))
+
+
+This image can be viewed in `napari` using the
+`napari-ome-zarr <https://github.com/ome/napari-ome-zarr>`_ plugin::
+
+    $ napari test_ngff_image.zarr
+
+Rendering settings
+------------------
+Render settings can be added to an existing zarr group::
+
+    store = parse_url(path, mode="w").store
+    root = zarr.group(store=store)
+    root.attrs["omero"] = {
+        "channels": [{
+            "color": "00FFFF",
+            "window": {"start": 0, "end": 20, "min": 0, "max": 255},
+            "label": "random",
+            "active": True,
+        }]
+    }
+
+Writing labels
+--------------
+
 The following code creates a 3D Image in OME-Zarr with labels::
 
     import numpy as np
@@ -72,13 +118,6 @@ The following code creates a 3D Image in OME-Zarr with labels::
     }
 
     write_image(label, label_grp, axes="zyx")
-
-
-This image can be viewed in `napari` using the
-`napari-ome-zarr <https://github.com/ome/napari-ome-zarr>`_ plugin::
-
-    $ napari test_ngff_image.zarr
-
 
 Writing HCS datasets to OME-NGFF
 --------------------------------
