@@ -58,8 +58,10 @@ repos:
           # default black line length is 88
           "--max-line-length=88",
           # Conflicts with black: E203 whitespace before ':'
+          # Conflicts with PEP8 and black:
+          # W503 line break before binary operator
           # Does not recognize deprecated directive in docstrings
-          "--ignore=E203,RST303",
+          "--ignore=E203,RST303, W503",
           "--rst-roles=class,func,ref,mod,meth,const",
         ]
 

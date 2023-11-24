@@ -1,6 +1,7 @@
 import filecmp
 import pathlib
 from tempfile import TemporaryDirectory
+from typing import Any, Dict, Optional
 
 import dask.array as da
 import numpy as np
@@ -556,6 +557,80 @@ class TestMultiscalesMetadata:
         ]
         with pytest.raises(ValueError):
             write_multiscales_metadata(self.root, datasets, axes=axes)
+
+    @pytest.mark.parametrize(
+        "metadata",
+        [
+            {
+                "channels": [
+                    {
+                        "color": "FF0000",
+                        "window": {"start": 0, "end": 255, "min": 0, "max": 255},
+                    }
+                ]
+            },
+            {"channels": [{"color": "FF0000"}]},
+            {"channels": [{"color": "FF000"}]},  # test wrong metadata
+            {"channels": [{"window": []}]},  # test wrong metadata
+            {
+                "channels": [  # test wrong metadata
+                    {"color": "FF0000", "window": {"start": 0, "end": 255, "min": 0}},
+                ]
+            },
+            None,
+        ],
+    )
+    def test_omero_metadata(self, metadata: Optional[Dict[str, Any]]):
+        datasets = []
+        for level, transf in enumerate(TRANSFORMATIONS):
+            datasets.append({"path": str(level), "coordinateTransformations": transf})
+        if metadata is None:
+            with pytest.raises(
+                KeyError, match="If `'omero'` is present, value cannot be `None`."
+            ):
+                write_multiscales_metadata(
+                    self.root, datasets, axes="tczyx", metadata={"omero": metadata}
+                )
+        else:
+            window_metadata = (
+                metadata["channels"][0].get("window")
+                if "window" in metadata["channels"][0]
+                else None
+            )
+            color_metadata = (
+                metadata["channels"][0].get("color")
+                if "color" in metadata["channels"][0]
+                else None
+            )
+            if window_metadata is not None and len(window_metadata) < 4:
+                if isinstance(window_metadata, dict):
+                    with pytest.raises(KeyError, match=".*`'window'`.*"):
+                        write_multiscales_metadata(
+                            self.root,
+                            datasets,
+                            axes="tczyx",
+                            metadata={"omero": metadata},
+                        )
+                elif isinstance(window_metadata, list):
+                    with pytest.raises(TypeError, match=".*`'window'`.*"):
+                        write_multiscales_metadata(
+                            self.root,
+                            datasets,
+                            axes="tczyx",
+                            metadata={"omero": metadata},
+                        )
+            elif color_metadata is not None and len(color_metadata) != 6:
+                with pytest.raises(TypeError, match=".*`'color'`.*"):
+                    write_multiscales_metadata(
+                        self.root,
+                        datasets,
+                        axes="tczyx",
+                        metadata={"omero": metadata},
+                    )
+            else:
+                write_multiscales_metadata(
+                    self.root, datasets, axes="tczyx", metadata={"omero": metadata}
+                )
 
 
 class TestPlateMetadata:

@@ -321,6 +321,29 @@ def write_multiscales_metadata(
             axes = _get_valid_axes(axes=axes, fmt=fmt)
             if axes is not None:
                 ndim = len(axes)
+    if (
+        isinstance(metadata, dict)
+        and metadata.get("metadata")
+        and isinstance(metadata["metadata"], dict)
+        and "omero" in metadata["metadata"]
+    ):
+        omero_metadata = metadata["metadata"].get("omero")
+        if omero_metadata is None:
+            raise KeyError("If `'omero'` is present, value cannot be `None`.")
+        for c in omero_metadata["channels"]:
+            if "color" in c:
+                if not isinstance(c["color"], str) or len(c["color"]) != 6:
+                    raise TypeError("`'color'` must be a hex code string.")
+            if "window" in c:
+                if not isinstance(c["window"], dict):
+                    raise TypeError("`'window'` must be a dict.")
+                for p in ["min", "max", "start", "end"]:
+                    if p not in c["window"]:
+                        raise KeyError(f"`'{p}'` not found in `'window'`.")
+                    if not isinstance(c["window"][p], (int, float)):
+                        raise TypeError(f"`'{p}'` must be an int or float.")
+
+        group.attrs["omero"] = omero_metadata
 
     # note: we construct the multiscale metadata via dict(), rather than {}
     # to avoid duplication of protected keys like 'version' in **metadata

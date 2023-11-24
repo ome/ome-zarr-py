@@ -382,7 +382,7 @@ class OMERO(Spec):
                     elif contrast_limits is not None:
                         contrast_limits[idx] = [start, end]
 
-            node.metadata["name"] = names
+            node.metadata["channel_names"] = names
             node.metadata["visible"] = visibles
             node.metadata["contrast_limits"] = contrast_limits
             node.metadata["colormap"] = colormaps

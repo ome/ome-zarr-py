@@ -34,6 +34,14 @@ class TestReader:
         reader = Reader(parse_url(filename))
         assert len(list(reader())) == 3
 
+    def test_omero(self):
+        reader = Reader(parse_url(str(self.path)))()
+        image_node = list(reader)[0]
+        omero = image_node.zarr.root_attrs.get("omero")
+        assert "channels" in omero
+        assert isinstance(omero["channels"], list)
+        assert len(omero["channels"]) == 1
+
 
 class TestInvalid:
     @pytest.fixture(autouse=True)
