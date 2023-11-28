@@ -488,7 +488,8 @@ def write_image(
         option.
     :param compute:
         If true compute immediately otherwise a list of :class:`dask.delayed.Delayed`
-        is returned.
+        is returned. If the input image is a dask Array this argument is ignored and
+        a list of :class:`dask.delayed.Delayed` is always returned.
     :return:
         Empty list if the compute flag is True, otherwise it returns a list of
         :class:`dask.delayed.Delayed` representing the value to be computed by
@@ -507,7 +508,6 @@ def write_image(
             coordinate_transformations=coordinate_transformations,
             storage_options=storage_options,
             name=None,
-            compute=compute,
             **metadata,
         )
     else:
@@ -551,7 +551,6 @@ def _write_dask_image(
     coordinate_transformations: Optional[List[List[Dict[str, Any]]]] = None,
     storage_options: Optional[Union[JSONDict, List[JSONDict]]] = None,
     name: Optional[str] = None,
-    compute: Optional[bool] = True,
     **metadata: Union[str, JSONDict, List[JSONDict]],
 ) -> List:
     if fmt.version in ("0.1", "0.2"):
