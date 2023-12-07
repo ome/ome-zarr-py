@@ -1,5 +1,5 @@
 
-Command-line Tool
+Command-line tool
 -----------------
 
 Open Zarr filesets containing images with associated OME metadata.
