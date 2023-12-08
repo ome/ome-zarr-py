@@ -69,6 +69,7 @@ repos:
     rev: v1.7.1
     hooks:
       - id: mypy
+        args: [--config-file=mypy.ini]
 
   - repo: https://github.com/adrienverge/yamllint.git
     rev: v1.33.0
