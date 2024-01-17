@@ -112,7 +112,7 @@ class ZarrLocation:
         return da.from_zarr(self.__store, subpath)
 
     def __eq__(self, rhs: object) -> bool:
-        if type(self) != type(rhs):
+        if type(self) is not type(rhs):
             return False
         if not isinstance(rhs, ZarrLocation):
             return False
