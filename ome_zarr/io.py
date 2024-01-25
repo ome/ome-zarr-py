@@ -28,22 +28,27 @@ class ZarrLocation:
     """
 
     def __init__(
-        self, path: Union[Path, str], mode: str = "r", fmt: Format = CurrentFormat()
+        self, path: Union[Path, str, FSStore], mode: str = "r", fmt: Format = CurrentFormat()
     ) -> None:
         LOGGER.debug("ZarrLocation.__init__ path: %s, fmt: %s", path, fmt.version)
         self.__fmt = fmt
         self.__mode = mode
+        self.__store = None
         if isinstance(path, Path):
             self.__path = str(path.resolve())
         elif isinstance(path, str):
             self.__path = path
+        elif isinstance(path, FSStore):
+            self.__path = path.path
+            self.__store = path
         else:
             raise TypeError(f"not expecting: {type(path)}")
 
         loader = fmt
         if loader is None:
             loader = CurrentFormat()
-        self.__store = loader.init_store(self.__path, mode)
+        if self.__store is None:
+            self.__store = loader.init_store(self.__path, mode)
 
         self.__init_metadata()
         detected = detect_format(self.__metadata, loader)
@@ -53,7 +58,8 @@ class ZarrLocation:
                 "version mismatch: detected: %s, requested: %s", detected, fmt
             )
             self.__fmt = detected
-            self.__store = detected.init_store(self.__path, mode)
+            if self.__store is None:
+                self.__store = detected.init_store(self.__path, mode)
             self.__init_metadata()
 
     def __init_metadata(self) -> None:
