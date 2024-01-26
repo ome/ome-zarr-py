@@ -42,15 +42,15 @@ class ZarrLocation:
             self.__path = path
         elif isinstance(path, FSStore):
             self.__path = path.path
-            self.__store = path
         else:
             raise TypeError(f"not expecting: {type(path)}")
 
         loader = fmt
         if loader is None:
             loader = CurrentFormat()
-        if not (hasattr(self, "__store") and self.__store):
-            self.__store = loader.init_store(self.__path, mode)
+        self.__store: FSStore = (
+            path if isinstance(path, FSStore) else loader.init_store(self.__path, mode)
+        )
 
         self.__init_metadata()
         detected = detect_format(self.__metadata, loader)
@@ -60,8 +60,7 @@ class ZarrLocation:
                 "version mismatch: detected: %s, requested: %s", detected, fmt
             )
             self.__fmt = detected
-            if not (hasattr(self, "__store") and self.__store):
-                self.__store = loader.init_store(self.__path, mode)
+            self.__store = detected.init_store(self.__path, mode)
             self.__init_metadata()
 
     def __init_metadata(self) -> None:
