@@ -1,10 +1,12 @@
+from pathlib import Path
+
+import fsspec
 import pytest
 import zarr
-from pathlib import Path
-import fsspec
 
 from ome_zarr.data import create_zarr
 from ome_zarr.io import ZarrLocation, parse_url
+
 
 class TestIO:
     @pytest.fixture(autouse=True)
@@ -31,6 +33,6 @@ class TestIO:
 
     def test_loc_fs(self):
         fs = fsspec.filesystem("memory")
-        fsstore = zarr.storage.FSStore(url='/', fs=fs)
+        fsstore = zarr.storage.FSStore(url="/", fs=fs)
         loc = ZarrLocation(fsstore)
         assert loc
