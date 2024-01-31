@@ -165,7 +165,10 @@ class ZarrLocation:
             return self.__path.split("/")
 
     def subpath(self, subpath: str = "") -> str:
-        if self.__store.fs.protocol == "file":
+        if self.__store.fs.protocol == "file" or self.__store.fs.protocol == (
+            "file",
+            "local",
+        ):
             filename = Path(self.__path) / subpath
             filename = filename.resolve()
             return str(filename)
