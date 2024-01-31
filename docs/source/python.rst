@@ -1,5 +1,5 @@
-ome_zarr Python library
-=======================
+Python tutorial
+===============
 
 Writing OME-NGFF images
 -----------------------
