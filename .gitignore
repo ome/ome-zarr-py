@@ -6,3 +6,8 @@ build
 dist/
 target/
 docs/build/
+
+# Testing files
+.tox*
+.coverage*
+coverage.xml
