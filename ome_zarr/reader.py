@@ -61,12 +61,10 @@ class Node:
             self.specs.append(Well(self))
 
     @overload
-    def first(self, spectype: Type["Well"]) -> Optional["Well"]:
-        ...
+    def first(self, spectype: Type["Well"]) -> Optional["Well"]: ...
 
     @overload
-    def first(self, spectype: Type["Plate"]) -> Optional["Plate"]:
-        ...
+    def first(self, spectype: Type["Plate"]) -> Optional["Plate"]: ...
 
     def first(self, spectype: Type["Spec"]) -> Optional["Spec"]:
         for spec in self.specs:
