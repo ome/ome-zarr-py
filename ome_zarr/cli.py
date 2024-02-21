@@ -1,4 +1,5 @@
 """Entrypoint for the `ome_zarr` command-line tool."""
+
 import argparse
 import logging
 import sys

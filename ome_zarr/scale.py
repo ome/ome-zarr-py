@@ -2,6 +2,7 @@
 
 See the :class:`~ome_zarr.scale.Scaler` class for details.
 """
+
 import inspect
 import logging
 import os
