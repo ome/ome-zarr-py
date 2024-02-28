@@ -1,5 +1,6 @@
 """Axes class for validating and transforming axes
 """
+
 from typing import Any, Dict, List, Union
 
 from .format import CurrentFormat, Format

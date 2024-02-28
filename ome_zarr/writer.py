@@ -1,6 +1,7 @@
 """Image writer utility
 
 """
+
 import logging
 import warnings
 from pathlib import Path

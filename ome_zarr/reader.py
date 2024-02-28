@@ -62,10 +62,12 @@ class Node:
 
     @overload
     def first(self, spectype: Type["Well"]) -> Optional["Well"]:
+        # Handled by the generic case
         ...
 
     @overload
     def first(self, spectype: Type["Plate"]) -> Optional["Plate"]:
+        # Handled by the generic case
         ...
 
     def first(self, spectype: Type["Spec"]) -> Optional["Spec"]:

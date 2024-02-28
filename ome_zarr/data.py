@@ -1,4 +1,5 @@
 """Functions for generating synthetic data."""
+
 from random import randrange
 from typing import Callable, List, Optional, Tuple, Union
 

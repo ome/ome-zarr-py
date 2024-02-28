@@ -166,26 +166,44 @@ class ZarrLocation:
             return {}
 
     def parts(self) -> List[str]:
-        if self.__store.fs.protocol == "file":
+        if self._isfile():
             return list(Path(self.__path).parts)
         else:
             return self.__path.split("/")
 
     def subpath(self, subpath: str = "") -> str:
-        if self.__store.fs.protocol == "file":
+        if self._isfile():
             filename = Path(self.__path) / subpath
             filename = filename.resolve()
             return str(filename)
-        if self.__store.fs.protocol in ["http", "https"]:
+        elif self._ishttp():
             url = str(self.__path)
             if not url.endswith("/"):
                 url = f"{url}/"
             return urljoin(url, subpath)
         else:
+            # Might require a warning
             if self.__path.endswith("/"):
                 return f"{self.__path}{subpath}"
             else:
                 return f"{self.__path}/{subpath}"
+
+    def _isfile(self) -> bool:
+        """
+        Return whether the current underlying implementation
+        points to a local file or not.
+        """
+        return self.__store.fs.protocol == "file" or self.__store.fs.protocol == (
+            "file",
+            "local",
+        )
+
+    def _ishttp(self) -> bool:
+        """
+        Return whether the current underlying implementation
+        points to a URL
+        """
+        return self.__store.fs.protocol in ["http", "https"]
 
 
 def parse_url(
