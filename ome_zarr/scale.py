@@ -93,7 +93,7 @@ class Scaler:
             grp.attrs.update(base.attrs)
 
     @property
-    def func(self) -> Callable[[np.ndarray, int, int], np.ndarray]:
+    def func(self) -> Callable[[np.ndarray], List[np.ndarray]]:
         """Get downsample function."""
         func = getattr(self, self.method, None)
         if not func:
