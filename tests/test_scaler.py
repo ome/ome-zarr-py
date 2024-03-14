@@ -15,10 +15,14 @@ class TestScaler:
             [(256, 256), True],
             [(256, 256), False],
         ),
-        ids=["5D-directly", "5D-indirectly",
-             "3D-directly", "3D-indirectly",
-             "2D-directly", "2D-indirectly"
-            ],
+        ids=[
+            "5D-directly",
+            "5D-indirectly",
+            "3D-directly",
+            "3D-indirectly",
+            "2D-directly",
+            "2D-indirectly",
+        ],
     )
     def test_case(self, request):
         return request.param
