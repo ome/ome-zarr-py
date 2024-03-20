@@ -46,10 +46,15 @@ class TestScaler:
         downscaled = scaler.func(data)
         self.check_downscaled(downscaled, shape)
 
-        assert np.sum([
-            not np.array_equal(downscaled[i], expected_downscaled[i])
-            for i in range(len(downscaled))
-        ]) == 0
+        assert (
+            np.sum(
+                [
+                    not np.array_equal(downscaled[i], expected_downscaled[i])
+                    for i in range(len(downscaled))
+                ]
+            )
+            == 0
+        )
 
     # this fails because of wrong channel dimension; need to fix in follow-up PR
     @pytest.mark.xfail
@@ -83,10 +88,15 @@ class TestScaler:
         downscaled = scaler.func(data)
         self.check_downscaled(downscaled, shape)
 
-        assert np.sum([
-            not np.array_equal(downscaled[i], expected_downscaled[i])
-            for i in range(len(downscaled))
-        ]) == 0
+        assert (
+            np.sum(
+                [
+                    not np.array_equal(downscaled[i], expected_downscaled[i])
+                    for i in range(len(downscaled))
+                ]
+            )
+            == 0
+        )
 
     @pytest.mark.skip(reason="This test does not terminate")
     def test_zoom(self, shape):
