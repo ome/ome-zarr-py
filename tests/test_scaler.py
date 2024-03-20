@@ -36,6 +36,26 @@ class TestScaler:
         downscaled = scaler.nearest(data)
         self.check_downscaled(downscaled, shape)
 
+    def test_nearest_via_method(self, shape):
+        data = self.create_data(shape)
+
+        scaler = Scaler()
+        expected_downscaled = scaler.nearest(data)
+
+        scaler.method = "nearest"
+        downscaled = scaler.func(data)
+        self.check_downscaled(downscaled, shape)
+
+        assert (
+            np.sum(
+                [
+                    not np.array_equal(downscaled[i], expected_downscaled[i])
+                    for i in range(len(downscaled))
+                ]
+            )
+            == 0
+        )
+
     # this fails because of wrong channel dimension; need to fix in follow-up PR
     @pytest.mark.xfail
     def test_gaussian(self, shape):
@@ -58,6 +78,26 @@ class TestScaler:
         downscaled = scaler.local_mean(data)
         self.check_downscaled(downscaled, shape)
 
+    def test_local_mean_via_method(self, shape):
+        data = self.create_data(shape)
+
+        scaler = Scaler()
+        expected_downscaled = scaler.local_mean(data)
+
+        scaler.method = "local_mean"
+        downscaled = scaler.func(data)
+        self.check_downscaled(downscaled, shape)
+
+        assert (
+            np.sum(
+                [
+                    not np.array_equal(downscaled[i], expected_downscaled[i])
+                    for i in range(len(downscaled))
+                ]
+            )
+            == 0
+        )
+
     @pytest.mark.skip(reason="This test does not terminate")
     def test_zoom(self, shape):
         data = self.create_data(shape)
@@ -79,6 +119,20 @@ class TestScaler:
         resized_dask = scaler.resize_image(data_delayed)
 
         assert np.array_equal(resized_data, resized_dask)
+
+    def test_scale_dask_via_method(self, shape):
+        data = self.create_data(shape)
+
+        chunk_size = [100, 100]
+        chunk_2d = (*(1,) * (data.ndim - 2), *chunk_size)
+        data_delayed = da.from_array(data, chunks=chunk_2d)
+
+        scaler = Scaler()
+        expected_downscaled = scaler.resize_image(data)
+
+        scaler.method = "resize_image"
+        assert np.array_equal(expected_downscaled, scaler.func(data))
+        assert np.array_equal(expected_downscaled, scaler.func(data_delayed))
 
     def test_big_dask_pyramid(self, tmpdir):
         # from https://github.com/ome/omero-cli-zarr/pull/134
