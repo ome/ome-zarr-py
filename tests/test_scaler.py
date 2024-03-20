@@ -72,7 +72,7 @@ class TestScaler:
         downscaled = scaler.laplacian(data)
         self.check_downscaled(downscaled, shape)
 
-    def test_nearest(self, shape):
+    def test_local_mean(self, shape):
         data = self.create_data(shape)
         scaler = Scaler()
         downscaled = scaler.local_mean(data)
