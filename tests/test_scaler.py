@@ -8,23 +8,13 @@ from ome_zarr.scale import Scaler
 class TestScaler:
     @pytest.fixture(
         params=(
-            [(1, 2, 1, 256, 256), True],
-            [(1, 2, 1, 256, 256), False],
-            [(3, 512, 512), True],
-            [(3, 512, 512), False],
-            [(256, 256), True],
-            [(256, 256), False],
+            (1, 2, 1, 256, 256),
+            (3, 512, 512),
+            (256, 256),
         ),
-        ids=[
-            "5D-directly",
-            "5D-indirectly",
-            "3D-directly",
-            "3D-indirectly",
-            "2D-directly",
-            "2D-indirectly",
-        ],
+        ids=["5D", "3D", "2D"],
     )
-    def test_case(self, request):
+    def shape(self, request):
         return request.param
 
     def create_data(self, shape, dtype=np.uint8, mean_val=10):
@@ -40,68 +30,72 @@ class TestScaler:
                 sh // scale_factor for sh in expected_shape[-2:]
             )
 
-    def test_nearest(self, test_case):
-        shape, directly = test_case
+    def test_nearest(self, shape):
         data = self.create_data(shape)
         scaler = Scaler()
-        if directly:
-            downscaled = scaler.nearest(data)
-        else:
-            scaler.method = "nearest"
-            downscaled = scaler.func(data)
+        downscaled = scaler.nearest(data)
+        self.check_downscaled(downscaled, shape)
+
+    def test_nearest_via_method(self, shape):
+        data = self.create_data(shape)
+
+        scaler = Scaler()
+        expected_downscaled = scaler.nearest(data)
+
+        scaler.method = "nearest"
+        downscaled = scaler.func(data)
+        self.check_downscaled(downscaled, shape)
+
+        assert np.sum([
+            not np.array_equal(downscaled[i], expected_downscaled[i])
+            for i in range(len(downscaled))
+        ]) == 0
+
+    # this fails because of wrong channel dimension; need to fix in follow-up PR
+    @pytest.mark.xfail
+    def test_gaussian(self, shape):
+        data = self.create_data(shape)
+        scaler = Scaler()
+        downscaled = scaler.gaussian(data)
         self.check_downscaled(downscaled, shape)
 
     # this fails because of wrong channel dimension; need to fix in follow-up PR
     @pytest.mark.xfail
-    def test_gaussian(self, test_case):
-        shape, directly = test_case
+    def test_laplacian(self, shape):
         data = self.create_data(shape)
         scaler = Scaler()
-        if directly:
-            downscaled = scaler.gaussian(data)
-        else:
-            scaler.method = "gaussian"
-            downscaled = scaler.func(data)
+        downscaled = scaler.laplacian(data)
         self.check_downscaled(downscaled, shape)
 
-    # this fails because of wrong channel dimension; need to fix in follow-up PR
-    @pytest.mark.xfail
-    def test_laplacian(self, test_case):
-        shape, directly = test_case
+    def test_nearest(self, shape):
         data = self.create_data(shape)
         scaler = Scaler()
-        if directly:
-            downscaled = scaler.laplacian(data)
-        else:
-            scaler.method = "laplacian"
-            downscaled = scaler.func(data)
+        downscaled = scaler.local_mean(data)
         self.check_downscaled(downscaled, shape)
 
-    def test_local_mean(self, test_case):
-        shape, directly = test_case
+    def test_local_mean_via_method(self, shape):
         data = self.create_data(shape)
+
         scaler = Scaler()
-        if directly:
-            downscaled = scaler.local_mean(data)
-        else:
-            scaler.method = "local_mean"
-            downscaled = scaler.func(data)
+        expected_downscaled = scaler.local_mean(data)
+
+        scaler.method = "local_mean"
+        downscaled = scaler.func(data)
         self.check_downscaled(downscaled, shape)
+
+        assert np.sum([
+            not np.array_equal(downscaled[i], expected_downscaled[i])
+            for i in range(len(downscaled))
+        ]) == 0
 
     @pytest.mark.skip(reason="This test does not terminate")
-    def test_zoom(self, test_case):
-        shape, directly = test_case
+    def test_zoom(self, shape):
         data = self.create_data(shape)
         scaler = Scaler()
-        if directly:
-            downscaled = scaler.zoom(data)
-        else:
-            scaler.method = "zoom"
-            downscaled = scaler.func(data)
+        downscaled = scaler.zoom(data)
         self.check_downscaled(downscaled, shape)
 
-    def test_scale_dask(self, test_case):
-        shape, directly = test_case
+    def test_scale_dask(self, shape):
         data = self.create_data(shape)
         # chunk size gives odd-shaped chunks at the edges
         # tests https://github.com/ome/ome-zarr-py/pull/244
@@ -111,15 +105,24 @@ class TestScaler:
         data_delayed = da.from_array(data, chunks=chunk_2d)
 
         scaler = Scaler()
-        if directly:
-            resized_data = scaler.resize_image(data)
-            resized_dask = scaler.resize_image(data_delayed)
-        else:
-            scaler.method = "resize_image"
-            resized_data = scaler.func(data)
-            resized_dask = scaler.func(data_delayed)
+        resized_data = scaler.resize_image(data)
+        resized_dask = scaler.resize_image(data_delayed)
 
         assert np.array_equal(resized_data, resized_dask)
+
+    def test_scale_dask_via_method(self, shape):
+        data = self.create_data(shape)
+
+        chunk_size = [100, 100]
+        chunk_2d = (*(1,) * (data.ndim - 2), *chunk_size)
+        data_delayed = da.from_array(data, chunks=chunk_2d)
+
+        scaler = Scaler()
+        expected_downscaled = scaler.resize_image(data)
+
+        scaler.method = "resize_image"
+        assert np.array_equal(expected_downscaled, scaler.func(data))
+        assert np.array_equal(expected_downscaled, scaler.func(data_delayed))
 
     def test_big_dask_pyramid(self, tmpdir):
         # from https://github.com/ome/omero-cli-zarr/pull/134
