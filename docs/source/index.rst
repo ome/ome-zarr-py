@@ -20,6 +20,7 @@ Contents
    cli
    python
    api
+   changelog
 
 Installation
 ------------

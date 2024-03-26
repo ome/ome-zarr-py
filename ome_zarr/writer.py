@@ -921,14 +921,13 @@ def _retuple(
 
     E.g. if chunks is (64, 64) and shape is (3, 4, 5, 1028, 1028)
     return (3, 4, 5, 64, 64)
+
+    If chunks is an integer, it is applied to all dimensions, to match
+    the behaviour of zarr-python.
     """
 
-    _chunks: Tuple[Any, ...]
     if isinstance(chunks, int):
-        _chunks = (chunks,)
-    else:
-        _chunks = chunks
+        return tuple([chunks] * len(shape))
 
-    dims_to_add = len(shape) - len(_chunks)
-
-    return (*shape[:dims_to_add], *_chunks)
+    dims_to_add = len(shape) - len(chunks)
+    return (*shape[:dims_to_add], *chunks)
