@@ -906,7 +906,7 @@ def _create_mip(
                 "Can't downsample if size of x or y dimension is 1. "
                 "Shape: %s" % (image.shape,)
             )
-        mip = scaler.nearest(image)
+        mip = scaler.func(image)
     else:
         LOGGER.debug("disabling pyramid")
         mip = [image]

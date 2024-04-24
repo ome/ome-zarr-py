@@ -77,9 +77,7 @@ class Scaler:
 
     def scale(self, input_array: str, output_directory: str) -> None:
         """Perform downsampling to disk."""
-        func = getattr(self, self.method, None)
-        if not func:
-            raise Exception
+        func = self.func
 
         store = self.__check_store(output_directory)
         base = zarr.open_array(input_array)
@@ -93,6 +91,14 @@ class Scaler:
         if self.copy_metadata:
             print(f"copying attribute keys: {list(base.attrs.keys())}")
             grp.attrs.update(base.attrs)
+
+    @property
+    def func(self) -> Callable[[np.ndarray], List[np.ndarray]]:
+        """Get downsample function."""
+        func = getattr(self, self.method, None)
+        if not func:
+            raise Exception
+        return func
 
     def __check_store(self, output_directory: str) -> MutableMapping:
         """Return a Zarr store if it doesn't already exist."""
