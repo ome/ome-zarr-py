@@ -62,7 +62,7 @@ repos:
           # W503 line break before binary operator
           # Does not recognize deprecated directive in docstrings
           "--ignore=E203,RST303,W503",
-          "--builtins-ignorelist=csv,io,types",
+          "--builtins-allowed-modules=csv,io,types",
           "--rst-roles=class,func,ref,mod,meth,const",
         ]
 
