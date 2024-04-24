@@ -2,6 +2,7 @@
 
 - Correctly specify maximum compatible fsspec version. ([#338](https://github.com/ome/ome-zarr-py/pull/338))
 - Add tests on Python 3.12. ([#338](https://github.com/ome/ome-zarr-py/pull/338))
+- Write OMERO metadata. ([#261](https://github.com/ome/ome-zarr-py/pull/261))
 
 # 0.8.3 (November 2023)
 
