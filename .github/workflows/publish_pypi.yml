@@ -11,8 +11,8 @@ jobs:
       - uses: actions/setup-python@v4
       - name: Build a binary wheel and a source tarball
         run: |
-          python -mpip install wheel
-          python setup.py sdist bdist_wheel
+          python -mpip install wheel build
+          python -m build
       - name: Publish distribution to PyPI
         if: startsWith(github.ref, 'refs/tags')
         uses: pypa/gh-action-pypi-publish@v1.3.0
