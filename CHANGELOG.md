@@ -1,4 +1,4 @@
-# 0.8.4 (unreleased)
+# 0.9.0 (May 2024)
 
 - Correctly specify maximum compatible fsspec version. ([#338](https://github.com/ome/ome-zarr-py/pull/338))
 - Add tests on Python 3.12. ([#338](https://github.com/ome/ome-zarr-py/pull/338))
