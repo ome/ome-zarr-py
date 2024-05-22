@@ -3,6 +3,11 @@
 - Correctly specify maximum compatible fsspec version. ([#338](https://github.com/ome/ome-zarr-py/pull/338))
 - Add tests on Python 3.12. ([#338](https://github.com/ome/ome-zarr-py/pull/338))
 - Write OMERO metadata. ([#261](https://github.com/ome/ome-zarr-py/pull/261))
+- Fixed chunking when a scalar value for chunks is given. Previously
+  passing ``storage_options={"chunks": <int>}`` only set the chunk
+  size of the final dimension. Now the chunk size of all dimensions is
+  set to this value, which is identical behaviour to ``zarr-python``.
+  ([#365](https://github.com/ome/ome-zarr-py/pull/365))
 
 # 0.8.3 (November 2023)
 

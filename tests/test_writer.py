@@ -216,6 +216,20 @@ class TestWriter:
                 shallow=False,
             )
 
+    def test_write_image_scalar_chunks(self):
+        """
+        Make sure a scalar chunks value is applied to all dimensions,
+        matching the behaviour of zarr-python.
+        """
+        shape = (64, 64, 64)
+        data = np.array(self.create_data(shape))
+        write_image(
+            image=data, group=self.group, axes="xyz", storage_options={"chunks": 32}
+        )
+        for data in self.group.values():
+            print(data)
+            assert data.chunks == (32, 32, 32)
+
     @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])
     def test_write_image_compressed(self, array_constructor):
         shape = (64, 64, 64)
