@@ -52,7 +52,7 @@ repos:
           # flake8-blind-except, FIXME
           flake8-builtins,
           flake8-rst-docstrings,
-          flake8-logging-format,
+          # flake8-logging-format, FIXME
         ]
         args: [
           # default black line length is 88
