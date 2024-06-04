@@ -4,7 +4,7 @@ import logging
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Iterator, List, Optional
 
-from zarr.storage import FSStore
+from zarr.v2.storage import FSStore
 
 LOGGER = logging.getLogger("ome_zarr.format")
 
@@ -342,4 +342,35 @@ class FormatV04(FormatV03):
                         )
 
 
-CurrentFormat = FormatV04
+class FormatV05(FormatV04):
+    """
+    Changelog: move to Zarr v3 (June 2024)
+    """
+
+    @property
+    def version(self) -> str:
+        return "0.5"
+
+    def init_store(self, path: str, mode: str = "r") -> FSStore:
+        """
+        Returns a Zarr v3 PathStore
+        """
+
+        from zarr.store import LocalStore, RemoteStore
+
+        cls = LocalStore
+        kwargs = {}
+        
+        if path.startswith(("http", "s3")):
+            cls = RemoteStore
+
+        store = cls(
+            path,
+            mode=mode,
+            **kwargs,
+        )  # TODO: open issue for using Path
+        LOGGER.debug("Created v0.5 store %s(%s, %s, %s)", cls, path, mode, kwargs)
+        return store
+    
+
+CurrentFormat = FormatV05

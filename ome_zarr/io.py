@@ -10,7 +10,12 @@ from typing import List, Optional, Union
 from urllib.parse import urljoin
 
 import dask.array as da
-from zarr.storage import FSStore
+
+# from zarr.v2.storage import FSStore
+from zarr.abc.store import Store
+
+from zarr.store import make_store_path
+from zarr.store.core import StorePath, StoreLike
 
 from .format import CurrentFormat, Format, detect_format
 from .types import JSONDict
@@ -20,7 +25,7 @@ LOGGER = logging.getLogger("ome_zarr.io")
 
 class ZarrLocation:
     """
-    IO primitive for reading and writing Zarr data. Uses FSStore for all
+    IO primitive for reading and writing Zarr data. Uses Store for all
     data access.
 
     No assumptions about the existence of the given path string are made.
@@ -29,30 +34,35 @@ class ZarrLocation:
 
     def __init__(
         self,
-        path: Union[Path, str, FSStore],
+        path: StoreLike,
         mode: str = "r",
         fmt: Format = CurrentFormat(),
     ) -> None:
         LOGGER.debug("ZarrLocation.__init__ path: %s, fmt: %s", path, fmt.version)
         self.__fmt = fmt
         self.__mode = mode
-        if isinstance(path, Path):
-            self.__path = str(path.resolve())
-        elif isinstance(path, str):
-            self.__path = path
-        elif isinstance(path, FSStore):
-            self.__path = path.path
-        else:
-            raise TypeError(f"not expecting: {type(path)}")
+
+        store_path = make_store_path(path, mode=mode)
+        self.__path = store_path.path
+
+        # if isinstance(path, Path):
+        #     self.__path = str(path.resolve())
+        # elif isinstance(path, str):
+        #     self.__path = path
+        # elif isinstance(path, Store):
+        #     self.__path = path.path
+        # else:
+        #     raise TypeError(f"not expecting: {type(path)}")
 
         loader = fmt
         if loader is None:
             loader = CurrentFormat()
-        self.__store: FSStore = (
-            path if isinstance(path, FSStore) else loader.init_store(self.__path, mode)
+        self.__store: Store = (
+            path if isinstance(path, Store) else loader.init_store(self.__path, mode)
         )
 
-        self.__init_metadata()
+        await self.__init_metadata()
+        print("init self.__metadata", self.__metadata)
         detected = detect_format(self.__metadata, loader)
         LOGGER.debug("ZarrLocation.__init__ %s detected: %s", path, detected)
         if detected != fmt:
@@ -63,18 +73,18 @@ class ZarrLocation:
             self.__store = detected.init_store(self.__path, mode)
             self.__init_metadata()
 
-    def __init_metadata(self) -> None:
+    async def __init_metadata(self) -> None:
         """
         Load the Zarr metadata files for the given location.
         """
-        self.zarray: JSONDict = self.get_json(".zarray")
-        self.zgroup: JSONDict = self.get_json(".zgroup")
+        self.zarray: JSONDict = await self.get_json(".zarray")
+        self.zgroup: JSONDict = await self.get_json(".zgroup")
         self.__metadata: JSONDict = {}
         self.__exists: bool = True
         if self.zgroup:
-            self.__metadata = self.get_json(".zattrs")
+            self.__metadata = await self.get_json(".zattrs")
         elif self.zarray:
-            self.__metadata = self.get_json(".zattrs")
+            self.__metadata = await self.get_json(".zattrs")
         else:
             self.__exists = False
 
@@ -104,7 +114,7 @@ class ZarrLocation:
         return self.__path
 
     @property
-    def store(self) -> FSStore:
+    def store(self) -> Store:
         """Return the initialized store for this location"""
         assert self.__store is not None
         return self.__store
@@ -145,7 +155,7 @@ class ZarrLocation:
         LOGGER.debug("open(%s(%s))", self.__class__.__name__, subpath)
         return self.__class__(subpath, mode=self.__mode, fmt=self.__fmt)
 
-    def get_json(self, subpath: str) -> JSONDict:
+    async def get_json(self, subpath: str) -> JSONDict:
         """
         Load and return a given subpath of store as JSON.
 
@@ -154,7 +164,10 @@ class ZarrLocation:
         All other exceptions log at the ERROR level.
         """
         try:
-            data = self.__store.get(subpath)
+            print('get_json', subpath)
+            data = await self.__store._get(subpath)
+            print('data', data)
+
             if not data:
                 return {}
             return json.loads(data)
@@ -206,20 +219,20 @@ class ZarrLocation:
         return self.__store.fs.protocol in ["http", "https"]
 
 
-def parse_url(
+async def parse_url(
     path: Union[Path, str], mode: str = "r", fmt: Format = CurrentFormat()
 ) -> Optional[ZarrLocation]:
     """Convert a path string or URL to a ZarrLocation subclass.
 
     >>> parse_url('does-not-exist')
     """
-    try:
-        loc = ZarrLocation(path, mode=mode, fmt=fmt)
-        if "r" in mode and not loc.exists():
-            return None
-        else:
-            return loc
-    except Exception:
-        LOGGER.exception("exception on parsing (stacktrace at DEBUG)")
-        LOGGER.debug("stacktrace:", exc_info=True)
+    # try:
+    loc = await ZarrLocation(path, mode=mode, fmt=fmt)
+    if "r" in mode and not loc.exists():
         return None
+    else:
+        return loc
+    # except Exception:
+    #     LOGGER.exception("exception on parsing (stacktrace at DEBUG)")
+    #     LOGGER.debug("stacktrace:", exc_info=True)
+    #     return None

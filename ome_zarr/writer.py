@@ -264,7 +264,7 @@ Please use the 'storage_options' argument instead."""
                 dask_delayed.append(da_delayed)
 
         else:
-            group.create_dataset(str(path), data=data, chunks=chunks_opt, **options)
+            group.create_array(str(path), data=data, chunks=chunks_opt, **options)
 
         datasets.append({"path": str(path)})
 
