@@ -15,6 +15,7 @@ import dask.array as da
 from zarr.abc.store import Store
 from zarr.store import make_store_path
 from zarr.store.core import StoreLike, StorePath
+from zarr.sync import sync
 
 from .format import CurrentFormat, Format, detect_format
 from .types import JSONDict
@@ -37,12 +38,15 @@ class ZarrLocation:
         mode: str = "r",
         fmt: Format = CurrentFormat(),
     ) -> None:
-        LOGGER.debug("ZarrLocation.__init__ path: %s, fmt: %s", path, fmt.version)
+        print("ZarrLocation.__init__ path: %s, fmt: %s", path, fmt.version)
         self.__fmt = fmt
         self.__mode = mode
 
-        store_path = make_store_path(path, mode=mode)
-        self.__path = store_path.path
+        # TODO: handle cases where `path` is NOT a string (e.g. a store)
+        # store_path = make_store_path(path, mode=mode)
+        # self.__path = store_path.path    # this is empty
+
+        self.__path = path
 
         # if isinstance(path, Path):
         #     self.__path = str(path.resolve())
@@ -60,12 +64,12 @@ class ZarrLocation:
             path if isinstance(path, Store) else loader.init_store(self.__path, mode)
         )
 
-    async def init_meta(self):
-        loader = self.__fmt
-        if loader is None:
-            loader = CurrentFormat()
+        # def init_meta(self):
+        #     loader = self.__fmt
+        #     if loader is None:
+        #         loader = CurrentFormat()
 
-        await self.__init_metadata()
+        sync(self.__init_metadata())
         print("init self.__metadata", self.__metadata)
         detected = detect_format(self.__metadata, loader)
         LOGGER.debug("ZarrLocation.__init__ %s detected: %s", self.__path, detected)
@@ -80,15 +84,19 @@ class ZarrLocation:
     async def __init_metadata(self) -> None:
         """
         Load the Zarr metadata files for the given location.
+        #TODO: nicer not to try load .zarray, .zgroup etc if v3
         """
         self.zarray: JSONDict = await self.get_json(".zarray")
         self.zgroup: JSONDict = await self.get_json(".zgroup")
+        v3_json = await self.get_json("zarr.json")
         self.__metadata: JSONDict = {}
         self.__exists: bool = True
         if self.zgroup:
             self.__metadata = await self.get_json(".zattrs")
         elif self.zarray:
             self.__metadata = await self.get_json(".zattrs")
+        elif v3_json:
+            self.__metadata = v3_json
         else:
             self.__exists = False
 
@@ -223,7 +231,7 @@ class ZarrLocation:
         return self.__store.fs.protocol in ["http", "https"]
 
 
-async def parse_url(
+def parse_url(
     path: Union[Path, str], mode: str = "r", fmt: Format = CurrentFormat()
 ) -> Optional[ZarrLocation]:
     """Convert a path string or URL to a ZarrLocation subclass.
@@ -232,7 +240,7 @@ async def parse_url(
     """
     # try:
     loc = ZarrLocation(path, mode=mode, fmt=fmt)
-    await loc.init_meta()
+    # await loc.init_meta()
     if "r" in mode and not loc.exists():
         return None
     else:

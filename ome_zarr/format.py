@@ -360,7 +360,7 @@ class FormatV05(FormatV04):
 
         cls = LocalStore
         kwargs = {}
-        
+
         if path.startswith(("http", "s3")):
             cls = RemoteStore
 
@@ -369,8 +369,8 @@ class FormatV05(FormatV04):
             mode=mode,
             **kwargs,
         )  # TODO: open issue for using Path
-        LOGGER.debug("Created v0.5 store %s(%s, %s, %s)", cls, path, mode, kwargs)
+        print("Created v0.5 store %s(%s, %s, %s)" % (cls, path, mode, kwargs))
         return store
-    
+
 
 CurrentFormat = FormatV05

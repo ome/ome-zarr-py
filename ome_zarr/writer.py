@@ -353,11 +353,12 @@ def write_multiscales_metadata(
     # note: we construct the multiscale metadata via dict(), rather than {}
     # to avoid duplication of protected keys like 'version' in **metadata
     # (for {} this would silently over-write it, with dict() it explicitly fails)
+    print("group.store_path", group.store_path)
     multiscales = [
         dict(
             version=fmt.version,
             datasets=_validate_datasets(datasets, ndim, fmt),
-            name=name if name else group.name,
+            name=name if name else str(group.store_path.store.root),
             **metadata,
         )
     ]
