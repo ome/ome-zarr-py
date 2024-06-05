@@ -351,6 +351,10 @@ class FormatV05(FormatV04):
     def version(self) -> str:
         return "0.5"
 
+    @property
+    def version_key(self) -> str:
+        return "https://ngff.openmicroscopy.org/0.5"
+
     def init_store(self, path: str, mode: str = "r") -> FSStore:
         """
         Returns a Zarr v3 PathStore

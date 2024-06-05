@@ -365,7 +365,10 @@ def write_multiscales_metadata(
     if axes is not None:
         multiscales[0]["axes"] = axes
 
-    group.attrs["multiscales"] = multiscales
+    if hasattr(fmt, "version_key"):
+        group.attrs[fmt.version_key] = {"multiscales": multiscales}
+    else:
+        group.attrs["multiscales"] = multiscales
 
 
 def write_plate_metadata(
