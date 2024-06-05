@@ -13,9 +13,8 @@ import dask.array as da
 
 # from zarr.v2.storage import FSStore
 from zarr.abc.store import Store
-
 from zarr.store import make_store_path
-from zarr.store.core import StorePath, StoreLike
+from zarr.store.core import StoreLike, StorePath
 
 from .format import CurrentFormat, Format, detect_format
 from .types import JSONDict
@@ -61,16 +60,21 @@ class ZarrLocation:
             path if isinstance(path, Store) else loader.init_store(self.__path, mode)
         )
 
+    async def init_meta(self):
+        loader = self.__fmt
+        if loader is None:
+            loader = CurrentFormat()
+
         await self.__init_metadata()
         print("init self.__metadata", self.__metadata)
         detected = detect_format(self.__metadata, loader)
-        LOGGER.debug("ZarrLocation.__init__ %s detected: %s", path, detected)
-        if detected != fmt:
+        LOGGER.debug("ZarrLocation.__init__ %s detected: %s", self.__path, detected)
+        if detected != self.__fmt:
             LOGGER.warning(
-                "version mismatch: detected: %s, requested: %s", detected, fmt
+                "version mismatch: detected: %s, requested: %s", detected, self.__fmt
             )
             self.__fmt = detected
-            self.__store = detected.init_store(self.__path, mode)
+            self.__store = detected.init_store(self.__path, self.__mode)
             self.__init_metadata()
 
     async def __init_metadata(self) -> None:
@@ -165,7 +169,7 @@ class ZarrLocation:
         """
         try:
             print('get_json', subpath)
-            data = await self.__store._get(subpath)
+            data = await self.__store.get(subpath)
             print('data', data)
 
             if not data:
@@ -227,7 +231,8 @@ async def parse_url(
     >>> parse_url('does-not-exist')
     """
     # try:
-    loc = await ZarrLocation(path, mode=mode, fmt=fmt)
+    loc = ZarrLocation(path, mode=mode, fmt=fmt)
+    await loc.init_meta()
     if "r" in mode and not loc.exists():
         return None
     else:

@@ -264,7 +264,11 @@ Please use the 'storage_options' argument instead."""
                 dask_delayed.append(da_delayed)
 
         else:
-            group.create_array(str(path), data=data, chunks=chunks_opt, **options)
+            # We create the array and write data to it immediately...
+            a = group.create_array(str(path), chunks=chunks_opt, shape=data.shape, dtype=data.dtype, **options)
+            # These 2 lines are equivalent to e.g. a[:,:] = data (for any number of dimensions)
+            s = [np.s_[:]] * len(data.shape)
+            a[tuple(s)] = data
 
         datasets.append({"path": str(path)})
 
