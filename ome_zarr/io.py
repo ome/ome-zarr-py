@@ -10,6 +10,7 @@ from typing import List, Optional, Union
 from urllib.parse import urljoin
 
 import dask.array as da
+from zarr import Group, Array, open
 
 # from zarr.v2.storage import FSStore
 from zarr.abc.store import Store
@@ -69,7 +70,7 @@ class ZarrLocation:
         #     if loader is None:
         #         loader = CurrentFormat()
 
-        sync(self.__init_metadata())
+        self.__init_metadata()
         print("init self.__metadata", self.__metadata)
         detected = detect_format(self.__metadata, loader)
         LOGGER.debug("ZarrLocation.__init__ %s detected: %s", self.__path, detected)
@@ -81,24 +82,61 @@ class ZarrLocation:
             self.__store = detected.init_store(self.__path, self.__mode)
             self.__init_metadata()
 
-    async def __init_metadata(self) -> None:
+    def __init_metadata(self) -> None:
         """
         Load the Zarr metadata files for the given location.
         #TODO: nicer not to try load .zarray, .zgroup etc if v3
         """
-        self.zarray: JSONDict = await self.get_json(".zarray")
-        self.zgroup: JSONDict = await self.get_json(".zgroup")
-        v3_json = await self.get_json("zarr.json")
+        # Create a Zarr Array or Group to look for json metadata
+        # This will handle both Zarr v2 and v3 files with zarr_format=None
+        self.zgroup: JSONDict = {}
+        self.zarray: JSONDict = {}
         self.__metadata: JSONDict = {}
         self.__exists: bool = True
-        if self.zgroup:
-            self.__metadata = await self.get_json(".zattrs")
-        elif self.zarray:
-            self.__metadata = await self.get_json(".zattrs")
-        elif v3_json:
-            self.__metadata = v3_json
-        else:
-            self.__exists = False
+
+        # array_or_group = open(store=self.__store, zarr_format=None)
+        # if isinstance(array_or_group, Array):
+        #     # This is always True since array is created if it doesn't
+        #     # exist (unless the store is not writable)
+        #     self.zarray = array_or_group.metadata.to_dict()
+        #     self.__metadata = self.zarray
+        # else:
+        #     self.zgroup = array_or_group.metadata.to_dict()
+        #     self.__metadata = self.zgroup
+        # if not self.__metadata:
+        #     self.__exists = False
+
+        try:
+            # NB: zarr_format not supported in Group.open() or Array.open() yet
+            # We want to use zarr_format=None to handle v2 or v3
+            zarr_group = Group.open(self.__store)  #, zarr_format=None)
+            self.zgroup: JSONDict = zarr_group.metadata.to_dict()
+            self.__metadata = self.zgroup
+        except FileNotFoundError:
+            # group doesn't exist yet, try array
+            try:
+                zarr_array = Array.open(self.__store)  #, zarr_format=None)
+                self.zarray: JSONDict = zarr_array.metadata.to_dict()
+                self.__metadata = self.zarray
+            except (ValueError, KeyError, FileNotFoundError):
+                # exceptions raised may change here?
+                print("__init_metadata DOESN'T EXIST", self.__store)
+                self.__exists = False
+                
+        print("__init_metadat EXISTS?", self.__exists, self.__metadata)
+        # self.zarray: JSONDict = await self.get_json(".zarray")
+        # self.zgroup: JSONDict = await self.get_json(".zgroup")
+        # v3_json = await self.get_json("zarr.json")
+        # self.__metadata: JSONDict = {}
+        # self.__exists: bool = True
+        # if self.zgroup:
+        #     self.__metadata = await self.get_json(".zattrs")
+        # elif self.zarray:
+        #     self.__metadata = await self.get_json(".zattrs")
+        # elif v3_json:
+        #     self.__metadata = v3_json
+        # else:
+        #     self.__exists = False
 
     def __repr__(self) -> str:
         """Print the path as well as whether this is a group or an array."""
@@ -240,7 +278,6 @@ def parse_url(
     """
     # try:
     loc = ZarrLocation(path, mode=mode, fmt=fmt)
-    # await loc.init_meta()
     if "r" in mode and not loc.exists():
         return None
     else:
