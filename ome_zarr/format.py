@@ -8,6 +8,8 @@ from zarr.v2.storage import FSStore
 
 LOGGER = logging.getLogger("ome_zarr.format")
 
+NGFF_URL_0_5 = "https://ngff.openmicroscopy.org/0.5"
+
 
 def format_from_version(version: str) -> "Format":
     for fmt in format_implementations():
@@ -24,6 +26,7 @@ def format_implementations() -> Iterator["Format"]:
     """
     Return an instance of each format implementation, newest to oldest.
     """
+    yield FormatV05()
     yield FormatV04()
     yield FormatV03()
     yield FormatV02()
@@ -353,7 +356,7 @@ class FormatV05(FormatV04):
 
     @property
     def version_key(self) -> str:
-        return "https://ngff.openmicroscopy.org/0.5"
+        return NGFF_URL_0_5
 
     def init_store(self, path: str, mode: str = "r") -> FSStore:
         """
@@ -375,6 +378,22 @@ class FormatV05(FormatV04):
         )  # TODO: open issue for using Path
         print("Created v0.5 store %s(%s, %s, %s)" % (cls, path, mode, kwargs))
         return store
+
+    def matches(self, metadata: dict) -> bool:
+        """Version 0.5+ defined by version_key (URL)"""
+        version = self._get_metadata_version(metadata)
+        LOGGER.debug("%s matches %s?", self.version, version)
+        return version == self.version_key
+    
+    def _get_metadata_version(self, metadata: dict) -> Optional[str]:
+        """
+        For version 0.5+ we use the NGFF_URL_0_5 key
+
+        Returns the version of the first object found in the metadata,
+        checking for 'multiscales', 'plate', 'well' etc
+        """
+        if self.version_key in metadata.get("attributes", {}):
+            return self.version_key
 
 
 CurrentFormat = FormatV05

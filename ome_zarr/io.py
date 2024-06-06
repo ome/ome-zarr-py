@@ -71,7 +71,7 @@ class ZarrLocation:
         #         loader = CurrentFormat()
 
         self.__init_metadata()
-        print("init self.__metadata", self.__metadata)
+        print("ZarrLocation init self.__metadata", self.__metadata)
         detected = detect_format(self.__metadata, loader)
         LOGGER.debug("ZarrLocation.__init__ %s detected: %s", self.__path, detected)
         if detected != self.__fmt:
@@ -110,20 +110,18 @@ class ZarrLocation:
             # NB: zarr_format not supported in Group.open() or Array.open() yet
             # We want to use zarr_format=None to handle v2 or v3
             zarr_group = Group.open(self.__store)  #, zarr_format=None)
-            self.zgroup: JSONDict = zarr_group.metadata.to_dict()
+            self.zgroup = zarr_group.metadata.to_dict()
             self.__metadata = self.zgroup
         except FileNotFoundError:
             # group doesn't exist yet, try array
             try:
                 zarr_array = Array.open(self.__store)  #, zarr_format=None)
-                self.zarray: JSONDict = zarr_array.metadata.to_dict()
+                self.zarray = zarr_array.metadata.to_dict()
                 self.__metadata = self.zarray
             except (ValueError, KeyError, FileNotFoundError):
                 # exceptions raised may change here?
-                print("__init_metadata DOESN'T EXIST", self.__store)
                 self.__exists = False
                 
-        print("__init_metadat EXISTS?", self.__exists, self.__metadata)
         # self.zarray: JSONDict = await self.get_json(".zarray")
         # self.zgroup: JSONDict = await self.get_json(".zgroup")
         # v3_json = await self.get_json("zarr.json")

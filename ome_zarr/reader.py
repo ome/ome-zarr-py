@@ -9,7 +9,7 @@ import dask.array as da
 import numpy as np
 
 from .axes import Axes
-from .format import format_from_version
+from .format import format_from_version, NGFF_URL_0_5
 from .io import ZarrLocation
 from .types import JSONDict
 
@@ -176,6 +176,11 @@ class Spec(ABC):
             LOGGER.debug(v)
 
     def lookup(self, key: str, default: Any) -> Any:
+
+        # Handle zarr V3 where everything is under "attributes"
+        if NGFF_URL_0_5 in self.zarr.root_attrs.get("attributes", {}):
+            return self.zarr.root_attrs.get("attributes", {}).get(NGFF_URL_0_5, {}).get(key, default)
+
         return self.zarr.root_attrs.get(key, default)
 
 
@@ -270,8 +275,11 @@ class Multiscales(Spec):
     @staticmethod
     def matches(zarr: ZarrLocation) -> bool:
         """is multiscales metadata present?"""
+
         if zarr.zgroup:
             if "multiscales" in zarr.root_attrs:
+                return True
+            if "multiscales" in (zarr.root_attrs.get("attributes", {}).get(NGFF_URL_0_5, {})):
                 return True
         return False
 
