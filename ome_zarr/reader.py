@@ -197,6 +197,7 @@ class Labels(Spec):
     def __init__(self, node: Node) -> None:
         super().__init__(node)
         label_names = self.lookup("labels", [])
+        print("Labels Spec __init__ label_names", label_names)
         for name in label_names:
             child_zarr = self.zarr.create(name)
             if child_zarr.exists():
@@ -269,6 +270,7 @@ class Label(Spec):
         )
         if properties:
             node.metadata.update({"properties": properties})
+        print("Label Spec __init__ END")
 
 
 class Multiscales(Spec):
@@ -307,10 +309,12 @@ class Multiscales(Spec):
 
         for resolution in self.datasets:
             data: da.core.Array = self.array(resolution, version)
-            chunk_sizes = [
-                str(c[0]) + (" (+ %s)" % c[-1] if c[-1] != c[0] else "")
-                for c in data.chunks
-            ]
+            # TODO: TEMP ignore chunks since data is numpy array not Dask Array
+            # (Dask not working with Zarr v3 just yet)
+            # chunk_sizes = [
+            #     str(c[0]) + (" (+ %s)" % c[-1] if c[-1] != c[0] else "")
+            #     for c in data.chunks
+            # ]
             LOGGER.info("resolution: %s", resolution)
             axes_names = None
             if axes is not None:
@@ -318,14 +322,19 @@ class Multiscales(Spec):
                     axis if isinstance(axis, str) else axis["name"] for axis in axes
                 )
             LOGGER.info(" - shape %s = %s", axes_names, data.shape)
-            LOGGER.info(" - chunks =  %s", chunk_sizes)
+            # LOGGER.info(" - chunks =  %s", chunk_sizes)
             LOGGER.info(" - dtype = %s", data.dtype)
             node.data.append(data)
 
         # Load possible node data
+        # When this Multiscales is itself a Labels image, this child_zarr won't exist
+        # e.g. 6001240.zarr/labels/0/labels doesn't exist
+        # BUT calling this with zarr v3 fails since
         child_zarr = self.zarr.create("labels")
+        print("Multiscales child_zarr 'labels' exists??", child_zarr, child_zarr.exists())
         if child_zarr.exists():
             node.add(child_zarr, visibility=False)
+        print("Multiscales __init__ END")
 
     def array(self, resolution: str, version: str) -> da.core.Array:
         # data.shape is (t, c, z, y, x) by convention

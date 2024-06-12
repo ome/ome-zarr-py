@@ -73,9 +73,9 @@ class ZarrLocation:
         self.__init_metadata()
         print("ZarrLocation init self.__metadata", self.__metadata)
         detected = detect_format(self.__metadata, loader)
-        LOGGER.debug("ZarrLocation.__init__ %s detected: %s", self.__path, detected)
+        print("ZarrLocation.__init__ %s detected: %s", self.__path, detected)
         if detected != self.__fmt:
-            LOGGER.warning(
+            print(
                 "version mismatch: detected: %s, requested: %s", detected, self.__fmt
             )
             self.__fmt = detected
@@ -109,18 +109,31 @@ class ZarrLocation:
         try:
             # NB: zarr_format not supported in Group.open() or Array.open() yet
             # We want to use zarr_format=None to handle v2 or v3
-            zarr_group = Group.open(self.__store)  #, zarr_format=None)
-            self.zgroup = zarr_group.metadata.to_dict()
-            self.__metadata = self.zgroup
-        except FileNotFoundError:
-            # group doesn't exist yet, try array
-            try:
-                zarr_array = Array.open(self.__store)  #, zarr_format=None)
-                self.zarray = zarr_array.metadata.to_dict()
-                self.__metadata = self.zarray
-            except (ValueError, KeyError, FileNotFoundError):
-                # exceptions raised may change here?
-                self.__exists = False
+            print("ZarrLocation __init_metadata: TRY to open group...")
+            # zarr_group = Group.open(self.__store)  #, zarr_format=None)
+
+            # NB: If the store is writable, open() will fail IF location doesn't exist because 
+            # zarr v3 will try to create an Array (instead of looking instead for a Group)
+            # and fails because 'shape' is not provided - see TypeError below.
+            # NB: we need zarr_format here to open V2 groups
+            # see https://github.com/zarr-developers/zarr-python/issues/1958
+            array_or_group = open(store=self.__store, zarr_format=2)
+            print("ZarrLocation __init metadata array_or_group", array_or_group)
+
+            self.__metadata = array_or_group.metadata.to_dict()
+            if isinstance(array_or_group, Group):
+                # {'attributes': {'_creator': {'name': 'omero-zarr', 'version': '0.3.1.dev10+geab4dde'}, 'multiscales': [{'name': 'My_i
+                # Need to "unwrap" the 'attributes' to get group metadata
+                self.zgroup = self.__metadata["attributes"]
+                self.__metadata = self.zgroup
+            else:
+                self.zarray = self.__metadata
+        except (ValueError, KeyError, FileNotFoundError):
+            # exceptions raised may change here?
+            self.__exists = False
+        except TypeError:
+            # open() tried to open_array() but we didn't supply 'shape' argument
+            self.__exists = False
                 
         # self.zarray: JSONDict = await self.get_json(".zarray")
         # self.zgroup: JSONDict = await self.get_json(".zgroup")
@@ -174,7 +187,10 @@ class ZarrLocation:
 
     def load(self, subpath: str = "") -> da.core.Array:
         """Use dask.array.from_zarr to load the subpath."""
-        return da.from_zarr(self.__store, subpath)
+        # return da.from_zarr(self.__store, subpath)
+        from zarr import load
+        # returns zarr Array (no chunks) instead of Dask
+        return load(store=self.__store, path=subpath)
 
     def __eq__(self, rhs: object) -> bool:
         if type(self) is not type(rhs):
@@ -201,6 +217,7 @@ class ZarrLocation:
         """Create a new Zarr location for the given path."""
         subpath = self.subpath(path)
         LOGGER.debug("open(%s(%s))", self.__class__.__name__, subpath)
+        print("ZarrLocation.create() subpath", subpath)
         return self.__class__(subpath, mode=self.__mode, fmt=self.__fmt)
 
     async def get_json(self, subpath: str) -> JSONDict:
@@ -254,10 +271,12 @@ class ZarrLocation:
         Return whether the current underlying implementation
         points to a local file or not.
         """
-        return self.__store.fs.protocol == "file" or self.__store.fs.protocol == (
-            "file",
-            "local",
-        )
+        # TODO: TEMP!
+        return True
+        # return self.__store.fs.protocol == "file" or self.__store.fs.protocol == (
+        #     "file",
+        #     "local",
+        # )
 
     def _ishttp(self) -> bool:
         """

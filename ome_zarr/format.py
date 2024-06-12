@@ -6,6 +6,10 @@ from typing import Any, Dict, Iterator, List, Optional
 
 from zarr.v2.storage import FSStore
 
+from zarr.store import LocalStore, RemoteStore
+from zarr.store import StoreLike, StorePath
+from zarr.abc.store import Store
+
 LOGGER = logging.getLogger("ome_zarr.format")
 
 NGFF_URL_0_5 = "https://ngff.openmicroscopy.org/0.5"
@@ -62,7 +66,7 @@ class Format(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def init_store(self, path: str, mode: str = "r") -> FSStore:
+    def init_store(self, path: str, mode: str = "r") -> Store:
         raise NotImplementedError()
 
     # @abstractmethod
@@ -136,6 +140,7 @@ class FormatV01(Format):
         LOGGER.debug("%s matches %s?", self.version, version)
         return version == self.version
 
+    # TODO Fix to return v3 Store
     def init_store(self, path: str, mode: str = "r") -> FSStore:
         store = FSStore(path, mode=mode, dimension_separator=".")
         LOGGER.debug("Created legacy flat FSStore(%s, %s)", path, mode)
@@ -182,30 +187,51 @@ class FormatV02(FormatV01):
     def version(self) -> str:
         return "0.2"
 
-    def init_store(self, path: str, mode: str = "r") -> FSStore:
+    # def init_store(self, path: str, mode: str = "r") -> FSStore:
+    #     """
+    #     Not ideal. Stores should remain hidden
+    #     TODO: could also check dimension_separator
+    #     """
+
+    #     kwargs = {
+    #         "dimension_separator": "/",
+    #         "normalize_keys": False,
+    #     }
+
+    #     mkdir = True
+
+        
+    #     if "r" in mode or path.startswith(("http", "s3")):
+    #         # Could be simplified on the fsspec side
+    #         mkdir = False
+    #     if mkdir:
+    #         kwargs["auto_mkdir"] = True
+
+    #     store = FSStore(
+    #         path,
+    #         mode=mode,
+    #         **kwargs,
+    #     )  # TODO: open issue for using Path
+    #     LOGGER.debug("Created nested FSStore(%s, %s, %s)", path, mode, kwargs)
+    #     return store
+    
+    def init_store(self, path: str, mode: str = "r") -> Store:
         """
-        Not ideal. Stores should remain hidden
-        TODO: could also check dimension_separator
+        Returns a Zarr v3 PathStore
         """
 
-        kwargs = {
-            "dimension_separator": "/",
-            "normalize_keys": False,
-        }
+        cls = LocalStore
+        kwargs = {}
 
-        mkdir = True
-        if "r" in mode or path.startswith(("http", "s3")):
-            # Could be simplified on the fsspec side
-            mkdir = False
-        if mkdir:
-            kwargs["auto_mkdir"] = True
+        if path.startswith(("http", "s3")):
+            cls = RemoteStore
 
-        store = FSStore(
+        store = cls(
             path,
             mode=mode,
             **kwargs,
         )  # TODO: open issue for using Path
-        LOGGER.debug("Created nested FSStore(%s, %s, %s)", path, mode, kwargs)
+        print("Created %s store %s(%s, %s, %s)" % (self.version, cls, path, mode, kwargs))
         return store
 
 
@@ -357,27 +383,6 @@ class FormatV05(FormatV04):
     @property
     def version_key(self) -> str:
         return NGFF_URL_0_5
-
-    def init_store(self, path: str, mode: str = "r") -> FSStore:
-        """
-        Returns a Zarr v3 PathStore
-        """
-
-        from zarr.store import LocalStore, RemoteStore
-
-        cls = LocalStore
-        kwargs = {}
-
-        if path.startswith(("http", "s3")):
-            cls = RemoteStore
-
-        store = cls(
-            path,
-            mode=mode,
-            **kwargs,
-        )  # TODO: open issue for using Path
-        print("Created v0.5 store %s(%s, %s, %s)" % (cls, path, mode, kwargs))
-        return store
 
     def matches(self, metadata: dict) -> bool:
         """Version 0.5+ defined by version_key (URL)"""
