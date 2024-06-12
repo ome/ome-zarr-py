@@ -9,7 +9,7 @@ import dask.array as da
 import numpy as np
 
 from .axes import Axes
-from .format import format_from_version, NGFF_URL_0_5
+from .format import NGFF_URL_0_5, format_from_version
 from .io import ZarrLocation
 from .types import JSONDict
 
@@ -179,7 +179,11 @@ class Spec(ABC):
 
         # Handle zarr V3 where everything is under "attributes"
         if NGFF_URL_0_5 in self.zarr.root_attrs.get("attributes", {}):
-            return self.zarr.root_attrs.get("attributes", {}).get(NGFF_URL_0_5, {}).get(key, default)
+            return (
+                self.zarr.root_attrs.get("attributes", {})
+                .get(NGFF_URL_0_5, {})
+                .get(key, default)
+            )
 
         return self.zarr.root_attrs.get(key, default)
 
@@ -281,7 +285,9 @@ class Multiscales(Spec):
         if zarr.zgroup:
             if "multiscales" in zarr.root_attrs:
                 return True
-            if "multiscales" in (zarr.root_attrs.get("attributes", {}).get(NGFF_URL_0_5, {})):
+            if "multiscales" in (
+                zarr.root_attrs.get("attributes", {}).get(NGFF_URL_0_5, {})
+            ):
                 return True
         return False
 
@@ -331,7 +337,9 @@ class Multiscales(Spec):
         # e.g. 6001240.zarr/labels/0/labels doesn't exist
         # BUT calling this with zarr v3 fails since
         child_zarr = self.zarr.create("labels")
-        print("Multiscales child_zarr 'labels' exists??", child_zarr, child_zarr.exists())
+        print(
+            "Multiscales child_zarr 'labels' exists??", child_zarr, child_zarr.exists()
+        )
         if child_zarr.exists():
             node.add(child_zarr, visibility=False)
         print("Multiscales __init__ END")

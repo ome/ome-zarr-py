@@ -4,11 +4,9 @@ import logging
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Iterator, List, Optional
 
-from zarr.v2.storage import FSStore
-
-from zarr.store import LocalStore, RemoteStore
-from zarr.store import StoreLike, StorePath
 from zarr.abc.store import Store
+from zarr.store import LocalStore, RemoteStore, StoreLike, StorePath
+from zarr.v2.storage import FSStore
 
 LOGGER = logging.getLogger("ome_zarr.format")
 
@@ -200,7 +198,6 @@ class FormatV02(FormatV01):
 
     #     mkdir = True
 
-        
     #     if "r" in mode or path.startswith(("http", "s3")):
     #         # Could be simplified on the fsspec side
     #         mkdir = False
@@ -214,7 +211,7 @@ class FormatV02(FormatV01):
     #     )  # TODO: open issue for using Path
     #     LOGGER.debug("Created nested FSStore(%s, %s, %s)", path, mode, kwargs)
     #     return store
-    
+
     def init_store(self, path: str, mode: str = "r") -> Store:
         """
         Returns a Zarr v3 PathStore
@@ -231,7 +228,9 @@ class FormatV02(FormatV01):
             mode=mode,
             **kwargs,
         )  # TODO: open issue for using Path
-        print("Created %s store %s(%s, %s, %s)" % (self.version, cls, path, mode, kwargs))
+        print(
+            "Created {} store {}({}, {}, {})".format(self.version, cls, path, mode, kwargs)
+        )
         return store
 
 
@@ -389,7 +388,7 @@ class FormatV05(FormatV04):
         version = self._get_metadata_version(metadata)
         LOGGER.debug("%s matches %s?", self.version, version)
         return version == self.version_key
-    
+
     def _get_metadata_version(self, metadata: dict) -> Optional[str]:
         """
         For version 0.5+ we use the NGFF_URL_0_5 key

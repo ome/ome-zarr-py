@@ -10,7 +10,7 @@ from typing import List, Optional, Union
 from urllib.parse import urljoin
 
 import dask.array as da
-from zarr import Group, Array, open
+from zarr import Array, Group, open
 
 # from zarr.v2.storage import FSStore
 from zarr.abc.store import Store
@@ -75,9 +75,7 @@ class ZarrLocation:
         detected = detect_format(self.__metadata, loader)
         print("ZarrLocation.__init__ %s detected: %s", self.__path, detected)
         if detected != self.__fmt:
-            print(
-                "version mismatch: detected: %s, requested: %s", detected, self.__fmt
-            )
+            print("version mismatch: detected: %s, requested: %s", detected, self.__fmt)
             self.__fmt = detected
             self.__store = detected.init_store(self.__path, self.__mode)
             self.__init_metadata()
@@ -112,7 +110,7 @@ class ZarrLocation:
             print("ZarrLocation __init_metadata: TRY to open group...")
             # zarr_group = Group.open(self.__store)  #, zarr_format=None)
 
-            # NB: If the store is writable, open() will fail IF location doesn't exist because 
+            # NB: If the store is writable, open() will fail IF location doesn't exist because
             # zarr v3 will try to create an Array (instead of looking instead for a Group)
             # and fails because 'shape' is not provided - see TypeError below.
             # NB: we need zarr_format here to open V2 groups
@@ -134,7 +132,7 @@ class ZarrLocation:
         except TypeError:
             # open() tried to open_array() but we didn't supply 'shape' argument
             self.__exists = False
-                
+
         # self.zarray: JSONDict = await self.get_json(".zarray")
         # self.zgroup: JSONDict = await self.get_json(".zgroup")
         # v3_json = await self.get_json("zarr.json")
@@ -189,6 +187,7 @@ class ZarrLocation:
         """Use dask.array.from_zarr to load the subpath."""
         # return da.from_zarr(self.__store, subpath)
         from zarr import load
+
         # returns zarr Array (no chunks) instead of Dask
         return load(store=self.__store, path=subpath)
 
@@ -229,9 +228,9 @@ class ZarrLocation:
         All other exceptions log at the ERROR level.
         """
         try:
-            print('get_json', subpath)
+            print("get_json", subpath)
             data = await self.__store.get(subpath)
-            print('data', data)
+            print("data", data)
 
             if not data:
                 return {}
