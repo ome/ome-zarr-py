@@ -10,7 +10,13 @@ from typing import List, Optional, Union
 from urllib.parse import urljoin
 
 import dask.array as da
-from zarr.storage import FSStore
+from zarr import Array, Group, open
+
+# from zarr.v2.storage import FSStore
+from zarr.abc.store import Store
+from zarr.store import make_store_path
+from zarr.store.core import StoreLike, StorePath
+from zarr.sync import sync
 
 from .format import CurrentFormat, Format, detect_format
 from .types import JSONDict
@@ -20,7 +26,7 @@ LOGGER = logging.getLogger("ome_zarr.io")
 
 class ZarrLocation:
     """
-    IO primitive for reading and writing Zarr data. Uses FSStore for all
+    IO primitive for reading and writing Zarr data. Uses Store for all
     data access.
 
     No assumptions about the existence of the given path string are made.
@@ -29,54 +35,117 @@ class ZarrLocation:
 
     def __init__(
         self,
-        path: Union[Path, str, FSStore],
+        path: StoreLike,
         mode: str = "r",
         fmt: Format = CurrentFormat(),
     ) -> None:
-        LOGGER.debug("ZarrLocation.__init__ path: %s, fmt: %s", path, fmt.version)
+        print("ZarrLocation.__init__ path: %s, fmt: %s", path, fmt.version)
         self.__fmt = fmt
         self.__mode = mode
-        if isinstance(path, Path):
-            self.__path = str(path.resolve())
-        elif isinstance(path, str):
-            self.__path = path
-        elif isinstance(path, FSStore):
-            self.__path = path.path
-        else:
-            raise TypeError(f"not expecting: {type(path)}")
+
+        # TODO: handle cases where `path` is NOT a string (e.g. a store)
+        # store_path = make_store_path(path, mode=mode)
+        # self.__path = store_path.path    # this is empty
+
+        self.__path = path
+
+        # if isinstance(path, Path):
+        #     self.__path = str(path.resolve())
+        # elif isinstance(path, str):
+        #     self.__path = path
+        # elif isinstance(path, Store):
+        #     self.__path = path.path
+        # else:
+        #     raise TypeError(f"not expecting: {type(path)}")
 
         loader = fmt
         if loader is None:
             loader = CurrentFormat()
-        self.__store: FSStore = (
-            path if isinstance(path, FSStore) else loader.init_store(self.__path, mode)
+        self.__store: Store = (
+            path if isinstance(path, Store) else loader.init_store(self.__path, mode)
         )
 
+        # def init_meta(self):
+        #     loader = self.__fmt
+        #     if loader is None:
+        #         loader = CurrentFormat()
+
         self.__init_metadata()
+        print("ZarrLocation init self.__metadata", self.__metadata)
         detected = detect_format(self.__metadata, loader)
-        LOGGER.debug("ZarrLocation.__init__ %s detected: %s", path, detected)
-        if detected != fmt:
-            LOGGER.warning(
-                "version mismatch: detected: %s, requested: %s", detected, fmt
-            )
+        print("ZarrLocation.__init__ %s detected: %s", self.__path, detected)
+        if detected != self.__fmt:
+            print("version mismatch: detected: %s, requested: %s", detected, self.__fmt)
             self.__fmt = detected
-            self.__store = detected.init_store(self.__path, mode)
+            self.__store = detected.init_store(self.__path, self.__mode)
             self.__init_metadata()
 
     def __init_metadata(self) -> None:
         """
         Load the Zarr metadata files for the given location.
+        #TODO: nicer not to try load .zarray, .zgroup etc if v3
         """
-        self.zarray: JSONDict = self.get_json(".zarray")
-        self.zgroup: JSONDict = self.get_json(".zgroup")
+        # Create a Zarr Array or Group to look for json metadata
+        # This will handle both Zarr v2 and v3 files with zarr_format=None
+        self.zgroup: JSONDict = {}
+        self.zarray: JSONDict = {}
         self.__metadata: JSONDict = {}
         self.__exists: bool = True
-        if self.zgroup:
-            self.__metadata = self.get_json(".zattrs")
-        elif self.zarray:
-            self.__metadata = self.get_json(".zattrs")
-        else:
+
+        # array_or_group = open(store=self.__store, zarr_format=None)
+        # if isinstance(array_or_group, Array):
+        #     # This is always True since array is created if it doesn't
+        #     # exist (unless the store is not writable)
+        #     self.zarray = array_or_group.metadata.to_dict()
+        #     self.__metadata = self.zarray
+        # else:
+        #     self.zgroup = array_or_group.metadata.to_dict()
+        #     self.__metadata = self.zgroup
+        # if not self.__metadata:
+        #     self.__exists = False
+
+        try:
+            # NB: zarr_format not supported in Group.open() or Array.open() yet
+            # We want to use zarr_format=None to handle v2 or v3
+            print("ZarrLocation __init_metadata: TRY to open group...")
+            # zarr_group = Group.open(self.__store)  #, zarr_format=None)
+
+            # NB: If the store is writable, open() will fail IF location doesn't exist because
+            # zarr v3 will try to create an Array (instead of looking instead for a Group)
+            # and fails because 'shape' is not provided - see TypeError below.
+            # NB: we need zarr_format here to open V2 groups
+            # see https://github.com/zarr-developers/zarr-python/issues/1958
+            array_or_group = open(store=self.__store, zarr_format=2)
+            print("ZarrLocation __init metadata array_or_group", array_or_group)
+
+            self.__metadata = array_or_group.metadata.to_dict()
+            if isinstance(array_or_group, Group):
+                # {'attributes': {'_creator': {'name': 'omero-zarr', 'version': '0.3.1.dev10+geab4dde'}, 'multiscales': [{'name': 'My_i
+                # Need to "unwrap" the 'attributes' to get group metadata
+                self.zgroup = self.__metadata["attributes"]
+                self.__metadata = self.zgroup
+            else:
+                self.zarray = self.__metadata
+        except (ValueError, KeyError, FileNotFoundError):
+            # exceptions raised may change here?
             self.__exists = False
+        except TypeError:
+            # open() tried to open_array() but we didn't supply 'shape' argument
+            self.__exists = False
+
+        # self.zarray: JSONDict = await self.get_json(".zarray")
+        # self.zgroup: JSONDict = await self.get_json(".zgroup")
+        # v3_json = await self.get_json("zarr.json")
+        # self.__metadata: JSONDict = {}
+        # self.__exists: bool = True
+        # if self.zgroup:
+        #     self.__metadata = await self.get_json(".zattrs")
+        # elif self.zarray:
+        #     self.__metadata = await self.get_json(".zattrs")
+        # elif v3_json:
+        #     self.__metadata = v3_json
+        # else:
+        #     self.__exists = False
 
     def __repr__(self) -> str:
         """Print the path as well as whether this is a group or an array."""
@@ -104,7 +173,7 @@ class ZarrLocation:
         return self.__path
 
     @property
-    def store(self) -> FSStore:
+    def store(self) -> Store:
         """Return the initialized store for this location"""
         assert self.__store is not None
         return self.__store
@@ -116,7 +185,11 @@ class ZarrLocation:
 
     def load(self, subpath: str = "") -> da.core.Array:
         """Use dask.array.from_zarr to load the subpath."""
-        return da.from_zarr(self.__store, subpath)
+        # return da.from_zarr(self.__store, subpath)
+        from zarr import load
+
+        # returns zarr Array (no chunks) instead of Dask
+        return load(store=self.__store, path=subpath)
 
     def __eq__(self, rhs: object) -> bool:
         if type(self) is not type(rhs):
@@ -143,9 +216,10 @@ class ZarrLocation:
         """Create a new Zarr location for the given path."""
         subpath = self.subpath(path)
         LOGGER.debug("open(%s(%s))", self.__class__.__name__, subpath)
+        print("ZarrLocation.create() subpath", subpath)
         return self.__class__(subpath, mode=self.__mode, fmt=self.__fmt)
 
-    def get_json(self, subpath: str) -> JSONDict:
+    async def get_json(self, subpath: str) -> JSONDict:
         """
         Load and return a given subpath of store as JSON.
 
@@ -154,7 +228,10 @@ class ZarrLocation:
         All other exceptions log at the ERROR level.
         """
         try:
-            data = self.__store.get(subpath)
+            print("get_json", subpath)
+            data = await self.__store.get(subpath)
+            print("data", data)
+
             if not data:
                 return {}
             return json.loads(data)
@@ -193,10 +270,12 @@ class ZarrLocation:
         Return whether the current underlying implementation
         points to a local file or not.
         """
-        return self.__store.fs.protocol == "file" or self.__store.fs.protocol == (
-            "file",
-            "local",
-        )
+        # TODO: TEMP!
+        return True
+        # return self.__store.fs.protocol == "file" or self.__store.fs.protocol == (
+        #     "file",
+        #     "local",
+        # )
 
     def _ishttp(self) -> bool:
         """
@@ -213,13 +292,13 @@ def parse_url(
 
     >>> parse_url('does-not-exist')
     """
-    try:
-        loc = ZarrLocation(path, mode=mode, fmt=fmt)
-        if "r" in mode and not loc.exists():
-            return None
-        else:
-            return loc
-    except Exception:
-        LOGGER.exception("exception on parsing (stacktrace at DEBUG)")
-        LOGGER.debug("stacktrace:", exc_info=True)
+    # try:
+    loc = ZarrLocation(path, mode=mode, fmt=fmt)
+    if "r" in mode and not loc.exists():
         return None
+    else:
+        return loc
+    # except Exception:
+    #     LOGGER.exception("exception on parsing (stacktrace at DEBUG)")
+    #     LOGGER.debug("stacktrace:", exc_info=True)
+    #     return None

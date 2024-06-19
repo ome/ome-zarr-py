@@ -4,9 +4,13 @@ import logging
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Iterator, List, Optional
 
-from zarr.storage import FSStore
+from zarr.abc.store import Store
+from zarr.store import LocalStore, RemoteStore, StoreLike, StorePath
+from zarr.v2.storage import FSStore
 
 LOGGER = logging.getLogger("ome_zarr.format")
+
+NGFF_URL_0_5 = "https://ngff.openmicroscopy.org/0.5"
 
 
 def format_from_version(version: str) -> "Format":
@@ -24,6 +28,7 @@ def format_implementations() -> Iterator["Format"]:
     """
     Return an instance of each format implementation, newest to oldest.
     """
+    yield FormatV05()
     yield FormatV04()
     yield FormatV03()
     yield FormatV02()
@@ -59,7 +64,7 @@ class Format(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def init_store(self, path: str, mode: str = "r") -> FSStore:
+    def init_store(self, path: str, mode: str = "r") -> Store:
         raise NotImplementedError()
 
     # @abstractmethod
@@ -133,6 +138,7 @@ class FormatV01(Format):
         LOGGER.debug("%s matches %s?", self.version, version)
         return version == self.version
 
+    # TODO Fix to return v3 Store
     def init_store(self, path: str, mode: str = "r") -> FSStore:
         store = FSStore(path, mode=mode, dimension_separator=".")
         LOGGER.debug("Created legacy flat FSStore(%s, %s)", path, mode)
@@ -179,30 +185,52 @@ class FormatV02(FormatV01):
     def version(self) -> str:
         return "0.2"
 
-    def init_store(self, path: str, mode: str = "r") -> FSStore:
+    # def init_store(self, path: str, mode: str = "r") -> FSStore:
+    #     """
+    #     Not ideal. Stores should remain hidden
+    #     TODO: could also check dimension_separator
+    #     """
+
+    #     kwargs = {
+    #         "dimension_separator": "/",
+    #         "normalize_keys": False,
+    #     }
+
+    #     mkdir = True
+
+    #     if "r" in mode or path.startswith(("http", "s3")):
+    #         # Could be simplified on the fsspec side
+    #         mkdir = False
+    #     if mkdir:
+    #         kwargs["auto_mkdir"] = True
+
+    #     store = FSStore(
+    #         path,
+    #         mode=mode,
+    #         **kwargs,
+    #     )  # TODO: open issue for using Path
+    #     LOGGER.debug("Created nested FSStore(%s, %s, %s)", path, mode, kwargs)
+    #     return store
+
+    def init_store(self, path: str, mode: str = "r") -> Store:
         """
-        Not ideal. Stores should remain hidden
-        TODO: could also check dimension_separator
+        Returns a Zarr v3 PathStore
         """
 
-        kwargs = {
-            "dimension_separator": "/",
-            "normalize_keys": False,
-        }
+        cls = LocalStore
+        kwargs = {}
 
-        mkdir = True
-        if "r" in mode or path.startswith(("http", "s3")):
-            # Could be simplified on the fsspec side
-            mkdir = False
-        if mkdir:
-            kwargs["auto_mkdir"] = True
+        if path.startswith(("http", "s3")):
+            cls = RemoteStore
 
-        store = FSStore(
+        store = cls(
             path,
             mode=mode,
             **kwargs,
         )  # TODO: open issue for using Path
-        LOGGER.debug("Created nested FSStore(%s, %s, %s)", path, mode, kwargs)
+        print(
+            "Created {} store {}({}, {}, {})".format(self.version, cls, path, mode, kwargs)
+        )
         return store
 
 
@@ -342,4 +370,34 @@ class FormatV04(FormatV03):
                         )
 
 
-CurrentFormat = FormatV04
+class FormatV05(FormatV04):
+    """
+    Changelog: move to Zarr v3 (June 2024)
+    """
+
+    @property
+    def version(self) -> str:
+        return "0.5"
+
+    @property
+    def version_key(self) -> str:
+        return NGFF_URL_0_5
+
+    def matches(self, metadata: dict) -> bool:
+        """Version 0.5+ defined by version_key (URL)"""
+        version = self._get_metadata_version(metadata)
+        LOGGER.debug("%s matches %s?", self.version, version)
+        return version == self.version_key
+
+    def _get_metadata_version(self, metadata: dict) -> Optional[str]:
+        """
+        For version 0.5+ we use the NGFF_URL_0_5 key
+
+        Returns the version of the first object found in the metadata,
+        checking for 'multiscales', 'plate', 'well' etc
+        """
+        if self.version_key in metadata.get("attributes", {}):
+            return self.version_key
+
+
+CurrentFormat = FormatV05

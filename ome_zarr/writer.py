@@ -264,7 +264,17 @@ Please use the 'storage_options' argument instead."""
                 dask_delayed.append(da_delayed)
 
         else:
-            group.create_dataset(str(path), data=data, chunks=chunks_opt, **options)
+            # We create the array and write data to it immediately...
+            a = group.create_array(
+                str(path),
+                chunks=chunks_opt,
+                shape=data.shape,
+                dtype=data.dtype,
+                **options,
+            )
+            # These 2 lines are equivalent to e.g. a[:,:] = data (for any number of dimensions)
+            s = [np.s_[:]] * len(data.shape)
+            a[tuple(s)] = data
 
         datasets.append({"path": str(path)})
 
@@ -349,18 +359,22 @@ def write_multiscales_metadata(
     # note: we construct the multiscale metadata via dict(), rather than {}
     # to avoid duplication of protected keys like 'version' in **metadata
     # (for {} this would silently over-write it, with dict() it explicitly fails)
+    print("group.store_path", group.store_path)
     multiscales = [
         dict(
             version=fmt.version,
             datasets=_validate_datasets(datasets, ndim, fmt),
-            name=name if name else group.name,
+            name=name if name else str(group.store_path.store.root),
             **metadata,
         )
     ]
     if axes is not None:
         multiscales[0]["axes"] = axes
 
-    group.attrs["multiscales"] = multiscales
+    if hasattr(fmt, "version_key"):
+        group.attrs[fmt.version_key] = {"multiscales": multiscales}
+    else:
+        group.attrs["multiscales"] = multiscales
 
 
 def write_plate_metadata(
