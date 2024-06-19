@@ -15,7 +15,7 @@ def read(fname):
 install_requires: List[List[str]] = []
 install_requires += (["dataclasses;python_version<'3.7'"],)
 install_requires += (["tifffile<2020.09.22;python_version<'3.7'"],)
-install_requires += (["numpy"],)
+install_requires += (["numpy<2"],)
 install_requires += (["dask"],)
 install_requires += (["distributed"],)
 install_requires += (["zarr>=2.8.1"],)
