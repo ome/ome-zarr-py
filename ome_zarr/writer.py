@@ -7,6 +7,7 @@ import warnings
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
+import dask
 import dask.array as da
 import numpy as np
 import zarr
@@ -629,8 +630,10 @@ Please use the 'storage_options' argument instead."""
     if coordinate_transformations is not None:
         for dataset, transform in zip(datasets, coordinate_transformations):
             dataset["coordinateTransformations"] = transform
-
-    write_multiscales_metadata(group, datasets, fmt, axes, name, **metadata)
+    if not compute:
+        delayed.append(dask.delayed(write_multiscales_metadata)(group, datasets, fmt, axes, name, **metadata))
+    else:
+        write_multiscales_metadata(group, datasets, fmt, axes, name, **metadata)
 
     return delayed
 
