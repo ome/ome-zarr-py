@@ -234,7 +234,6 @@ def write_multiscale(
         msg = """The 'chunks' argument is deprecated and will be removed in version 0.5.
 Please use the 'storage_options' argument instead."""
         warnings.warn(msg, DeprecationWarning)
-    is_dask = False
     datasets: List[dict] = []
     for path, data in enumerate(pyramid):
         options = _resolve_storage_options(storage_options, path)
@@ -249,7 +248,6 @@ Please use the 'storage_options' argument instead."""
             chunks_opt = _retuple(chunks_opt, data.shape)
 
         if isinstance(data, da.Array):
-            is_dask = True
             if chunks_opt is not None:
                 data = da.array(data).rechunk(chunks=chunks_opt)
                 options["chunks"] = chunks_opt
@@ -283,7 +281,7 @@ Please use the 'storage_options' argument instead."""
         for dataset, transform in zip(datasets, coordinate_transformations):
             dataset["coordinateTransformations"] = transform
 
-    if is_dask and not compute:
+    if len(dask_delayed) > 0 and not compute:
         write_multiscales_metadata_delayed = dask.delayed(write_multiscales_metadata)
         return dask_delayed + [
             bind(write_multiscales_metadata_delayed, dask_delayed)(
