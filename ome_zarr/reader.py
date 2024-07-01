@@ -3,6 +3,7 @@
 import logging
 import math
 from abc import ABC
+from importlib.metadata import PackageNotFoundError, version
 from typing import Any, Dict, Iterator, List, Optional, Type, Union, cast, overload
 
 import dask.array as da
@@ -253,12 +254,19 @@ class Label(Spec):
                 del properties[label_val]["label-value"]
 
         # TODO: a metadata transform should be provided by specific impls.
+        try:
+            napari_version = tuple(map(int, list(version("napari").split("."))))[
+                :2
+            ]  # major and minor versions as int
+        except PackageNotFoundError:
+            napari_version = (0, 5)  # default to 0.5+ if not installed
+        colormap_key = "colormap" if napari_version >= (0, 5) else "color"
         name = self.zarr.basename()
         node.metadata.update(
             {
                 "visible": node.visible,
                 "name": name,
-                "color": colors,
+                colormap_key: colors,
                 "metadata": {"image": self.lookup("image", {}), "path": name},
             }
         )
