@@ -255,9 +255,9 @@ class Label(Spec):
 
         # TODO: a metadata transform should be provided by specific impls.
         try:
-            napari_version = tuple(map(int, list(version("napari").split("."))))[
-                :2
-            ]  # major and minor versions as int
+            napari_version = tuple(
+                map(int, list(version("napari").split(".")[:2]))
+            )  # major and minor versions as int
         except PackageNotFoundError:
             napari_version = (0, 5)  # default to 0.5+ if not installed
         colormap_key = "colormap" if napari_version >= (0, 5) else "color"
