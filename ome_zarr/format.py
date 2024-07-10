@@ -229,7 +229,9 @@ class FormatV02(FormatV01):
             **kwargs,
         )  # TODO: open issue for using Path
         print(
-            "Created {} store {}({}, {}, {})".format(self.version, cls, path, mode, kwargs)
+            "Created {} store {}({}, {}, {})".format(
+                self.version, cls, path, mode, kwargs
+            )
         )
         return store
 
