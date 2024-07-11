@@ -180,7 +180,7 @@ class TestWriter:
 
         assert not compute == len(dask_delayed_jobs)
 
-        if not len(dask_delayed_jobs):
+        if not compute:
             # can be configured to use a Local or Slurm cluster
             # before persisting the jobs
             dask_delayed_jobs = persist(*dask_delayed_jobs)

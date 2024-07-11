@@ -7,9 +7,11 @@ import warnings
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
+import dask
 import dask.array as da
 import numpy as np
 import zarr
+from dask.graph_manipulation import bind
 
 from .axes import Axes
 from .format import CurrentFormat, Format
@@ -232,7 +234,6 @@ def write_multiscale(
         msg = """The 'chunks' argument is deprecated and will be removed in version 0.5.
 Please use the 'storage_options' argument instead."""
         warnings.warn(msg, DeprecationWarning)
-
     datasets: List[dict] = []
     for path, data in enumerate(pyramid):
         options = _resolve_storage_options(storage_options, path)
@@ -280,7 +281,15 @@ Please use the 'storage_options' argument instead."""
         for dataset, transform in zip(datasets, coordinate_transformations):
             dataset["coordinateTransformations"] = transform
 
-    write_multiscales_metadata(group, datasets, fmt, axes, name, **metadata)
+    if len(dask_delayed) > 0 and not compute:
+        write_multiscales_metadata_delayed = dask.delayed(write_multiscales_metadata)
+        return dask_delayed + [
+            bind(write_multiscales_metadata_delayed, dask_delayed)(
+                group, datasets, fmt, axes, name, **metadata
+            )
+        ]
+    else:
+        write_multiscales_metadata(group, datasets, fmt, axes, name, **metadata)
 
     return dask_delayed
 
@@ -629,10 +638,16 @@ Please use the 'storage_options' argument instead."""
     if coordinate_transformations is not None:
         for dataset, transform in zip(datasets, coordinate_transformations):
             dataset["coordinateTransformations"] = transform
-
-    write_multiscales_metadata(group, datasets, fmt, axes, name, **metadata)
-
-    return delayed
+    if not compute:
+        write_multiscales_metadata_delayed = dask.delayed(write_multiscales_metadata)
+        return delayed + [
+            bind(write_multiscales_metadata_delayed, delayed)(
+                group, datasets, fmt, axes, name, **metadata
+            )
+        ]
+    else:
+        write_multiscales_metadata(group, datasets, fmt, axes, name, **metadata)
+        return delayed
 
 
 def write_label_metadata(
