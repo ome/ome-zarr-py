@@ -1,3 +1,7 @@
+# Unreleased
+
+- Drop support for Python 3.8.
+
 # 0.9.0 (May 2024)
 
 - Correctly specify maximum compatible fsspec version. ([#338](https://github.com/ome/ome-zarr-py/pull/338))
