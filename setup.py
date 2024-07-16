@@ -36,7 +36,7 @@ setup(
     long_description=read("README.rst"),
     packages=["ome_zarr"],
     py_modules=["ome_zarr"],
-    python_requires=">=3.6",
+    python_requires=">=3.9",
     install_requires=install_requires,
     classifiers=[
         "Development Status :: 4 - Beta",
