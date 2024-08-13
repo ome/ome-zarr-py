@@ -21,7 +21,7 @@ install_requires += (["distributed"],)
 install_requires += (["zarr>=2.8.1"],)
 install_requires += (["fsspec[s3]>=0.8,!=2021.07.0"],)
 # See https://github.com/fsspec/filesystem_spec/issues/819
-install_requires += (["aiohttp<4"],)
+install_requires += (["aiohttp"],)
 install_requires += (["requests"],)
 install_requires += (["scikit-image"],)
 install_requires += (["toolz"],)
