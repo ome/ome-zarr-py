@@ -4,13 +4,13 @@ import json
 import logging
 import os
 import webbrowser
+from collections.abc import Iterator
 from http.server import (  # type: ignore[attr-defined]
     HTTPServer,
     SimpleHTTPRequestHandler,
     test,
 )
 from pathlib import Path
-from typing import Iterator, List
 
 import dask
 import dask.array as da
@@ -91,8 +91,8 @@ def download(input_path: str, output_dir: str = ".") -> None:
     assert location, f"not a zarr: {location}"
 
     reader = Reader(location)
-    nodes: List[Node] = list()
-    paths: List[List[str]] = list()
+    nodes: list[Node] = list()
+    paths: list[list[str]] = list()
     for node in reader():
         nodes.append(node)
         paths.append(node.zarr.parts())
@@ -118,8 +118,8 @@ def download(input_path: str, output_dir: str = ".") -> None:
             node.write_metadata(metadata)
             f.write(json.dumps(metadata))
 
-        resolutions: List[da.core.Array] = []
-        datasets: List[str] = []
+        resolutions: list[da.core.Array] = []
+        datasets: list[str] = []
         for spec in node.specs:
             if isinstance(spec, Multiscales):
                 datasets = spec.datasets
@@ -135,7 +135,7 @@ def download(input_path: str, output_dir: str = ".") -> None:
                 zarr.group(str(target_path))
 
 
-def strip_common_prefix(parts: List[List[str]]) -> str:
+def strip_common_prefix(parts: list[list[str]]) -> str:
     """Find and remove the prefix common to all strings.
 
     Returns the last element of the common prefix.

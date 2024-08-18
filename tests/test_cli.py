@@ -1,7 +1,6 @@
 import os
 from collections import deque
 from pathlib import Path
-from typing import List
 
 import pytest
 
@@ -57,7 +56,7 @@ class TestCli:
         self._rotate_and_test(top, mid, bot)
 
     def _rotate_and_test(self, *hierarchy: Path, reverse: bool = True):
-        results: List[List[str]] = [
+        results: list[list[str]] = [
             list((Path("d")).parts),
             list((Path("d") / "e").parts),
             list((Path("d") / "e" / "f").parts),

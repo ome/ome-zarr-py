@@ -1,11 +1,11 @@
 """Definition of complex types for use elsewhere."""
 
-from typing import Any, Callable, Dict, List, Tuple, Union
+from typing import Any, Callable, Union
 
-LayerData = Union[Tuple[Any], Tuple[Any, Dict], Tuple[Any, Dict, str]]
+LayerData = Union[tuple[Any], tuple[Any, dict], tuple[Any, dict, str]]
 
-PathLike = Union[str, List[str]]
+PathLike = Union[str, list[str]]
 
-ReaderFunction = Callable[[PathLike], List[LayerData]]
+ReaderFunction = Callable[[PathLike], list[LayerData]]
 
-JSONDict = Dict[str, Any]
+JSONDict = dict[str, Any]
