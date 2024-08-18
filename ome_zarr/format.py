@@ -2,7 +2,8 @@
 
 import logging
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Iterator, List, Optional
+from collections.abc import Iterator
+from typing import Any, Optional
 
 from zarr.storage import FSStore
 
@@ -91,20 +92,20 @@ class Format(ABC):
 
     @abstractmethod
     def generate_well_dict(
-        self, well: str, rows: List[str], columns: List[str]
+        self, well: str, rows: list[str], columns: list[str]
     ) -> dict:  # pragma: no cover
         raise NotImplementedError()
 
     @abstractmethod
     def validate_well_dict(
-        self, well: dict, rows: List[str], columns: List[str]
+        self, well: dict, rows: list[str], columns: list[str]
     ) -> None:  # pragma: no cover
         raise NotImplementedError()
 
     @abstractmethod
     def generate_coordinate_transformations(
-        self, shapes: List[tuple]
-    ) -> Optional[List[List[Dict[str, Any]]]]:  # pragma: no cover
+        self, shapes: list[tuple]
+    ) -> Optional[list[list[dict[str, Any]]]]:  # pragma: no cover
         raise NotImplementedError()
 
     @abstractmethod
@@ -112,8 +113,8 @@ class Format(ABC):
         self,
         ndim: int,
         nlevels: int,
-        coordinate_transformations: Optional[List[List[Dict[str, Any]]]] = None,
-    ) -> Optional[List[List[Dict[str, Any]]]]:  # pragma: no cover
+        coordinate_transformations: Optional[list[list[dict[str, Any]]]] = None,
+    ) -> Optional[list[list[dict[str, Any]]]]:  # pragma: no cover
         raise NotImplementedError()
 
 
@@ -122,7 +123,7 @@ class FormatV01(Format):
     Initial format. (2020)
     """
 
-    REQUIRED_PLATE_WELL_KEYS: Dict[str, type] = {"path": str}
+    REQUIRED_PLATE_WELL_KEYS: dict[str, type] = {"path": str}
 
     @property
     def version(self) -> str:
@@ -139,12 +140,12 @@ class FormatV01(Format):
         return store
 
     def generate_well_dict(
-        self, well: str, rows: List[str], columns: List[str]
+        self, well: str, rows: list[str], columns: list[str]
     ) -> dict:
         return {"path": str(well)}
 
     def validate_well_dict(
-        self, well: dict, rows: List[str], columns: List[str]
+        self, well: dict, rows: list[str], columns: list[str]
     ) -> None:
         if any(e not in self.REQUIRED_PLATE_WELL_KEYS for e in well.keys()):
             LOGGER.debug("%s contains unspecified keys", well)
@@ -157,15 +158,15 @@ class FormatV01(Format):
                 raise ValueError("%s path must be of %s type", well, key_type)
 
     def generate_coordinate_transformations(
-        self, shapes: List[tuple]
-    ) -> Optional[List[List[Dict[str, Any]]]]:
+        self, shapes: list[tuple]
+    ) -> Optional[list[list[dict[str, Any]]]]:
         return None
 
     def validate_coordinate_transformations(
         self,
         ndim: int,
         nlevels: int,
-        coordinate_transformations: Optional[List[List[Dict[str, Any]]]] = None,
+        coordinate_transformations: Optional[list[list[dict[str, Any]]]] = None,
     ) -> None:
         return None
 
@@ -230,7 +231,7 @@ class FormatV04(FormatV03):
         return "0.4"
 
     def generate_well_dict(
-        self, well: str, rows: List[str], columns: List[str]
+        self, well: str, rows: list[str], columns: list[str]
     ) -> dict:
         row, column = well.split("/")
         if row not in rows:
@@ -242,7 +243,7 @@ class FormatV04(FormatV03):
         return {"path": str(well), "rowIndex": rowIndex, "columnIndex": columnIndex}
 
     def validate_well_dict(
-        self, well: dict, rows: List[str], columns: List[str]
+        self, well: dict, rows: list[str], columns: list[str]
     ) -> None:
         super().validate_well_dict(well, rows, columns)
         if len(well["path"].split("/")) != 2:
@@ -258,10 +259,10 @@ class FormatV04(FormatV03):
             raise ValueError("Mismatching column index for %s", well)
 
     def generate_coordinate_transformations(
-        self, shapes: List[tuple]
-    ) -> Optional[List[List[Dict[str, Any]]]]:
+        self, shapes: list[tuple]
+    ) -> Optional[list[list[dict[str, Any]]]]:
         data_shape = shapes[0]
-        coordinate_transformations: List[List[Dict[str, Any]]] = []
+        coordinate_transformations: list[list[dict[str, Any]]] = []
         # calculate minimal 'scale' transform based on pyramid dims
         for shape in shapes:
             assert len(shape) == len(data_shape)
@@ -274,7 +275,7 @@ class FormatV04(FormatV03):
         self,
         ndim: int,
         nlevels: int,
-        coordinate_transformations: Optional[List[List[Dict[str, Any]]]] = None,
+        coordinate_transformations: Optional[list[list[dict[str, Any]]]] = None,
     ) -> None:
         """
         Validates that a list of dicts contains a 'scale' transformation
