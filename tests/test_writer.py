@@ -157,9 +157,27 @@ class TestWriter:
 
         shape = (3, 300, 300)
         data = self.create_data(shape)
-        data = array_constructor(data)
+        if array_constructor == da.from_array:
+            data = array_constructor(data, chunks=(1, 50, 50))
+        else:
+            data = array_constructor(data)
 
         write_image(data, group, axes="cyx", storage_options=storage_options)
+        self.zip_store.close()
+        # load the data from the ZipStore
+        store = zarr.storage.ZipStore(self.zip_path, mode="r")
+        group = zarr.open_group(store=store)
+        # check the chunksize of the array
+        if array_constructor == da.from_array:
+            if storage_options is None:
+                assert group[0].chunks == (1, 50, 50)
+            else:
+                assert group[0].chunks == storage_options["chunks"]
+        else:
+            if storage_options is None:
+                pass
+            else:
+                assert group[0].chunks == storage_options["chunks"]
 
     @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])
     @pytest.mark.parametrize("storage_options", [None, {"chunks": (1, 100, 100)}])
@@ -168,14 +186,32 @@ class TestWriter:
         group = zarr.group(store=self.zip_store, overwrite=True)
 
         shape = (3, 300, 300)
-        data1 = self.create_data(shape)
-        data1 = array_constructor(data1)
-        data2 = self.create_data(shape)
-        data2 = array_constructor(data2)
+        data_arrs = []
+        for i in range(2):
+            data = self.create_data(shape)
+            if array_constructor == da.from_array:
+                data = array_constructor(data, chunks=(1, 50, 50))
+            else:
+                data = array_constructor(data)
+            data_arrs.append(data.copy())
 
-        write_multiscale(
-            [data1, data2], group, axes="cyx", storage_options=storage_options
-        )
+        write_multiscale(data_arrs, group, axes="cyx", storage_options=storage_options)
+        self.zip_store.close()
+        # load the data from the ZipStore
+        store = zarr.storage.ZipStore(self.zip_path, mode="r")
+        group = zarr.open_group(store=store)
+        # check the chunksize of the array
+        for i in range(2):
+            if array_constructor == da.from_array:
+                if storage_options is None:
+                    assert group[i].chunks == (1, 50, 50)
+                else:
+                    assert group[i].chunks == storage_options["chunks"]
+            else:
+                if storage_options is None:
+                    pass
+                else:
+                    assert group[i].chunks == storage_options["chunks"]
 
     @pytest.mark.parametrize("read_from_zarr", [True, False])
     @pytest.mark.parametrize("compute", [True, False])
