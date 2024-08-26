@@ -39,6 +39,8 @@ class TestWriter:
     @pytest.fixture(autouse=True)
     def initdir(self, tmpdir):
         self.path = pathlib.Path(tmpdir.mkdir("data"))
+        self.zip_path = pathlib.Path(tmpdir.mkdir("data_zip"), "data.zip")
+        self.zip_store = zarr.storage.ZipStore(self.zip_path, mode="w")
         self.store = parse_url(self.path, mode="w").store
         self.root = zarr.group(store=self.store)
         self.group = self.root.create_group("test")
@@ -145,6 +147,35 @@ class TestWriter:
             assert transfs[0]["scale"][0] == 1
             for value in transfs[0]["scale"]:
                 assert value >= 1
+
+    # write_image/write_multiscale ZipStore when the storage_options is not None
+    @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])
+    @pytest.mark.parametrize("storage_options", [None, {"chunks": (1, 100, 100)}])
+    def test_write_image_zipstore(self, array_constructor, storage_options):
+        # Initialize the Zarr group from ZipStore
+        group = zarr.group(store=self.zip_store, overwrite=True)
+
+        shape = (3, 300, 300)
+        data = self.create_data(shape)
+        data = array_constructor(data)
+
+        write_image(data, group, axes="cyx", storage_options=storage_options)
+
+    @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])
+    @pytest.mark.parametrize("storage_options", [None, {"chunks": (1, 100, 100)}])
+    def test_write_multiscale_zipstore(self, array_constructor, storage_options):
+        # Initialize the Zarr group from ZipStore
+        group = zarr.group(store=self.zip_store, overwrite=True)
+
+        shape = (3, 300, 300)
+        data1 = self.create_data(shape)
+        data1 = array_constructor(data1)
+        data2 = self.create_data(shape)
+        data2 = array_constructor(data2)
+
+        write_multiscale(
+            [data1, data2], group, axes="cyx", storage_options=storage_options
+        )
 
     @pytest.mark.parametrize("read_from_zarr", [True, False])
     @pytest.mark.parametrize("compute", [True, False])
