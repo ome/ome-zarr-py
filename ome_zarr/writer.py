@@ -235,6 +235,7 @@ def write_multiscale(
 Please use the 'storage_options' argument instead."""
         warnings.warn(msg, DeprecationWarning)
     datasets: List[dict] = []
+    is_zipstore = isinstance(group.store, zarr.storage.ZipStore)
     for path, data in enumerate(pyramid):
         options = _resolve_storage_options(storage_options, path)
 
@@ -251,11 +252,13 @@ Please use the 'storage_options' argument instead."""
             if chunks_opt is not None:
                 data = da.array(data).rechunk(chunks=chunks_opt)
                 options["chunks"] = chunks_opt
+            # storage options with chunks results in duplicate key error for ZipStore
+            # TODO: do other stores also cause this error with da.to_zarr?
             da_delayed = da.to_zarr(
                 arr=data,
                 url=group.store,
                 component=str(Path(group.path, str(path))),
-                storage_options=options,
+                storage_options=None if is_zipstore else options,
                 compressor=options.get("compressor", zarr.storage.default_compressor),
                 dimension_separator=group._store._dimension_separator,
                 compute=compute,
@@ -585,6 +588,7 @@ Please use the 'storage_options' argument instead."""
     # for path, data in enumerate(pyramid):
     max_layer: int = scaler.max_layer if scaler is not None else 0
     shapes = []
+    is_zipstore = isinstance(group.store, zarr.storage.ZipStore)
     for path in range(0, max_layer + 1):
         # LOGGER.debug(f"write_image path: {path}")
         options = _resolve_storage_options(storage_options, path)
@@ -609,12 +613,14 @@ Please use the 'storage_options' argument instead."""
         LOGGER.debug(
             "write dask.array to_zarr shape: %s, dtype: %s", image.shape, image.dtype
         )
+        # storage options with chunks results in duplicate key error for ZipStore
+        # TODO: do other stores also cause this error with da.to_zarr?
         delayed.append(
             da.to_zarr(
                 arr=image,
                 url=group.store,
                 component=str(Path(group.path, str(path))),
-                storage_options=options,
+                storage_options=None if is_zipstore else options,
                 compute=False,
                 compressor=options.get("compressor", zarr.storage.default_compressor),
                 dimension_separator=group._store._dimension_separator,
