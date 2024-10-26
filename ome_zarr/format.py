@@ -4,7 +4,7 @@ import logging
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Iterator, List, Optional
 
-from zarr.storage import FSStore
+from zarr.storage import RemoteStore
 
 LOGGER = logging.getLogger("ome_zarr.format")
 
@@ -59,7 +59,7 @@ class Format(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def init_store(self, path: str, mode: str = "r") -> FSStore:
+    def init_store(self, path: str, mode: str = "r") -> RemoteStore:
         raise NotImplementedError()
 
     # @abstractmethod
@@ -133,9 +133,9 @@ class FormatV01(Format):
         LOGGER.debug("%s matches %s?", self.version, version)
         return version == self.version
 
-    def init_store(self, path: str, mode: str = "r") -> FSStore:
-        store = FSStore(path, mode=mode, dimension_separator=".")
-        LOGGER.debug("Created legacy flat FSStore(%s, %s)", path, mode)
+    def init_store(self, path: str, mode: str = "r") -> RemoteStore:
+        store = RemoteStore(path, mode=mode, dimension_separator=".")
+        LOGGER.debug("Created legacy flat RemoteStore(%s, %s)", path, mode)
         return store
 
     def generate_well_dict(
@@ -179,15 +179,17 @@ class FormatV02(FormatV01):
     def version(self) -> str:
         return "0.2"
 
-    def init_store(self, path: str, mode: str = "r") -> FSStore:
+    def init_store(self, path: str, mode: str = "r") -> RemoteStore:
         """
         Not ideal. Stores should remain hidden
         TODO: could also check dimension_separator
         """
 
         kwargs = {
-            "dimension_separator": "/",
-            "normalize_keys": False,
+            # gets specified when creating an array
+            # "dimension_separator": "/",
+            # No normalize_keys in Zarr v3
+            # "normalize_keys": False,
         }
 
         mkdir = True
@@ -197,12 +199,12 @@ class FormatV02(FormatV01):
         if mkdir:
             kwargs["auto_mkdir"] = True
 
-        store = FSStore(
+        store = RemoteStore.from_url(
             path,
             mode=mode,
             **kwargs,
         )  # TODO: open issue for using Path
-        LOGGER.debug("Created nested FSStore(%s, %s, %s)", path, mode, kwargs)
+        LOGGER.debug("Created nested RemoteStore(%s, %s, %s)", path, mode, kwargs)
         return store
 
 

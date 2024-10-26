@@ -10,7 +10,8 @@ from typing import List, Optional, Union
 from urllib.parse import urljoin
 
 import dask.array as da
-from zarr.storage import FSStore
+import zarr
+from zarr.storage import RemoteStore
 
 from .format import CurrentFormat, Format, detect_format
 from .types import JSONDict
@@ -20,7 +21,7 @@ LOGGER = logging.getLogger("ome_zarr.io")
 
 class ZarrLocation:
     """
-    IO primitive for reading and writing Zarr data. Uses FSStore for all
+    IO primitive for reading and writing Zarr data. Uses RemoteStore for all
     data access.
 
     No assumptions about the existence of the given path string are made.
@@ -29,7 +30,7 @@ class ZarrLocation:
 
     def __init__(
         self,
-        path: Union[Path, str, FSStore],
+        path: Union[Path, str, RemoteStore],
         mode: str = "r",
         fmt: Format = CurrentFormat(),
     ) -> None:
@@ -40,7 +41,7 @@ class ZarrLocation:
             self.__path = str(path.resolve())
         elif isinstance(path, str):
             self.__path = path
-        elif isinstance(path, FSStore):
+        elif isinstance(path, RemoteStore):
             self.__path = path.path
         else:
             raise TypeError(f"not expecting: {type(path)}")
@@ -48,8 +49,8 @@ class ZarrLocation:
         loader = fmt
         if loader is None:
             loader = CurrentFormat()
-        self.__store: FSStore = (
-            path if isinstance(path, FSStore) else loader.init_store(self.__path, mode)
+        self.__store: RemoteStore = (
+            path if isinstance(path, RemoteStore) else loader.init_store(self.__path, mode)
         )
 
         self.__init_metadata()
@@ -104,7 +105,7 @@ class ZarrLocation:
         return self.__path
 
     @property
-    def store(self) -> FSStore:
+    def store(self) -> RemoteStore:
         """Return the initialized store for this location"""
         assert self.__store is not None
         return self.__store
@@ -154,10 +155,15 @@ class ZarrLocation:
         All other exceptions log at the ERROR level.
         """
         try:
-            data = self.__store.get(subpath)
-            if not data:
-                return {}
-            return json.loads(data)
+            store = zarr.storage.RemoteStore.from_url("https://uk1s3.embassy.ebi.ac.uk")
+            group = zarr.open_group(store=store, path="idr/zarr/v0.4/idr0062A/6001240.zarr")
+            print("Zarr group", group.attrs.asdict())
+
+            print("self.__path", self.__path)
+            print("subpath", subpath)
+            # data = self.__store.get(subpath)
+            group = zarr.open_group(store=self.__store, path="/")
+            return group.attrs.asdict()
         except KeyError:
             LOGGER.debug("JSON not found: %s", subpath)
             return {}

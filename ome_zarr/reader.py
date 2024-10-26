@@ -192,10 +192,10 @@ class Labels(Spec):
     def __init__(self, node: Node) -> None:
         super().__init__(node)
         label_names = self.lookup("labels", [])
-        for name in label_names:
-            child_zarr = self.zarr.create(name)
-            if child_zarr.exists():
-                node.add(child_zarr)
+        # for name in label_names:
+        #     child_zarr = self.zarr.create(name)
+        #     if child_zarr.exists():
+        #         node.add(child_zarr)
 
 
 class Label(Spec):
