@@ -11,7 +11,7 @@ from urllib.parse import urljoin
 
 import dask.array as da
 import zarr
-from zarr.storage import RemoteStore
+from zarr.storage import RemoteStore, LocalStore, StoreLike
 
 from .format import CurrentFormat, Format, detect_format
 from .types import JSONDict
@@ -21,7 +21,7 @@ LOGGER = logging.getLogger("ome_zarr.io")
 
 class ZarrLocation:
     """
-    IO primitive for reading and writing Zarr data. Uses RemoteStore for all
+    IO primitive for reading and writing Zarr data. Uses a store for all
     data access.
 
     No assumptions about the existence of the given path string are made.
@@ -30,7 +30,7 @@ class ZarrLocation:
 
     def __init__(
         self,
-        path: Union[Path, str, RemoteStore],
+        path: StoreLike,
         mode: str = "r",
         fmt: Format = CurrentFormat(),
     ) -> None:
@@ -41,7 +41,7 @@ class ZarrLocation:
             self.__path = str(path.resolve())
         elif isinstance(path, str):
             self.__path = path
-        elif isinstance(path, RemoteStore):
+        elif isinstance(path, RemoteStore, LocalStore):
             self.__path = path.path
         else:
             raise TypeError(f"not expecting: {type(path)}")
@@ -52,7 +52,6 @@ class ZarrLocation:
         self.__store: RemoteStore = (
             path if isinstance(path, RemoteStore) else loader.init_store(self.__path, mode)
         )
-
         self.__init_metadata()
         detected = detect_format(self.__metadata, loader)
         LOGGER.debug("ZarrLocation.__init__ %s detected: %s", path, detected)
@@ -68,16 +67,18 @@ class ZarrLocation:
         """
         Load the Zarr metadata files for the given location.
         """
-        self.zarray: JSONDict = self.get_json(".zarray")
         self.zgroup: JSONDict = self.get_json(".zgroup")
+        self.zarray: JSONDict = {}
         self.__metadata: JSONDict = {}
         self.__exists: bool = True
         if self.zgroup:
-            self.__metadata = self.get_json(".zattrs")
-        elif self.zarray:
-            self.__metadata = self.get_json(".zattrs")
+            self.__metadata = self.zgroup
         else:
-            self.__exists = False
+            self.zarray: JSONDict = self.get_json(".zarray")
+            if self.zarray:
+                self.__metadata = self.zarray
+            else:
+                self.__exists = False
 
     def __repr__(self) -> str:
         """Print the path as well as whether this is a group or an array."""
@@ -155,14 +156,7 @@ class ZarrLocation:
         All other exceptions log at the ERROR level.
         """
         try:
-            store = zarr.storage.RemoteStore.from_url("https://uk1s3.embassy.ebi.ac.uk")
-            group = zarr.open_group(store=store, path="idr/zarr/v0.4/idr0062A/6001240.zarr")
-            print("Zarr group", group.attrs.asdict())
-
-            print("self.__path", self.__path)
-            print("subpath", subpath)
-            # data = self.__store.get(subpath)
-            group = zarr.open_group(store=self.__store, path="/")
+            group = zarr.open_group(store=self.__store, path="/", zarr_version=2)
             return group.attrs.asdict()
         except KeyError:
             LOGGER.debug("JSON not found: %s", subpath)
@@ -199,10 +193,11 @@ class ZarrLocation:
         Return whether the current underlying implementation
         points to a local file or not.
         """
-        return self.__store.fs.protocol == "file" or self.__store.fs.protocol == (
-            "file",
-            "local",
-        )
+        # return self.__store.fs.protocol == "file" or self.__store.fs.protocol == (
+        #     "file",
+        #     "local",
+        # )
+        return isinstance(self.__store, LocalStore)
 
     def _ishttp(self) -> bool:
         """

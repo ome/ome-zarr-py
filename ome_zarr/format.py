@@ -4,7 +4,7 @@ import logging
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Iterator, List, Optional
 
-from zarr.storage import RemoteStore
+from zarr.storage import RemoteStore, LocalStore
 
 LOGGER = logging.getLogger("ome_zarr.format")
 
@@ -134,8 +134,24 @@ class FormatV01(Format):
         return version == self.version
 
     def init_store(self, path: str, mode: str = "r") -> RemoteStore:
-        store = RemoteStore(path, mode=mode, dimension_separator=".")
-        LOGGER.debug("Created legacy flat RemoteStore(%s, %s)", path, mode)
+        """
+        Not ideal. Stores should remain hidden
+        "dimension_separator" is specified at array creation time
+        """
+
+        if path.startswith(("http", "s3")):
+            store = RemoteStore.from_url(
+                path,
+                storage_options=None,
+                mode=mode,
+            )
+        else:
+            # No other kwargs supported
+            store = LocalStore(
+                path,
+                mode=mode
+            )
+        LOGGER.debug("Created nested RemoteStore(%s, %s, %s)", path, mode)
         return store
 
     def generate_well_dict(
@@ -178,35 +194,6 @@ class FormatV02(FormatV01):
     @property
     def version(self) -> str:
         return "0.2"
-
-    def init_store(self, path: str, mode: str = "r") -> RemoteStore:
-        """
-        Not ideal. Stores should remain hidden
-        TODO: could also check dimension_separator
-        """
-
-        kwargs = {
-            # gets specified when creating an array
-            # "dimension_separator": "/",
-            # No normalize_keys in Zarr v3
-            # "normalize_keys": False,
-        }
-
-        mkdir = True
-        if "r" in mode or path.startswith(("http", "s3")):
-            # Could be simplified on the fsspec side
-            mkdir = False
-        if mkdir:
-            kwargs["auto_mkdir"] = True
-
-        store = RemoteStore.from_url(
-            path,
-            mode=mode,
-            **kwargs,
-        )  # TODO: open issue for using Path
-        LOGGER.debug("Created nested RemoteStore(%s, %s, %s)", path, mode, kwargs)
-        return store
-
 
 class FormatV03(FormatV02):  # inherits from V02 to avoid code duplication
     """

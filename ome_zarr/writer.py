@@ -190,7 +190,7 @@ def write_multiscale(
     :param pyramid:
         The image data to save. Largest level first. All image arrays MUST be up to
         5-dimensional with dimensions ordered (t, c, z, y, x)
-    :type group: :class:`zarr.hierarchy.Group`
+    :type group: :class:`zarr.Group`
     :param group: The group within the zarr store to store the data in
     :type chunks: int or tuple of ints, optional
     :param chunks:
@@ -265,7 +265,12 @@ Please use the 'storage_options' argument instead."""
                 dask_delayed.append(da_delayed)
 
         else:
-            group.create_dataset(str(path), data=data, chunks=chunks_opt, **options)
+            # v2 arguments
+            options["shape"] = data.shape
+            options["chunks"] = chunks_opt
+            options["dimension_separator"] = "/"
+
+            group.create_array(str(path), data=data, **options)
 
         datasets.append({"path": str(path)})
 
@@ -305,7 +310,7 @@ def write_multiscales_metadata(
     """
     Write the multiscales metadata in the group.
 
-    :type group: :class:`zarr.hierarchy.Group`
+    :type group: :class:`zarr.Group`
     :param group: The group within the zarr store to write the metadata in.
     :type datasets: list of dicts
     :param datasets:
@@ -385,7 +390,7 @@ def write_plate_metadata(
     """
     Write the plate metadata in the group.
 
-    :type group: :class:`zarr.hierarchy.Group`
+    :type group: :class:`zarr.Group`
     :param group: The group within the zarr store to write the metadata in.
     :type rows: list of str
     :param rows: The list of names for the plate rows.
@@ -428,7 +433,7 @@ def write_well_metadata(
     """
     Write the well metadata in the group.
 
-    :type group: :class:`zarr.hierarchy.Group`
+    :type group: :class:`zarr.Group`
     :param group: The group within the zarr store to write the metadata in.
     :type images: list of dict
     :param images: The list of dictionaries for all fields of views.
@@ -465,7 +470,7 @@ def write_image(
       if the scaler argument is non-None.
       Image array MUST be up to 5-dimensional with dimensions
       ordered (t, c, z, y, x).  Image can be a numpy or dask Array.
-    :type group: :class:`zarr.hierarchy.Group`
+    :type group: :class:`zarr.Group`
     :param group: The group within the zarr store to write the metadata in.
     :type scaler: :class:`ome_zarr.scale.Scaler`
     :param scaler:
@@ -664,7 +669,7 @@ def write_label_metadata(
     The label data must have been written to a sub-group,
     with the same name as the second argument.
 
-    :type group: :class:`zarr.hierarchy.Group`
+    :type group: :class:`zarr.Group`
     :param group: The group within the zarr store to write the metadata in.
     :type name: str
     :param name: The name of the label sub-group.
@@ -722,7 +727,7 @@ def write_multiscale_labels(
       the image label data to save. Largest level first
       All image arrays MUST be up to 5-dimensional with dimensions
       ordered (t, c, z, y, x)
-    :type group: :class:`zarr.hierarchy.Group`
+    :type group: :class:`zarr.Group`
     :param group: The group within the zarr store to write the metadata in.
     :type name: str, optional
     :param name: The name of this labels data.
@@ -811,7 +816,7 @@ def write_labels(
       if the scaler argument is non-None.
       Label array MUST be up to 5-dimensional with dimensions
       ordered (t, c, z, y, x)
-    :type group: :class:`zarr.hierarchy.Group`
+    :type group: :class:`zarr.Group`
     :param group: The group within the zarr store to write the metadata in.
     :type name: str, optional
     :param name: The name of this labels data.

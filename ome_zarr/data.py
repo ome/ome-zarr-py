@@ -111,7 +111,7 @@ def create_zarr(
 
     loc = parse_url(zarr_directory, mode="w")
     assert loc
-    grp = zarr.group(loc.store)
+    grp = zarr.group(loc.store, zarr_format=2)
     axes = None
     size_c = 1
     if fmt.version not in ("0.1", "0.2"):
