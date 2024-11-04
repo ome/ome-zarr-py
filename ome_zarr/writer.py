@@ -270,7 +270,7 @@ Please use the 'storage_options' argument instead."""
             options["chunks"] = chunks_opt
             options["dimension_separator"] = "/"
 
-            group.create_array(str(path), data=data, **options)
+            group.create_array(str(path), data=data, dtype=data.dtype, **options)
 
         datasets.append({"path": str(path)})
 
