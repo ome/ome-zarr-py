@@ -151,7 +151,7 @@ class FormatV01(Format):
                 path,
                 mode=mode
             )
-        LOGGER.debug("Created nested RemoteStore(%s, %s, %s)", path, mode)
+        LOGGER.debug("Created nested RemoteStore(%s, %s)", path, mode)
         return store
 
     def generate_well_dict(

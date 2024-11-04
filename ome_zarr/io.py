@@ -41,8 +41,10 @@ class ZarrLocation:
             self.__path = str(path.resolve())
         elif isinstance(path, str):
             self.__path = path
-        elif isinstance(path, RemoteStore, LocalStore):
+        elif isinstance(path, RemoteStore):
             self.__path = path.path
+        elif isinstance(path, LocalStore):
+            self.__path = str(path.root)
         else:
             raise TypeError(f"not expecting: {type(path)}")
 
