@@ -256,9 +256,13 @@ Please use the 'storage_options' argument instead."""
                 url=group.store,
                 component=str(Path(group.path, str(path))),
                 storage_options=options,
-                compressor=options.get("compressor", zarr.storage.default_compressor),
-                dimension_separator=group._store._dimension_separator,
+                # TODO: default compressor?
+                compressor=options.get("compressor", None),
+                # TODO: default dimension_separator? Not set in store for zarr v3
+                # dimension_separator=group.store.dimension_separator,
+                dimension_separator = "/",
                 compute=compute,
+                zarr_format=2,
             )
 
             if not compute:
@@ -269,6 +273,9 @@ Please use the 'storage_options' argument instead."""
             options["shape"] = data.shape
             options["chunks"] = chunks_opt
             options["dimension_separator"] = "/"
+
+            # otherwise we get 'null'
+            options["fill_value"] = 0
 
             group.create_array(str(path), data=data, dtype=data.dtype, **options)
 
@@ -606,8 +613,8 @@ Please use the 'storage_options' argument instead."""
         # chunks_opt = options.pop("chunks", None)
         if chunks_opt is not None:
             chunks_opt = _retuple(chunks_opt, image.shape)
+            # image.chunks will be used by da.to_zarr
             image = da.array(image).rechunk(chunks=chunks_opt)
-            options["chunks"] = chunks_opt
         LOGGER.debug("chunks_opt: %s", chunks_opt)
         shapes.append(image.shape)
 
@@ -621,8 +628,12 @@ Please use the 'storage_options' argument instead."""
                 component=str(Path(group.path, str(path))),
                 storage_options=options,
                 compute=False,
-                compressor=options.get("compressor", zarr.storage.default_compressor),
-                dimension_separator=group._store._dimension_separator,
+                # TODO: default compressor?
+                compressor=options.pop("compressor", None),
+                # TODO: default dimension_separator? Not set in store for zarr v3
+                # dimension_separator=group.store.dimension_separator,
+                dimension_separator = "/",
+                zarr_format=2,
             )
         )
         datasets.append({"path": str(path)})
