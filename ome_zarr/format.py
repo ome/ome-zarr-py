@@ -4,7 +4,7 @@ import logging
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Iterator, List, Optional
 
-from zarr.storage import RemoteStore, LocalStore
+from zarr.storage import LocalStore, RemoteStore
 
 LOGGER = logging.getLogger("ome_zarr.format")
 
@@ -147,10 +147,7 @@ class FormatV01(Format):
             )
         else:
             # No other kwargs supported
-            store = LocalStore(
-                path,
-                mode=mode
-            )
+            store = LocalStore(path, mode=mode)
         LOGGER.debug("Created nested RemoteStore(%s, %s)", path, mode)
         return store
 
@@ -194,6 +191,7 @@ class FormatV02(FormatV01):
     @property
     def version(self) -> str:
         return "0.2"
+
 
 class FormatV03(FormatV02):  # inherits from V02 to avoid code duplication
     """

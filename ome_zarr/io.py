@@ -11,7 +11,7 @@ from urllib.parse import urljoin
 
 import dask.array as da
 import zarr
-from zarr.storage import RemoteStore, LocalStore, StoreLike
+from zarr.storage import LocalStore, RemoteStore, StoreLike
 
 from .format import CurrentFormat, Format, detect_format
 from .types import JSONDict
@@ -52,7 +52,9 @@ class ZarrLocation:
         if loader is None:
             loader = CurrentFormat()
         self.__store: RemoteStore = (
-            path if isinstance(path, RemoteStore) else loader.init_store(self.__path, mode)
+            path
+            if isinstance(path, RemoteStore)
+            else loader.init_store(self.__path, mode)
         )
         self.__init_metadata()
         detected = detect_format(self.__metadata, loader)

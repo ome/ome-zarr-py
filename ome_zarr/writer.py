@@ -260,7 +260,7 @@ Please use the 'storage_options' argument instead."""
                 compressor=options.get("compressor", None),
                 # TODO: default dimension_separator? Not set in store for zarr v3
                 # dimension_separator=group.store.dimension_separator,
-                dimension_separator = "/",
+                dimension_separator="/",
                 compute=compute,
                 zarr_format=2,
             )
@@ -632,7 +632,7 @@ Please use the 'storage_options' argument instead."""
                 compressor=options.pop("compressor", None),
                 # TODO: default dimension_separator? Not set in store for zarr v3
                 # dimension_separator=group.store.dimension_separator,
-                dimension_separator = "/",
+                dimension_separator="/",
                 zarr_format=2,
             )
         )
