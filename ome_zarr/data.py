@@ -21,7 +21,16 @@ CHANNEL_DIMENSION = 1
 
 
 def coins() -> Tuple[List, List]:
-    """Sample data from skimage."""
+    """
+    Sample data from skimage.
+
+    Returns
+    -------
+    pyramids :
+        List of pyramid arrays.
+    labels :
+        List of labels.
+    """
     # Thanks to Juan
     # https://gist.github.com/jni/62e07ddd135dbb107278bc04c0f9a8e7
     image = data.coins()[50:-50, 50:-50]
@@ -37,7 +46,16 @@ def coins() -> Tuple[List, List]:
 
 
 def astronaut() -> Tuple[List, List]:
-    """Sample data from skimage."""
+    """
+    Sample data from skimage.
+
+    Returns
+    -------
+    pyramids :
+        List of pyramid arrays.
+    labels :
+        List of labels.
+    """
     scaler = Scaler()
 
     astro = data.astronaut()
