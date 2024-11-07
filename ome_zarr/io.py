@@ -77,7 +77,7 @@ class ZarrLocation:
         if self.zgroup:
             self.__metadata = self.zgroup
         else:
-            self.zarray: JSONDict = self.get_json(".zarray")
+            self.zarray = self.get_json(".zarray")
             if self.zarray:
                 self.__metadata = self.zarray
             else:
