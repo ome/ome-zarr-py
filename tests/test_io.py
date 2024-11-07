@@ -1,6 +1,5 @@
 from pathlib import Path
 
-import fsspec
 import pytest
 import zarr
 from zarr.storage import LocalStore

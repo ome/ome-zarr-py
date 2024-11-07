@@ -3,7 +3,6 @@
 Primary entry point is the :func:`~ome_zarr.io.parse_url` method.
 """
 
-import json
 import logging
 from pathlib import Path
 from typing import List, Optional, Union
