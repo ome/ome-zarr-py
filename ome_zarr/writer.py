@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 import dask
 import dask.array as da
+from numcodecs import Blosc
 import numpy as np
 import zarr
 from dask.graph_manipulation import bind
@@ -256,8 +257,8 @@ Please use the 'storage_options' argument instead."""
                 url=group.store,
                 component=str(Path(group.path, str(path))),
                 storage_options=options,
-                # TODO: default compressor?
-                compressor=options.get("compressor", None),
+                # by default we use Blosc with zstd compression
+                compressor=options.get("compressor", Blosc(cname="zstd", clevel=5, shuffle=Blosc.SHUFFLE)),
                 # TODO: default dimension_separator? Not set in store for zarr v3
                 # dimension_separator=group.store.dimension_separator,
                 dimension_separator="/",
@@ -273,6 +274,10 @@ Please use the 'storage_options' argument instead."""
             options["shape"] = data.shape
             options["chunks"] = chunks_opt
             options["dimension_separator"] = "/"
+
+            # default to zstd compression
+            options["compressor"] = options.get("compressor",
+                                                Blosc(cname="zstd", clevel=5, shuffle=Blosc.SHUFFLE))
 
             # otherwise we get 'null'
             options["fill_value"] = 0
@@ -628,8 +633,8 @@ Please use the 'storage_options' argument instead."""
                 component=str(Path(group.path, str(path))),
                 storage_options=options,
                 compute=False,
-                # TODO: default compressor?
-                compressor=options.pop("compressor", None),
+                compressor=options.pop("compressor",
+                                       Blosc(cname="zstd", clevel=5, shuffle=Blosc.SHUFFLE)),
                 # TODO: default dimension_separator? Not set in store for zarr v3
                 # dimension_separator=group.store.dimension_separator,
                 dimension_separator="/",
