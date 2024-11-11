@@ -9,10 +9,10 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 import dask
 import dask.array as da
-from numcodecs import Blosc
 import numpy as np
 import zarr
 from dask.graph_manipulation import bind
+from numcodecs import Blosc
 
 from .axes import Axes
 from .format import CurrentFormat, Format
@@ -258,7 +258,9 @@ Please use the 'storage_options' argument instead."""
                 component=str(Path(group.path, str(path))),
                 storage_options=options,
                 # by default we use Blosc with zstd compression
-                compressor=options.get("compressor", Blosc(cname="zstd", clevel=5, shuffle=Blosc.SHUFFLE)),
+                compressor=options.get(
+                    "compressor", Blosc(cname="zstd", clevel=5, shuffle=Blosc.SHUFFLE)
+                ),
                 # TODO: default dimension_separator? Not set in store for zarr v3
                 # dimension_separator=group.store.dimension_separator,
                 dimension_separator="/",
@@ -276,8 +278,9 @@ Please use the 'storage_options' argument instead."""
             options["dimension_separator"] = "/"
 
             # default to zstd compression
-            options["compressor"] = options.get("compressor",
-                                                Blosc(cname="zstd", clevel=5, shuffle=Blosc.SHUFFLE))
+            options["compressor"] = options.get(
+                "compressor", Blosc(cname="zstd", clevel=5, shuffle=Blosc.SHUFFLE)
+            )
 
             # otherwise we get 'null'
             options["fill_value"] = 0
@@ -633,11 +636,13 @@ Please use the 'storage_options' argument instead."""
                 component=str(Path(group.path, str(path))),
                 storage_options=options,
                 compute=False,
-                compressor=options.pop("compressor",
-                                       Blosc(cname="zstd", clevel=5, shuffle=Blosc.SHUFFLE)),
+                compressor=options.pop(
+                    "compressor", Blosc(cname="zstd", clevel=5, shuffle=Blosc.SHUFFLE)
+                ),
                 # TODO: default dimension_separator? Not set in store for zarr v3
                 # dimension_separator=group.store.dimension_separator,
                 dimension_separator="/",
+                # TODO: hard-coded zarr_format for now. Needs to be set by the format.py
                 zarr_format=2,
             )
         )
