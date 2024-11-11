@@ -239,7 +239,7 @@ class TestWriter:
         write_image(
             data, self.group, axes="zyx", storage_options={"compressor": compressor}
         )
-        group = zarr.open(f"{self.path}/test")
+        group = zarr.open(f"{self.path}/test", zarr_format=2)
         assert group["0"].compressor.get_config() == {
             "id": "blosc",
             "cname": "zstd",
@@ -1086,11 +1086,13 @@ class TestLabelWriter:
         assert np.allclose(label_data, node.data[0][...].compute())
 
         # Verify label metadata
-        label_root = zarr.open(f"{self.path}/labels", "r")
+        label_root = zarr.open(f"{self.path}/labels", mode="r", zarr_format=2)
         assert "labels" in label_root.attrs
         assert label_name in label_root.attrs["labels"]
 
-        label_group = zarr.open(f"{self.path}/labels/{label_name}", "r")
+        label_group = zarr.open(
+            f"{self.path}/labels/{label_name}", mode="r", zarr_format=2
+        )
         assert "image-label" in label_group.attrs
         assert label_group.attrs["image-label"]["version"] == fmt.version
 
@@ -1233,7 +1235,7 @@ class TestLabelWriter:
             self.verify_label_data(label_name, label_data, fmt, shape, transformations)
 
         # Verify label metadata
-        label_root = zarr.open(f"{self.path}/labels", "r")
+        label_root = zarr.open(f"{self.path}/labels", mode="r", zarr_format=2)
         assert "labels" in label_root.attrs
         assert len(label_root.attrs["labels"]) == len(label_names)
         assert all(
