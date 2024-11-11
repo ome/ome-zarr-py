@@ -226,7 +226,7 @@ class TestWriter:
         write_image(
             image=data, group=self.group, axes="xyz", storage_options={"chunks": 32}
         )
-        for data in self.group.values():
+        for data in self.group.array_values():
             print(data)
             assert data.chunks == (32, 32, 32)
 
