@@ -133,7 +133,7 @@ class FormatV01(Format):
         LOGGER.debug("%s matches %s?", self.version, version)
         return version == self.version
 
-    def init_store(self, path: str, mode: str = "r") -> RemoteStore:
+    def init_store(self, path: str, mode: str = "r") -> RemoteStore | LocalStore:
         """
         Not ideal. Stores should remain hidden
         "dimension_separator" is specified at array creation time
