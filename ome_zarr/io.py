@@ -75,21 +75,24 @@ class ZarrLocation:
         self.__metadata: JSONDict = {}
         self.__exists: bool = True
         try:
-            array_or_group = zarr.open(store=self.__store, path="/")
-            if isinstance(array_or_group, zarr.Group):
-                self.zgroup = array_or_group.attrs.asdict()
-                # For zarr v3, everything is under the "ome" namespace
-                if "ome" in self.zgroup:
-                    self.zgroup = self.zgroup["ome"]
-                self.__metadata = self.zgroup
-            else:
-                self.zarray = array_or_group.attrs.asdict()
-                self.__metadata = self.zarray
+            # If we want to *create* a new zarr v2 group, we need to specify
+            # zarr_format=2. This is not needed for reading.
+            group = zarr.open_group(store=self.__store, path="/", zarr_version=2)
+            self.zgroup = group.attrs.asdict()
+            # For zarr v3, everything is under the "ome" namespace
+            if "ome" in self.zgroup:
+                self.zgroup = self.zgroup["ome"]
+            self.__metadata = self.zgroup
         except (ValueError, FileNotFoundError):
-            # We actually get a ValueError when the file is not found
-            # /zarr-python/src/zarr/abc/store.py", line 189, in _check_writable
-            #   raise ValueError("store mode does not support writing")
-            self.__exists = False
+            try:
+                array = zarr.open_array(store=self.__store, path="/", zarr_version=2)
+                self.zarray = array.attrs.asdict()
+                self.__metadata = self.zarray
+            except (ValueError, FileNotFoundError):
+                # We actually get a ValueError when the file is not found
+                # /zarr-python/src/zarr/abc/store.py", line 189, in _check_writable
+                #   raise ValueError("store mode does not support writing")
+                self.__exists = False
 
     def __repr__(self) -> str:
         """Print the path as well as whether this is a group or an array."""
@@ -167,7 +170,7 @@ class ZarrLocation:
         All other exceptions log at the ERROR level.
         """
         try:
-            array_or_group = zarr.open(store=self.__store, path="/")
+            array_or_group = zarr.open_group(store=self.__store, path="/")
             return array_or_group.attrs.asdict()
         except (KeyError, FileNotFoundError):
             LOGGER.debug("JSON not found: %s", subpath)
