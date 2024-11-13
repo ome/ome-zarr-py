@@ -240,7 +240,8 @@ class TestWriter:
             data, self.group, axes="zyx", storage_options={"compressor": compressor}
         )
         group = zarr.open(f"{self.path}/test", zarr_format=2)
-        assert group["0"].compressor.get_config() == {
+        comp = group["0"].info._compressor
+        assert comp.get_config() == {
             "id": "blosc",
             "cname": "zstd",
             "clevel": 5,
