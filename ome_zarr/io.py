@@ -77,7 +77,9 @@ class ZarrLocation:
         try:
             # If we want to *create* a new zarr v2 group, we need to specify
             # zarr_format=2. This is not needed for reading.
-            group = zarr.open_group(store=self.__store, path="/", zarr_version=2)
+            group = zarr.open_group(
+                store=self.__store, path="/", mode=self.__mode, zarr_version=2
+            )
             self.zgroup = group.attrs.asdict()
             # For zarr v3, everything is under the "ome" namespace
             if "ome" in self.zgroup:
@@ -85,7 +87,9 @@ class ZarrLocation:
             self.__metadata = self.zgroup
         except (ValueError, FileNotFoundError):
             try:
-                array = zarr.open_array(store=self.__store, path="/", zarr_version=2)
+                array = zarr.open_array(
+                    store=self.__store, path="/", mode=self.__mode, zarr_version=2
+                )
                 self.zarray = array.attrs.asdict()
                 self.__metadata = self.zarray
             except (ValueError, FileNotFoundError):

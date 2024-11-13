@@ -15,7 +15,7 @@ class TestIO:
         create_zarr(str(self.path))
         # this overwrites the data if mode="w"
         self.store = parse_url(str(self.path), mode="r").store
-        self.root = zarr.group(store=self.store)
+        self.root = zarr.open_group(store=self.store, mode="r")
 
     def test_parse_url(self):
         assert parse_url(str(self.path))

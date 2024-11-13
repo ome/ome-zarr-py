@@ -143,11 +143,11 @@ class FormatV01(Format):
             store = RemoteStore.from_url(
                 path,
                 storage_options=None,
-                mode=mode,
+                read_only=(mode in ("r", "r+", "a")),
             )
         else:
             # No other kwargs supported
-            store = LocalStore(path, mode=mode)
+            store = LocalStore(path, read_only=(mode in ("r", "r+", "a")))
         LOGGER.debug("Created nested RemoteStore(%s, %s)", path, mode)
         return store
 
