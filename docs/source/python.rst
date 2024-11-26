@@ -17,13 +17,11 @@ The following code creates a 3D Image in OME-Zarr::
 
     import numpy as np
     import zarr
-    import os
 
     from ome_zarr.io import parse_url
     from ome_zarr.writer import write_image
 
     path = "test_ngff_image.zarr"
-    os.mkdir(path)
 
     size_xy = 128
     size_z = 10
