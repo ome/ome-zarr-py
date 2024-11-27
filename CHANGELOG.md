@@ -1,6 +1,7 @@
 # Unreleased
 
 - Drop support for Python 3.8.
+- Document parameters and return value of `parse_url`.
 
 # 0.9.0 (May 2024)
 
