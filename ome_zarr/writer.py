@@ -5,7 +5,7 @@
 import logging
 import warnings
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Optional, Union
 
 import dask
 import dask.array as da
@@ -20,15 +20,15 @@ from .types import JSONDict
 
 LOGGER = logging.getLogger("ome_zarr.writer")
 
-ListOfArrayLike = Union[List[da.Array], List[np.ndarray]]
+ListOfArrayLike = Union[list[da.Array], list[np.ndarray]]
 ArrayLike = Union[da.Array, np.ndarray]
 
 
 def _get_valid_axes(
     ndim: Optional[int] = None,
-    axes: Optional[Union[str, List[str], List[Dict[str, str]]]] = None,
+    axes: Optional[Union[str, list[str], list[dict[str, str]]]] = None,
     fmt: Format = CurrentFormat(),
-) -> Union[None, List[str], List[Dict[str, str]]]:
+) -> Union[None, list[str], list[dict[str, str]]]:
     """Returns list of axes valid for fmt.version or raise exception if invalid"""
 
     if fmt.version in ("0.1", "0.2"):
@@ -65,8 +65,8 @@ def _get_valid_axes(
 
 
 def _validate_well_images(
-    images: List[Union[str, dict]], fmt: Format = CurrentFormat()
-) -> List[dict]:
+    images: list[Union[str, dict]], fmt: Format = CurrentFormat()
+) -> list[dict]:
     VALID_KEYS = [
         "acquisition",
         "path",
@@ -91,8 +91,8 @@ def _validate_well_images(
 
 
 def _validate_plate_acquisitions(
-    acquisitions: List[Dict], fmt: Format = CurrentFormat()
-) -> List[Dict]:
+    acquisitions: list[dict], fmt: Format = CurrentFormat()
+) -> list[dict]:
     VALID_KEYS = [
         "id",
         "name",
@@ -115,9 +115,9 @@ def _validate_plate_acquisitions(
 
 
 def _validate_plate_rows_columns(
-    rows_or_columns: List[str],
+    rows_or_columns: list[str],
     fmt: Format = CurrentFormat(),
-) -> List[dict]:
+) -> list[dict]:
     if len(set(rows_or_columns)) != len(rows_or_columns):
         raise ValueError(f"{rows_or_columns} must contain unique elements")
     validated_list = []
@@ -129,8 +129,8 @@ def _validate_plate_rows_columns(
 
 
 def _validate_datasets(
-    datasets: List[dict], dims: int, fmt: Format = CurrentFormat()
-) -> List[Dict]:
+    datasets: list[dict], dims: int, fmt: Format = CurrentFormat()
+) -> list[dict]:
     if datasets is None or len(datasets) == 0:
         raise ValueError("Empty datasets list")
     transformations = []
@@ -150,11 +150,11 @@ def _validate_datasets(
 
 
 def _validate_plate_wells(
-    wells: List[Union[str, dict]],
-    rows: List[str],
-    columns: List[str],
+    wells: list[Union[str, dict]],
+    rows: list[str],
+    columns: list[str],
     fmt: Format = CurrentFormat(),
-) -> List[dict]:
+) -> list[dict]:
     validated_wells = []
     if wells is None or len(wells) == 0:
         raise ValueError("Empty wells list")
@@ -174,15 +174,15 @@ def _validate_plate_wells(
 def write_multiscale(
     pyramid: ListOfArrayLike,
     group: zarr.Group,
-    chunks: Optional[Union[Tuple[Any, ...], int]] = None,
+    chunks: Optional[Union[tuple[Any, ...], int]] = None,
     fmt: Format = CurrentFormat(),
-    axes: Optional[Union[str, List[str], List[Dict[str, str]]]] = None,
-    coordinate_transformations: Optional[List[List[Dict[str, Any]]]] = None,
-    storage_options: Optional[Union[JSONDict, List[JSONDict]]] = None,
+    axes: Optional[Union[str, list[str], list[dict[str, str]]]] = None,
+    coordinate_transformations: Optional[list[list[dict[str, Any]]]] = None,
+    storage_options: Optional[Union[JSONDict, list[JSONDict]]] = None,
     name: Optional[str] = None,
     compute: Optional[bool] = True,
-    **metadata: Union[str, JSONDict, List[JSONDict]],
-) -> List:
+    **metadata: Union[str, JSONDict, list[JSONDict]],
+) -> list:
     """
     Write a pyramid with multiscale metadata to disk.
 
@@ -234,7 +234,7 @@ def write_multiscale(
         msg = """The 'chunks' argument is deprecated and will be removed in version 0.5.
 Please use the 'storage_options' argument instead."""
         warnings.warn(msg, DeprecationWarning)
-    datasets: List[dict] = []
+    datasets: list[dict] = []
     for path, data in enumerate(pyramid):
         options = _resolve_storage_options(storage_options, path)
 
@@ -296,11 +296,11 @@ Please use the 'storage_options' argument instead."""
 
 def write_multiscales_metadata(
     group: zarr.Group,
-    datasets: List[dict],
+    datasets: list[dict],
     fmt: Format = CurrentFormat(),
-    axes: Optional[Union[str, List[str], List[Dict[str, str]]]] = None,
+    axes: Optional[Union[str, list[str], list[dict[str, str]]]] = None,
     name: Optional[str] = None,
-    **metadata: Union[str, JSONDict, List[JSONDict]],
+    **metadata: Union[str, JSONDict, list[JSONDict]],
 ) -> None:
     """
     Write the multiscales metadata in the group.
@@ -374,11 +374,11 @@ def write_multiscales_metadata(
 
 def write_plate_metadata(
     group: zarr.Group,
-    rows: List[str],
-    columns: List[str],
-    wells: List[Union[str, dict]],
+    rows: list[str],
+    columns: list[str],
+    wells: list[Union[str, dict]],
     fmt: Format = CurrentFormat(),
-    acquisitions: Optional[List[dict]] = None,
+    acquisitions: Optional[list[dict]] = None,
     field_count: Optional[int] = None,
     name: Optional[str] = None,
 ) -> None:
@@ -405,7 +405,7 @@ def write_plate_metadata(
     :param field_count: The maximum number of fields per view across wells.
     """
 
-    plate: Dict[str, Union[str, int, List[Dict]]] = {
+    plate: dict[str, Union[str, int, list[dict]]] = {
         "columns": _validate_plate_rows_columns(columns),
         "rows": _validate_plate_rows_columns(rows),
         "wells": _validate_plate_wells(wells, rows, columns, fmt=fmt),
@@ -422,7 +422,7 @@ def write_plate_metadata(
 
 def write_well_metadata(
     group: zarr.Group,
-    images: List[Union[str, dict]],
+    images: list[Union[str, dict]],
     fmt: Format = CurrentFormat(),
 ) -> None:
     """
@@ -449,14 +449,14 @@ def write_image(
     image: ArrayLike,
     group: zarr.Group,
     scaler: Scaler = Scaler(),
-    chunks: Optional[Union[Tuple[Any, ...], int]] = None,
+    chunks: Optional[Union[tuple[Any, ...], int]] = None,
     fmt: Format = CurrentFormat(),
-    axes: Optional[Union[str, List[str], List[Dict[str, str]]]] = None,
-    coordinate_transformations: Optional[List[List[Dict[str, Any]]]] = None,
-    storage_options: Optional[Union[JSONDict, List[JSONDict]]] = None,
+    axes: Optional[Union[str, list[str], list[dict[str, str]]]] = None,
+    coordinate_transformations: Optional[list[list[dict[str, Any]]]] = None,
+    storage_options: Optional[Union[JSONDict, list[JSONDict]]] = None,
     compute: Optional[bool] = True,
-    **metadata: Union[str, JSONDict, List[JSONDict]],
-) -> List:
+    **metadata: Union[str, JSONDict, list[JSONDict]],
+) -> list:
     """Writes an image to the zarr store according to ome-zarr specification
 
     :type image: :class:`numpy.ndarray` or `dask.array.Array`
@@ -539,7 +539,7 @@ def write_image(
 
 
 def _resolve_storage_options(
-    storage_options: Union[JSONDict, List[JSONDict], None], path: int
+    storage_options: Union[JSONDict, list[JSONDict], None], path: int
 ) -> JSONDict:
     options = {}
     if storage_options:
@@ -555,18 +555,18 @@ def _write_dask_image(
     image: da.Array,
     group: zarr.Group,
     scaler: Scaler = Scaler(),
-    chunks: Optional[Union[Tuple[Any, ...], int]] = None,
+    chunks: Optional[Union[tuple[Any, ...], int]] = None,
     fmt: Format = CurrentFormat(),
-    axes: Optional[Union[str, List[str], List[Dict[str, str]]]] = None,
-    coordinate_transformations: Optional[List[List[Dict[str, Any]]]] = None,
-    storage_options: Optional[Union[JSONDict, List[JSONDict]]] = None,
+    axes: Optional[Union[str, list[str], list[dict[str, str]]]] = None,
+    coordinate_transformations: Optional[list[list[dict[str, Any]]]] = None,
+    storage_options: Optional[Union[JSONDict, list[JSONDict]]] = None,
     name: Optional[str] = None,
     compute: Optional[bool] = True,
-    **metadata: Union[str, JSONDict, List[JSONDict]],
-) -> List:
+    **metadata: Union[str, JSONDict, list[JSONDict]],
+) -> list:
     if fmt.version in ("0.1", "0.2"):
         # v0.1 and v0.2 are strictly 5D
-        shape_5d: Tuple[Any, ...] = (*(1,) * (5 - image.ndim), *image.shape)
+        shape_5d: tuple[Any, ...] = (*(1,) * (5 - image.ndim), *image.shape)
         image = image.reshape(shape_5d)
         # and we don't need axes
         axes = None
@@ -579,7 +579,7 @@ def _write_dask_image(
 Please use the 'storage_options' argument instead."""
         warnings.warn(msg, DeprecationWarning)
 
-    datasets: List[dict] = []
+    datasets: list[dict] = []
     delayed = []
 
     # for path, data in enumerate(pyramid):
@@ -653,10 +653,10 @@ Please use the 'storage_options' argument instead."""
 def write_label_metadata(
     group: zarr.Group,
     name: str,
-    colors: Optional[List[JSONDict]] = None,
-    properties: Optional[List[JSONDict]] = None,
+    colors: Optional[list[JSONDict]] = None,
+    properties: Optional[list[JSONDict]] = None,
     fmt: Format = CurrentFormat(),
-    **metadata: Union[List[JSONDict], JSONDict, str],
+    **metadata: Union[list[JSONDict], JSONDict, str],
 ) -> None:
     """
     Write image-label metadata to the group.
@@ -699,18 +699,18 @@ def write_label_metadata(
 
 
 def write_multiscale_labels(
-    pyramid: List,
+    pyramid: list,
     group: zarr.Group,
     name: str,
-    chunks: Optional[Union[Tuple[Any, ...], int]] = None,
+    chunks: Optional[Union[tuple[Any, ...], int]] = None,
     fmt: Format = CurrentFormat(),
-    axes: Optional[Union[str, List[str], List[Dict[str, str]]]] = None,
-    coordinate_transformations: Optional[List[List[Dict[str, Any]]]] = None,
-    storage_options: Optional[Union[JSONDict, List[JSONDict]]] = None,
+    axes: Optional[Union[str, list[str], list[dict[str, str]]]] = None,
+    coordinate_transformations: Optional[list[list[dict[str, Any]]]] = None,
+    storage_options: Optional[Union[JSONDict, list[JSONDict]]] = None,
     label_metadata: Optional[JSONDict] = None,
     compute: Optional[bool] = True,
     **metadata: JSONDict,
-) -> List:
+) -> list:
     """
     Write pyramidal image labels to disk.
 
@@ -790,15 +790,15 @@ def write_labels(
     group: zarr.Group,
     name: str,
     scaler: Scaler = Scaler(),
-    chunks: Optional[Union[Tuple[Any, ...], int]] = None,
+    chunks: Optional[Union[tuple[Any, ...], int]] = None,
     fmt: Format = CurrentFormat(),
-    axes: Optional[Union[str, List[str], List[Dict[str, str]]]] = None,
-    coordinate_transformations: Optional[List[List[Dict[str, Any]]]] = None,
-    storage_options: Optional[Union[JSONDict, List[JSONDict]]] = None,
+    axes: Optional[Union[str, list[str], list[dict[str, str]]]] = None,
+    coordinate_transformations: Optional[list[list[dict[str, Any]]]] = None,
+    storage_options: Optional[Union[JSONDict, list[JSONDict]]] = None,
     label_metadata: Optional[JSONDict] = None,
     compute: Optional[bool] = True,
     **metadata: JSONDict,
-) -> List:
+) -> list:
     """
     Write image label data to disk.
 
@@ -900,14 +900,14 @@ def _create_mip(
     image: np.ndarray,
     fmt: Format,
     scaler: Scaler,
-    axes: Optional[Union[str, List[str], List[Dict[str, str]]]],
-) -> Tuple[List[np.ndarray], Optional[Union[str, List[str], List[Dict[str, str]]]]]:
+    axes: Optional[Union[str, list[str], list[dict[str, str]]]],
+) -> tuple[list[np.ndarray], Optional[Union[str, list[str], list[dict[str, str]]]]]:
     if image.ndim > 5:
         raise ValueError("Only images of 5D or less are supported")
 
     if fmt.version in ("0.1", "0.2"):
         # v0.1 and v0.2 are strictly 5D
-        shape_5d: Tuple[Any, ...] = (*(1,) * (5 - image.ndim), *image.shape)
+        shape_5d: tuple[Any, ...] = (*(1,) * (5 - image.ndim), *image.shape)
         image = image.reshape(shape_5d)
         # and we don't need axes
         axes = None
@@ -929,8 +929,8 @@ def _create_mip(
 
 
 def _retuple(
-    chunks: Union[Tuple[Any, ...], int], shape: Tuple[Any, ...]
-) -> Tuple[Any, ...]:
+    chunks: Union[tuple[Any, ...], int], shape: tuple[Any, ...]
+) -> tuple[Any, ...]:
     """
     Expand chunks to match shape.
 

@@ -2,7 +2,6 @@
 
 import codecs
 import os
-from typing import List
 
 from setuptools import setup
 
@@ -12,7 +11,7 @@ def read(fname):
     return codecs.open(file_path, encoding="utf-8").read()
 
 
-install_requires: List[List[str]] = []
+install_requires: list[list[str]] = []
 install_requires += (["dataclasses;python_version<'3.7'"],)
 install_requires += (["tifffile<2020.09.22;python_version<'3.7'"],)
 install_requires += (["numpy"],)

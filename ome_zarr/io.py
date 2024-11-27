@@ -6,7 +6,7 @@ Primary entry point is the :func:`~ome_zarr.io.parse_url` method.
 import json
 import logging
 from pathlib import Path
-from typing import List, Optional, Union
+from typing import Optional, Union
 from urllib.parse import urljoin
 
 import dask.array as da
@@ -165,7 +165,7 @@ class ZarrLocation:
             LOGGER.exception("Error while loading JSON")
             return {}
 
-    def parts(self) -> List[str]:
+    def parts(self) -> list[str]:
         if self._isfile():
             return list(Path(self.__path).parts)
         else:
