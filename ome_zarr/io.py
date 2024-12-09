@@ -74,11 +74,16 @@ class ZarrLocation:
         self.zarray: JSONDict = {}
         self.__metadata: JSONDict = {}
         self.__exists: bool = True
+        # If we want to *create* a new zarr v2 group, we need to specify
+        # zarr_format. This is not needed for reading.
+        zarr_format = None
+        if self.__mode == "w":
+            # For now, let's support writing of zarr v2
+            # TODO: handle writing of zarr v2 OR zarr v3
+            zarr_format = 2
         try:
-            # If we want to *create* a new zarr v2 group, we need to specify
-            # zarr_format=2. This is not needed for reading.
             group = zarr.open_group(
-                store=self.__store, path="/", mode=self.__mode, zarr_version=2
+                store=self.__store, path="/", mode=self.__mode, zarr_format=zarr_format
             )
             self.zgroup = group.attrs.asdict()
             # For zarr v3, everything is under the "ome" namespace
@@ -88,7 +93,10 @@ class ZarrLocation:
         except (ValueError, FileNotFoundError):
             try:
                 array = zarr.open_array(
-                    store=self.__store, path="/", mode=self.__mode, zarr_version=2
+                    store=self.__store,
+                    path="/",
+                    mode=self.__mode,
+                    zarr_format=zarr_format,
                 )
                 self.zarray = array.attrs.asdict()
                 self.__metadata = self.zarray
