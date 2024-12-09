@@ -18,10 +18,7 @@ install_requires += (["tifffile<2020.09.22;python_version<'3.7'"],)
 install_requires += (["numpy"],)
 install_requires += (["dask"],)
 install_requires += (["distributed"],)
-# install_requires += (["zarr==v3.0.0-beta.1"],)
-install_requires += (
-    ["zarr @ git+https://github.com/zarr-developers/zarr-python@e49647b"],
-)
+install_requires += (["zarr==v3.0.0-beta.3"],)
 install_requires += (["fsspec[s3]>=0.8,!=2021.07.0"],)
 # See https://github.com/fsspec/filesystem_spec/issues/819
 install_requires += (["aiohttp<4"],)
