@@ -52,7 +52,7 @@ class TestInvalid:
         grp = create_zarr(str(self.path))
         # update version to something invalid
         attrs = grp.attrs.asdict()
-        attrs["multiscales"][0]["version"] = "invalid"
+        attrs["ome"]["multiscales"][0]["version"] = "invalid"
         grp.attrs.put(attrs)
         # should raise exception
         with pytest.raises(ValueError) as exe:
