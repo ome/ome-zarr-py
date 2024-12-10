@@ -273,15 +273,20 @@ Please use the 'storage_options' argument instead."""
 
         else:
             # v2 arguments
+            if fmt.version in ("0.1", "0.2", "0.3", "0.4"):
+                options["chunks"] = chunks_opt
+                options["dimension_separator"] = "/"
+                # default to zstd compression
+                options["compressor"] = options.get(
+                    "compressor", Blosc(cname="zstd", clevel=5, shuffle=Blosc.SHUFFLE)
+                )
+            else:
+                if axes is not None:
+                    options["dimension_names"] = [
+                        axis["name"] for axis in axes if isinstance(axis, dict)
+                    ]
+
             options["shape"] = data.shape
-            options["chunks"] = chunks_opt
-            options["dimension_separator"] = "/"
-
-            # default to zstd compression
-            options["compressor"] = options.get(
-                "compressor", Blosc(cname="zstd", clevel=5, shuffle=Blosc.SHUFFLE)
-            )
-
             # otherwise we get 'null'
             options["fill_value"] = 0
 
@@ -380,7 +385,6 @@ def write_multiscales_metadata(
     # (for {} this would silently over-write it, with dict() it explicitly fails)
     multiscales = [
         dict(
-            version=fmt.version,
             datasets=_validate_datasets(datasets, ndim, fmt),
             name=name if name else group.name,
             **metadata,
@@ -389,7 +393,12 @@ def write_multiscales_metadata(
     if axes is not None:
         multiscales[0]["axes"] = axes
 
-    group.attrs["multiscales"] = multiscales
+    if fmt.version in ("0.1", "0.2", "0.3", "0.4"):
+        multiscales[0]["version"] = fmt.version
+        group.attrs["multiscales"] = multiscales
+    else:
+        # Zarr v3 metadata under 'ome' with top-level version
+        group.attrs["ome"] = {"version": fmt.version, "multiscales": multiscales}
 
 
 def write_plate_metadata(
