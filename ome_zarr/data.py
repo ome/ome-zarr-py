@@ -127,7 +127,7 @@ def create_zarr(
     """Generate a synthetic image pyramid with labels."""
     pyramid, labels = method()
 
-    loc = parse_url(zarr_directory, mode="w")
+    loc = parse_url(zarr_directory, mode="w", fmt=fmt)
     assert loc
     grp = zarr.group(loc.store, zarr_format=fmt.zarr_format)
     axes = None
@@ -195,6 +195,7 @@ def create_zarr(
         grp,
         axes=axes,
         storage_options=storage_options,
+        fmt=fmt,
         metadata={"omero": image_data},
     )
 
@@ -209,7 +210,7 @@ def create_zarr(
         if axes is not None:
             # remove channel axis for masks
             axes = axes.replace("c", "")
-        write_multiscale(labels, label_grp, axes=axes)
+        write_multiscale(labels, label_grp, axes=axes, fmt=fmt)
 
         colors = []
         properties = []
