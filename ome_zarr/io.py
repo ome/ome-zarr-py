@@ -80,7 +80,10 @@ class ZarrLocation:
         if self.__mode == "w":
             # For now, let's support writing of zarr v2
             # TODO: handle writing of zarr v2 OR zarr v3
-            zarr_format = 2
+            if self.__fmt.version in ("0.1", "0.2", "0.3", "0.4"):
+                zarr_format = 2
+            else:
+                zarr_format = 3
         try:
             group = zarr.open_group(
                 store=self.__store, path="/", mode=self.__mode, zarr_format=zarr_format
