@@ -211,6 +211,14 @@ def parse_url(
 ) -> Optional[ZarrLocation]:
     """Convert a path string or URL to a ZarrLocation subclass.
 
+    :param path: Path to parse.
+    :param mode: Mode to open in.
+    :param fmt: Version of the OME-NGFF spec to open path with.
+
+    :return: `ZarrLocation`.
+        If mode is 'r', and the path does not exist returns None.
+        If there is an error opening the path, also returns None.
+
     >>> parse_url('does-not-exist')
     """
     try:
