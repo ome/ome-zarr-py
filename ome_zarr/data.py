@@ -129,7 +129,7 @@ def create_zarr(
 
     loc = parse_url(zarr_directory, mode="w")
     assert loc
-    grp = zarr.group(loc.store, zarr_format=2)
+    grp = zarr.group(loc.store, zarr_format=fmt.zarr_format)
     axes = None
     size_c = 1
     if fmt.version not in ("0.1", "0.2"):
@@ -200,7 +200,10 @@ def create_zarr(
 
     if labels:
         labels_grp = grp.create_group("labels")
-        labels_grp.attrs["labels"] = [label_name]
+        if fmt.zarr_format == 2:
+            labels_grp.attrs["labels"] = [label_name]
+        else:
+            labels_grp.attrs["ome"] = {"labels": [label_name]}
 
         label_grp = labels_grp.create_group(label_name)
         if axes is not None:
@@ -214,11 +217,23 @@ def create_zarr(
             rgba = [randrange(0, 256) for i in range(4)]
             colors.append({"label-value": x, "rgba": rgba})
             properties.append({"label-value": x, "class": f"class {x}"})
-        label_grp.attrs["image-label"] = {
-            "version": fmt.version,
-            "colors": colors,
-            "properties": properties,
-            "source": {"image": "../../"},
-        }
+        if fmt.zarr_format == 2:
+            label_grp.attrs["image-label"] = {
+                "version": fmt.version,
+                "colors": colors,
+                "properties": properties,
+                "source": {"image": "../../"},
+            }
+        else:
+            ome_attrs = label_grp.attrs["ome"]
+            label_grp.attrs["ome"] = {
+                "image-label": {
+                    "version": fmt.version,
+                    "colors": colors,
+                    "properties": properties,
+                    "source": {"image": "../../"},
+                },
+                **ome_attrs,
+            }
 
     return grp

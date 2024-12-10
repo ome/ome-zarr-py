@@ -265,7 +265,7 @@ Please use the 'storage_options' argument instead."""
                 # dimension_separator=group.store.dimension_separator,
                 dimension_separator="/",
                 compute=compute,
-                zarr_format=2,
+                zarr_format=fmt.zarr_format,
             )
 
             if not compute:
@@ -273,7 +273,7 @@ Please use the 'storage_options' argument instead."""
 
         else:
             # v2 arguments
-            if fmt.version in ("0.1", "0.2", "0.3", "0.4"):
+            if fmt.zarr_format == 2:
                 options["chunks"] = chunks_opt
                 options["dimension_separator"] = "/"
                 # default to zstd compression
@@ -356,6 +356,8 @@ def write_multiscales_metadata(
             axes = _get_valid_axes(axes=axes, fmt=fmt)
             if axes is not None:
                 ndim = len(axes)
+
+    ome_attrs = {}
     if (
         isinstance(metadata, dict)
         and metadata.get("metadata")
@@ -378,7 +380,7 @@ def write_multiscales_metadata(
                     if not isinstance(c["window"][p], (int, float)):
                         raise TypeError(f"`'{p}'` must be an int or float.")
 
-        group.attrs["omero"] = omero_metadata
+        ome_attrs["omero"] = omero_metadata
 
     # note: we construct the multiscale metadata via dict(), rather than {}
     # to avoid duplication of protected keys like 'version' in **metadata
@@ -393,12 +395,15 @@ def write_multiscales_metadata(
     if axes is not None:
         multiscales[0]["axes"] = axes
 
-    if fmt.version in ("0.1", "0.2", "0.3", "0.4"):
+    ome_attrs["multiscales"] = multiscales
+
+    if fmt.zarr_format == 2:
         multiscales[0]["version"] = fmt.version
-        group.attrs["multiscales"] = multiscales
+        for key, data in ome_attrs.items():
+            group.attrs[key] = data
     else:
         # Zarr v3 metadata under 'ome' with top-level version
-        group.attrs["ome"] = {"version": fmt.version, "multiscales": multiscales}
+        group.attrs["ome"] = {"version": fmt.version, **ome_attrs}
 
 
 def write_plate_metadata(
@@ -446,7 +451,10 @@ def write_plate_metadata(
         plate["field_count"] = field_count
     if acquisitions is not None:
         plate["acquisitions"] = _validate_plate_acquisitions(acquisitions)
-    group.attrs["plate"] = plate
+    if fmt.zarr_format == 2:
+        group.attrs["plate"] = plate
+    else:
+        group.attrs["ome"] = {"plate": plate}
 
 
 def write_well_metadata(
@@ -471,7 +479,10 @@ def write_well_metadata(
         "images": _validate_well_images(images),
         "version": fmt.version,
     }
-    group.attrs["well"] = well
+    if fmt.zarr_format == 2:
+        group.attrs["well"] = well
+    else:
+        group.attrs["ome"] = {"well": well}
 
 
 def write_image(
@@ -730,7 +741,10 @@ def write_label_metadata(
 
     label_list = group.attrs.get("labels", [])
     label_list.append(name)
-    group.attrs["labels"] = label_list
+    if fmt.zarr_format == 2:
+        group.attrs["labels"] = label_list
+    else:
+        group.attrs["ome"] = {"labels": label_list}
 
 
 def write_multiscale_labels(
