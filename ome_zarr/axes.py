@@ -1,7 +1,7 @@
 """Axes class for validating and transforming axes
 """
 
-from typing import Any, Dict, List, Union
+from typing import Any, Union
 
 from .format import CurrentFormat, Format
 
@@ -11,7 +11,7 @@ KNOWN_AXES = {"x": "space", "y": "space", "z": "space", "c": "channel", "t": "ti
 class Axes:
     def __init__(
         self,
-        axes: Union[List[str], List[Dict[str, str]]],
+        axes: Union[list[str], list[dict[str, str]]],
         fmt: Format = CurrentFormat(),
     ) -> None:
         """
@@ -41,15 +41,15 @@ class Axes:
 
     def to_list(
         self, fmt: Format = CurrentFormat()
-    ) -> Union[List[str], List[Dict[str, str]]]:
+    ) -> Union[list[str], list[dict[str, str]]]:
         if fmt.version == "0.3":
             return self._get_names()
         return self.axes
 
     @staticmethod
     def _axes_to_dicts(
-        axes: Union[List[str], List[Dict[str, str]]]
-    ) -> List[Dict[str, str]]:
+        axes: Union[list[str], list[dict[str, str]]]
+    ) -> list[dict[str, str]]:
         """Returns a list of axis dicts with name and type"""
         axes_dicts = []
         for axis in axes:
@@ -74,7 +74,7 @@ class Axes:
                 "Too many unknown axes types. 1 allowed, found: %s" % unknown_types
             )
 
-        def _last_index(item: str, item_list: List[Any]) -> int:
+        def _last_index(item: str, item_list: list[Any]) -> int:
             return max(loc for loc, val in enumerate(item_list) if val == item)
 
         if "time" in axes_types and _last_index("time", axes_types) > 0:
@@ -88,7 +88,7 @@ class Axes:
         ) > axes_types.index("space"):
             raise ValueError("'space' axes must come after 'channel'")
 
-    def _get_names(self) -> List[str]:
+    def _get_names(self) -> list[str]:
         """Returns a list of axis names"""
         axes_names = []
         for axis in self.axes:

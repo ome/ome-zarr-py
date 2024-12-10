@@ -3,7 +3,8 @@
 import logging
 import math
 from abc import ABC
-from typing import Any, Dict, Iterator, List, Optional, Type, Union, cast, overload
+from collections.abc import Iterator
+from typing import Any, Optional, Union, cast, overload
 
 import dask.array as da
 import numpy as np
@@ -23,25 +24,25 @@ class Node:
     def __init__(
         self,
         zarr: ZarrLocation,
-        root: Union["Node", "Reader", List[ZarrLocation]],
+        root: Union["Node", "Reader", list[ZarrLocation]],
         visibility: bool = True,
         plate_labels: bool = False,
     ):
         self.zarr = zarr
         self.root = root
-        self.seen: List[ZarrLocation] = []
+        self.seen: list[ZarrLocation] = []
         if isinstance(root, (Node, Reader)):
             self.seen = root.seen
         else:
-            self.seen = cast(List[ZarrLocation], root)
+            self.seen = cast(list[ZarrLocation], root)
         self.__visible = visibility
 
         # Likely to be updated by specs
         self.metadata: JSONDict = dict()
-        self.data: List[da.core.Array] = list()
-        self.specs: List[Spec] = []
-        self.pre_nodes: List[Node] = []
-        self.post_nodes: List[Node] = []
+        self.data: list[da.core.Array] = list()
+        self.specs: list[Spec] = []
+        self.pre_nodes: list[Node] = []
+        self.post_nodes: list[Node] = []
 
         # TODO: this should be some form of plugin infra over subclasses
         if Labels.matches(zarr):
@@ -61,16 +62,16 @@ class Node:
             self.specs.append(Well(self))
 
     @overload
-    def first(self, spectype: Type["Well"]) -> Optional["Well"]:
+    def first(self, spectype: type["Well"]) -> Optional["Well"]:
         # Handled by the generic case
         ...
 
     @overload
-    def first(self, spectype: Type["Plate"]) -> Optional["Plate"]:
+    def first(self, spectype: type["Plate"]) -> Optional["Plate"]:
         # Handled by the generic case
         ...
 
-    def first(self, spectype: Type["Spec"]) -> Optional["Spec"]:
+    def first(self, spectype: type["Spec"]) -> Optional["Spec"]:
         for spec in self.specs:
             if isinstance(spec, spectype):
                 return spec
@@ -101,7 +102,7 @@ class Node:
                 node.visible = visibility
         return old
 
-    def load(self, spec_type: Type["Spec"]) -> Optional["Spec"]:
+    def load(self, spec_type: type["Spec"]) -> Optional["Spec"]:
         for spec in self.specs:
             if isinstance(spec, spec_type):
                 return spec
@@ -226,7 +227,7 @@ class Label(Spec):
             LOGGER.warning("no parent found for %s: %s", self, image)
 
         # Metadata: TODO move to a class
-        colors: Dict[Union[int, bool], List[float]] = {}
+        colors: dict[Union[int, bool], list[float]] = {}
         color_list = image_label.get("colors", [])
         if color_list:
             for color in color_list:
@@ -244,7 +245,7 @@ class Label(Spec):
                 except Exception:
                     LOGGER.exception("invalid color - %s", color)
 
-        properties: Dict[int, Dict[str, str]] = {}
+        properties: dict[int, dict[str, str]] = {}
         props_list = image_label.get("properties", [])
         if props_list:
             for props in props_list:
@@ -291,7 +292,7 @@ class Multiscales(Spec):
         # This will get overwritten by 'omero' metadata if present
         node.metadata["name"] = multiscales[0].get("name")
         paths = [d["path"] for d in datasets]
-        self.datasets: List[str] = paths
+        self.datasets: list[str] = paths
         transformations = [d.get("coordinateTransformations") for d in datasets]
         if any(trans is not None for trans in transformations):
             node.metadata["coordinateTransformations"] = transformations
@@ -351,9 +352,9 @@ class OMERO(Spec):
                 return  # EARLY EXIT
 
             colormaps = []
-            contrast_limits: Optional[List[Optional[Any]]] = [None for x in channels]
-            names: List[str] = [("channel_%d" % idx) for idx, ch in enumerate(channels)]
-            visibles: List[bool] = [True for x in channels]
+            contrast_limits: Optional[list[Optional[Any]]] = [None for x in channels]
+            names: list[str] = [("channel_%d" % idx) for idx, ch in enumerate(channels)]
+            visibles: list[bool] = [True for x in channels]
 
             for idx, ch in enumerate(channels):
                 # 'FF0000' -> [1, 0, 0]
@@ -440,7 +441,7 @@ class Well(Spec):
         def get_lazy_well(level: int, tile_shape: tuple) -> da.Array:
             lazy_rows = []
             for row in range(row_count):
-                lazy_row: List[da.Array] = []
+                lazy_row: list[da.Array] = []
                 for col in range(column_count):
                     LOGGER.debug(
                         "creating lazy_reader. row: %s col: %s level: %s",
@@ -554,7 +555,7 @@ class Plate(Spec):
         lazy_rows = []
         # For level 0, return whole image for each tile
         for row in range(self.row_count):
-            lazy_row: List[da.Array] = []
+            lazy_row: list[da.Array] = []
             for col in range(self.column_count):
                 lazy_row.append(get_tile(row, col))
             lazy_rows.append(da.concatenate(lazy_row, axis=len(self.axes) - 1))
@@ -585,7 +586,7 @@ class PlateLabels(Plate):
 
         # combine 'properties' from each image
         # from https://github.com/ome/ome-zarr-py/pull/61/
-        properties: Dict[int, Dict[str, Any]] = {}
+        properties: dict[int, dict[str, Any]] = {}
         for row in self.row_names:
             for col in self.col_names:
                 path = f"{row}/{col}/{self.first_field_path}/labels/0/.zattrs"
@@ -617,7 +618,7 @@ class Reader:
     def __init__(self, zarr: ZarrLocation) -> None:
         assert zarr.exists()
         self.zarr = zarr
-        self.seen: List[ZarrLocation] = [zarr]
+        self.seen: list[ZarrLocation] = [zarr]
 
     def __call__(self) -> Iterator[Node]:
         node = Node(self.zarr, self)
