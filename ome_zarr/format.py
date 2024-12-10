@@ -55,6 +55,11 @@ class Format(ABC):
     def version(self) -> str:  # pragma: no cover
         raise NotImplementedError()
 
+    @property
+    @abstractmethod
+    def zarr_format(self) -> int:  # pragma: no cover
+        raise NotImplementedError()
+
     @abstractmethod
     def matches(self, metadata: dict) -> bool:  # pragma: no cover
         raise NotImplementedError()
@@ -128,6 +133,10 @@ class FormatV01(Format):
     @property
     def version(self) -> str:
         return "0.1"
+
+    @property
+    def zarr_format(self) -> int:
+        return 2
 
     def matches(self, metadata: dict) -> bool:
         version = self._get_metadata_version(metadata)
@@ -338,6 +347,10 @@ class FormatV05(FormatV04):
     @property
     def version(self) -> str:
         return "0.5"
+
+    @property
+    def zarr_format(self) -> int:
+        return 3
 
 
 CurrentFormat = FormatV05
