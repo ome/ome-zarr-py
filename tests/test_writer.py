@@ -39,7 +39,8 @@ class TestWriter:
     @pytest.fixture(autouse=True)
     def initdir(self, tmpdir):
         self.path = pathlib.Path(tmpdir.mkdir("data"))
-        self.store = parse_url(self.path, mode="w").store
+        # All Zarr v2 formats tested below can use this store
+        self.store = parse_url(self.path, mode="w", fmt=FormatV04()).store
         self.root = zarr.group(store=self.store)
         self.group = self.root.create_group("test")
 
@@ -140,12 +141,19 @@ class TestWriter:
         assert np.allclose(data, node.data[0][...].compute())
 
     @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])
-    def test_write_image_current(self, array_constructor):
+    def test_write_image_current(self, array_constructor, tmpdir):
         shape = (64, 64, 64)
         data = self.create_data(shape)
         data = array_constructor(data)
-        write_image(data, self.group, axes="zyx")
-        reader = Reader(parse_url(f"{self.path}/test"))
+        # don't use self.store etc as that is not current zarr format (v3)
+        test_path = pathlib.Path(tmpdir.mkdir("current"))
+        store = parse_url(test_path, mode="w").store
+        print("test_path", test_path)
+        root = zarr.group(store=store)
+        group = root.create_group("test")
+        write_image(data, group, axes="zyx")
+        # assert group is None
+        reader = Reader(parse_url(f"{test_path}/test"))
         image_node = list(reader())[0]
         for transfs in image_node.metadata["coordinateTransformations"]:
             assert len(transfs) == 1

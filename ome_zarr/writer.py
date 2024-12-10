@@ -248,44 +248,37 @@ Please use the 'storage_options' argument instead."""
         if chunks_opt is not None:
             chunks_opt = _retuple(chunks_opt, data.shape)
 
+        # v2 arguments
+        if fmt.zarr_format == 2:
+            options["chunks"] = chunks_opt
+            options["dimension_separator"] = "/"
+            # default to zstd compression
+            options["compressor"] = options.get(
+                "compressor", Blosc(cname="zstd", clevel=5, shuffle=Blosc.SHUFFLE)
+            )
+        else:
+            if axes is not None:
+                options["dimension_names"] = [
+                    axis["name"] for axis in axes if isinstance(axis, dict)
+                ]
+
         if isinstance(data, da.Array):
+            options["zarr_format"] = fmt.zarr_format
             if chunks_opt is not None:
                 data = da.array(data).rechunk(chunks=chunks_opt)
-                options["chunks"] = chunks_opt
             da_delayed = da.to_zarr(
                 arr=data,
                 url=group.store,
                 component=str(Path(group.path, str(path))),
-                storage_options=options,
-                # by default we use Blosc with zstd compression
-                compressor=options.get(
-                    "compressor", Blosc(cname="zstd", clevel=5, shuffle=Blosc.SHUFFLE)
-                ),
-                # TODO: default dimension_separator? Not set in store for zarr v3
-                # dimension_separator=group.store.dimension_separator,
-                dimension_separator="/",
                 compute=compute,
                 zarr_format=fmt.zarr_format,
+                **options,
             )
 
             if not compute:
                 dask_delayed.append(da_delayed)
 
         else:
-            # v2 arguments
-            if fmt.zarr_format == 2:
-                options["chunks"] = chunks_opt
-                options["dimension_separator"] = "/"
-                # default to zstd compression
-                options["compressor"] = options.get(
-                    "compressor", Blosc(cname="zstd", clevel=5, shuffle=Blosc.SHUFFLE)
-                )
-            else:
-                if axes is not None:
-                    options["dimension_names"] = [
-                        axis["name"] for axis in axes if isinstance(axis, dict)
-                    ]
-
             options["shape"] = data.shape
             # otherwise we get 'null'
             options["fill_value"] = 0
@@ -649,21 +642,21 @@ Please use the 'storage_options' argument instead."""
         LOGGER.debug(
             "write dask.array to_zarr shape: %s, dtype: %s", image.shape, image.dtype
         )
+        if fmt.zarr_format == 2:
+            options["dimension_separator"] = "/"
+            if options["compressor"] is None:
+                options["compressor"] = Blosc(
+                    cname="zstd", clevel=5, shuffle=Blosc.SHUFFLE
+                )
+
         delayed.append(
             da.to_zarr(
                 arr=image,
                 url=group.store,
                 component=str(Path(group.path, str(path))),
-                storage_options=options,
                 compute=False,
-                compressor=options.pop(
-                    "compressor", Blosc(cname="zstd", clevel=5, shuffle=Blosc.SHUFFLE)
-                ),
-                # TODO: default dimension_separator? Not set in store for zarr v3
-                # dimension_separator=group.store.dimension_separator,
-                dimension_separator="/",
-                # TODO: hard-coded zarr_format for now. Needs to be set by the format.py
-                zarr_format=2,
+                zarr_format=fmt.zarr_format,
+                **options,
             )
         )
         datasets.append({"path": str(path)})
