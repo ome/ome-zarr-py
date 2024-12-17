@@ -5,7 +5,7 @@ Primary entry point is the :func:`~ome_zarr.io.parse_url` method.
 
 import logging
 from pathlib import Path
-from typing import List, Optional, Union
+from typing import Optional, Union
 from urllib.parse import urljoin
 
 import dask.array as da
@@ -191,7 +191,7 @@ class ZarrLocation:
             LOGGER.exception("Error while loading JSON")
             return {}
 
-    def parts(self) -> List[str]:
+    def parts(self) -> list[str]:
         if self._isfile():
             return list(Path(self.__path).parts)
         else:
@@ -237,6 +237,14 @@ def parse_url(
     path: Union[Path, str], mode: str = "r", fmt: Format = CurrentFormat()
 ) -> Optional[ZarrLocation]:
     """Convert a path string or URL to a ZarrLocation subclass.
+
+    :param path: Path to parse.
+    :param mode: Mode to open in.
+    :param fmt: Version of the OME-NGFF spec to open path with.
+
+    :return: `ZarrLocation`.
+        If mode is 'r', and the path does not exist returns None.
+        If there is an error opening the path, also returns None.
 
     >>> parse_url('does-not-exist')
     """

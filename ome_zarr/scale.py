@@ -6,9 +6,9 @@ See the :class:`~ome_zarr.scale.Scaler` class for details.
 import inspect
 import logging
 import os
-from collections.abc import MutableMapping
+from collections.abc import Iterator, MutableMapping
 from dataclasses import dataclass
-from typing import Any, Callable, Iterator, List, Tuple, Union
+from typing import Any, Callable, Union
 
 import dask.array as da
 import numpy as np
@@ -26,7 +26,7 @@ from .io import parse_url
 
 LOGGER = logging.getLogger("ome_zarr.scale")
 
-ListOfArrayLike = Union[List[da.Array], List[np.ndarray]]
+ListOfArrayLike = Union[list[da.Array], list[np.ndarray]]
 ArrayLike = Union[da.Array, np.ndarray]
 
 
@@ -93,7 +93,7 @@ class Scaler:
             grp.attrs.update(base.attrs)
 
     @property
-    def func(self) -> Callable[[np.ndarray], List[np.ndarray]]:
+    def func(self) -> Callable[[np.ndarray], list[np.ndarray]]:
         """Get downsample function."""
         func = getattr(self, self.method, None)
         if not func:
@@ -107,7 +107,7 @@ class Scaler:
         assert loc
         return loc.store
 
-    def __assert_values(self, pyramid: List[np.ndarray]) -> None:
+    def __assert_values(self, pyramid: list[np.ndarray]) -> None:
         """Check for a single unique set of values for all pyramid levels."""
         expected = set(np.unique(pyramid[0]))
         print(f"level 0 {pyramid[0].shape} = {len(expected)} labels")
@@ -122,7 +122,7 @@ class Scaler:
                 )
 
     def __create_group(
-        self, store: MutableMapping, base: np.ndarray, pyramid: List[np.ndarray]
+        self, store: MutableMapping, base: np.ndarray, pyramid: list[np.ndarray]
     ) -> zarr.Group:
         """Create group and datasets."""
         grp = zarr.group(store)
@@ -143,7 +143,7 @@ class Scaler:
         """
         if isinstance(image, da.Array):
 
-            def _resize(image: ArrayLike, out_shape: Tuple, **kwargs: Any) -> ArrayLike:
+            def _resize(image: ArrayLike, out_shape: tuple, **kwargs: Any) -> ArrayLike:
                 return dask_resize(image, out_shape, **kwargs)
 
         else:
@@ -161,7 +161,7 @@ class Scaler:
         )
         return image.astype(dtype)
 
-    def nearest(self, base: np.ndarray) -> List[np.ndarray]:
+    def nearest(self, base: np.ndarray) -> list[np.ndarray]:
         """
         Downsample using :func:`skimage.transform.resize`.
         """
@@ -172,7 +172,7 @@ class Scaler:
         if isinstance(plane, da.Array):
 
             def _resize(
-                image: ArrayLike, output_shape: Tuple, **kwargs: Any
+                image: ArrayLike, output_shape: tuple, **kwargs: Any
             ) -> ArrayLike:
                 return dask_resize(image, output_shape, **kwargs)
 
@@ -187,7 +187,7 @@ class Scaler:
             anti_aliasing=False,
         ).astype(plane.dtype)
 
-    def gaussian(self, base: np.ndarray) -> List[np.ndarray]:
+    def gaussian(self, base: np.ndarray) -> list[np.ndarray]:
         """Downsample using :func:`skimage.transform.pyramid_gaussian`."""
         return list(
             pyramid_gaussian(
@@ -198,7 +198,7 @@ class Scaler:
             )
         )
 
-    def laplacian(self, base: np.ndarray) -> List[np.ndarray]:
+    def laplacian(self, base: np.ndarray) -> list[np.ndarray]:
         """Downsample using :func:`skimage.transform.pyramid_laplacian`."""
         return list(
             pyramid_laplacian(
@@ -209,7 +209,7 @@ class Scaler:
             )
         )
 
-    def local_mean(self, base: np.ndarray) -> List[np.ndarray]:
+    def local_mean(self, base: np.ndarray) -> list[np.ndarray]:
         """Downsample using :func:`skimage.transform.downscale_local_mean`."""
         rv = [base]
         stack_dims = base.ndim - 2
@@ -218,7 +218,7 @@ class Scaler:
             rv.append(downscale_local_mean(rv[-1], factors=factors).astype(base.dtype))
         return rv
 
-    def zoom(self, base: np.ndarray) -> List[np.ndarray]:
+    def zoom(self, base: np.ndarray) -> list[np.ndarray]:
         """Downsample using :func:`scipy.ndimage.zoom`."""
         rv = [base]
         print(base.shape)

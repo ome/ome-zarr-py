@@ -1,6 +1,6 @@
 import csv
 import os
-from typing import Dict, Union
+from typing import Union
 
 from zarr.convenience import open as zarr_open
 
@@ -50,7 +50,7 @@ def csv_to_zarr(
 
     # Use #d to denote double etc.
     # e.g. "area (pixels)#d,well_label#s,Width#l,Height#l"
-    cols_types_by_name: Dict[str, str] = {}
+    cols_types_by_name: dict[str, str] = {}
     for col_name_type in csv_keys.split(","):
         if "#" in col_name_type:
             col_name, col_type = col_name_type.rsplit("#", 1)
@@ -62,7 +62,7 @@ def csv_to_zarr(
     csv_columns = None
     id_column = None
 
-    props_by_id: Dict[Union[str, int], Dict] = {}
+    props_by_id: dict[Union[str, int], dict] = {}
 
     with open(csv_path, newline="") as csvfile:
         row_reader = csv.reader(csvfile, delimiter=",")
@@ -90,7 +90,7 @@ def csv_to_zarr(
 
 
 def dict_to_zarr(
-    props_to_add: Dict[Union[str, int], Dict], zarr_path: str, zarr_id: str
+    props_to_add: dict[Union[str, int], dict], zarr_path: str, zarr_id: str
 ) -> None:
     """
     Add keys:values to the label properties of a ome-zarr Plate or Image.
