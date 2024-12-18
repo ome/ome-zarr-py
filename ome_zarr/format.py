@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterator
 from typing import Any, Optional
 
-from zarr.storage import FSStore
+from zarr.storage import LocalStore, RemoteStore
 
 LOGGER = logging.getLogger("ome_zarr.format")
 
@@ -60,7 +60,7 @@ class Format(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def init_store(self, path: str, mode: str = "r") -> FSStore:
+    def init_store(self, path: str, mode: str = "r") -> RemoteStore:
         raise NotImplementedError()
 
     # @abstractmethod
@@ -134,9 +134,22 @@ class FormatV01(Format):
         LOGGER.debug("%s matches %s?", self.version, version)
         return version == self.version
 
-    def init_store(self, path: str, mode: str = "r") -> FSStore:
-        store = FSStore(path, mode=mode, dimension_separator=".")
-        LOGGER.debug("Created legacy flat FSStore(%s, %s)", path, mode)
+    def init_store(self, path: str, mode: str = "r") -> RemoteStore | LocalStore:
+        """
+        Not ideal. Stores should remain hidden
+        "dimension_separator" is specified at array creation time
+        """
+
+        if path.startswith(("http", "s3")):
+            store = RemoteStore.from_url(
+                path,
+                storage_options=None,
+                read_only=(mode in ("r", "r+", "a")),
+            )
+        else:
+            # No other kwargs supported
+            store = LocalStore(path, read_only=(mode in ("r", "r+", "a")))
+        LOGGER.debug("Created nested RemoteStore(%s, %s)", path, mode)
         return store
 
     def generate_well_dict(
@@ -179,32 +192,6 @@ class FormatV02(FormatV01):
     @property
     def version(self) -> str:
         return "0.2"
-
-    def init_store(self, path: str, mode: str = "r") -> FSStore:
-        """
-        Not ideal. Stores should remain hidden
-        TODO: could also check dimension_separator
-        """
-
-        kwargs = {
-            "dimension_separator": "/",
-            "normalize_keys": False,
-        }
-
-        mkdir = True
-        if "r" in mode or path.startswith(("http", "s3")):
-            # Could be simplified on the fsspec side
-            mkdir = False
-        if mkdir:
-            kwargs["auto_mkdir"] = True
-
-        store = FSStore(
-            path,
-            mode=mode,
-            **kwargs,
-        )  # TODO: open issue for using Path
-        LOGGER.debug("Created nested FSStore(%s, %s, %s)", path, mode, kwargs)
-        return store
 
 
 class FormatV03(FormatV02):  # inherits from V02 to avoid code duplication
