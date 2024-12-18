@@ -1,8 +1,9 @@
 [build-system]
 requires = [
-    "setuptools>=60",
+    "setuptools>=64",
     "setuptools-scm>=8.0",
 ]
+build-backend = "setuptools.build_meta"
 
 [tools.setuptools.dynamic]
 version = {attr = "ome_zarr.__version__"}
@@ -58,3 +59,6 @@ Changelog = "https://github.com/ome/ome-zarr-py/blob/master/CHANGELOG.md"
 [tool.setuptools]
 packages = ["ome_zarr"]
 py-modules = ["ome_zarr"]
+
+[tool.setuptools_scm]
+version_file = "ome_zarr/_version.py"
