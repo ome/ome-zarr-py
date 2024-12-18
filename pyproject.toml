@@ -16,7 +16,6 @@ description="Implementation of images in Zarr files."
 requires-python = ">3.8"
 
 dependencies = [
-    "tifffile",
     "numpy",
     "dask",
     "distributed",
