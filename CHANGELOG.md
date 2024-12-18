@@ -1,7 +1,12 @@
-# Unreleased
+# 0.10.2 (November 2024)
 
 - Drop support for Python 3.8.
 - Document parameters and return value of `parse_url`.
+* Write metadata using delayed that depends on writing array(s)
+* Document return values of sample data
+* Simplify Python tutorial
+* pin zarr at < 3
+* Update version of pyupgrade
 
 # 0.9.0 (May 2024)
 
