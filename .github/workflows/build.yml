@@ -9,7 +9,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.8', '3.9', '3.10', '3.11', '3.12']
+        python-version: ['3.9', '3.10', '3.11', '3.12']
         os: ['windows-latest', 'macos-latest', 'ubuntu-latest']
     steps:
       - uses: actions/checkout@v4
@@ -27,7 +27,9 @@ jobs:
         run: tox --conf tox.ini
 
       - name: Upload code coverage
-        uses: codecov/codecov-action@v2
+        uses: codecov/codecov-action@v4
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         with:
           file: ./coverage.xml
           fail_ci_if_error: true

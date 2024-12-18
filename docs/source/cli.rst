@@ -1,3 +1,5 @@
+.. highlight:: bash
+
 
 Command-line tool
 -----------------
@@ -7,50 +9,53 @@ The examples below use the image at http://idr.openmicroscopy.org/webclient/?sho
 
 All examples can be made more or less verbose by passing `-v` or `-q` one or more times::
 
-    # ome_zarr -vvv ...
+    ome_zarr -vvv ...
 
 
 info
 ====
 
-Use the `ome_zarr` command to interrogate Zarr datasets::
+Use the `ome_zarr` command to interrogate Zarr datasets.
 
-    # Remote data
-    $ ome_zarr info https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.1/6001240.zarr/
+Remote data::
 
-    # Local data (after downloading as below)
-    $ ome_zarr info 6001240.zarr/
+    ome_zarr info https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.1/6001240.zarr/
+
+Local data::
+
+    ome_zarr info 6001240.zarr/
 
 view
 ====
 
 Use the `ome_zarr` command to view Zarr data in the https://ome.github.io/ome-ngff-validator::
 
-    # Local data (after downloading as below)
-    $ ome_zarr view 6001240.zarr/
+    ome_zarr view 6001240.zarr/
 
 download
 ========
 
-To download all the resolutions and metadata for an image::
+To download all the resolutions and metadata for an image use ``ome_zarr download``. This creates ``6001240.zarr`` locally::
 
-    # creates local 6001240.zarr/
-    $ ome_zarr download https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.1/6001240.zarr/
+    ome_zarr download https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.1/6001240.zarr/
 
-    # Specify output directory
-    $ ome_zarr download https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.1/6001240.zarr/ --output image_dir
+Specify a different output directory::
+
+    ome_zarr download https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.1/6001240.zarr/ --output image_dir
 
 create
 ======
 
-To create sample OME-Zarr image from the `skimage coins <https://scikit-image.org/docs/stable/api/skimage.data.html#skimage.data.coins>`_
-image::
+To create sample OME-Zarr image from the `skimage <https://scikit-image.org/docs/stable/api/skimage.data.html>`_
+data.
 
-    # Create an OME-Zarr image in coinsdata/ dir:
-    $ ome_zarr create coinsdata
+Create an OME-Zarr image in coinsdata/ dir::
 
-    # Create an rgb image from skimage astronaut in testimage dir:
-    $ ome_zarr create testimage --method=astronaut
+    ome_zarr create coinsdata
+
+Create an rgb image from skimage astronaut in testimage dir::
+
+    ome_zarr create testimage --method=astronaut
 
 csv to labels
 =============
@@ -75,13 +80,13 @@ to specify the data-type for each column (string by default).
  - `s`: `StringColumn`, for text
  - `b`: `BoolColumn`, for true/false
 
-Use e.g. `#d` as a suffix in the column name to denote a `float` column, no spaces etc.:
-```
-"area#d,label_text#s,Width#l,Height#l"
-```
+Use e.g. `#d` as a suffix in the column name to denote a `float` column, no spaces etc.::
+
+    "area#d,label_text#s,Width#l,Height#l"
+
 
 For example, to take values from columns named `area`, `label_text`, `Width` and `Height`
 within a CSV file named `labels_data.csv` with an ID column named `shape_id` and add these
 values to label properties with an ID key of `omero:shapeId` in an Image or Plate named `123.zarr`::
 
-    ome_zarr csv_to_labels labels_data.csv shape_id "area#d,label_text#s,Width#l,Height#l" 123.zarr omero:shapeId```
+    ome_zarr csv_to_labels labels_data.csv shape_id "area#d,label_text#s,Width#l,Height#l" 123.zarr omero:shapeId

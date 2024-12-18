@@ -1,7 +1,7 @@
 import filecmp
 import pathlib
 from tempfile import TemporaryDirectory
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 import dask.array as da
 import numpy as np
@@ -180,7 +180,7 @@ class TestWriter:
 
         assert not compute == len(dask_delayed_jobs)
 
-        if not len(dask_delayed_jobs):
+        if not compute:
             # can be configured to use a Local or Slurm cluster
             # before persisting the jobs
             dask_delayed_jobs = persist(*dask_delayed_jobs)
@@ -215,6 +215,20 @@ class TestWriter:
                 f"{self.path}/test/.zattrs",
                 shallow=False,
             )
+
+    def test_write_image_scalar_chunks(self):
+        """
+        Make sure a scalar chunks value is applied to all dimensions,
+        matching the behaviour of zarr-python.
+        """
+        shape = (64, 64, 64)
+        data = np.array(self.create_data(shape))
+        write_image(
+            image=data, group=self.group, axes="xyz", storage_options={"chunks": 32}
+        )
+        for data in self.group.values():
+            print(data)
+            assert data.chunks == (32, 32, 32)
 
     @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])
     def test_write_image_compressed(self, array_constructor):
@@ -580,7 +594,7 @@ class TestMultiscalesMetadata:
             None,
         ],
     )
-    def test_omero_metadata(self, metadata: Optional[Dict[str, Any]]):
+    def test_omero_metadata(self, metadata: Optional[dict[str, Any]]):
         datasets = []
         for level, transf in enumerate(TRANSFORMATIONS):
             datasets.append({"path": str(level), "coordinateTransformations": transf})

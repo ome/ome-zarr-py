@@ -1,7 +1,7 @@
 """Functions for generating synthetic data."""
 
 from random import randrange
-from typing import Callable, List, Optional, Tuple, Union
+from typing import Callable, Optional, Union
 
 import numpy as np
 import zarr
@@ -20,8 +20,17 @@ from .writer import write_multiscale
 CHANNEL_DIMENSION = 1
 
 
-def coins() -> Tuple[List, List]:
-    """Sample data from skimage."""
+def coins() -> tuple[list, list]:
+    """
+    Sample data from skimage.
+
+    Returns
+    -------
+    pyramids :
+        List of pyramid arrays.
+    labels :
+        List of labels.
+    """
     # Thanks to Juan
     # https://gist.github.com/jni/62e07ddd135dbb107278bc04c0f9a8e7
     image = data.coins()[50:-50, 50:-50]
@@ -36,8 +45,17 @@ def coins() -> Tuple[List, List]:
     return pyramid, labels
 
 
-def astronaut() -> Tuple[List, List]:
-    """Sample data from skimage."""
+def astronaut() -> tuple[list, list]:
+    """
+    Sample data from skimage.
+
+    Returns
+    -------
+    pyramids :
+        List of pyramid arrays.
+    labels :
+        List of labels.
+    """
     scaler = Scaler()
 
     astro = data.astronaut()
@@ -85,7 +103,7 @@ def make_circle(h: int, w: int, value: int, target: np.ndarray) -> None:
     target[mask] = value
 
 
-def rgb_to_5d(pixels: np.ndarray) -> List:
+def rgb_to_5d(pixels: np.ndarray) -> list:
     """Convert an RGB image into 5D image (t, c, z, y, x)."""
     if len(pixels.shape) == 2:
         stack = np.array([pixels])
@@ -101,10 +119,10 @@ def rgb_to_5d(pixels: np.ndarray) -> List:
 
 def create_zarr(
     zarr_directory: str,
-    method: Callable[..., Tuple[List, List]] = coins,
+    method: Callable[..., tuple[list, list]] = coins,
     label_name: str = "coins",
     fmt: Format = CurrentFormat(),
-    chunks: Optional[Union[Tuple, List]] = None,
+    chunks: Optional[Union[tuple, list]] = None,
 ) -> zarr.Group:
     """Generate a synthetic image pyramid with labels."""
     pyramid, labels = method()
