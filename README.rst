@@ -64,10 +64,8 @@ Distributed under the terms of the `BSD`_ license,
 
 .. |docs| image:: https://readthedocs.org/projects/ome-zarr/badge/?version=stable
     :alt: Documentation Status
-    :scale: 100%
     :target: https://ome-zarr.readthedocs.io/en/stable/?badge=stable
 
 .. |coverage| image:: https://codecov.io/gh/ome/ome-zarr-py/branch/master/graph/badge.svg
     :alt: Test coverage
-    :scale: 100%
     :target: https://codecov.io/gh/ome/ome-zarr-py
