@@ -4,6 +4,7 @@ import os
 import pytest
 
 from ome_zarr.data import astronaut, create_zarr
+from ome_zarr.format import FormatV04
 from ome_zarr.utils import download, info
 
 
@@ -18,7 +19,7 @@ class TestOmeZarr:
     @pytest.fixture(autouse=True)
     def initdir(self, tmpdir):
         self.path = tmpdir.mkdir("data")
-        create_zarr(str(self.path), method=astronaut)
+        create_zarr(str(self.path), method=astronaut, fmt=FormatV04())
 
     def check_info_stdout(self, out):
         for log in log_strings(0, 3, 1024, 1024, 1, 64, 64, "uint8"):

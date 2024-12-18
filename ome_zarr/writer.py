@@ -12,6 +12,7 @@ import dask.array as da
 import numpy as np
 import zarr
 from dask.graph_manipulation import bind
+from numcodecs import Blosc
 
 from .axes import Axes
 from .format import CurrentFormat, Format
@@ -190,7 +191,7 @@ def write_multiscale(
     :param pyramid:
         The image data to save. Largest level first. All image arrays MUST be up to
         5-dimensional with dimensions ordered (t, c, z, y, x)
-    :type group: :class:`zarr.hierarchy.Group`
+    :type group: :class:`zarr.Group`
     :param group: The group within the zarr store to store the data in
     :type chunks: int or tuple of ints, optional
     :param chunks:
@@ -247,25 +248,42 @@ Please use the 'storage_options' argument instead."""
         if chunks_opt is not None:
             chunks_opt = _retuple(chunks_opt, data.shape)
 
+        # v2 arguments
+        if fmt.zarr_format == 2:
+            options["chunks"] = chunks_opt
+            options["dimension_separator"] = "/"
+            # default to zstd compression
+            options["compressor"] = options.get(
+                "compressor", Blosc(cname="zstd", clevel=5, shuffle=Blosc.SHUFFLE)
+            )
+        else:
+            if axes is not None:
+                options["dimension_names"] = [
+                    axis["name"] for axis in axes if isinstance(axis, dict)
+                ]
+
         if isinstance(data, da.Array):
+            options["zarr_format"] = fmt.zarr_format
             if chunks_opt is not None:
                 data = da.array(data).rechunk(chunks=chunks_opt)
-                options["chunks"] = chunks_opt
             da_delayed = da.to_zarr(
                 arr=data,
                 url=group.store,
                 component=str(Path(group.path, str(path))),
-                storage_options=options,
-                compressor=options.get("compressor", zarr.storage.default_compressor),
-                dimension_separator=group._store._dimension_separator,
                 compute=compute,
+                zarr_format=fmt.zarr_format,
+                **options,
             )
 
             if not compute:
                 dask_delayed.append(da_delayed)
 
         else:
-            group.create_dataset(str(path), data=data, chunks=chunks_opt, **options)
+            options["shape"] = data.shape
+            # otherwise we get 'null'
+            options["fill_value"] = 0
+
+            group.create_array(str(path), data=data, dtype=data.dtype, **options)
 
         datasets.append({"path": str(path)})
 
@@ -305,7 +323,7 @@ def write_multiscales_metadata(
     """
     Write the multiscales metadata in the group.
 
-    :type group: :class:`zarr.hierarchy.Group`
+    :type group: :class:`zarr.Group`
     :param group: The group within the zarr store to write the metadata in.
     :type datasets: list of dicts
     :param datasets:
@@ -331,6 +349,8 @@ def write_multiscales_metadata(
             axes = _get_valid_axes(axes=axes, fmt=fmt)
             if axes is not None:
                 ndim = len(axes)
+
+    ome_attrs = {}
     if (
         isinstance(metadata, dict)
         and metadata.get("metadata")
@@ -353,14 +373,13 @@ def write_multiscales_metadata(
                     if not isinstance(c["window"][p], (int, float)):
                         raise TypeError(f"`'{p}'` must be an int or float.")
 
-        group.attrs["omero"] = omero_metadata
+        ome_attrs["omero"] = omero_metadata
 
     # note: we construct the multiscale metadata via dict(), rather than {}
     # to avoid duplication of protected keys like 'version' in **metadata
     # (for {} this would silently over-write it, with dict() it explicitly fails)
     multiscales = [
         dict(
-            version=fmt.version,
             datasets=_validate_datasets(datasets, ndim, fmt),
             name=name if name else group.name,
             **metadata,
@@ -369,7 +388,15 @@ def write_multiscales_metadata(
     if axes is not None:
         multiscales[0]["axes"] = axes
 
-    group.attrs["multiscales"] = multiscales
+    ome_attrs["multiscales"] = multiscales
+
+    if fmt.zarr_format == 2:
+        multiscales[0]["version"] = fmt.version
+        for key, data in ome_attrs.items():
+            group.attrs[key] = data
+    else:
+        # Zarr v3 metadata under 'ome' with top-level version
+        group.attrs["ome"] = {"version": fmt.version, **ome_attrs}
 
 
 def write_plate_metadata(
@@ -385,7 +412,7 @@ def write_plate_metadata(
     """
     Write the plate metadata in the group.
 
-    :type group: :class:`zarr.hierarchy.Group`
+    :type group: :class:`zarr.Group`
     :param group: The group within the zarr store to write the metadata in.
     :type rows: list of str
     :param rows: The list of names for the plate rows.
@@ -417,7 +444,10 @@ def write_plate_metadata(
         plate["field_count"] = field_count
     if acquisitions is not None:
         plate["acquisitions"] = _validate_plate_acquisitions(acquisitions)
-    group.attrs["plate"] = plate
+    if fmt.zarr_format == 2:
+        group.attrs["plate"] = plate
+    else:
+        group.attrs["ome"] = {"plate": plate}
 
 
 def write_well_metadata(
@@ -428,7 +458,7 @@ def write_well_metadata(
     """
     Write the well metadata in the group.
 
-    :type group: :class:`zarr.hierarchy.Group`
+    :type group: :class:`zarr.Group`
     :param group: The group within the zarr store to write the metadata in.
     :type images: list of dict
     :param images: The list of dictionaries for all fields of views.
@@ -442,7 +472,10 @@ def write_well_metadata(
         "images": _validate_well_images(images),
         "version": fmt.version,
     }
-    group.attrs["well"] = well
+    if fmt.zarr_format == 2:
+        group.attrs["well"] = well
+    else:
+        group.attrs["ome"] = {"well": well}
 
 
 def write_image(
@@ -465,7 +498,7 @@ def write_image(
       if the scaler argument is non-None.
       Image array MUST be up to 5-dimensional with dimensions
       ordered (t, c, z, y, x).  Image can be a numpy or dask Array.
-    :type group: :class:`zarr.hierarchy.Group`
+    :type group: :class:`zarr.Group`
     :param group: The group within the zarr store to write the metadata in.
     :type scaler: :class:`ome_zarr.scale.Scaler`
     :param scaler:
@@ -601,23 +634,29 @@ Please use the 'storage_options' argument instead."""
         # chunks_opt = options.pop("chunks", None)
         if chunks_opt is not None:
             chunks_opt = _retuple(chunks_opt, image.shape)
+            # image.chunks will be used by da.to_zarr
             image = da.array(image).rechunk(chunks=chunks_opt)
-            options["chunks"] = chunks_opt
         LOGGER.debug("chunks_opt: %s", chunks_opt)
         shapes.append(image.shape)
 
         LOGGER.debug(
             "write dask.array to_zarr shape: %s, dtype: %s", image.shape, image.dtype
         )
+        if fmt.zarr_format == 2:
+            options["dimension_separator"] = "/"
+            if options["compressor"] is None:
+                options["compressor"] = Blosc(
+                    cname="zstd", clevel=5, shuffle=Blosc.SHUFFLE
+                )
+
         delayed.append(
             da.to_zarr(
                 arr=image,
                 url=group.store,
                 component=str(Path(group.path, str(path))),
-                storage_options=options,
                 compute=False,
-                compressor=options.get("compressor", zarr.storage.default_compressor),
-                dimension_separator=group._store._dimension_separator,
+                zarr_format=fmt.zarr_format,
+                **options,
             )
         )
         datasets.append({"path": str(path)})
@@ -664,7 +703,7 @@ def write_label_metadata(
     The label data must have been written to a sub-group,
     with the same name as the second argument.
 
-    :type group: :class:`zarr.hierarchy.Group`
+    :type group: :class:`zarr.Group`
     :param group: The group within the zarr store to write the metadata in.
     :type name: str
     :param name: The name of the label sub-group.
@@ -695,7 +734,10 @@ def write_label_metadata(
 
     label_list = group.attrs.get("labels", [])
     label_list.append(name)
-    group.attrs["labels"] = label_list
+    if fmt.zarr_format == 2:
+        group.attrs["labels"] = label_list
+    else:
+        group.attrs["ome"] = {"labels": label_list}
 
 
 def write_multiscale_labels(
@@ -722,7 +764,7 @@ def write_multiscale_labels(
       the image label data to save. Largest level first
       All image arrays MUST be up to 5-dimensional with dimensions
       ordered (t, c, z, y, x)
-    :type group: :class:`zarr.hierarchy.Group`
+    :type group: :class:`zarr.Group`
     :param group: The group within the zarr store to write the metadata in.
     :type name: str, optional
     :param name: The name of this labels data.
@@ -811,7 +853,7 @@ def write_labels(
       if the scaler argument is non-None.
       Label array MUST be up to 5-dimensional with dimensions
       ordered (t, c, z, y, x)
-    :type group: :class:`zarr.hierarchy.Group`
+    :type group: :class:`zarr.Group`
     :param group: The group within the zarr store to write the metadata in.
     :type name: str, optional
     :param name: The name of this labels data.
