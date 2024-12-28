@@ -39,6 +39,21 @@ class Scaler:
     choices. These values can be returned by the
     :func:`~ome_zarr.scale.Scaler.methods` method.
 
+    Attributes:
+        copy_metadata:
+            If `True`, copy Zarr attributes from the input array to the new group.
+        downscale:
+            Downscaling factor.
+        in_place:
+            Does not do anything.
+        labeled:
+            If `True`, check that the values in the downsampled levels are a subset
+            of the values found in the input array.
+        max_layer:
+            The maximum number of downsampled layers to create.
+        method:
+            Downsampling method
+
     >>> import numpy as np
     >>> data = np.zeros((1, 1, 1, 64, 64))
     >>> scaler = Scaler()
