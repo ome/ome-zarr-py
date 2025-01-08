@@ -1,6 +1,6 @@
 sphinx==7.1.2
 sphinx-rtd-theme==3.0.2
-fsspec==2023.6.0
+fsspec
 zarr
 dask
 numpy
