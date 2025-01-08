@@ -1,3 +1,9 @@
+# 0.10.3 (Janbuary 2025)
+
+- Document Scaler attributes ([#418](https://github.com/ome/ome-zarr-py/pull/418))
+- Fix dimension separator when downloading files ([#419](https://github.com/ome/ome-zarr-py/pull/419))
+- Exclude bad version of fsspec in deps ([#420](https://github.com/ome/ome-zarr-py/pull/420))
+
 # 0.10.2 (November 2024)
 
 - Drop support for Python 3.8.
