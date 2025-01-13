@@ -170,7 +170,8 @@ class TestWriter:
             path = f"{self.path}/temp/"
             store = parse_url(path, mode="w").store
             temp_group = zarr.group(store=store).create_group("test")
-            write_image(data, temp_group, axes="zyx", storage_options=opts)
+            # compressor not used
+            write_image(data_delayed, temp_group, axes="zyx", storage_options=opts)
             loc = ZarrLocation(f"{self.path}/temp/test")
             reader = Reader(loc)()
             nodes = list(reader)
@@ -179,6 +180,8 @@ class TestWriter:
                 .load(Multiscales)
                 .array(resolution="0", version=CurrentFormat().version)
             )
+            # check that the data is the same
+            assert np.allclose(data, data_delayed[...].compute())
 
         dask_delayed_jobs = write_image(
             data_delayed,
@@ -250,7 +253,8 @@ class TestWriter:
             data, self.group, axes="zyx", storage_options={"compressor": compressor}
         )
         group = zarr.open(f"{self.path}/test", zarr_format=2)
-        comp = group["0"].info._compressor
+        assert len(group["0"].info._compressors) > 0
+        comp = group["0"].info._compressors[0]
         assert comp.get_config() == {
             "id": "blosc",
             "cname": "zstd",
@@ -259,7 +263,8 @@ class TestWriter:
             "blocksize": 0,
         }
 
-    def test_default_compression(self):
+    @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])
+    def test_default_compression(self, array_constructor):
         """Test that the default compression is not None.
 
         We make an array of zeros which should compress trivially easily,
@@ -270,13 +275,13 @@ class TestWriter:
         # avoid empty chunks so they are guaranteed to be written out to disk
         arr_np[0, 0, 0, 0] = 1
         # 4MB chunks, trivially compressible
-        arr = da.from_array(arr_np, chunks=(1, 50, 200, 400))
+        arr = array_constructor(arr_np)
         with TemporaryDirectory(suffix=".ome.zarr") as tempdir:
             path = tempdir
             store = parse_url(path, mode="w").store
             root = zarr.group(store=store)
             # no compressor options, we are checking default
-            write_multiscale([arr], group=root, axes="tzyx")
+            write_multiscale([arr], group=root, axes="tzyx", chunks=(1, 50, 200, 400))
             # check chunk: multiscale level 0, 4D chunk at (0, 0, 0, 0)
             chunk_size = (pathlib.Path(path) / "0/0/0/0/0").stat().st_size
             assert chunk_size < 4e6
