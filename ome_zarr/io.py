@@ -10,7 +10,7 @@ from urllib.parse import urljoin
 
 import dask.array as da
 import zarr
-from zarr.storage import LocalStore, RemoteStore, StoreLike
+from zarr.storage import FsspecStore, LocalStore, StoreLike
 
 from .format import CurrentFormat, Format, detect_format
 from .types import JSONDict
@@ -40,7 +40,7 @@ class ZarrLocation:
             self.__path = str(path.resolve())
         elif isinstance(path, str):
             self.__path = path
-        elif isinstance(path, RemoteStore):
+        elif isinstance(path, FsspecStore):
             self.__path = path.path
         elif isinstance(path, LocalStore):
             self.__path = str(path.root)
@@ -50,9 +50,9 @@ class ZarrLocation:
         loader = fmt
         if loader is None:
             loader = CurrentFormat()
-        self.__store: RemoteStore = (
+        self.__store: FsspecStore = (
             path
-            if isinstance(path, RemoteStore)
+            if isinstance(path, FsspecStore)
             else loader.init_store(self.__path, mode)
         )
         self.__init_metadata()
@@ -132,7 +132,7 @@ class ZarrLocation:
         return self.__path
 
     @property
-    def store(self) -> RemoteStore:
+    def store(self) -> FsspecStore:
         """Return the initialized store for this location"""
         assert self.__store is not None
         return self.__store

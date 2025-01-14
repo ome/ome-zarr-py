@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterator
 from typing import Any, Optional
 
-from zarr.storage import LocalStore, RemoteStore
+from zarr.storage import FsspecStore, LocalStore
 
 LOGGER = logging.getLogger("ome_zarr.format")
 
@@ -60,7 +60,7 @@ class Format(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def init_store(self, path: str, mode: str = "r") -> RemoteStore:
+    def init_store(self, path: str, mode: str = "r") -> FsspecStore | LocalStore:
         raise NotImplementedError()
 
     # @abstractmethod
@@ -134,14 +134,14 @@ class FormatV01(Format):
         LOGGER.debug("%s matches %s?", self.version, version)
         return version == self.version
 
-    def init_store(self, path: str, mode: str = "r") -> RemoteStore | LocalStore:
+    def init_store(self, path: str, mode: str = "r") -> FsspecStore | LocalStore:
         """
         Not ideal. Stores should remain hidden
         "dimension_separator" is specified at array creation time
         """
 
         if path.startswith(("http", "s3")):
-            store = RemoteStore.from_url(
+            store = FsspecStore.from_url(
                 path,
                 storage_options=None,
                 read_only=(mode in ("r", "r+", "a")),
@@ -149,7 +149,7 @@ class FormatV01(Format):
         else:
             # No other kwargs supported
             store = LocalStore(path, read_only=(mode in ("r", "r+", "a")))
-        LOGGER.debug("Created nested RemoteStore(%s, %s)", path, mode)
+        LOGGER.debug("Created nested FsspecStore(%s, %s)", path, mode)
         return store
 
     def generate_well_dict(
