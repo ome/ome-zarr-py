@@ -6,7 +6,7 @@ ome-zarr-py
 
 Tools for multi-resolution images stored in Zarr filesets, according to the `OME NGFF spec`_.
 
-See `Documentation <https://ome-zarr.readthedocs.io/>`_ for usage information.
+See `Readthedocs <https://ome-zarr.readthedocs.io/>`_ for usage information.
 
 Documentation
 -------------
@@ -56,13 +56,7 @@ Distributed under the terms of the `BSD`_ license,
 "ome-zarr-py" is free and open source software
 
 .. _`OME NGFF spec`: https://github.com/ome/ngff
-.. _`@napari`: https://github.com/napari
 .. _`BSD`: https://opensource.org/licenses/BSD-2-Clause
-.. _`Apache Software License 2.0`: http://www.apache.org/licenses/LICENSE-2.0
-.. _`Mozilla Public License 2.0`: https://www.mozilla.org/media/MPL/2.0/index.txt
-.. _`napari`: https://github.com/napari/napari
-.. _`napari-ome-zarr`: https://github.com/ome/napari-ome-zarr
-.. _`ome-zarr`: https://pypi.org/project/ome-zarr/
 
 .. |pypi| image:: https://badge.fury.io/py/ome-zarr.svg
     :alt: PyPI project
