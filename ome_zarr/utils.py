@@ -129,7 +129,9 @@ def download(input_path: str, output_dir: str = ".") -> None:
                     for dataset, data in reversed(list(zip(datasets, resolutions))):
                         LOGGER.info("resolution %s...", dataset)
                         with pbar:
-                            data.to_zarr(str(target_path / dataset))
+                            data.to_zarr(
+                                str(target_path / dataset), dimension_separator="/"
+                            )
             else:
                 # Assume a group that needs metadata, like labels
                 zarr.group(str(target_path))

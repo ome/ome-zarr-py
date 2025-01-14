@@ -20,8 +20,8 @@ dependencies = [
     "numpy",
     "dask",
     "distributed",
-    "zarr==v3.0.0-beta.3",
-    "fsspec[s3]>=0.8,!=2021.07.0",
+    "zarr>=v3.0.0",
+    "fsspec[s3]>=0.8,!=2021.07.0,!=2023.9.0",
     # See https://github.com/fsspec/filesystem_spec/issues/819
     "aiohttp<4",
     "requests",
