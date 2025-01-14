@@ -172,6 +172,11 @@ def _validate_plate_wells(
     return validated_wells
 
 
+def _blosc_compressor() -> Blosc:
+    """Return a Blosc compressor with zstd compression"""
+    return Blosc(cname="zstd", clevel=5, shuffle=Blosc.SHUFFLE)
+
+
 def write_multiscale(
     pyramid: ListOfArrayLike,
     group: zarr.Group,
@@ -252,15 +257,15 @@ Please use the 'storage_options' argument instead."""
             if chunks_opt is not None:
                 data = da.array(data).rechunk(chunks=chunks_opt)
                 options["chunks"] = chunks_opt
+            else:
+                options["chunks"] = data.chunks
             da_delayed = da.to_zarr(
                 arr=data,
                 url=group.store,
                 component=str(Path(group.path, str(path))),
                 storage_options=options,
                 # by default we use Blosc with zstd compression
-                compressor=options.get(
-                    "compressor", Blosc(cname="zstd", clevel=5, shuffle=Blosc.SHUFFLE)
-                ),
+                compressor=options.get("compressor", _blosc_compressor()),
                 # TODO: default dimension_separator? Not set in store for zarr v3
                 # dimension_separator=group.store.dimension_separator,
                 dimension_separator="/",
@@ -274,18 +279,17 @@ Please use the 'storage_options' argument instead."""
         else:
             # v2 arguments
             options["shape"] = data.shape
-            options["chunks"] = chunks_opt
-            options["dimension_separator"] = "/"
+            if chunks_opt is not None:
+                options["chunks"] = chunks_opt
+            options["chunk_key_encoding"] = {"name": "v2", "separator": "/"}
 
             # default to zstd compression
-            options["compressor"] = options.get(
-                "compressor", Blosc(cname="zstd", clevel=5, shuffle=Blosc.SHUFFLE)
-            )
+            options["compressor"] = options.get("compressor", _blosc_compressor())
 
             # otherwise we get 'null'
             options["fill_value"] = 0
 
-            group.create_array(str(path), data=data, dtype=data.dtype, **options)
+            group.create_dataset(str(path), data=data, dtype=data.dtype, **options)
 
         datasets.append({"path": str(path)})
 
@@ -636,9 +640,7 @@ Please use the 'storage_options' argument instead."""
                 component=str(Path(group.path, str(path))),
                 storage_options=options,
                 compute=False,
-                compressor=options.pop(
-                    "compressor", Blosc(cname="zstd", clevel=5, shuffle=Blosc.SHUFFLE)
-                ),
+                compressor=options.pop("compressor", _blosc_compressor()),
                 # TODO: default dimension_separator? Not set in store for zarr v3
                 # dimension_separator=group.store.dimension_separator,
                 dimension_separator="/",
