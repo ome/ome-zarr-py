@@ -1,3 +1,47 @@
+# 0.10.3 (Janbuary 2025)
+
+- Document Scaler attributes ([#418](https://github.com/ome/ome-zarr-py/pull/418))
+- Fix dimension separator when downloading files ([#419](https://github.com/ome/ome-zarr-py/pull/419))
+- Exclude bad version of fsspec in deps ([#420](https://github.com/ome/ome-zarr-py/pull/420))
+
+# 0.10.2 (November 2024)
+
+- Drop support for Python 3.8.
+- Document parameters and return value of `parse_url`.
+* Write metadata using delayed that depends on writing array(s)
+* Document return values of sample data
+* Simplify Python tutorial
+* pin zarr at < 3
+* Update version of pyupgrade
+
+# 0.9.0 (May 2024)
+
+- Correctly specify maximum compatible fsspec version. ([#338](https://github.com/ome/ome-zarr-py/pull/338))
+- Add tests on Python 3.12. ([#338](https://github.com/ome/ome-zarr-py/pull/338))
+- Write OMERO metadata. ([#261](https://github.com/ome/ome-zarr-py/pull/261))
+- Fixed chunking when a scalar value for chunks is given. Previously
+  passing ``storage_options={"chunks": <int>}`` only set the chunk
+  size of the final dimension. Now the chunk size of all dimensions is
+  set to this value, which is identical behaviour to ``zarr-python``.
+  ([#365](https://github.com/ome/ome-zarr-py/pull/365))
+
+# 0.8.3 (November 2023)
+
+- Fix reading HCS file on AWS S3 ([#322](https://github.com/ome/ome-zarr-py/pull/322))
+- Update docs to include write example for HCS dataset ([#317](https://github.com/ome/ome-zarr-py/pull/317))
+- Minor improvements to format docs ([#316](https://github.com/ome/ome-zarr-py/pull/316))
+- Add dask to intersphinx mapping ([#315](https://github.com/ome/ome-zarr-py/pull/315))
+
+# 0.8.2 (September 2023)
+
+- Fix compute on plate grid ([#299](https://github.com/ome/ome-zarr-py/pull/299))
+- Check Well exists before trying to load data ([#296](https://github.com/ome/ome-zarr-py/pull/296))
+- Avoid hard-coded field-of-view path "0". Thanks to [aeisenbarth](https://github.com/aeisenbarth) ([#300](https://github.com/ome/ome-zarr-py/pull/300))
+- Update python.rst to have min, max for window. Thanks to [Sean Martin](https://github.com/seankmartin) ([#309](https://github.com/ome/ome-zarr-py/pull/309))
+- Exclude fsspec 2023.9.0 fixes FileNotFoundError ([#307](https://github.com/ome/ome-zarr-py/pull/307))
+- Set minimum fsspec version. Thanks to [Evan Lyall](https://github.com/elyall) ([#295](https://github.com/ome/ome-zarr-py/pull/295))
+- Add conda install instructions to README. Thanks to [David Stansby](https://github.com/dstansby) ([#313](https://github.com/ome/ome-zarr-py/pull/313))
+- Cody tidy fixes. Thanks to [Dimitri Papadopoulos Orfanos](https://github.com/DimitriPapadopoulos) ([#310](https://github.com/ome/ome-zarr-py/pull/310), [#312](https://github.com/ome/ome-zarr-py/pull/312))
 # 0.8.0 (June 2023)
 
 - Add `ome_zarr view image.zarr` to server and view in browser ([#285](https://github.com/ome/ome-zarr-py/pull/285))

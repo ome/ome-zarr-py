@@ -1,4 +1,4 @@
-from typing import Any, Tuple
+from typing import Any
 
 import numpy as np
 import skimage.transform
@@ -9,7 +9,7 @@ from dask import array as da
 
 
 def resize(
-    image: da.Array, output_shape: Tuple[int, ...], *args: Any, **kwargs: Any
+    image: da.Array, output_shape: tuple[int, ...], *args: Any, **kwargs: Any
 ) -> da.Array:
     r"""
     Wrapped copy of "skimage.transform.resize"
@@ -62,7 +62,7 @@ def resize(
     return output.rechunk(image.chunksize).astype(image.dtype)
 
 
-def downscale_nearest(image: da.Array, factors: Tuple[int, ...]) -> da.Array:
+def downscale_nearest(image: da.Array, factors: tuple[int, ...]) -> da.Array:
     """
     Primitive downscaling by integer factors using stepped slicing.
     :type image: :class:`dask.array`
@@ -81,7 +81,7 @@ def downscale_nearest(image: da.Array, factors: Tuple[int, ...]) -> da.Array:
     ):
         raise ValueError(
             f"All scale factors must not be greater than the dimension length: "
-            f"({tuple(factors)}) <= ({tuple(image.shape)})"
+            f"({factors}) <= ({tuple(image.shape)})"
         )
     slices = tuple(slice(None, None, factor) for factor in factors)
     return image[slices]

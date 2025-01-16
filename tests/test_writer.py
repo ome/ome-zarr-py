@@ -1,6 +1,7 @@
 import filecmp
 import pathlib
 from tempfile import TemporaryDirectory
+from typing import Any, Optional
 
 import dask.array as da
 import numpy as np
@@ -179,7 +180,7 @@ class TestWriter:
 
         assert not compute == len(dask_delayed_jobs)
 
-        if not len(dask_delayed_jobs):
+        if not compute:
             # can be configured to use a Local or Slurm cluster
             # before persisting the jobs
             dask_delayed_jobs = persist(*dask_delayed_jobs)
@@ -214,6 +215,20 @@ class TestWriter:
                 f"{self.path}/test/.zattrs",
                 shallow=False,
             )
+
+    def test_write_image_scalar_chunks(self):
+        """
+        Make sure a scalar chunks value is applied to all dimensions,
+        matching the behaviour of zarr-python.
+        """
+        shape = (64, 64, 64)
+        data = np.array(self.create_data(shape))
+        write_image(
+            image=data, group=self.group, axes="xyz", storage_options={"chunks": 32}
+        )
+        for data in self.group.values():
+            print(data)
+            assert data.chunks == (32, 32, 32)
 
     @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])
     def test_write_image_compressed(self, array_constructor):
@@ -556,6 +571,80 @@ class TestMultiscalesMetadata:
         ]
         with pytest.raises(ValueError):
             write_multiscales_metadata(self.root, datasets, axes=axes)
+
+    @pytest.mark.parametrize(
+        "metadata",
+        [
+            {
+                "channels": [
+                    {
+                        "color": "FF0000",
+                        "window": {"start": 0, "end": 255, "min": 0, "max": 255},
+                    }
+                ]
+            },
+            {"channels": [{"color": "FF0000"}]},
+            {"channels": [{"color": "FF000"}]},  # test wrong metadata
+            {"channels": [{"window": []}]},  # test wrong metadata
+            {
+                "channels": [  # test wrong metadata
+                    {"color": "FF0000", "window": {"start": 0, "end": 255, "min": 0}},
+                ]
+            },
+            None,
+        ],
+    )
+    def test_omero_metadata(self, metadata: Optional[dict[str, Any]]):
+        datasets = []
+        for level, transf in enumerate(TRANSFORMATIONS):
+            datasets.append({"path": str(level), "coordinateTransformations": transf})
+        if metadata is None:
+            with pytest.raises(
+                KeyError, match="If `'omero'` is present, value cannot be `None`."
+            ):
+                write_multiscales_metadata(
+                    self.root, datasets, axes="tczyx", metadata={"omero": metadata}
+                )
+        else:
+            window_metadata = (
+                metadata["channels"][0].get("window")
+                if "window" in metadata["channels"][0]
+                else None
+            )
+            color_metadata = (
+                metadata["channels"][0].get("color")
+                if "color" in metadata["channels"][0]
+                else None
+            )
+            if window_metadata is not None and len(window_metadata) < 4:
+                if isinstance(window_metadata, dict):
+                    with pytest.raises(KeyError, match=".*`'window'`.*"):
+                        write_multiscales_metadata(
+                            self.root,
+                            datasets,
+                            axes="tczyx",
+                            metadata={"omero": metadata},
+                        )
+                elif isinstance(window_metadata, list):
+                    with pytest.raises(TypeError, match=".*`'window'`.*"):
+                        write_multiscales_metadata(
+                            self.root,
+                            datasets,
+                            axes="tczyx",
+                            metadata={"omero": metadata},
+                        )
+            elif color_metadata is not None and len(color_metadata) != 6:
+                with pytest.raises(TypeError, match=".*`'color'`.*"):
+                    write_multiscales_metadata(
+                        self.root,
+                        datasets,
+                        axes="tczyx",
+                        metadata={"omero": metadata},
+                    )
+            else:
+                write_multiscales_metadata(
+                    self.root, datasets, axes="tczyx", metadata={"omero": metadata}
+                )
 
 
 class TestPlateMetadata:

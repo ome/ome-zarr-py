@@ -1,0 +1,64 @@
+[build-system]
+requires = [
+    "setuptools>=64",
+    "setuptools-scm>=8.0",
+]
+build-backend = "setuptools.build_meta"
+
+[tools.setuptools.dynamic]
+version = {attr = "ome_zarr.__version__"}
+
+[project]
+name = "ome-zarr"
+readme = "README.rst"
+dynamic = ["version"]
+description="Implementation of images in Zarr files."
+
+requires-python = ">3.10"
+
+dependencies = [
+    "numpy",
+    "dask",
+    "distributed",
+    "zarr>=2.8.1,<3",
+    "fsspec[s3]>=0.8,!=2021.07.0,!=2023.9.0",
+    # See https://github.com/fsspec/filesystem_spec/issues/819
+    "aiohttp<4",
+    "requests",
+    "scikit-image",
+    "toolz",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+    "License :: OSI Approved :: BSD License",
+]
+
+authors = [
+    {name = "The Open Microscopy Team"},
+]
+
+[project.entry-points."console_scripts"]
+ome_zarr = "ome_zarr.cli:main"
+
+[project.optional-dependencies]
+tests = [
+    "pytest",
+]
+
+[project.urls]
+Documentation = "https://ome-zarr.readthedocs.io"
+Repository = "https://github.com/ome/ome-zarr-py"
+Changelog = "https://github.com/ome/ome-zarr-py/blob/master/CHANGELOG.md"
+
+[tool.setuptools]
+packages = ["ome_zarr"]
+py-modules = ["ome_zarr"]
+
+[tool.setuptools_scm]
+version_file = "ome_zarr/_version.py"

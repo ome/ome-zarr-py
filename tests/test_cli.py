@@ -1,12 +1,21 @@
 import os
 from collections import deque
 from pathlib import Path
-from typing import List
 
 import pytest
 
 from ome_zarr.cli import main
 from ome_zarr.utils import strip_common_prefix
+
+
+def directory_items(directory: Path):
+    """
+    Get all items (files and folders) in a directory, relative to that directory.
+    """
+    if not directory.is_dir():
+        raise ValueError(f"{directory} is not a directory")
+
+    return sorted([p.relative_to(directory) for p in directory.glob("*")])
 
 
 class TestCli:
@@ -41,6 +50,24 @@ class TestCli:
         main(["download", filename, f"--output={out}"])
         main(["info", f"{out}/{basename}"])
 
+        assert directory_items(Path(out) / "data-3") == [
+            Path(".zattrs"),
+            Path(".zgroup"),
+            Path("0"),
+            Path("1"),
+            Path("2"),
+            Path("3"),
+            Path("4"),
+            Path("labels"),
+        ]
+
+        assert directory_items(Path(out) / "data-3" / "1") == [
+            Path(".zarray"),
+            Path("0"),
+            Path("1"),
+            Path("2"),
+        ]
+
     def test_s3_info(self, s3_address):
         main(["info", s3_address])
 
@@ -57,7 +84,7 @@ class TestCli:
         self._rotate_and_test(top, mid, bot)
 
     def _rotate_and_test(self, *hierarchy: Path, reverse: bool = True):
-        results: List[List[str]] = [
+        results: list[list[str]] = [
             list((Path("d")).parts),
             list((Path("d") / "e").parts),
             list((Path("d") / "e" / "f").parts),

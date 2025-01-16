@@ -6,7 +6,7 @@ Primary entry point is the :func:`~ome_zarr.io.parse_url` method.
 import json
 import logging
 from pathlib import Path
-from typing import List, Optional, Union
+from typing import Optional, Union
 from urllib.parse import urljoin
 
 import dask.array as da
@@ -28,7 +28,10 @@ class ZarrLocation:
     """
 
     def __init__(
-        self, path: Union[Path, str], mode: str = "r", fmt: Format = CurrentFormat()
+        self,
+        path: Union[Path, str, FSStore],
+        mode: str = "r",
+        fmt: Format = CurrentFormat(),
     ) -> None:
         LOGGER.debug("ZarrLocation.__init__ path: %s, fmt: %s", path, fmt.version)
         self.__fmt = fmt
@@ -37,13 +40,17 @@ class ZarrLocation:
             self.__path = str(path.resolve())
         elif isinstance(path, str):
             self.__path = path
+        elif isinstance(path, FSStore):
+            self.__path = path.path
         else:
             raise TypeError(f"not expecting: {type(path)}")
 
         loader = fmt
         if loader is None:
             loader = CurrentFormat()
-        self.__store = loader.init_store(self.__path, mode)
+        self.__store: FSStore = (
+            path if isinstance(path, FSStore) else loader.init_store(self.__path, mode)
+        )
 
         self.__init_metadata()
         detected = detect_format(self.__metadata, loader)
@@ -112,7 +119,7 @@ class ZarrLocation:
         return da.from_zarr(self.__store, subpath)
 
     def __eq__(self, rhs: object) -> bool:
-        if type(self) != type(rhs):
+        if type(self) is not type(rhs):
             return False
         if not isinstance(rhs, ZarrLocation):
             return False
@@ -158,28 +165,59 @@ class ZarrLocation:
             LOGGER.exception("Error while loading JSON")
             return {}
 
-    def parts(self) -> List[str]:
-        if self.__store.fs.protocol == "file":
+    def parts(self) -> list[str]:
+        if self._isfile():
             return list(Path(self.__path).parts)
         else:
             return self.__path.split("/")
 
     def subpath(self, subpath: str = "") -> str:
-        if self.__store.fs.protocol == "file":
+        if self._isfile():
             filename = Path(self.__path) / subpath
             filename = filename.resolve()
             return str(filename)
-        else:
+        elif self._ishttp():
             url = str(self.__path)
             if not url.endswith("/"):
                 url = f"{url}/"
             return urljoin(url, subpath)
+        else:
+            # Might require a warning
+            if self.__path.endswith("/"):
+                return f"{self.__path}{subpath}"
+            else:
+                return f"{self.__path}/{subpath}"
+
+    def _isfile(self) -> bool:
+        """
+        Return whether the current underlying implementation
+        points to a local file or not.
+        """
+        return self.__store.fs.protocol == "file" or self.__store.fs.protocol == (
+            "file",
+            "local",
+        )
+
+    def _ishttp(self) -> bool:
+        """
+        Return whether the current underlying implementation
+        points to a URL
+        """
+        return self.__store.fs.protocol in ["http", "https"]
 
 
 def parse_url(
     path: Union[Path, str], mode: str = "r", fmt: Format = CurrentFormat()
 ) -> Optional[ZarrLocation]:
     """Convert a path string or URL to a ZarrLocation subclass.
+
+    :param path: Path to parse.
+    :param mode: Mode to open in.
+    :param fmt: Version of the OME-NGFF spec to open path with.
+
+    :return: `ZarrLocation`.
+        If mode is 'r', and the path does not exist returns None.
+        If there is an error opening the path, also returns None.
 
     >>> parse_url('does-not-exist')
     """

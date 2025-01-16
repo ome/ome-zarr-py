@@ -1,9 +1,7 @@
 """Simple conversion helpers."""
 
-from typing import List
 
-
-def int_to_rgba(v: int) -> List[float]:
+def int_to_rgba(v: int) -> list[float]:
     """Get rgba (0-1) e.g. (1, 0.5, 0, 1) from integer.
     >>> print(int_to_rgba(0))
     [0.0, 0.0, 0.0, 0.0]
@@ -13,7 +11,7 @@ def int_to_rgba(v: int) -> List[float]:
     return [x / 255 for x in v.to_bytes(4, signed=True, byteorder="big")]
 
 
-def int_to_rgba_255(v: int) -> List[int]:
+def int_to_rgba_255(v: int) -> list[int]:
     """Get rgba (0-255) from integer.
     >>> print(int_to_rgba_255(0))
     [0, 0, 0, 0]

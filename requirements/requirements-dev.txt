@@ -1,3 +1,4 @@
+fsspec
 black
 cython >= 0.29.16
 numpy >= 1.16.0
