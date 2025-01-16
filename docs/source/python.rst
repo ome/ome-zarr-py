@@ -253,6 +253,7 @@ Using dask to fetch:
 
 
     def get_tile(ch, z, row, column):
+        print("get_tile", ch, z, row, column)
         mean_val = ((row + 1) * (column + 1) * 4) + (10 * z)
         rng = np.random.default_rng(1000 * ch)
         return rng.poisson(mean_val, size=tile_shape).astype(dtype)
@@ -284,6 +285,7 @@ Using dask to fetch:
 
     print("dask_data", dask_data)
 
+    # This will create a downsampled 'multiscales' pyramid
     write_image(dask_data, root, axes="czyx")
 
     root.attrs["omero"] = {
