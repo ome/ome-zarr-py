@@ -200,7 +200,7 @@ the data is available as `dask` arrays::
 More writing examples
 ---------------------
 
-Writing big image from tiles:
+Writing big image from tiles::
 
     # Created for https://forum.image.sc/t/writing-tile-wise-ome-zarr-with-pyramid-size/85063
 
@@ -313,7 +313,7 @@ Writing big image from tiles:
     write_multiscales_metadata(root, datasets, axes=axes)
 
 
-Using dask to fetch:
+Using dask to fetch::
 
     # Created for https://forum.image.sc/t/writing-tile-wise-ome-zarr-with-pyramid-size/85063
 
