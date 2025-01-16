@@ -118,12 +118,14 @@ Writing big image from tiles:
 
     # Created for https://forum.image.sc/t/writing-tile-wise-ome-zarr-with-pyramid-size/85063
 
+    import os
     import zarr
     from ome_zarr.io import parse_url
     from ome_zarr.reader import Reader
     from ome_zarr.writer import write_multiscales_metadata
-    from omero_zarr.raw_pixels import downsample_pyramid_on_disk
+    from ome_zarr.dask_utils import resize as da_resize
     import numpy as np
+    import dask.array as da
     from math import ceil
 
     url = "https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.3/9836842.zarr"
@@ -132,6 +134,38 @@ Writing big image from tiles:
     # first level of the pyramid
     dask_data = nodes[0].data[0]
     tile_size = 512
+
+    def downsample_pyramid_on_disk(parent, paths):
+        """
+        Takes a high-resolution Zarr array at paths[0] in the zarr group
+        and down-samples it by a factor of 2 for each of the other paths
+        """
+        group_path = parent.store.path
+        image_path = os.path.join(group_path, parent.path)
+        print("downsample_pyramid_on_disk", image_path)
+        for count, path in enumerate(paths[1:]):
+            target_path = os.path.join(image_path, path)
+            if os.path.exists(target_path):
+                print("path exists: %s" % target_path)
+                continue
+            # open previous resolution from disk via dask...
+            path_to_array = os.path.join(image_path, paths[count])
+            dask_image = da.from_zarr(path_to_array)
+
+            # resize in X and Y
+            dims = list(dask_image.shape)
+            dims[-1] = dims[-1] // 2
+            dims[-2] = dims[-2] // 2
+            output = da_resize(
+                dask_image, tuple(dims), preserve_range=True, anti_aliasing=False
+            )
+
+            # write to disk
+            da.to_zarr(
+                arr=output, url=image_path, component=path,
+                dimension_separator=parent._store._dimension_separator,
+            )
+        return paths
 
     def get_tile(ch, row, col):
         # read the tile data from somewhere - we use the dask array
@@ -167,11 +201,12 @@ Writing big image from tiles:
     for ch_index in range(channel_count):
         for row in range(row_count):
             for col in range(col_count):
-                tile = get_tile(ch_index, row, col)
+                tile = get_tile(ch_index, row, col).compute()
                 y1 = row * tile_size
                 y2 = y1 + tile_size
                 x1 = col * tile_size
                 x2 = x1 + tile_size
+                print("ch_index", ch_index, "row", row, "col", col)
                 zarray[ch_index, y1:y2, x1:x2] = tile
 
     paths = ["0", "1", "2"]
@@ -190,6 +225,7 @@ Writing big image from tiles:
         datasets.append({"path": p, "coordinateTransformations": t})
 
     write_multiscales_metadata(root, datasets, axes=axes)
+
 
 Using dask to fetch:
 
