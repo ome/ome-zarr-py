@@ -130,7 +130,9 @@ def download(input_path: str, output_dir: str = ".") -> None:
                         LOGGER.info("resolution %s...", dataset)
                         with pbar:
                             data.to_zarr(
-                                str(target_path / dataset), dimension_separator="/"
+                                str(target_path / dataset),
+                                zarr_format=2,
+                                dimension_separator="/",
                             )
             else:
                 # Assume a group that needs metadata, like labels

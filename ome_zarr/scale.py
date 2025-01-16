@@ -138,7 +138,7 @@ class Scaler:
 
     def __create_group(
         self, store: MutableMapping, base: np.ndarray, pyramid: list[np.ndarray]
-    ) -> zarr.hierarchy.Group:
+    ) -> zarr.Group:
         """Create group and datasets."""
         grp = zarr.group(store)
         grp.create_dataset("base", data=base)
