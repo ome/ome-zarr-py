@@ -15,9 +15,7 @@ class TestStartingPoints:
         create_zarr(str(self.path))
 
     def matches(self, node: Node, expected: list[type[Spec]]):
-        found: list[type[Spec]] = list()
-        for spec in node.specs:
-            found.append(type(spec))
+        found: list[type[Spec]] = [type(spec) for spec in node.specs]
 
         expected_names = sorted(x.__name__ for x in expected)
         found_names = sorted(x.__name__ for x in found)

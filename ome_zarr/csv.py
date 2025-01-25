@@ -114,16 +114,15 @@ def dict_to_zarr(
     if plate_attrs is None and not multiscales:
         raise Exception("zarr_path must be to plate.zarr or image.zarr")
 
-    labels_paths = []
     if plate_attrs is not None:
         # look for 'label/0' under the first field of each Well
         field = "0"
-        for w in plate_attrs.get("wells", []):
-            labels_paths.append(
-                os.path.join(zarr_path, w["path"], field, "labels", "0")
-            )
+        labels_paths = [
+            os.path.join(zarr_path, w["path"], field, "labels", "0")
+            for w in plate_attrs.get("wells", [])
+        ]
     else:
-        labels_paths.append(os.path.join(zarr_path, "labels", "0"))
+        labels_paths = [os.path.join(zarr_path, "labels", "0")]
 
     for path_to_labels in labels_paths:
         label_group = zarr_open(path_to_labels)
