@@ -6,9 +6,9 @@ See the :class:`~ome_zarr.scale.Scaler` class for details.
 import inspect
 import logging
 import os
-from collections.abc import Iterator, MutableMapping
+from collections.abc import Callable, Iterator, MutableMapping
 from dataclasses import dataclass
-from typing import Any, Callable, Union
+from typing import Any, Union
 
 import dask.array as da
 import numpy as np

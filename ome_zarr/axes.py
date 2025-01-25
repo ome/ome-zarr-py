@@ -11,7 +11,7 @@ KNOWN_AXES = {"x": "space", "y": "space", "z": "space", "c": "channel", "t": "ti
 class Axes:
     def __init__(
         self,
-        axes: Union[list[str], list[dict[str, str]]],
+        axes: list[str] | list[dict[str, str]],
         fmt: Format = CurrentFormat(),
     ) -> None:
         """
@@ -41,15 +41,13 @@ class Axes:
 
     def to_list(
         self, fmt: Format = CurrentFormat()
-    ) -> Union[list[str], list[dict[str, str]]]:
+    ) -> list[str] | list[dict[str, str]]:
         if fmt.version == "0.3":
             return self._get_names()
         return self.axes
 
     @staticmethod
-    def _axes_to_dicts(
-        axes: Union[list[str], list[dict[str, str]]]
-    ) -> list[dict[str, str]]:
+    def _axes_to_dicts(axes: list[str] | list[dict[str, str]]) -> list[dict[str, str]]:
         """Returns a list of axis dicts with name and type"""
         axes_dicts = []
         for axis in axes:

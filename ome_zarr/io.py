@@ -29,7 +29,7 @@ class ZarrLocation:
 
     def __init__(
         self,
-        path: Union[Path, str, FSStore],
+        path: Path | str | FSStore,
         mode: str = "r",
         fmt: Format = CurrentFormat(),
     ) -> None:
@@ -207,8 +207,8 @@ class ZarrLocation:
 
 
 def parse_url(
-    path: Union[Path, str], mode: str = "r", fmt: Format = CurrentFormat()
-) -> Optional[ZarrLocation]:
+    path: Path | str, mode: str = "r", fmt: Format = CurrentFormat()
+) -> ZarrLocation | None:
     """Convert a path string or URL to a ZarrLocation subclass.
 
     :param path: Path to parse.

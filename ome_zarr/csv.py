@@ -13,9 +13,9 @@ from .io import parse_url
 COLUMN_TYPES = ["d", "l", "s", "b"]
 
 
-def parse_csv_value(value: str, col_type: str) -> Union[str, float, int, bool]:
+def parse_csv_value(value: str, col_type: str) -> str | float | int | bool:
     """Parse string value from csv, according to COLUMN_TYPES"""
-    rv: Union[str, float, int, bool] = value
+    rv: str | float | int | bool = value
     try:
         if col_type == "d":
             rv = float(value)
@@ -62,7 +62,7 @@ def csv_to_zarr(
     csv_columns = None
     id_column = None
 
-    props_by_id: dict[Union[str, int], dict] = {}
+    props_by_id: dict[str | int, dict] = {}
 
     with open(csv_path, newline="") as csvfile:
         row_reader = csv.reader(csvfile, delimiter=",")
@@ -90,7 +90,7 @@ def csv_to_zarr(
 
 
 def dict_to_zarr(
-    props_to_add: dict[Union[str, int], dict], zarr_path: str, zarr_id: str
+    props_to_add: dict[str | int, dict], zarr_path: str, zarr_id: str
 ) -> None:
     """
     Add keys:values to the label properties of a ome-zarr Plate or Image.

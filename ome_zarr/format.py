@@ -67,7 +67,7 @@ class Format(ABC):
     def init_channels(self) -> None:  # pragma: no cover
         raise NotImplementedError()
 
-    def _get_metadata_version(self, metadata: dict) -> Optional[str]:
+    def _get_metadata_version(self, metadata: dict) -> str | None:
         """
         Checks the metadata dict for a version
 
@@ -105,7 +105,7 @@ class Format(ABC):
     @abstractmethod
     def generate_coordinate_transformations(
         self, shapes: list[tuple]
-    ) -> Optional[list[list[dict[str, Any]]]]:  # pragma: no cover
+    ) -> list[list[dict[str, Any]]] | None:  # pragma: no cover
         raise NotImplementedError()
 
     @abstractmethod
@@ -113,8 +113,8 @@ class Format(ABC):
         self,
         ndim: int,
         nlevels: int,
-        coordinate_transformations: Optional[list[list[dict[str, Any]]]] = None,
-    ) -> Optional[list[list[dict[str, Any]]]]:  # pragma: no cover
+        coordinate_transformations: list[list[dict[str, Any]]] | None = None,
+    ) -> list[list[dict[str, Any]]] | None:  # pragma: no cover
         raise NotImplementedError()
 
 
@@ -159,14 +159,14 @@ class FormatV01(Format):
 
     def generate_coordinate_transformations(
         self, shapes: list[tuple]
-    ) -> Optional[list[list[dict[str, Any]]]]:
+    ) -> list[list[dict[str, Any]]] | None:
         return None
 
     def validate_coordinate_transformations(
         self,
         ndim: int,
         nlevels: int,
-        coordinate_transformations: Optional[list[list[dict[str, Any]]]] = None,
+        coordinate_transformations: list[list[dict[str, Any]]] | None = None,
     ) -> None:
         return None
 
@@ -260,7 +260,7 @@ class FormatV04(FormatV03):
 
     def generate_coordinate_transformations(
         self, shapes: list[tuple]
-    ) -> Optional[list[list[dict[str, Any]]]]:
+    ) -> list[list[dict[str, Any]]] | None:
         data_shape = shapes[0]
         coordinate_transformations: list[list[dict[str, Any]]] = []
         # calculate minimal 'scale' transform based on pyramid dims
@@ -275,7 +275,7 @@ class FormatV04(FormatV03):
         self,
         ndim: int,
         nlevels: int,
-        coordinate_transformations: Optional[list[list[dict[str, Any]]]] = None,
+        coordinate_transformations: list[list[dict[str, Any]]] | None = None,
     ) -> None:
         """
         Validates that a list of dicts contains a 'scale' transformation
