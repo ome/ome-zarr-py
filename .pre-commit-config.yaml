@@ -15,14 +15,13 @@ repos:
     rev: 24.10.0
     hooks:
       - id: black
-        args: [--target-version=py36]
 
   - repo: https://github.com/asottile/pyupgrade
     rev: v3.19.0
     hooks:
       - id: pyupgrade
         args:
-          - --py39-plus
+          - --py310-plus
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
