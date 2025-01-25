@@ -296,7 +296,7 @@ class FormatV04(FormatV03):
         for transformations in coordinate_transformations:
             assert isinstance(transformations, list)
             types = [t.get("type", None) for t in transformations]
-            if any([t is None for t in types]):
+            if any(t is None for t in types):
                 raise ValueError("Missing type in: %s" % transformations)
             # validate scales...
             if sum(t == "scale" for t in types) != 1:
