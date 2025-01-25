@@ -301,7 +301,7 @@ class Multiscales(Spec):
         for resolution in self.datasets:
             data: da.core.Array = self.array(resolution, version)
             chunk_sizes = [
-                str(c[0]) + (" (+ %s)" % c[-1] if c[-1] != c[0] else "")
+                str(c[0]) + (f" (+ {c[-1]})" if c[-1] != c[0] else "")
                 for c in data.chunks
             ]
             LOGGER.info("resolution: %s", resolution)
@@ -353,7 +353,7 @@ class OMERO(Spec):
 
             colormaps = []
             contrast_limits: list[Any | None] | None = [None for x in channels]
-            names: list[str] = [("channel_%d" % idx) for idx, ch in enumerate(channels)]
+            names: list[str] = [f"channel_{idx}" for idx, ch in enumerate(channels)]
             visibles: list[bool] = [True for x in channels]
 
             for idx, ch in enumerate(channels):

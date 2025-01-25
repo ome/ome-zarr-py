@@ -919,7 +919,7 @@ def _create_mip(
         if image.shape[-1] == 1 or image.shape[-2] == 1:
             raise ValueError(
                 "Can't downsample if size of x or y dimension is 1. "
-                "Shape: %s" % (image.shape,)
+                f"Shape: {image.shape}"
             )
         mip = scaler.func(image)
     else:
