@@ -1,6 +1,5 @@
 import csv
 import os
-from typing import Union
 
 from zarr.convenience import open as zarr_open
 

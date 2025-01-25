@@ -5,7 +5,7 @@
 import logging
 import warnings
 from pathlib import Path
-from typing import Any, Optional, Union
+from typing import Any, Union
 
 import dask
 import dask.array as da

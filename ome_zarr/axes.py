@@ -1,7 +1,7 @@
 """Axes class for validating and transforming axes
 """
 
-from typing import Any, Union
+from typing import Any
 
 from .format import CurrentFormat, Format
 

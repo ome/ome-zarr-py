@@ -1,7 +1,7 @@
 import filecmp
 import pathlib
 from tempfile import TemporaryDirectory
-from typing import Any, Optional
+from typing import Any
 
 import dask.array as da
 import numpy as np

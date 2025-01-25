@@ -3,7 +3,6 @@
 import argparse
 import logging
 import sys
-from typing import Union
 
 from .csv import csv_to_zarr
 from .data import astronaut, coins, create_zarr
