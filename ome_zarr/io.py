@@ -134,7 +134,7 @@ class ZarrLocation:
         >>> ZarrLocation("https://example.com/baz/").basename()
         'baz'
         """
-        path = self.__path.endswith("/") and self.__path[0:-1] or self.__path
+        path = (self.__path.endswith("/") and self.__path[0:-1]) or self.__path
         return path.split("/")[-1]
 
     # TODO: update to from __future__ import annotations with 3.7+
