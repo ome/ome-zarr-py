@@ -362,7 +362,7 @@ def write_multiscales_metadata(
         dict(
             version=fmt.version,
             datasets=_validate_datasets(datasets, ndim, fmt),
-            name=name if name else group.name,
+            name=name or group.name,
             **metadata,
         )
     ]
