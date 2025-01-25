@@ -29,7 +29,7 @@ class TestUpgrade:
         loc = parse_url(path, mode=mode, fmt=fmt)
         assert loc
         reader = Reader(loc)
-        node = list(reader())[0]
+        node = next(iter(reader()))
         assert Multiscales.matches(node.zarr)
         assert node.data[0].shape == shape
         assert np.max(node.data[0]) > 0
