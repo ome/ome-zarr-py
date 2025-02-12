@@ -1,4 +1,4 @@
-# 0.10.3 (Janbuary 2025)
+# 0.10.3 (January 2025)
 
 - Document Scaler attributes ([#418](https://github.com/ome/ome-zarr-py/pull/418))
 - Fix dimension separator when downloading files ([#419](https://github.com/ome/ome-zarr-py/pull/419))
