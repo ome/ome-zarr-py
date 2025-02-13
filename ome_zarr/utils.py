@@ -132,7 +132,9 @@ def splitall(path):
 def view(input_path: str, port: int = 8000) -> None:
     # serve the parent directory in a simple server with CORS. Open browser
     parent_dir, image_name = os.path.split(input_path)
-    parent_dir = str(parent_dir)
+    # in case input_path had trailing slash, we go one level up...
+    if len(image_name) == 0:
+        parent_dir, image_name = os.path.split(parent_dir)
 
     # walk the input path to find all .zattrs files...
     def walk(path: Path):
