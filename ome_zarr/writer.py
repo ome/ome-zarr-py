@@ -1,6 +1,4 @@
-"""Image writer utility
-
-"""
+"""Image writer utility"""
 
 import logging
 import warnings
@@ -23,10 +21,12 @@ LOGGER = logging.getLogger("ome_zarr.writer")
 ListOfArrayLike = Union[list[da.Array], list[np.ndarray]]
 ArrayLike = Union[da.Array, np.ndarray]
 
+AxesType = Optional[Union[str, list[str], list[dict[str, str]]]]
+
 
 def _get_valid_axes(
     ndim: Optional[int] = None,
-    axes: Optional[Union[str, list[str], list[dict[str, str]]]] = None,
+    axes: AxesType = None,
     fmt: Format = CurrentFormat(),
 ) -> Union[None, list[str], list[dict[str, str]]]:
     """Returns list of axes valid for fmt.version or raise exception if invalid"""
@@ -176,7 +176,7 @@ def write_multiscale(
     group: zarr.Group,
     chunks: Optional[Union[tuple[Any, ...], int]] = None,
     fmt: Format = CurrentFormat(),
-    axes: Optional[Union[str, list[str], list[dict[str, str]]]] = None,
+    axes: AxesType = None,
     coordinate_transformations: Optional[list[list[dict[str, Any]]]] = None,
     storage_options: Optional[Union[JSONDict, list[JSONDict]]] = None,
     name: Optional[str] = None,
@@ -298,7 +298,7 @@ def write_multiscales_metadata(
     group: zarr.Group,
     datasets: list[dict],
     fmt: Format = CurrentFormat(),
-    axes: Optional[Union[str, list[str], list[dict[str, str]]]] = None,
+    axes: AxesType = None,
     name: Optional[str] = None,
     **metadata: Union[str, JSONDict, list[JSONDict]],
 ) -> None:
@@ -451,7 +451,7 @@ def write_image(
     scaler: Scaler = Scaler(),
     chunks: Optional[Union[tuple[Any, ...], int]] = None,
     fmt: Format = CurrentFormat(),
-    axes: Optional[Union[str, list[str], list[dict[str, str]]]] = None,
+    axes: AxesType = None,
     coordinate_transformations: Optional[list[list[dict[str, Any]]]] = None,
     storage_options: Optional[Union[JSONDict, list[JSONDict]]] = None,
     compute: Optional[bool] = True,
@@ -521,7 +521,7 @@ def write_image(
             **metadata,
         )
     else:
-        mip, axes = _create_mip(image, fmt, scaler, axes)
+        mip = _create_mip(image, fmt, scaler, axes)
         dask_delayed_jobs = write_multiscale(
             mip,
             group,
@@ -557,7 +557,7 @@ def _write_dask_image(
     scaler: Scaler = Scaler(),
     chunks: Optional[Union[tuple[Any, ...], int]] = None,
     fmt: Format = CurrentFormat(),
-    axes: Optional[Union[str, list[str], list[dict[str, str]]]] = None,
+    axes: AxesType = None,
     coordinate_transformations: Optional[list[list[dict[str, Any]]]] = None,
     storage_options: Optional[Union[JSONDict, list[JSONDict]]] = None,
     name: Optional[str] = None,
@@ -704,7 +704,7 @@ def write_multiscale_labels(
     name: str,
     chunks: Optional[Union[tuple[Any, ...], int]] = None,
     fmt: Format = CurrentFormat(),
-    axes: Optional[Union[str, list[str], list[dict[str, str]]]] = None,
+    axes: AxesType = None,
     coordinate_transformations: Optional[list[list[dict[str, Any]]]] = None,
     storage_options: Optional[Union[JSONDict, list[JSONDict]]] = None,
     label_metadata: Optional[JSONDict] = None,
@@ -792,7 +792,7 @@ def write_labels(
     scaler: Scaler = Scaler(),
     chunks: Optional[Union[tuple[Any, ...], int]] = None,
     fmt: Format = CurrentFormat(),
-    axes: Optional[Union[str, list[str], list[dict[str, str]]]] = None,
+    axes: AxesType = None,
     coordinate_transformations: Optional[list[list[dict[str, Any]]]] = None,
     storage_options: Optional[Union[JSONDict, list[JSONDict]]] = None,
     label_metadata: Optional[JSONDict] = None,
@@ -873,7 +873,7 @@ def write_labels(
             **metadata,
         )
     else:
-        mip, axes = _create_mip(labels, fmt, scaler, axes)
+        mip = _create_mip(labels, fmt, scaler, axes)
         dask_delayed_jobs = write_multiscale(
             mip,
             sub_group,
@@ -900,8 +900,16 @@ def _create_mip(
     image: np.ndarray,
     fmt: Format,
     scaler: Scaler,
-    axes: Optional[Union[str, list[str], list[dict[str, str]]]],
-) -> tuple[list[np.ndarray], Optional[Union[str, list[str], list[dict[str, str]]]]]:
+    axes: AxesType,
+) -> list[np.ndarray]:
+    """
+    Generate a downsampled pyramid of images.
+
+    Returns
+    -------
+    pyramid :
+        List of numpy arrays that are the downsampled pyramid levels.
+    """
     if image.ndim > 5:
         raise ValueError("Only images of 5D or less are supported")
 
@@ -909,8 +917,6 @@ def _create_mip(
         # v0.1 and v0.2 are strictly 5D
         shape_5d: tuple[Any, ...] = (*(1,) * (5 - image.ndim), *image.shape)
         image = image.reshape(shape_5d)
-        # and we don't need axes
-        axes = None
 
     # check axes before trying to scale
     _get_valid_axes(image.ndim, axes, fmt)
@@ -925,7 +931,7 @@ def _create_mip(
     else:
         LOGGER.debug("disabling pyramid")
         mip = [image]
-    return mip, axes
+    return mip
 
 
 def _retuple(
