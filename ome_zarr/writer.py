@@ -1,6 +1,4 @@
-"""Image writer utility
-
-"""
+"""Image writer utility"""
 
 import logging
 import warnings

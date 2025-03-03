@@ -1,5 +1,4 @@
-"""Axes class for validating and transforming axes
-"""
+"""Axes class for validating and transforming axes"""
 
 from typing import Any, Union
 
@@ -48,7 +47,7 @@ class Axes:
 
     @staticmethod
     def _axes_to_dicts(
-        axes: Union[list[str], list[dict[str, str]]]
+        axes: Union[list[str], list[dict[str, str]]],
     ) -> list[dict[str, str]]:
         """Returns a list of axis dicts with name and type"""
         axes_dicts = []
