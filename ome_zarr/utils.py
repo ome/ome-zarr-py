@@ -131,14 +131,20 @@ def splitall(path):
 
 def view(input_path: str, port: int = 8000) -> None:
     # serve the parent directory in a simple server with CORS. Open browser
-    parent_dir, image_name = os.path.split(input_path)
+    parent_path, server_dir = os.path.split(input_path)
     # in case input_path had trailing slash, we go one level up...
-    if len(image_name) == 0:
-        parent_dir, image_name = os.path.split(parent_dir)
+    if len(server_dir) == 0:
+        parent_path, server_dir = os.path.split(parent_path)
+
+    # 'input_path' is path passed to the script. To the data dir. E.g. "ZARR/data"
+    # 'parent_path', e.g. "ZARR" just for running http server
+    # 'server_dir' is the name of our top-level dir E.g. "data"
+
+    # We will be serving the data from last dir in /parent/dir/path
+    # so we need to use that as base for image URLs...
 
     # walk the input path to find all .zattrs files...
     def walk(path: Path):
-        print("walk", path, (path / ".zattrs").exists())
         if (path / ".zattrs").exists():
             yield from find_multiscales(path)
         else:
@@ -150,40 +156,52 @@ def view(input_path: str, port: int = 8000) -> None:
                 else:
                     continue
 
-    zarrs = list(walk(Path(input_path)))
-
-    for z in zarrs:
-        # split file path into list
-        z[2] = splitall(z[2])
+    url = None
+    zarrs = []
+    if server_dir.endswith(".csv"):
+        # open CSV in biofile finder...
+        source = {
+            "uri": f"http://localhost:{port}/{server_dir}",
+            "type": "csv",
+            "name": "biofile_finder.csv",
+        }
+        s = urllib.parse.quote(json.dumps(source))
+        url = f"https://bff.allencell.org/app?source={s}"
+    else:
+        zarrs = list(walk(Path(input_path)))
 
     # If we have just one zarr, open ome-ngff-validator in a web browser...
     if len(zarrs) == 1:
         url = (
             f"https://ome.github.io/ome-ngff-validator/"
-            f"?source=http://localhost:{port}/{image_name}"
+            f"?source=http://localhost:{port}/{server_dir}"
         )
     elif len(zarrs) > 1:
         # ...otherwise write to CSV file and open in BioFile Finder
-        max_folders = max(len(z[2]) for z in zarrs)
-        col_names = ["File Path", "File Name"] + [
-            f"Folder {i}" for i in range(max_folders)
-        ]
-        # open csv file and write lines...
+        col_names = ["File Path", "File Name", "Folders"]
+        # write csv file into the dir we're serving from...
         bff_csv = os.path.join(input_path, "biofile_finder.csv")
+
         with open(bff_csv, "w", newline="") as csvfile:
             writer = csv.writer(csvfile, delimiter=",")
             writer.writerow(col_names)
             for zarr_img in zarrs:
-                # path_to_zarr, name, dirname
-                file_path = f"http://localhost:{port}/{zarr_img[0]}"
+                # zarr paths start with full path to img
+                # e.g. ZARR/data/to/img (from walk("ZARR/data"))
+                # but we want them to be from the server_dir to img, e.g "data/to/img".
+                # So we want relative /to/img path, from input_path -> to img
+                relpath = os.path.relpath(zarr_img[0], input_path)
+                # On Windows, we need to replace \\ with / in relpath for URL
+                rel_url = "/".join(splitall(relpath))
+                file_path = f"http://localhost:{port}/{server_dir}/{rel_url}"
                 name = zarr_img[1]
-                # folders list needs to be same length for every row.
-                # e.g. ['f1', 'f2', '-', '-']
-                folders = zarr_img[2] + ["-"] * (max_folders - len(zarr_img[2]))
-                writer.writerow([file_path, name] + folders)
+                # folders is "f1,f2,f3" etc.
+                folders_path = os.path.relpath(zarr_img[2], input_path)
+                folders = ",".join(splitall(folders_path))
+                writer.writerow([file_path, name, folders])
 
         source = {
-            "uri": f"http://localhost:{port}/{image_name}/biofile_finder.csv",
+            "uri": f"http://localhost:{port}/{server_dir}/biofile_finder.csv",
             "type": "csv",
             "name": "biofile_finder.csv",
         }
@@ -198,9 +216,13 @@ def view(input_path: str, port: int = 8000) -> None:
         def translate_path(self, path: str) -> str:
             # Since we don't call the class constructor ourselves,
             # we set the directory here instead
-            self.directory = parent_dir
+            self.directory = parent_path
             super_path = super().translate_path(path)
             return super_path
+
+    if url is None:
+        print("No OME-Zarr files found in", input_path)
+        return
 
     # Open in browser...
     webbrowser.open(url)
