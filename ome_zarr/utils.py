@@ -129,7 +129,7 @@ def splitall(path):
     return allparts
 
 
-def view(input_path: str, port: int = 8000) -> None:
+def view(input_path: str, port: int = 8000, dry_run=False) -> None:
     # serve the parent directory in a simple server with CORS. Open browser
     parent_path, server_dir = os.path.split(input_path)
     # in case input_path had trailing slash, we go one level up...
@@ -222,6 +222,10 @@ def view(input_path: str, port: int = 8000) -> None:
 
     if url is None:
         print("No OME-Zarr files found in", input_path)
+        return
+
+    # for testing
+    if dry_run:
         return
 
     # Open in browser...
