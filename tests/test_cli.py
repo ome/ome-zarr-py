@@ -3,9 +3,11 @@ from collections import deque
 from pathlib import Path
 
 import pytest
+import zarr
 
 from ome_zarr.cli import main
 from ome_zarr.utils import strip_common_prefix, view
+from ome_zarr.writer import write_plate_metadata
 
 
 def directory_items(directory: Path):
@@ -112,8 +114,15 @@ class TestCli:
         view(filename, 8000, True)
 
         img_dir = (self.path / "images").mkdir()
+        img_dir2 = (img_dir / "dir2").mkdir()
         main(["create", "--method=astronaut", (str(img_dir / "astronaut"))])
-        main(["create", "--method=coins", (str(img_dir / "coins"))])
+        main(["create", "--method=coins", (str(img_dir2 / "coins"))])
+
+        # create a plate
+        plate_dir = (img_dir2 / "plate").mkdir()
+        store = zarr.DirectoryStore(str(plate_dir))
+        root = zarr.group(store=store)
+        write_plate_metadata(root, ["A"], ["1"], ["A/1"])
 
         # TODO: check that there is a biofile_finder.csv in img_dir
         view(img_dir, 8000, True)
