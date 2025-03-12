@@ -70,9 +70,7 @@ class ZarrLocation:
         self.zgroup: JSONDict = self.get_json(".zgroup")
         self.__metadata: JSONDict = {}
         self.__exists: bool = True
-        if self.zgroup:
-            self.__metadata = self.get_json(".zattrs")
-        elif self.zarray:
+        if self.zgroup or self.zarray:
             self.__metadata = self.get_json(".zattrs")
         else:
             self.__exists = False

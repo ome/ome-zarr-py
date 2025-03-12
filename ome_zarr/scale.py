@@ -26,8 +26,8 @@ from .io import parse_url
 
 LOGGER = logging.getLogger("ome_zarr.scale")
 
-ListOfArrayLike = Union[list[da.Array], list[np.ndarray]]
-ArrayLike = Union[da.Array, np.ndarray]
+ListOfArrayLike = Union[list[da.Array], list[np.ndarray]]  # noqa: UP007  # FIXME
+ArrayLike = Union[da.Array, np.ndarray]  # noqa: UP007  # FIXME
 
 
 @dataclass
