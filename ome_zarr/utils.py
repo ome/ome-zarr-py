@@ -29,6 +29,17 @@ def info(path: str, stats: bool = False) -> Iterator[Node]:
 
     All :class:`Nodes <ome_utils.reader.Node>` that are found from the given path will
     be visited recursively.
+
+    Parameters
+    ----------
+    path :
+        Path to OME-Zarr fileset.
+    stats :
+        If True, print stats (currently just minimum/maximum of all arrays)
+
+    Warnings
+    --------
+    Passing ``stats=True`` will trigger a full read of every array in the fileset.
     """
     zarr = parse_url(path)
     assert zarr, f"not a zarr: {zarr}"
