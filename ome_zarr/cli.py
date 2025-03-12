@@ -26,19 +26,19 @@ def config_logging(loglevel: int, args: argparse.Namespace) -> None:
 
 def info(args: argparse.Namespace) -> None:
     """Wrap the :func:`~ome_zarr.utils.info` method."""
-    config_logging(logging.WARN, args)
+    config_logging(logging.WARNING, args)
     list(zarr_info(args.path, stats=args.stats))
 
 
 def view(args: argparse.Namespace) -> None:
     """Wrap the :func:`~ome_zarr.utils.view` method."""
-    config_logging(logging.WARN, args)
+    config_logging(logging.WARNING, args)
     zarr_view(args.path, args.port)
 
 
 def download(args: argparse.Namespace) -> None:
     """Wrap the :func:`~ome_zarr.utils.download` method."""
-    config_logging(logging.WARN, args)
+    config_logging(logging.WARNING, args)
     zarr_download(args.path, args.output)
 
 
@@ -47,7 +47,7 @@ def create(args: argparse.Namespace) -> None:
 
     :func:`~ome_zarr.data.coins` or :func:`~ome_zarr.data.astronaut`.
     """
-    config_logging(logging.WARN, args)
+    config_logging(logging.WARNING, args)
     if args.method == "coins":
         method = coins
         label_name = "coins"
