@@ -1,6 +1,7 @@
 """Definition of complex types for use elsewhere."""
 
-from typing import Any, Callable, Union
+from collections.abc import Callable
+from typing import Any, Union
 
 LayerData = Union[tuple[Any], tuple[Any, dict], tuple[Any, dict, str]]
 
