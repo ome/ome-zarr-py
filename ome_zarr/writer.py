@@ -3,7 +3,7 @@
 import logging
 import warnings
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeAlias
 
 import dask
 import dask.array as da
@@ -19,7 +19,7 @@ from .types import JSONDict
 LOGGER = logging.getLogger("ome_zarr.writer")
 
 ListOfArrayLike = list[da.Array] | list[np.ndarray]
-ArrayLike = da.Array | np.ndarray
+ArrayLike: TypeAlias = da.Array | np.ndarray
 
 AxesType = str | list[str] | list[dict[str, str]] | None
 
