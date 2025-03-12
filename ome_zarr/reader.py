@@ -555,9 +555,9 @@ class Plate(Spec):
         lazy_rows = []
         # For level 0, return whole image for each tile
         for row in range(self.row_count):
-            lazy_row: list[da.Array] = []
-            for col in range(self.column_count):
-                lazy_row.append(get_tile(row, col))
+            lazy_row: list[da.Array] = [
+                get_tile(row, col) for col in range(self.column_count)
+            ]
             lazy_rows.append(da.concatenate(lazy_row, axis=len(self.axes) - 1))
         return da.concatenate(lazy_rows, axis=len(self.axes) - 2)
 
