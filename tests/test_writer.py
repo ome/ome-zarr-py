@@ -108,7 +108,7 @@ class TestWriter:
 
         # Verify
         reader = Reader(parse_url(f"{self.path}/test"))
-        node = list(reader())[0]
+        node = next(iter(reader()))
         assert Multiscales.matches(node.zarr)
         if version.version in ("0.1", "0.2"):
             # v0.1 and v0.2 MUST be 5D
@@ -136,7 +136,7 @@ class TestWriter:
         data = array_constructor(data)
         write_image(data, self.group, axes="zyx")
         reader = Reader(parse_url(f"{self.path}/test"))
-        image_node = list(reader())[0]
+        image_node = next(iter(reader()))
         for transfs in image_node.metadata["coordinateTransformations"]:
             assert len(transfs) == 1
             assert transfs[0]["type"] == "scale"
@@ -186,7 +186,7 @@ class TestWriter:
             dask_delayed_jobs = persist(*dask_delayed_jobs)
 
         reader = Reader(parse_url(f"{self.path}/test"))
-        image_node = list(reader())[0]
+        image_node = next(iter(reader()))
         first_chunk = [c[0] for c in image_node.data[0].chunks]
         assert tuple(first_chunk) == _retuple(chunks, image_node.data[0].shape)
         for level, transfs in enumerate(
@@ -1069,7 +1069,7 @@ class TestLabelWriter:
     def verify_label_data(self, label_name, label_data, fmt, shape, transformations):
         # Verify image data
         reader = Reader(parse_url(f"{self.path}/labels/{label_name}"))
-        node = list(reader())[0]
+        node = next(iter(reader()))
         assert Multiscales.matches(node.zarr)
         if fmt.version in ("0.1", "0.2"):
             # v0.1 and v0.2 MUST be 5D

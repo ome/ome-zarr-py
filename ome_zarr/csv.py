@@ -19,7 +19,7 @@ def parse_csv_value(value: str, col_type: str) -> str | float | int | bool:
         if col_type == "d":
             rv = float(value)
         elif col_type == "l":
-            rv = int(round(float(value)))
+            rv = round(float(value))
         elif col_type == "b":
             rv = bool(value)
     except ValueError:

@@ -28,7 +28,7 @@ def _get_valid_axes(
     ndim: int | None = None,
     axes: AxesType = None,
     fmt: Format = CurrentFormat(),
-) -> None | list[str] | list[dict[str, str]]:
+) -> list[str] | list[dict[str, str]] | None:
     """Returns list of axes valid for fmt.version or raise exception if invalid"""
 
     if fmt.version in ("0.1", "0.2"):
@@ -925,7 +925,7 @@ def _create_mip(
         if image.shape[-1] == 1 or image.shape[-2] == 1:
             raise ValueError(
                 "Can't downsample if size of x or y dimension is 1. "
-                "Shape: %s" % (image.shape,)
+                f"Shape: {image.shape}"
             )
         mip = scaler.func(image)
     else:

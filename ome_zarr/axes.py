@@ -69,7 +69,7 @@ class Axes:
         unknown_types = [atype for atype in axes_types if atype not in known_types]
         if len(unknown_types) > 1:
             raise ValueError(
-                "Too many unknown axes types. 1 allowed, found: %s" % unknown_types
+                f"Too many unknown axes types. 1 allowed, found: {unknown_types}"
             )
 
         def _last_index(item: str, item_list: list[Any]) -> int:
@@ -91,7 +91,7 @@ class Axes:
         axes_names = []
         for axis in self.axes:
             if "name" not in axis:
-                raise ValueError("Axis Dict %s has no 'name'" % axis)
+                raise ValueError(f"Axis Dict {axis} has no 'name'")
             axes_names.append(axis["name"])
         return axes_names
 
@@ -104,7 +104,7 @@ class Axes:
             if val_axes not in [("z", "y", "x"), ("c", "y", "x"), ("t", "y", "x")]:
                 raise ValueError(
                     "3D data must have axes ('z', 'y', 'x') or ('c', 'y', 'x')"
-                    " or ('t', 'y', 'x'), not %s" % (val_axes,)
+                    f" or ('t', 'y', 'x'), not {val_axes}"
                 )
         elif len(val_axes) == 4:
             if val_axes not in [
