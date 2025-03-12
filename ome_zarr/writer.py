@@ -298,7 +298,7 @@ Please use the 'storage_options' argument instead."""
                 del options["chunk_key_encoding"]
             # handle any 'chunks' option from storage_options
             if chunks_opt is not None:
-                data = da.array(data).rechunk(chunks=chunks_opt)
+                data = da.array(data).rechunk(chunks=chunks_opt)  # noqa: PLW2901
             da_delayed = da.to_zarr(
                 arr=data,
                 url=group.store,
