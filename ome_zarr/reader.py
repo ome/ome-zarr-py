@@ -269,10 +269,7 @@ class Multiscales(Spec):
     @staticmethod
     def matches(zarr: ZarrLocation) -> bool:
         """is multiscales metadata present?"""
-        if zarr.zgroup:
-            if "multiscales" in zarr.root_attrs:
-                return True
-        return False
+        return bool(zarr.zgroup) and "multiscales" in zarr.root_attrs
 
     def __init__(self, node: Node) -> None:
         super().__init__(node)

@@ -402,7 +402,7 @@ def write_multiscales_metadata(
         if omero_metadata is None:
             raise KeyError("If `'omero'` is present, value cannot be `None`.")
         for c in omero_metadata["channels"]:
-            if "color" in c:
+            if "color" in c:  # noqa: SIM102
                 if not isinstance(c["color"], str) or len(c["color"]) != 6:
                     raise TypeError("`'color'` must be a hex code string.")
             if "window" in c:
