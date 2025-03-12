@@ -112,7 +112,7 @@ class Node:
         prepend: bool = False,
         visibility: bool | None = None,
         plate_labels: bool = False,
-    ) -> "Optional[Node]":
+    ) -> "Node | None":
         """Create a child node if this location has not yet been seen.
 
         Newly created nodes may be considered higher or lower priority than
