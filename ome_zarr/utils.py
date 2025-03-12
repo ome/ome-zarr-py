@@ -67,13 +67,15 @@ def find_multiscales(path_to_zattrs):
         plate = zattrs.get("plate")
         wells = plate.get("wells")
         field = "0"
-        print("well", wells[0])
-        path_to_zarr = path_to_zattrs / wells[0].get("path") / field
-        plate_name = os.path.basename(path_to_zattrs)
-        return [[path_to_zarr, plate_name, os.path.dirname(path_to_zattrs)]]
+        if len(wells) > 0:
+            path_to_zarr = path_to_zattrs / wells[0].get("path") / field
+            plate_name = os.path.basename(path_to_zattrs)
+            return [[path_to_zarr, plate_name, os.path.dirname(path_to_zattrs)]]
+        else:
+            LOGGER.info(f"No wells found in plate{path_to_zattrs}")
+            return []
     elif zattrs.get("bioformats2raw.layout") == 3:
         # Open OME/METADATA.ome.xml
-        print("bioformats2raw.layout...")
         try:
             tree = ET.parse(path_to_zattrs / "OME" / "METADATA.ome.xml")
             root = tree.getroot()
