@@ -143,7 +143,7 @@ class Scaler:
         grp = zarr.group(store)
         grp.create_dataset("base", data=base)
         series = []
-        for i, dataset in enumerate(pyramid):
+        for i in range(len(pyramid)):
             if i == 0:
                 path = "base"
             else:
