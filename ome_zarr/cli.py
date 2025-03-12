@@ -103,7 +103,7 @@ def main(args: Union[list[str], None] = None) -> None:
 
     # info
     parser_info = subparsers.add_parser("info")
-    parser_info.add_argument("path")
+    parser_info.add_argument("path", help="Path to image.zarr")
     parser_info.add_argument("--stats", action="store_true")
     parser_info.set_defaults(func=info)
 
@@ -115,8 +115,14 @@ def main(args: Union[list[str], None] = None) -> None:
 
     # view (in ome-ngff-validator in a browser)
     parser_view = subparsers.add_parser("view")
-    parser_view.add_argument("path")
-    parser_view.add_argument("--port", type=int, default=8000)
+    parser_view.add_argument(
+        "path",
+        help="Path to image.zarr to open in ome-ngff-validator "
+        "OR directory to open in BioFile Finder",
+    )
+    parser_view.add_argument(
+        "--port", type=int, default=8000, help="Port to serve the data (default: 8000)"
+    )
     parser_view.set_defaults(func=view)
 
     # create
