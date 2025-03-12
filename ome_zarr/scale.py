@@ -147,7 +147,7 @@ class Scaler:
             if i == 0:
                 path = "base"
             else:
-                path = "%s" % i
+                path = str(i)
                 grp.create_dataset(path, data=pyramid[i])
             series.append({"path": path})
         return grp

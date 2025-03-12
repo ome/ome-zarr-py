@@ -290,14 +290,14 @@ class FormatV04(FormatV03):
         ct_count = len(coordinate_transformations)
         if ct_count != nlevels:
             raise ValueError(
-                "coordinate_transformations count: %s must match datasets %s"
-                % (ct_count, nlevels)
+                f"coordinate_transformations count: {ct_count} must match "
+                f"datasets {nlevels}"
             )
         for transformations in coordinate_transformations:
             assert isinstance(transformations, list)
             types = [t.get("type", None) for t in transformations]
             if any(t is None for t in types):
-                raise ValueError("Missing type in: %s" % transformations)
+                raise ValueError(f"Missing type in: {transformations}")
             # validate scales...
             if sum(t == "scale" for t in types) != 1:
                 raise ValueError(
@@ -308,12 +308,12 @@ class FormatV04(FormatV03):
                 raise ValueError("First coordinate_transformations must be 'scale'")
             first = transformations[0]
             if "scale" not in transformations[0]:
-                raise ValueError("Missing scale argument in: %s" % first)
+                raise ValueError(f"Missing scale argument in: {first}")
             scale = first["scale"]
             if len(scale) != ndim:
                 raise ValueError(
-                    "'scale' list %s must match number of image dimensions: %s"
-                    % (scale, ndim)
+                    f"'scale' list {scale} must match "
+                    f"number of image dimensions: {ndim}"
                 )
             for value in scale:
                 if not isinstance(value, (float, int)):
@@ -329,12 +329,12 @@ class FormatV04(FormatV03):
             elif sum(translation_types) == 1:
                 transformation = transformations[types.index("translation")]
                 if "translation" not in transformation:
-                    raise ValueError("Missing scale argument in: %s" % first)
+                    raise ValueError(f"Missing scale argument in: {first}")
                 translation = transformation["translation"]
                 if len(translation) != ndim:
                     raise ValueError(
-                        "'translation' list %s must match image dimensions count: %s"
-                        % (translation, ndim)
+                        f"'translation' list {translation} must match "
+                        f"image dimensions count: {ndim}"
                     )
                 for value in translation:
                     if not isinstance(value, (float, int)):
