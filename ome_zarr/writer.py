@@ -585,7 +585,7 @@ Please use the 'storage_options' argument instead."""
     # for path, data in enumerate(pyramid):
     max_layer: int = scaler.max_layer if scaler is not None else 0
     shapes = []
-    for path in range(0, max_layer + 1):
+    for path in range(max_layer + 1):
         # LOGGER.debug(f"write_image path: {path}")
         options = _resolve_storage_options(storage_options, path)
 
