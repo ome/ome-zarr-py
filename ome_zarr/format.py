@@ -79,7 +79,7 @@ class Format(ABC):
             dataset = multiscales[0]
             return dataset.get("version", None)
         for name in ["plate", "well", "image-label"]:
-            obj = metadata.get(name, None)
+            obj = metadata.get(name)
             if obj:
                 return obj.get("version", None)
         return None
