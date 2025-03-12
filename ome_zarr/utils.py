@@ -178,7 +178,7 @@ def find_multiscales(path_to_zattrs):
                     )
                     series += 1
             return images
-        except Exception as ex:
+        except Exception as ex:  # noqa: BLE001
             print(ex)
     elif zattrs.get("multiscales"):
         return [
