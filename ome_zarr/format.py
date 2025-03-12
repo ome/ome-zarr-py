@@ -2,7 +2,7 @@
 
 import logging
 from abc import ABC, abstractmethod
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from typing import Any
 
 from zarr.storage import FsspecStore, LocalStore
@@ -134,7 +134,7 @@ class FormatV01(Format):
     Initial format. (2020)
     """
 
-    REQUIRED_PLATE_WELL_KEYS: dict[str, type] = {"path": str}
+    REQUIRED_PLATE_WELL_KEYS: Mapping[str, type] = {"path": str}
 
     @property
     def version(self) -> str:
@@ -234,7 +234,11 @@ class FormatV04(FormatV03):
     introduce coordinate_transformations in multiscales (Nov 2021)
     """
 
-    REQUIRED_PLATE_WELL_KEYS = {"path": str, "rowIndex": int, "columnIndex": int}
+    REQUIRED_PLATE_WELL_KEYS: Mapping[str, type] = {
+        "path": str,
+        "rowIndex": int,
+        "columnIndex": int,
+    }
 
     @property
     def version(self) -> str:
