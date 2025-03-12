@@ -18,7 +18,7 @@ def int_to_rgba_255(v: int) -> list[int]:
     >>> print([round(x, 3) for x in int_to_rgba_255(100100)])
     [0, 1, 135, 4]
     """
-    return [x for x in v.to_bytes(4, signed=True, byteorder="big")]
+    return list(v.to_bytes(4, signed=True, byteorder="big"))
 
 
 def rgba_to_int(r: int, g: int, b: int, a: int) -> int:

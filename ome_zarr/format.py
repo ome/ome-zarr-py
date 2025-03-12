@@ -3,7 +3,7 @@
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
-from typing import Any, Optional
+from typing import Any
 
 from zarr.storage import FSStore
 
@@ -67,7 +67,7 @@ class Format(ABC):
     def init_channels(self) -> None:  # pragma: no cover
         raise NotImplementedError()
 
-    def _get_metadata_version(self, metadata: dict) -> Optional[str]:
+    def _get_metadata_version(self, metadata: dict) -> str | None:
         """
         Checks the metadata dict for a version
 
@@ -79,7 +79,7 @@ class Format(ABC):
             dataset = multiscales[0]
             return dataset.get("version", None)
         for name in ["plate", "well", "image-label"]:
-            obj = metadata.get(name, None)
+            obj = metadata.get(name)
             if obj:
                 return obj.get("version", None)
         return None
@@ -105,7 +105,7 @@ class Format(ABC):
     @abstractmethod
     def generate_coordinate_transformations(
         self, shapes: list[tuple]
-    ) -> Optional[list[list[dict[str, Any]]]]:  # pragma: no cover
+    ) -> list[list[dict[str, Any]]] | None:  # pragma: no cover
         raise NotImplementedError()
 
     @abstractmethod
@@ -113,8 +113,8 @@ class Format(ABC):
         self,
         ndim: int,
         nlevels: int,
-        coordinate_transformations: Optional[list[list[dict[str, Any]]]] = None,
-    ) -> Optional[list[list[dict[str, Any]]]]:  # pragma: no cover
+        coordinate_transformations: list[list[dict[str, Any]]] | None = None,
+    ) -> list[list[dict[str, Any]]] | None:  # pragma: no cover
         raise NotImplementedError()
 
 
@@ -159,14 +159,14 @@ class FormatV01(Format):
 
     def generate_coordinate_transformations(
         self, shapes: list[tuple]
-    ) -> Optional[list[list[dict[str, Any]]]]:
+    ) -> list[list[dict[str, Any]]] | None:
         return None
 
     def validate_coordinate_transformations(
         self,
         ndim: int,
         nlevels: int,
-        coordinate_transformations: Optional[list[list[dict[str, Any]]]] = None,
+        coordinate_transformations: list[list[dict[str, Any]]] | None = None,
     ) -> None:
         return None
 
@@ -260,7 +260,7 @@ class FormatV04(FormatV03):
 
     def generate_coordinate_transformations(
         self, shapes: list[tuple]
-    ) -> Optional[list[list[dict[str, Any]]]]:
+    ) -> list[list[dict[str, Any]]] | None:
         data_shape = shapes[0]
         coordinate_transformations: list[list[dict[str, Any]]] = []
         # calculate minimal 'scale' transform based on pyramid dims
@@ -275,7 +275,7 @@ class FormatV04(FormatV03):
         self,
         ndim: int,
         nlevels: int,
-        coordinate_transformations: Optional[list[list[dict[str, Any]]]] = None,
+        coordinate_transformations: list[list[dict[str, Any]]] | None = None,
     ) -> None:
         """
         Validates that a list of dicts contains a 'scale' transformation
@@ -296,7 +296,7 @@ class FormatV04(FormatV03):
         for transformations in coordinate_transformations:
             assert isinstance(transformations, list)
             types = [t.get("type", None) for t in transformations]
-            if any([t is None for t in types]):
+            if any(t is None for t in types):
                 raise ValueError("Missing type in: %s" % transformations)
             # validate scales...
             if sum(t == "scale" for t in types) != 1:
