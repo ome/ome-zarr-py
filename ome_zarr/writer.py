@@ -3,7 +3,7 @@
 import logging
 import warnings
 from pathlib import Path
-from typing import Any, Union
+from typing import Any
 
 import dask
 import dask.array as da
