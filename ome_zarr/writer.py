@@ -77,7 +77,7 @@ def _validate_well_images(
         if isinstance(image, str):
             validated_images.append({"path": str(image)})
         elif isinstance(image, dict):
-            if any(e not in VALID_KEYS for e in image.keys()):
+            if any(e not in VALID_KEYS for e in image):
                 LOGGER.debug("%s contains unspecified keys", image)
             if "path" not in image:
                 raise ValueError(f"{image} must contain a path key")
@@ -106,7 +106,7 @@ def _validate_plate_acquisitions(
     for acquisition in acquisitions:
         if not isinstance(acquisition, dict):
             raise ValueError(f"{acquisition} must be a dictionary")
-        if any(e not in VALID_KEYS for e in acquisition.keys()):
+        if any(e not in VALID_KEYS for e in acquisition):
             LOGGER.debug("%s contains unspecified keys", acquisition)
         if "id" not in acquisition:
             raise ValueError(f"{acquisition} must contain an id key")

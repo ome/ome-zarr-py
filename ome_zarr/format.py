@@ -179,7 +179,7 @@ class FormatV01(Format):
     def validate_well_dict(
         self, well: dict, rows: list[str], columns: list[str]
     ) -> None:
-        if any(e not in self.REQUIRED_PLATE_WELL_KEYS for e in well.keys()):
+        if any(e not in self.REQUIRED_PLATE_WELL_KEYS for e in well):
             LOGGER.debug("%s contains unspecified keys", well)
         for key, key_type in self.REQUIRED_PLATE_WELL_KEYS.items():
             if key not in well:
