@@ -263,7 +263,8 @@ Please use the 'storage_options' argument instead."""
                 arr=data,
                 url=group.store,
                 component=str(Path(group.path, str(path))),
-                storage_options=options,
+                # IF we pass storage_options then dask NEEDS url to be a string
+                storage_options=None,
                 # by default we use Blosc with zstd compression
                 compressor=options.get("compressor", _blosc_compressor()),
                 # TODO: default dimension_separator? Not set in store for zarr v3
