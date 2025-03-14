@@ -1,11 +1,9 @@
-"""Image writer utility
-
-"""
+"""Image writer utility"""
 
 import logging
 import warnings
 from pathlib import Path
-from typing import Any, Optional, Union
+from typing import Any, TypeAlias
 
 import dask
 import dask.array as da
@@ -21,15 +19,17 @@ from .types import JSONDict
 
 LOGGER = logging.getLogger("ome_zarr.writer")
 
-ListOfArrayLike = Union[list[da.Array], list[np.ndarray]]
-ArrayLike = Union[da.Array, np.ndarray]
+ListOfArrayLike = list[da.Array] | list[np.ndarray]
+ArrayLike: TypeAlias = da.Array | np.ndarray
+
+AxesType = str | list[str] | list[dict[str, str]] | None
 
 
 def _get_valid_axes(
-    ndim: Optional[int] = None,
-    axes: Optional[Union[str, list[str], list[dict[str, str]]]] = None,
+    ndim: int | None = None,
+    axes: AxesType = None,
     fmt: Format = CurrentFormat(),
-) -> Union[None, list[str], list[dict[str, str]]]:
+) -> list[str] | list[dict[str, str]] | None:
     """Returns list of axes valid for fmt.version or raise exception if invalid"""
 
     if fmt.version in ("0.1", "0.2"):
@@ -66,7 +66,7 @@ def _get_valid_axes(
 
 
 def _validate_well_images(
-    images: list[Union[str, dict]], fmt: Format = CurrentFormat()
+    images: list[str | dict], fmt: Format = CurrentFormat()
 ) -> list[dict]:
     VALID_KEYS = [
         "acquisition",
@@ -151,7 +151,7 @@ def _validate_datasets(
 
 
 def _validate_plate_wells(
-    wells: list[Union[str, dict]],
+    wells: list[str | dict],
     rows: list[str],
     columns: list[str],
     fmt: Format = CurrentFormat(),
@@ -180,14 +180,14 @@ def _blosc_compressor() -> Blosc:
 def write_multiscale(
     pyramid: ListOfArrayLike,
     group: zarr.Group,
-    chunks: Optional[Union[tuple[Any, ...], int]] = None,
+    chunks: tuple[Any, ...] | int | None = None,
     fmt: Format = CurrentFormat(),
-    axes: Optional[Union[str, list[str], list[dict[str, str]]]] = None,
-    coordinate_transformations: Optional[list[list[dict[str, Any]]]] = None,
-    storage_options: Optional[Union[JSONDict, list[JSONDict]]] = None,
-    name: Optional[str] = None,
-    compute: Optional[bool] = True,
-    **metadata: Union[str, JSONDict, list[JSONDict]],
+    axes: AxesType = None,
+    coordinate_transformations: list[list[dict[str, Any]]] | None = None,
+    storage_options: JSONDict | list[JSONDict] | None = None,
+    name: str | None = None,
+    compute: bool | None = True,
+    **metadata: str | JSONDict | list[JSONDict],
 ) -> list:
     """
     Write a pyramid with multiscale metadata to disk.
@@ -323,9 +323,9 @@ def write_multiscales_metadata(
     group: zarr.Group,
     datasets: list[dict],
     fmt: Format = CurrentFormat(),
-    axes: Optional[Union[str, list[str], list[dict[str, str]]]] = None,
-    name: Optional[str] = None,
-    **metadata: Union[str, JSONDict, list[JSONDict]],
+    axes: AxesType = None,
+    name: str | None = None,
+    **metadata: str | JSONDict | list[JSONDict],
 ) -> None:
     """
     Write the multiscales metadata in the group.
@@ -387,7 +387,7 @@ def write_multiscales_metadata(
         dict(
             version=fmt.version,
             datasets=_validate_datasets(datasets, ndim, fmt),
-            name=name if name else group.name,
+            name=name or group.name,
             **metadata,
         )
     ]
@@ -401,11 +401,11 @@ def write_plate_metadata(
     group: zarr.Group,
     rows: list[str],
     columns: list[str],
-    wells: list[Union[str, dict]],
+    wells: list[str | dict],
     fmt: Format = CurrentFormat(),
-    acquisitions: Optional[list[dict]] = None,
-    field_count: Optional[int] = None,
-    name: Optional[str] = None,
+    acquisitions: list[dict] | None = None,
+    field_count: int | None = None,
+    name: str | None = None,
 ) -> None:
     """
     Write the plate metadata in the group.
@@ -430,7 +430,7 @@ def write_plate_metadata(
     :param field_count: The maximum number of fields per view across wells.
     """
 
-    plate: dict[str, Union[str, int, list[dict]]] = {
+    plate: dict[str, str | int | list[dict]] = {
         "columns": _validate_plate_rows_columns(columns),
         "rows": _validate_plate_rows_columns(rows),
         "wells": _validate_plate_wells(wells, rows, columns, fmt=fmt),
@@ -447,7 +447,7 @@ def write_plate_metadata(
 
 def write_well_metadata(
     group: zarr.Group,
-    images: list[Union[str, dict]],
+    images: list[str | dict],
     fmt: Format = CurrentFormat(),
 ) -> None:
     """
@@ -474,13 +474,13 @@ def write_image(
     image: ArrayLike,
     group: zarr.Group,
     scaler: Scaler = Scaler(),
-    chunks: Optional[Union[tuple[Any, ...], int]] = None,
+    chunks: tuple[Any, ...] | int | None = None,
     fmt: Format = CurrentFormat(),
-    axes: Optional[Union[str, list[str], list[dict[str, str]]]] = None,
-    coordinate_transformations: Optional[list[list[dict[str, Any]]]] = None,
-    storage_options: Optional[Union[JSONDict, list[JSONDict]]] = None,
-    compute: Optional[bool] = True,
-    **metadata: Union[str, JSONDict, list[JSONDict]],
+    axes: AxesType = None,
+    coordinate_transformations: list[list[dict[str, Any]]] | None = None,
+    storage_options: JSONDict | list[JSONDict] | None = None,
+    compute: bool | None = True,
+    **metadata: str | JSONDict | list[JSONDict],
 ) -> list:
     """Writes an image to the zarr store according to ome-zarr specification
 
@@ -546,7 +546,7 @@ def write_image(
             **metadata,
         )
     else:
-        mip, axes = _create_mip(image, fmt, scaler, axes)
+        mip = _create_mip(image, fmt, scaler, axes)
         dask_delayed_jobs = write_multiscale(
             mip,
             group,
@@ -564,7 +564,7 @@ def write_image(
 
 
 def _resolve_storage_options(
-    storage_options: Union[JSONDict, list[JSONDict], None], path: int
+    storage_options: JSONDict | list[JSONDict] | None, path: int
 ) -> JSONDict:
     options = {}
     if storage_options:
@@ -580,14 +580,14 @@ def _write_dask_image(
     image: da.Array,
     group: zarr.Group,
     scaler: Scaler = Scaler(),
-    chunks: Optional[Union[tuple[Any, ...], int]] = None,
+    chunks: tuple[Any, ...] | int | None = None,
     fmt: Format = CurrentFormat(),
-    axes: Optional[Union[str, list[str], list[dict[str, str]]]] = None,
-    coordinate_transformations: Optional[list[list[dict[str, Any]]]] = None,
-    storage_options: Optional[Union[JSONDict, list[JSONDict]]] = None,
-    name: Optional[str] = None,
-    compute: Optional[bool] = True,
-    **metadata: Union[str, JSONDict, list[JSONDict]],
+    axes: AxesType = None,
+    coordinate_transformations: list[list[dict[str, Any]]] | None = None,
+    storage_options: JSONDict | list[JSONDict] | None = None,
+    name: str | None = None,
+    compute: bool | None = True,
+    **metadata: str | JSONDict | list[JSONDict],
 ) -> list:
     if fmt.version in ("0.1", "0.2"):
         # v0.1 and v0.2 are strictly 5D
@@ -610,7 +610,7 @@ Please use the 'storage_options' argument instead."""
     # for path, data in enumerate(pyramid):
     max_layer: int = scaler.max_layer if scaler is not None else 0
     shapes = []
-    for path in range(0, max_layer + 1):
+    for path in range(max_layer + 1):
         # LOGGER.debug(f"write_image path: {path}")
         options = _resolve_storage_options(storage_options, path)
 
@@ -682,10 +682,10 @@ Please use the 'storage_options' argument instead."""
 def write_label_metadata(
     group: zarr.Group,
     name: str,
-    colors: Optional[list[JSONDict]] = None,
-    properties: Optional[list[JSONDict]] = None,
+    colors: list[JSONDict] | None = None,
+    properties: list[JSONDict] | None = None,
     fmt: Format = CurrentFormat(),
-    **metadata: Union[list[JSONDict], JSONDict, str],
+    **metadata: list[JSONDict] | JSONDict | str,
 ) -> None:
     """
     Write image-label metadata to the group.
@@ -731,13 +731,13 @@ def write_multiscale_labels(
     pyramid: list,
     group: zarr.Group,
     name: str,
-    chunks: Optional[Union[tuple[Any, ...], int]] = None,
+    chunks: tuple[Any, ...] | int | None = None,
     fmt: Format = CurrentFormat(),
-    axes: Optional[Union[str, list[str], list[dict[str, str]]]] = None,
-    coordinate_transformations: Optional[list[list[dict[str, Any]]]] = None,
-    storage_options: Optional[Union[JSONDict, list[JSONDict]]] = None,
-    label_metadata: Optional[JSONDict] = None,
-    compute: Optional[bool] = True,
+    axes: AxesType = None,
+    coordinate_transformations: list[list[dict[str, Any]]] | None = None,
+    storage_options: JSONDict | list[JSONDict] | None = None,
+    label_metadata: JSONDict | None = None,
+    compute: bool | None = True,
     **metadata: JSONDict,
 ) -> list:
     """
@@ -815,17 +815,17 @@ def write_multiscale_labels(
 
 
 def write_labels(
-    labels: Union[np.ndarray, da.Array],
+    labels: np.ndarray | da.Array,
     group: zarr.Group,
     name: str,
     scaler: Scaler = Scaler(),
-    chunks: Optional[Union[tuple[Any, ...], int]] = None,
+    chunks: tuple[Any, ...] | int | None = None,
     fmt: Format = CurrentFormat(),
-    axes: Optional[Union[str, list[str], list[dict[str, str]]]] = None,
-    coordinate_transformations: Optional[list[list[dict[str, Any]]]] = None,
-    storage_options: Optional[Union[JSONDict, list[JSONDict]]] = None,
-    label_metadata: Optional[JSONDict] = None,
-    compute: Optional[bool] = True,
+    axes: AxesType = None,
+    coordinate_transformations: list[list[dict[str, Any]]] | None = None,
+    storage_options: JSONDict | list[JSONDict] | None = None,
+    label_metadata: JSONDict | None = None,
+    compute: bool | None = True,
     **metadata: JSONDict,
 ) -> list:
     """
@@ -902,7 +902,7 @@ def write_labels(
             **metadata,
         )
     else:
-        mip, axes = _create_mip(labels, fmt, scaler, axes)
+        mip = _create_mip(labels, fmt, scaler, axes)
         dask_delayed_jobs = write_multiscale(
             mip,
             sub_group,
@@ -929,8 +929,16 @@ def _create_mip(
     image: np.ndarray,
     fmt: Format,
     scaler: Scaler,
-    axes: Optional[Union[str, list[str], list[dict[str, str]]]],
-) -> tuple[list[np.ndarray], Optional[Union[str, list[str], list[dict[str, str]]]]]:
+    axes: AxesType,
+) -> list[np.ndarray]:
+    """
+    Generate a downsampled pyramid of images.
+
+    Returns
+    -------
+    pyramid :
+        List of numpy arrays that are the downsampled pyramid levels.
+    """
     if image.ndim > 5:
         raise ValueError("Only images of 5D or less are supported")
 
@@ -938,8 +946,6 @@ def _create_mip(
         # v0.1 and v0.2 are strictly 5D
         shape_5d: tuple[Any, ...] = (*(1,) * (5 - image.ndim), *image.shape)
         image = image.reshape(shape_5d)
-        # and we don't need axes
-        axes = None
 
     # check axes before trying to scale
     _get_valid_axes(image.ndim, axes, fmt)
@@ -948,18 +954,16 @@ def _create_mip(
         if image.shape[-1] == 1 or image.shape[-2] == 1:
             raise ValueError(
                 "Can't downsample if size of x or y dimension is 1. "
-                "Shape: %s" % (image.shape,)
+                f"Shape: {image.shape}"
             )
         mip = scaler.func(image)
     else:
         LOGGER.debug("disabling pyramid")
         mip = [image]
-    return mip, axes
+    return mip
 
 
-def _retuple(
-    chunks: Union[tuple[Any, ...], int], shape: tuple[Any, ...]
-) -> tuple[Any, ...]:
+def _retuple(chunks: tuple[Any, ...] | int, shape: tuple[Any, ...]) -> tuple[Any, ...]:
     """
     Expand chunks to match shape.
 

@@ -1,29 +1,6 @@
 ---
 repos:
 
-  - repo: https://github.com/asottile/seed-isort-config
-    rev: v2.2.0
-    hooks:
-      - id: seed-isort-config
-
-  - repo: https://github.com/PyCQA/isort
-    rev: 5.13.2
-    hooks:
-      - id: isort
-
-  - repo: https://github.com/psf/black
-    rev: 24.10.0
-    hooks:
-      - id: black
-        args: [--target-version=py36]
-
-  - repo: https://github.com/asottile/pyupgrade
-    rev: v3.19.0
-    hooks:
-      - id: pyupgrade
-        args:
-          - --py39-plus
-
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
     hooks:
@@ -44,27 +21,16 @@ repos:
         args:
           - --autofix
 
-  - repo: https://github.com/PyCQA/flake8
-    rev: 7.1.1
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.9.10
     hooks:
-      - id: flake8
-        additional_dependencies: [
-          # flake8-blind-except, FIXME
-          flake8-builtins,
-          flake8-rst-docstrings,
-          # flake8-logging-format, FIXME
-        ]
-        args: [
-          # default black line length is 88
-          "--max-line-length=88",
-          # Conflicts with black: E203 whitespace before ':'
-          # Conflicts with PEP8 and black:
-          # W503 line break before binary operator
-          # Does not recognize deprecated directive in docstrings
-          "--ignore=E203,RST303,W503",
-          "--builtins-allowed-modules=csv,io,types",
-          "--rst-roles=class,func,ref,mod,meth,const",
-        ]
+    - id: ruff
+      args: ["--fix", "--show-fixes"]
+
+  - repo: https://github.com/psf/black
+    rev: 24.10.0
+    hooks:
+      - id: black
 
   - repo: https://github.com/pre-commit/mirrors-mypy
     rev: v1.13.0
@@ -76,8 +42,7 @@ repos:
     rev: v1.35.1
     hooks:
       - id: yamllint
-        # args: [--config-data=relaxed]
-        #
+        args: [--config-data=relaxed]
 
   - repo: https://github.com/codespell-project/codespell
     rev: v2.3.0

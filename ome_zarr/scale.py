@@ -6,9 +6,9 @@ See the :class:`~ome_zarr.scale.Scaler` class for details.
 import inspect
 import logging
 import os
-from collections.abc import Iterator, MutableMapping
+from collections.abc import Callable, Iterator, MutableMapping
 from dataclasses import dataclass
-from typing import Any, Callable, Union
+from typing import Any, Union
 
 import dask.array as da
 import numpy as np
@@ -143,11 +143,11 @@ class Scaler:
         grp = zarr.group(store)
         grp.create_dataset("base", data=base)
         series = []
-        for i, dataset in enumerate(pyramid):
+        for i in range(len(pyramid)):
             if i == 0:
                 path = "base"
             else:
-                path = "%s" % i
+                path = str(i)
                 grp.create_dataset(path, data=pyramid[i])
             series.append({"path": path})
         return grp

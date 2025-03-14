@@ -112,7 +112,7 @@ class Node:
         self,
         zarr: ZarrLocation,
         prepend: bool = False,
-        visibility: Optional[bool] = None,
+        visibility: bool | None = None,
         plate_labels: bool = False,
     ) -> "Optional[Node]":
         """Create a child node if this location has not yet been seen.
@@ -227,7 +227,7 @@ class Label(Spec):
             LOGGER.warning("no parent found for %s: %s", self, image)
 
         # Metadata: TODO move to a class
-        colors: dict[Union[int, bool], list[float]] = {}
+        colors: dict[int | bool, list[float]] = {}
         color_list = image_label.get("colors", [])
         if color_list:
             for color in color_list:
@@ -301,7 +301,7 @@ class Multiscales(Spec):
         for resolution in self.datasets:
             data: da.core.Array = self.array(resolution, version)
             chunk_sizes = [
-                str(c[0]) + (" (+ %s)" % c[-1] if c[-1] != c[0] else "")
+                str(c[0]) + (f" (+ {c[-1]})" if c[-1] != c[0] else "")
                 for c in data.chunks
             ]
             LOGGER.info("resolution: %s", resolution)
@@ -352,8 +352,8 @@ class OMERO(Spec):
                 return  # EARLY EXIT
 
             colormaps = []
-            contrast_limits: Optional[list[Optional[Any]]] = [None for x in channels]
-            names: list[str] = [("channel_%d" % idx) for idx, ch in enumerate(channels)]
+            contrast_limits: list[Any | None] | None = [None for x in channels]
+            names: list[str] = [f"channel_{idx}" for idx, ch in enumerate(channels)]
             visibles: list[bool] = [True for x in channels]
 
             for idx, ch in enumerate(channels):
@@ -496,7 +496,7 @@ class Plate(Spec):
         # Get the first well...
         well_zarr = self.zarr.create(self.well_paths[0])
         well_node = Node(well_zarr, node)
-        well_spec: Optional[Well] = well_node.first(Well)
+        well_spec: Well | None = well_node.first(Well)
         if well_spec is None:
             raise Exception("Could not find first well")
         self.first_field_path = well_spec.well_data["images"][0]["path"]
@@ -555,9 +555,9 @@ class Plate(Spec):
         lazy_rows = []
         # For level 0, return whole image for each tile
         for row in range(self.row_count):
-            lazy_row: list[da.Array] = []
-            for col in range(self.column_count):
-                lazy_row.append(get_tile(row, col))
+            lazy_row: list[da.Array] = [
+                get_tile(row, col) for col in range(self.column_count)
+            ]
             lazy_rows.append(da.concatenate(lazy_row, axis=len(self.axes) - 1))
         return da.concatenate(lazy_rows, axis=len(self.axes) - 2)
 

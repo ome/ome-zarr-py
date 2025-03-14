@@ -19,7 +19,6 @@ requires-python = ">3.10"
 dependencies = [
     "numpy",
     "dask",
-    "distributed",
     "zarr>=v3.0.0",
     "fsspec[s3]>=0.8,!=2021.07.0,!=2023.9.0",
     # See https://github.com/fsspec/filesystem_spec/issues/819
@@ -55,6 +54,21 @@ tests = [
 Documentation = "https://ome-zarr.readthedocs.io"
 Repository = "https://github.com/ome/ome-zarr-py"
 Changelog = "https://github.com/ome/ome-zarr-py/blob/master/CHANGELOG.md"
+
+[tool.ruff.lint]
+extend-select = [
+    "I",   # isort
+    # "D",    # pydocstyle            # FIXME
+    # "BLE",  # flake8-blind-except   # FIXME
+    "A",   # flake8-builtins
+    # "G",    # flake8-logging-format # FIXME
+]
+
+[tool.ruff.lint.extend-per-file-ignores]
+"ome_zarr/csv.py" = ["A005"]
+"ome_zarr/io.py" = ["A005"]
+"ome_zarr/types.py" = ["A005"]
+"tests/*.py" = ["D"]
 
 [tool.setuptools]
 packages = ["ome_zarr"]

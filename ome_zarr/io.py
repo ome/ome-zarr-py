@@ -5,7 +5,6 @@ Primary entry point is the :func:`~ome_zarr.io.parse_url` method.
 
 import logging
 from pathlib import Path
-from typing import Optional, Union
 from urllib.parse import urljoin
 
 import dask.array as da
@@ -163,7 +162,7 @@ class ZarrLocation:
         >>> ZarrLocation("https://example.com/baz/").basename()
         'baz'
         """
-        path = self.__path.endswith("/") and self.__path[0:-1] or self.__path
+        path = (self.__path.endswith("/") and self.__path[0:-1]) or self.__path
         return path.split("/")[-1]
 
     # TODO: update to from __future__ import annotations with 3.7+
@@ -234,8 +233,8 @@ class ZarrLocation:
 
 
 def parse_url(
-    path: Union[Path, str], mode: str = "r", fmt: Format = CurrentFormat()
-) -> Optional[ZarrLocation]:
+    path: Path | str, mode: str = "r", fmt: Format = CurrentFormat()
+) -> ZarrLocation | None:
     """Convert a path string or URL to a ZarrLocation subclass.
 
     :param path: Path to parse.
