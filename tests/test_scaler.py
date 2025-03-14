@@ -145,4 +145,4 @@ class TestScaler:
         print("level_1", level_1)
         # to zarr invokes compute
         data_dir = tmpdir.mkdir("test_big_dask_pyramid")
-        da.to_zarr(level_1, data_dir)
+        da.to_zarr(level_1, str(data_dir))
