@@ -201,11 +201,15 @@ def view(input_path: str, port: int = 8000, dry_run=False) -> None:
                 # folders is "f1,f2,f3" etc.
                 folders_path = os.path.relpath(zarr_img[2], input_path)
                 folders = ",".join(splitall(folders_path))
-                mtime = os.path.getmtime(zarr_img[0])
-                # format mtime as "YYYY-MM-DD HH:MM:SS.Z"
-                timestamp = datetime.fromtimestamp(mtime).strftime(
-                    "%Y-%m-%d %H:%M:%S.%Z"
-                )
+                timestamp = ""
+                try:
+                    mtime = os.path.getmtime(zarr_img[0])
+                    # format mtime as "YYYY-MM-DD HH:MM:SS.Z"
+                    timestamp = datetime.fromtimestamp(mtime).strftime(
+                        "%Y-%m-%d %H:%M:%S.%Z"
+                    )
+                except OSError:
+                    pass
                 writer.writerow([file_path, name, folders, timestamp])
 
         source = {
