@@ -8,6 +8,7 @@ import urllib
 import webbrowser
 import xml.etree.ElementTree as ET
 from collections.abc import Iterator
+from datetime import datetime
 from http.server import (  # type: ignore[attr-defined]
     HTTPServer,
     SimpleHTTPRequestHandler,
@@ -180,7 +181,7 @@ def view(input_path: str, port: int = 8000, dry_run=False) -> None:
         )
     elif len(zarrs) > 1:
         # ...otherwise write to CSV file and open in BioFile Finder
-        col_names = ["File Path", "File Name", "Folders"]
+        col_names = ["File Path", "File Name", "Folders", "Uploaded"]
         # write csv file into the dir we're serving from...
         bff_csv = os.path.join(input_path, "biofile_finder.csv")
 
@@ -200,7 +201,12 @@ def view(input_path: str, port: int = 8000, dry_run=False) -> None:
                 # folders is "f1,f2,f3" etc.
                 folders_path = os.path.relpath(zarr_img[2], input_path)
                 folders = ",".join(splitall(folders_path))
-                writer.writerow([file_path, name, folders])
+                mtime = os.path.getmtime(zarr_img[0])
+                # format mtime as "YYYY-MM-DD HH:MM:SS.Z"
+                timestamp = datetime.fromtimestamp(mtime).strftime(
+                    "%Y-%m-%d %H:%M:%S.%Z"
+                )
+                writer.writerow([file_path, name, folders, timestamp])
 
         source = {
             "uri": f"http://localhost:{port}/{server_dir}/biofile_finder.csv",
