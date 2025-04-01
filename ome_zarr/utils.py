@@ -197,7 +197,7 @@ def view(input_path: str, port: int = 8000, dry_run=False) -> None:
                 # On Windows, we need to replace \\ with / in relpath for URL
                 rel_url = "/".join(splitall(relpath))
                 file_path = f"http://localhost:{port}/{server_dir}/{rel_url}"
-                name = zarr_img[1]
+                name = zarr_img[1] or os.path.basename(zarr_img[0])
                 # folders is "f1,f2,f3" etc.
                 folders_path = os.path.relpath(zarr_img[2], input_path)
                 folders = ",".join(splitall(folders_path))
