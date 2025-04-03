@@ -56,6 +56,39 @@ def info(path: str, stats: bool = False) -> Iterator[Node]:
         yield node
 
 
+def view(input_path: str, port: int = 8000) -> None:
+    # serve the parent directory in a simple server with CORS. Open browser
+
+    parent_dir, image_name = os.path.split(input_path)
+    if len(image_name) == 0:
+        parent_dir, image_name = os.path.split(parent_dir)
+    parent_dir = str(parent_dir)
+
+    class CORSRequestHandler(SimpleHTTPRequestHandler):
+        def end_headers(self) -> None:
+            self.send_header("Access-Control-Allow-Origin", "*")
+            SimpleHTTPRequestHandler.end_headers(self)
+
+        def translate_path(self, path: str) -> str:
+            # Since we don't call the class constructor ourselves,
+            # we set the directory here instead
+            self.directory = parent_dir
+            super_path = super().translate_path(path)
+            return super_path
+
+    # open ome-ngff-validator in a web browser...
+    url = (
+        f"https://ome.github.io/ome-ngff-validator/"
+        f"?source=http://localhost:{port}/{image_name}"
+    )
+
+    # Open in browser...
+    webbrowser.open(url)
+
+    # ...then start serving content
+    test(CORSRequestHandler, HTTPServer, port=port)
+
+
 def find_multiscales(path_to_zattrs):
     # return list of images. Each image is [path_to_zarr, name, dirname]
     # We want full path to find the multiscales Image. e.g. full/path/to/image.zarr/0
@@ -132,8 +165,9 @@ def splitall(path):
     return allparts
 
 
-def view(input_path: str, port: int = 8000, dry_run=False) -> None:
+def finder(input_path: str, port: int = 8000, dry_run=False) -> None:
     # serve the parent directory in a simple server with CORS. Open browser
+    # dry_run is for testing, so we don't open the browser or start the server
     parent_path, server_dir = os.path.split(input_path)
     # in case input_path had trailing slash, we go one level up...
     if len(server_dir) == 0:
