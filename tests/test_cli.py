@@ -116,8 +116,20 @@ class TestCli:
     def test_finder(self):
         img_dir = (self.path / "images").mkdir()
         img_dir2 = (img_dir / "dir2").mkdir()
+        bf2raw_dir = (img_dir / "bf2raw.zarr").mkdir()
         main(["create", "--method=astronaut", (str(img_dir / "astronaut"))])
         main(["create", "--method=coins", (str(img_dir2 / "coins"))])
+        (bf2raw_dir / "OME").mkdir()
+
+        # write minimal bioformats2raw and xml metadata
+        with open(bf2raw_dir / ".zattrs", "w") as f:
+            f.write("""{"bioformats2raw.layout" : 3}""")
+        with open(bf2raw_dir / "OME" / "METADATA.ome.xml", "w") as f:
+            f.write(
+                """<?xml version="1.0" encoding="UTF-8"?>
+                <OME><Image ID="Image:1" Name="test.fake"></Image></OME>
+                """
+            )
 
         # create a plate
         plate_dir = (img_dir2 / "plate").mkdir()
@@ -128,3 +140,9 @@ class TestCli:
         finder(img_dir, 8000, True)
 
         assert (img_dir / "biofile_finder.csv").exists()
+        csv_text = (img_dir / "biofile_finder.csv").read_text(encoding="utf-8")
+        print(csv_text)
+        assert "File Path,File Name,Folders,Uploaded" in csv_text
+        assert "dir2/plate/A/1/0,plate,dir2" in csv_text
+        assert "coins,dir2" in csv_text
+        assert "test.fake" in csv_text
