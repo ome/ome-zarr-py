@@ -64,6 +64,12 @@ def view(input_path: str, port: int = 8000) -> None:
         parent_dir, image_name = os.path.split(parent_dir)
     parent_dir = str(parent_dir)
 
+    # open ome-ngff-validator in a web browser...
+    url = (
+        f"https://ome.github.io/ome-ngff-validator/"
+        f"?source=http://localhost:{port}/{image_name}"
+    )
+
     class CORSRequestHandler(SimpleHTTPRequestHandler):
         def end_headers(self) -> None:
             self.send_header("Access-Control-Allow-Origin", "*")
@@ -75,12 +81,6 @@ def view(input_path: str, port: int = 8000) -> None:
             self.directory = parent_dir
             super_path = super().translate_path(path)
             return super_path
-
-    # open ome-ngff-validator in a web browser...
-    url = (
-        f"https://ome.github.io/ome-ngff-validator/"
-        f"?source=http://localhost:{port}/{image_name}"
-    )
 
     # Open in browser...
     webbrowser.open(url)
@@ -208,12 +208,10 @@ def finder(input_path: str, port: int = 8000, dry_run=False) -> None:
         zarrs = list(walk(Path(input_path)))
 
     # If we have just one zarr, open ome-ngff-validator in a web browser...
-    if len(zarrs) == 1:
-        url = (
-            f"https://ome.github.io/ome-ngff-validator/"
-            f"?source=http://localhost:{port}/{server_dir}"
-        )
-    elif len(zarrs) > 1:
+    if len(zarrs) == 0:
+        print("No OME-Zarr files found in", input_path)
+        return
+    else:
         # ...otherwise write to CSV file and open in BioFile Finder
         col_names = ["File Path", "File Name", "Folders", "Uploaded"]
         # write csv file into the dir we're serving from...
@@ -265,10 +263,6 @@ def finder(input_path: str, port: int = 8000, dry_run=False) -> None:
             self.directory = parent_path
             super_path = super().translate_path(path)
             return super_path
-
-    if url is None:
-        print("No OME-Zarr files found in", input_path)
-        return
 
     # for testing
     if dry_run:
