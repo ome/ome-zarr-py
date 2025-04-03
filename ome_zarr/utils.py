@@ -56,8 +56,9 @@ def info(path: str, stats: bool = False) -> Iterator[Node]:
         yield node
 
 
-def view(input_path: str, port: int = 8000) -> None:
+def view(input_path: str, port: int = 8000, dry_run: bool = False) -> None:
     # serve the parent directory in a simple server with CORS. Open browser
+    # dry_run is for testing, so we don't open the browser or start the server
 
     parent_dir, image_name = os.path.split(input_path)
     if len(image_name) == 0:
@@ -81,6 +82,10 @@ def view(input_path: str, port: int = 8000) -> None:
             self.directory = parent_dir
             super_path = super().translate_path(path)
             return super_path
+
+    # for testing
+    if dry_run:
+        return
 
     # Open in browser...
     webbrowser.open(url)

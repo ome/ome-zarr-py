@@ -6,7 +6,7 @@ import pytest
 import zarr
 
 from ome_zarr.cli import main
-from ome_zarr.utils import finder, strip_common_prefix
+from ome_zarr.utils import finder, strip_common_prefix, view
 from ome_zarr.writer import write_plate_metadata
 
 
@@ -105,13 +105,13 @@ class TestCli:
             secondpass.reverse()
             self._rotate_and_test(*list(secondpass), reverse=False)
 
-    # def test_view(self):
-    #     filename = str(self.path) + "-4"
-    #     main(["create", "--method=astronaut", filename])
-    #     # CLI doesn't support the dry_run option yet
-    #     # main(["view", filename, "8000"])
-    #     # we need dry_run to be True to avoid blocking the test with server
-    #     view(filename, 8000, True)
+    def test_view(self):
+        filename = str(self.path) + "-4"
+        main(["create", "--method=astronaut", filename])
+        # CLI doesn't support the dry_run option yet
+        # main(["view", filename, "8000"])
+        # we need dry_run to be True to avoid blocking the test with server
+        view(filename, 8000, True)
 
     def test_finder(self):
         img_dir = (self.path / "images").mkdir()
