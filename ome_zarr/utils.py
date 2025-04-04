@@ -199,18 +199,7 @@ def finder(input_path: str, port: int = 8000, dry_run=False) -> None:
                     continue
 
     url = None
-    zarrs = []
-    if server_dir.endswith(".csv"):
-        # open CSV in biofile finder...
-        source = {
-            "uri": f"http://localhost:{port}/{server_dir}",
-            "type": "csv",
-            "name": "biofile_finder.csv",
-        }
-        s = urllib.parse.quote(json.dumps(source))
-        url = f"https://bff.allencell.org/app?source={s}"
-    else:
-        zarrs = list(walk(Path(input_path)))
+    zarrs = list(walk(Path(input_path)))
 
     # If we have just one zarr, open ome-ngff-validator in a web browser...
     if len(zarrs) == 0:
