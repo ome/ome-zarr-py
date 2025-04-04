@@ -245,6 +245,8 @@ def finder(input_path: str, port: int = 8000, dry_run=False) -> None:
         }
         s = urllib.parse.quote(json.dumps(source))
         url = f"https://bff.allencell.org/app?source={s}"
+        # show small thumbnails view by default. (v=3 for big thumbnails)
+        url += "&v=2"
 
     class CORSRequestHandler(SimpleHTTPRequestHandler):
         def end_headers(self) -> None:
