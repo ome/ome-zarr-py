@@ -51,7 +51,7 @@ class ZarrLocation:
             loader = CurrentFormat()
         self.__store: FsspecStore = (
             path
-            if isinstance(path, FsspecStore)
+            if isinstance(path, (FsspecStore, LocalStore))
             else loader.init_store(self.__path, mode)
         )
         self.__init_metadata()
