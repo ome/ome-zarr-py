@@ -245,13 +245,13 @@ class TestWriter:
         group = zarr.open(f"{self.path}/test", zarr_format=2)
         assert len(group["0"].info._compressors) > 0
         comp = group["0"].info._compressors[0]
-        print("comp.get_config()", comp.get_config())
         assert comp.get_config() == {
             "id": "blosc",
             "cname": "zstd",
             "clevel": 5,
             "shuffle": Blosc.SHUFFLE,
             "blocksize": 0,
+            "typesize": None,
         }
 
     @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])
