@@ -254,11 +254,9 @@ Please use the 'storage_options' argument instead."""
             chunks_opt = _retuple(chunks_opt, data.shape)
 
         if isinstance(data, da.Array):
+            # handle any 'chunks' option from storage_options
             if chunks_opt is not None:
                 data = da.array(data).rechunk(chunks=chunks_opt)
-                options["chunks"] = chunks_opt
-            else:
-                options["chunks"] = data.chunks
             da_delayed = da.to_zarr(
                 arr=data,
                 url=group.store,
@@ -267,8 +265,6 @@ Please use the 'storage_options' argument instead."""
                 storage_options=None,
                 # by default we use Blosc with zstd compression
                 compressor=options.get("compressor", _blosc_compressor()),
-                # TODO: default dimension_separator? Not set in store for zarr v3
-                # dimension_separator=group.store.dimension_separator,
                 dimension_separator="/",
                 compute=compute,
                 zarr_format=2,
@@ -642,10 +638,7 @@ Please use the 'storage_options' argument instead."""
                 storage_options=options,
                 compute=False,
                 compressor=options.pop("compressor", _blosc_compressor()),
-                # TODO: default dimension_separator? Not set in store for zarr v3
-                # dimension_separator=group.store.dimension_separator,
                 dimension_separator="/",
-                # TODO: hard-coded zarr_format for now. Needs to be set by the format.py
                 zarr_format=2,
             )
         )

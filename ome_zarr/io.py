@@ -221,10 +221,6 @@ class ZarrLocation:
         Return whether the current underlying implementation
         points to a local file or not.
         """
-        # return self.__store.fs.protocol == "file" or self.__store.fs.protocol == (
-        #     "file",
-        #     "local",
-        # )
         return isinstance(self.__store, LocalStore)
 
     def _ishttp(self) -> bool:

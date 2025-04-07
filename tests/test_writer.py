@@ -170,7 +170,6 @@ class TestWriter:
             path = f"{self.path}/temp/"
             store = parse_url(path, mode="w").store
             temp_group = zarr.group(store=store).create_group("test")
-            # compressor not used
             write_image(data_delayed, temp_group, axes="zyx", storage_options=opts)
             loc = ZarrLocation(f"{self.path}/temp/test")
             reader = Reader(loc)()
