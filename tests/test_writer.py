@@ -79,15 +79,6 @@ class TestWriter:
     def test_writer(
         self, shape, scaler, format_version, array_constructor, storage_options_list
     ):
-        # Under ONLY these 4 conditions, test is currently failing.
-        # '3D-scale-True-from_array' (all formats)
-        if (
-            len(shape) == 3
-            and scaler is not None
-            and storage_options_list
-            and array_constructor == da.array
-        ):
-            return
 
         data = self.create_data(shape)
         data = array_constructor(data)
