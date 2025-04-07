@@ -4,6 +4,7 @@ Primary entry point is the :func:`~ome_zarr.io.parse_url` method.
 """
 
 import logging
+import warnings
 from pathlib import Path
 from urllib.parse import urljoin
 
@@ -176,10 +177,12 @@ class ZarrLocation:
         """
         Load and return a given subpath of store as JSON.
 
+        Deprecated: not needed in __init_metadata since zarr v3.
         HTTP 403 and 404 responses are treated as if the file does not exist.
         Exceptions during the remote connection are logged at the WARN level.
         All other exceptions log at the ERROR level.
         """
+        warnings.warn("get_json() deprecated", DeprecationWarning)
         try:
             array_or_group = zarr.open_group(store=self.__store, path="/")
             return array_or_group.attrs.asdict()
