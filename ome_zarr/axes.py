@@ -1,5 +1,4 @@
-"""Axes class for validating and transforming axes
-"""
+"""Axes class for validating and transforming axes"""
 
 from typing import Any
 
