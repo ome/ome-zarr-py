@@ -1,3 +1,12 @@
+# 0.11.0 (April 2025)
+
+- Browse collection of local OME-Zarr in BioFile Finder ([#436](https://github.com/ome/ome-zarr-py/pull/436))
+- Remove unused `distributed` from dependencies. Thanks to [Marvin Albert](https://github.com/m-albert) ([#441](https://github.com/ome/ome-zarr-py/pull/441))
+- Simplify `_create_mip()`. Thanks to [David Stansby](https://github.com/dstansby) ([#438](https://github.com/ome/ome-zarr-py/pull/438))
+- Add parameters to `info` documentation. Thanks to [David Stansby](https://github.com/dstansby) ([#437](https://github.com/ome/ome-zarr-py/pull/437))
+- Apply `ruff flake8` rules and other fixes. Thanks to [Dimitri Papadopoulos Orfanos](https://github.com/DimitriPapadopoulos) ([#423](https://github.com/ome/ome-zarr-py/pull/423) - [#434](https://github.com/ome/ome-zarr-py/pull/434))
+
+
 # 0.10.3 (January 2025)
 
 - Document Scaler attributes ([#418](https://github.com/ome/ome-zarr-py/pull/418))
