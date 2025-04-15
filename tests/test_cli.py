@@ -3,9 +3,11 @@ from collections import deque
 from pathlib import Path
 
 import pytest
+import zarr
 
 from ome_zarr.cli import main
-from ome_zarr.utils import strip_common_prefix
+from ome_zarr.utils import finder, strip_common_prefix, view
+from ome_zarr.writer import write_plate_metadata
 
 
 def directory_items(directory: Path):
@@ -102,3 +104,45 @@ class TestCli:
             secondpass: deque = deque(hierarchy)
             secondpass.reverse()
             self._rotate_and_test(*list(secondpass), reverse=False)
+
+    def test_view(self):
+        filename = str(self.path) + "-4"
+        main(["create", "--method=astronaut", filename])
+        # CLI doesn't support the dry_run option yet
+        # main(["view", filename, "8000"])
+        # we need dry_run to be True to avoid blocking the test with server
+        view(filename, 8000, True)
+
+    def test_finder(self):
+        img_dir = (self.path / "images").mkdir()
+        img_dir2 = (img_dir / "dir2").mkdir()
+        bf2raw_dir = (img_dir / "bf2raw.zarr").mkdir()
+        main(["create", "--method=astronaut", (str(img_dir / "astronaut"))])
+        main(["create", "--method=coins", (str(img_dir2 / "coins"))])
+        (bf2raw_dir / "OME").mkdir()
+
+        # write minimal bioformats2raw and xml metadata
+        with open(bf2raw_dir / ".zattrs", "w") as f:
+            f.write("""{"bioformats2raw.layout" : 3}""")
+        with open(bf2raw_dir / "OME" / "METADATA.ome.xml", "w") as f:
+            f.write(
+                """<?xml version="1.0" encoding="UTF-8"?>
+                <OME><Image ID="Image:1" Name="test.fake"></Image></OME>
+                """
+            )
+
+        # create a plate
+        plate_dir = (img_dir2 / "plate").mkdir()
+        store = zarr.DirectoryStore(str(plate_dir))
+        root = zarr.group(store=store)
+        write_plate_metadata(root, ["A"], ["1"], ["A/1"])
+
+        finder(img_dir, 8000, True)
+
+        assert (img_dir / "biofile_finder.csv").exists()
+        csv_text = (img_dir / "biofile_finder.csv").read_text(encoding="utf-8")
+        print(csv_text)
+        assert "File Path,File Name,Folders,Uploaded" in csv_text
+        assert "dir2/plate/A/1/0,plate,dir2" in csv_text
+        assert "coins,dir2" in csv_text
+        assert "test.fake" in csv_text
