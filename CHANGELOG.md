@@ -1,3 +1,8 @@
+
+# 0.11.1 (April 2025)
+
+- Use release/v1 PyPA action branch for publishing to PyPI ([#449](https://github.com/ome/ome-zarr-py/pull/449))
+
 # 0.11.0 (April 2025)
 
 - Browse collection of local OME-Zarr in BioFile Finder ([#436](https://github.com/ome/ome-zarr-py/pull/436))
