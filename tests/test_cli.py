@@ -65,6 +65,7 @@ class TestCli:
 
         assert directory_items(Path(out) / "data-3" / "1") == [
             Path(".zarray"),
+            Path(".zattrs"),  # empty '{}'
             Path("0"),
             Path("1"),
             Path("2"),
