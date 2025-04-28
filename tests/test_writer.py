@@ -1239,3 +1239,21 @@ class TestLabelWriter:
         assert all(
             label_name in label_root.attrs["labels"] for label_name in label_names
         )
+
+
+def test_overwrite(tmp_path: pathlib.Path) -> None:
+    # Check that with mode="a", data can be overwritten
+    group_path = tmp_path / "test.ome.zarr"
+
+    # Write some data
+    vol = np.zeros((64, 64, 64))
+    store = parse_url(group_path, mode="w").store
+    assert store.mode == "w"
+    root = zarr.group(store=store)
+    write_image(image=vol, group=root, axes="zyx")
+
+    # Try writing some different data
+    vol = np.ones((64, 64, 64))
+    store = parse_url(group_path, mode="w").store
+    root = zarr.group(store=store)
+    write_image(image=vol, group=root, axes="zyx")
