@@ -72,7 +72,9 @@ def view(input_path: str, port: int = 8000, dry_run: bool = False) -> None:
     # dry_run is for testing, so we don't open the browser or start the server
 
     zarrs = []
-    if (Path(input_path) / ".zattrs").exists():
+    if (Path(input_path) / ".zattrs").exists() or (
+        Path(input_path) / "zarr.json"
+    ).exists():
         zarrs = find_multiscales(Path(input_path))
     if len(zarrs) == 0:
         print(
@@ -120,9 +122,18 @@ def find_multiscales(path_to_zattrs):
     # We want full path to find the multiscales Image. e.g. full/path/to/image.zarr/0
     # AND we want image Name, e.g. "image.zarr Series 0"
     # AND we want the dir path to use for Tags e.g. full/path/to
-    with open(path_to_zattrs / ".zattrs") as f:
-        text = f.read()
+    text = None
+    for name in (".zattrs", "zarr.json"):
+        if (Path(path_to_zattrs) / name).exists():
+            with open(path_to_zattrs / name) as f:
+                text = f.read()
+            break
+    if text is None:
+        print("No .zattrs or zarr.json found in {path_to_zattrs}")
+        return []
     zattrs = json.loads(text)
+    if "attributes" in zattrs and "ome" in zattrs["attributes"]:
+        zattrs = zattrs["attributes"]["ome"]
     if "plate" in zattrs:
         plate = zattrs.get("plate")
         wells = plate.get("wells")
@@ -208,11 +219,11 @@ def finder(input_path: str, port: int = 8000, dry_run=False) -> None:
 
     # walk the input path to find all .zattrs files...
     def walk(path: Path):
-        if (path / ".zattrs").exists():
+        if (path / ".zattrs").exists() or (path / "zarr.json").exists():
             yield from find_multiscales(path)
         else:
             for p in path.iterdir():
-                if (p / ".zattrs").exists():
+                if (p / ".zattrs").exists() or (p / "zarr.json").exists():
                     yield from find_multiscales(p)
                 elif p.is_dir():
                     yield from walk(p)
