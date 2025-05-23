@@ -79,6 +79,7 @@ class TestWriter:
     def test_writer(
         self, shape, scaler, format_version, array_constructor, storage_options_list
     ):
+
         data = self.create_data(shape)
         data = array_constructor(data)
         version = format_version()
@@ -160,7 +161,7 @@ class TestWriter:
             path = f"{self.path}/temp/"
             store = parse_url(path, mode="w").store
             temp_group = zarr.group(store=store).create_group("test")
-            write_image(data, temp_group, axes="zyx", storage_options=opts)
+            write_image(data_delayed, temp_group, axes="zyx", storage_options=opts)
             loc = ZarrLocation(f"{self.path}/temp/test")
             reader = Reader(loc)()
             nodes = list(reader)
@@ -169,6 +170,8 @@ class TestWriter:
                 .load(Multiscales)
                 .array(resolution="0", version=CurrentFormat().version)
             )
+            # check that the data is the same
+            assert np.allclose(data, data_delayed[...].compute())
 
         dask_delayed_jobs = write_image(
             data_delayed,
@@ -226,7 +229,7 @@ class TestWriter:
         write_image(
             image=data, group=self.group, axes="xyz", storage_options={"chunks": 32}
         )
-        for data in self.group.values():
+        for data in self.group.array_values():
             print(data)
             assert data.chunks == (32, 32, 32)
 
@@ -239,8 +242,10 @@ class TestWriter:
         write_image(
             data, self.group, axes="zyx", storage_options={"compressor": compressor}
         )
-        group = zarr.open(f"{self.path}/test")
-        assert group["0"].compressor.get_config() == {
+        group = zarr.open(f"{self.path}/test", zarr_format=2)
+        assert len(group["0"].info._compressors) > 0
+        comp = group["0"].info._compressors[0]
+        assert comp.get_config() == {
             "id": "blosc",
             "cname": "zstd",
             "clevel": 5,
@@ -248,7 +253,8 @@ class TestWriter:
             "blocksize": 0,
         }
 
-    def test_default_compression(self):
+    @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])
+    def test_default_compression(self, array_constructor):
         """Test that the default compression is not None.
 
         We make an array of zeros which should compress trivially easily,
@@ -259,13 +265,13 @@ class TestWriter:
         # avoid empty chunks so they are guaranteed to be written out to disk
         arr_np[0, 0, 0, 0] = 1
         # 4MB chunks, trivially compressible
-        arr = da.from_array(arr_np, chunks=(1, 50, 200, 400))
+        arr = array_constructor(arr_np)
         with TemporaryDirectory(suffix=".ome.zarr") as tempdir:
             path = tempdir
             store = parse_url(path, mode="w").store
             root = zarr.group(store=store)
             # no compressor options, we are checking default
-            write_multiscale([arr], group=root, axes="tzyx")
+            write_multiscale([arr], group=root, axes="tzyx", chunks=(1, 50, 200, 400))
             # check chunk: multiscale level 0, 4D chunk at (0, 0, 0, 0)
             chunk_size = (pathlib.Path(path) / "0/0/0/0/0").stat().st_size
             assert chunk_size < 4e6
@@ -1086,11 +1092,13 @@ class TestLabelWriter:
         assert np.allclose(label_data, node.data[0][...].compute())
 
         # Verify label metadata
-        label_root = zarr.open(f"{self.path}/labels", "r")
+        label_root = zarr.open(f"{self.path}/labels", mode="r", zarr_format=2)
         assert "labels" in label_root.attrs
         assert label_name in label_root.attrs["labels"]
 
-        label_group = zarr.open(f"{self.path}/labels/{label_name}", "r")
+        label_group = zarr.open(
+            f"{self.path}/labels/{label_name}", mode="r", zarr_format=2
+        )
         assert "image-label" in label_group.attrs
         assert label_group.attrs["image-label"]["version"] == fmt.version
 
@@ -1233,7 +1241,7 @@ class TestLabelWriter:
             self.verify_label_data(label_name, label_data, fmt, shape, transformations)
 
         # Verify label metadata
-        label_root = zarr.open(f"{self.path}/labels", "r")
+        label_root = zarr.open(f"{self.path}/labels", mode="r", zarr_format=2)
         assert "labels" in label_root.attrs
         assert len(label_root.attrs["labels"]) == len(label_names)
         assert all(
