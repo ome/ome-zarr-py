@@ -32,6 +32,16 @@ Use the `ome_zarr` command to view Zarr data in the https://ome.github.io/ome-ng
 
     ome_zarr view 6001240.zarr/
 
+finder
+======
+
+Use the `ome_zarr` command to display multiple OME-Zarr images in the BioFile Finder app
+in a browser. This command parses the specified directory to find all OME-Zarr Images
+and Plates, combines them into a `biofile_finder.csv` file and opens this in the
+app, which allows you to browse thumbnails of all images::
+
+    ome_zarr finder /path/to/dir/
+
 download
 ========
 

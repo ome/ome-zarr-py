@@ -8,6 +8,7 @@ from .csv import csv_to_zarr
 from .data import astronaut, coins, create_zarr
 from .scale import Scaler
 from .utils import download as zarr_download
+from .utils import finder as bff_finder
 from .utils import info as zarr_info
 from .utils import view as zarr_view
 
@@ -34,6 +35,12 @@ def view(args: argparse.Namespace) -> None:
     """Wrap the :func:`~ome_zarr.utils.view` method."""
     config_logging(logging.WARNING, args)
     zarr_view(args.path, args.port)
+
+
+def finder(args: argparse.Namespace) -> None:
+    """Wrap the :func:`~ome_zarr.utils.finder` method."""
+    config_logging(logging.WARN, args)
+    bff_finder(args.path, args.port)
 
 
 def download(args: argparse.Namespace) -> None:
@@ -102,7 +109,7 @@ def main(args: list[str] | None = None) -> None:
 
     # info
     parser_info = subparsers.add_parser("info")
-    parser_info.add_argument("path")
+    parser_info.add_argument("path", help="Path to image.zarr")
     parser_info.add_argument("--stats", action="store_true")
     parser_info.set_defaults(func=info)
 
@@ -114,9 +121,25 @@ def main(args: list[str] | None = None) -> None:
 
     # view (in ome-ngff-validator in a browser)
     parser_view = subparsers.add_parser("view")
-    parser_view.add_argument("path")
-    parser_view.add_argument("--port", type=int, default=8000)
+    parser_view.add_argument(
+        "path",
+        help="Path to image.zarr to open in ome-ngff-validator",
+    )
+    parser_view.add_argument(
+        "--port", type=int, default=8000, help="Port to serve the data (default: 8000)"
+    )
     parser_view.set_defaults(func=view)
+
+    # finder (open a dir of images in BioFile Finder in a browser)
+    parser_finder = subparsers.add_parser("finder")
+    parser_finder.add_argument(
+        "path",
+        help="Directory to open in BioFile Finder",
+    )
+    parser_finder.add_argument(
+        "--port", type=int, default=8000, help="Port to serve the data (default: 8000)"
+    )
+    parser_finder.set_defaults(func=finder)
 
     # create
     parser_create = subparsers.add_parser("create")
