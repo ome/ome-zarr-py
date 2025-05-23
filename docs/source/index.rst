@@ -4,6 +4,8 @@ ome-zarr-py
 
 Tools for reading and writing multi-resolution images stored in Zarr filesets, according to the `OME NGFF spec`_.
 
+NB: ome-zarr-py uses ``zarr-python v3`` and supports reading of OME-Zarr v0.5 but doesn't currently support writing
+of OME-Zarr v0.5.
 
 Features
 --------

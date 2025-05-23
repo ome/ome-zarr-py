@@ -6,7 +6,7 @@ ome-zarr-py
 
 Tools for multi-resolution images stored in Zarr filesets, according to the `OME NGFF spec`_.
 
-See `Readthedocs <https://ome-zarr.readthedocs.io/>`_ for usage information.
+See `Documentation <https://ome-zarr.readthedocs.io/>`_ for usage information.
 
 Documentation
 -------------
