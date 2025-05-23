@@ -251,7 +251,6 @@ class TestWriter:
             "clevel": 5,
             "shuffle": Blosc.SHUFFLE,
             "blocksize": 0,
-            "typesize": None,
         }
 
     @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])
