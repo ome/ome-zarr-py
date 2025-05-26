@@ -3,7 +3,7 @@ import zarr
 from numpy import zeros
 
 from ome_zarr.data import create_zarr
-from ome_zarr.format import FormatV01, FormatV02, FormatV03
+from ome_zarr.format import FormatV01, FormatV02, FormatV03, FormatV04
 from ome_zarr.io import parse_url
 from ome_zarr.reader import Label, Labels, Multiscales, Node, Plate, Well
 from ome_zarr.writer import write_image, write_plate_metadata, write_well_metadata
@@ -44,7 +44,7 @@ class TestHCSNode:
     @pytest.fixture(autouse=True)
     def initdir(self, tmpdir):
         self.path = tmpdir.mkdir("data")
-        self.store = parse_url(str(self.path), mode="w").store
+        self.store = parse_url(str(self.path), mode="w", fmt=FormatV04()).store
         self.root = zarr.group(store=self.store)
 
     def test_minimal_plate(self):

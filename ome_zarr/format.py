@@ -25,6 +25,7 @@ def format_implementations() -> Iterator["Format"]:
     """
     Return an instance of each format implementation, newest to oldest.
     """
+    yield FormatV05()
     yield FormatV04()
     yield FormatV03()
     yield FormatV02()
@@ -330,4 +331,18 @@ class FormatV04(FormatV03):
                         )
 
 
-CurrentFormat = FormatV04
+class FormatV05(FormatV04):
+    """
+    Changelog: added FormatV05 (May 2025): writing not supported yet
+    """
+
+    @property
+    def version(self) -> str:
+        return "0.5"
+
+    @property
+    def zarr_format(self) -> int:
+        return 3
+
+
+CurrentFormat = FormatV05

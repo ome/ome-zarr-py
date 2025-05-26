@@ -22,6 +22,7 @@ from skimage.transform import (
 )
 
 from .dask_utils import resize as dask_resize
+from .format import FormatV04
 from .io import parse_url
 
 LOGGER = logging.getLogger("ome_zarr.scale")
@@ -118,7 +119,7 @@ class Scaler:
     def __check_store(self, output_directory: str) -> MutableMapping:
         """Return a Zarr store if it doesn't already exist."""
         assert not os.path.exists(output_directory)
-        loc = parse_url(output_directory, mode="w")
+        loc = parse_url(output_directory, mode="w", fmt=FormatV04())
         assert loc
         return loc.store
 

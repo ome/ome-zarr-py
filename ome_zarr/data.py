@@ -12,7 +12,7 @@ from skimage.measure import label
 from skimage.morphology import closing, remove_small_objects, square
 from skimage.segmentation import clear_border
 
-from .format import CurrentFormat, Format
+from .format import Format, FormatV04
 from .io import parse_url
 from .scale import Scaler
 from .writer import write_multiscale
@@ -121,13 +121,13 @@ def create_zarr(
     zarr_directory: str,
     method: Callable[..., tuple[list, list]] = coins,
     label_name: str = "coins",
-    fmt: Format = CurrentFormat(),
+    fmt: Format = FormatV04(),
     chunks: tuple | list | None = None,
 ) -> zarr.Group:
     """Generate a synthetic image pyramid with labels."""
     pyramid, labels = method()
 
-    loc = parse_url(zarr_directory, mode="w")
+    loc = parse_url(zarr_directory, mode="w", fmt=fmt)
     assert loc
     grp = zarr.group(loc.store, zarr_format=2)
     axes = None
