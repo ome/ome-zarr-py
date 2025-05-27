@@ -70,12 +70,12 @@ class TestHCSReader:
         self.root = zarr.group(store=self.store)
 
     def test_minimal_plate(self):
-        write_plate_metadata(self.root, ["A"], ["1"], ["A/1"])
+        write_plate_metadata(self.root, ["A"], ["1"], ["A/1"], fmt=FormatV04())
         row_group = self.root.require_group("A")
         well = row_group.require_group("1")
-        write_well_metadata(well, ["0"])
+        write_well_metadata(well, ["0"], fmt=FormatV04())
         image = well.require_group("0")
-        write_image(zeros((1, 1, 1, 256, 256)), image)
+        write_image(zeros((1, 1, 1, 256, 256)), image, fmt=FormatV04())
 
         reader = Reader(parse_url(str(self.path)))
         nodes = list(reader())
@@ -91,15 +91,17 @@ class TestHCSReader:
         row_names = ["A", "B", "C"]
         col_names = ["1", "2", "3", "4"]
         well_paths = ["A/1", "A/2", "A/4", "B/2", "B/3", "C/1", "C/3", "C/4"]
-        write_plate_metadata(self.root, row_names, col_names, well_paths)
+        write_plate_metadata(
+            self.root, row_names, col_names, well_paths, fmt=FormatV04()
+        )
         for wp in well_paths:
             row, col = wp.split("/")
             row_group = self.root.require_group(row)
             well = row_group.require_group(col)
-            write_well_metadata(well, field_paths)
+            write_well_metadata(well, field_paths, fmt=FormatV04())
             for field in field_paths:
                 image = well.require_group(str(field))
-                write_image(ones((1, 1, 1, 256, 256)), image)
+                write_image(ones((1, 1, 1, 256, 256)), image, fmt=FormatV04())
 
         reader = Reader(parse_url(str(self.path)))
         nodes = list(reader())

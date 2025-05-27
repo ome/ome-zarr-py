@@ -196,6 +196,7 @@ def create_zarr(
         axes=axes,
         storage_options=storage_options,
         metadata={"omero": image_data},
+        fmt=fmt,
     )
 
     if labels:
@@ -206,7 +207,7 @@ def create_zarr(
         if axes is not None:
             # remove channel axis for masks
             axes = axes.replace("c", "")
-        write_multiscale(labels, label_grp, axes=axes)
+        write_multiscale(labels, label_grp, axes=axes, fmt=fmt)
 
         colors = []
         properties = []

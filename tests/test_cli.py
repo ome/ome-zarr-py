@@ -138,7 +138,7 @@ class TestCli:
         plate_path = Path(img_dir2.mkdir("plate"))
         store = parse_url(plate_path, mode="w", fmt=FormatV04()).store
         root = zarr.group(store=store)
-        write_plate_metadata(root, ["A"], ["1"], ["A/1"])
+        write_plate_metadata(root, ["A"], ["1"], ["A/1"], fmt=FormatV04())
 
         finder(img_dir, 8000, True)
 

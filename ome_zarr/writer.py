@@ -474,6 +474,7 @@ def write_well_metadata(
       Defaults to the most current.
     """
 
+    _check_format(fmt)
     well = {
         "images": _validate_well_images(images),
         "version": fmt.version,

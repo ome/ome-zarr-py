@@ -48,12 +48,12 @@ class TestHCSNode:
         self.root = zarr.group(store=self.store)
 
     def test_minimal_plate(self):
-        write_plate_metadata(self.root, ["A"], ["1"], ["A/1"])
+        write_plate_metadata(self.root, ["A"], ["1"], ["A/1"], fmt=FormatV01())
         row_group = self.root.require_group("A")
         well = row_group.require_group("1")
-        write_well_metadata(well, ["0"])
+        write_well_metadata(well, ["0"], fmt=FormatV04())
         image = well.require_group("0")
-        write_image(zeros((1, 1, 1, 256, 256)), image)
+        write_image(zeros((1, 1, 1, 256, 256)), image, fmt=FormatV01())
 
         node = Node(parse_url(str(self.path)), list())
         assert node.data
@@ -85,7 +85,7 @@ class TestHCSNode:
             write_well_metadata(well, ["0", "1", "2"], fmt=fmt)
             for field in range(3):
                 image = well.require_group(str(field))
-                write_image(zeros((1, 1, 1, 256, 256)), image)
+                write_image(zeros((1, 1, 1, 256, 256)), image, fmt=fmt)
 
         node = Node(parse_url(str(self.path)), list())
         assert node.data
