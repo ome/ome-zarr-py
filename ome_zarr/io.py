@@ -79,12 +79,7 @@ class ZarrLocation:
         zarr_format = None
         if self.__mode == "w":
             # For now, let's support writing of zarr v2
-            # Prevent attempt to write zarr v3
             # TODO: handle writing of zarr v2 OR zarr v3
-            if self.__fmt.version not in ["0.1", "0.2", "0.3", "0.4"]:
-                raise ValueError(
-                    f"Unsupported format version for writing: {self.__fmt.version}"
-                )
             zarr_format = 2
         try:
             group = zarr.open_group(
