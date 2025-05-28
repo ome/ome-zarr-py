@@ -255,13 +255,8 @@ def parse_url(
 
     >>> parse_url('does-not-exist')
     """
-    try:
-        loc = ZarrLocation(path, mode=mode, fmt=fmt)
-        if "r" in mode and not loc.exists():
-            return None
-        else:
-            return loc
-    except Exception:
-        LOGGER.exception("exception on parsing (stacktrace at DEBUG)")
-        LOGGER.debug("stacktrace:", exc_info=True)
+    loc = ZarrLocation(path, mode=mode, fmt=fmt)
+    if "r" in mode and not loc.exists():
         return None
+    else:
+        return loc
