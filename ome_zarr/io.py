@@ -82,8 +82,10 @@ class ZarrLocation:
             # TODO: handle writing of zarr v2 OR zarr v3
             zarr_format = 2
         try:
+            # this group is used to get zgroup metadata (is this used for anything?)
+            # and to check if the group exists for reading. Only need "r" mode for this.
             group = zarr.open_group(
-                store=self.__store, path="/", mode=self.__mode, zarr_format=zarr_format
+                store=self.__store, path="/", mode="r", zarr_format=zarr_format
             )
             self.zgroup = group.attrs.asdict()
             # For zarr v3, everything is under the "ome" namespace
@@ -91,6 +93,13 @@ class ZarrLocation:
                 self.zgroup = self.zgroup["ome"]
             self.__metadata = self.zgroup
         except (ValueError, FileNotFoundError):
+            # doesn't exist. If we are in "w" mode, we need to create Zarr v2 group.
+            if self.__mode == "w":
+                group = zarr.open_group(
+                    store=self.__store, path="/", mode="w", zarr_format=zarr_format
+                )
+                return
+            # If we are in "r" mode, we can try to open the array
             try:
                 array = zarr.open_array(
                     store=self.__store,

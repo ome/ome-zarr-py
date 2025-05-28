@@ -13,7 +13,6 @@ class TestIO:
     def initdir(self, tmpdir):
         self.path = tmpdir.mkdir("data")
         create_zarr(str(self.path))
-        # this overwrites the data if mode="w"
         self.store = parse_url(str(self.path), mode="r").store
         self.root = zarr.open_group(store=self.store, mode="r")
 
@@ -21,7 +20,7 @@ class TestIO:
         assert parse_url(str(self.path))
 
     def test_parse_nonexistent_url(self):
-        assert parse_url(self.path + "/does-not-exist") is None
+        assert parse_url(str(self.path + "/does-not-exist")) is None
 
     def test_loc_str(self):
         assert ZarrLocation(str(self.path))
@@ -36,3 +35,17 @@ class TestIO:
         store = LocalStore(str(self.path))
         loc = ZarrLocation(store)
         assert loc
+
+    def test_no_overwrite(self):
+        print("self.path:", self.path)
+        assert self.root.attrs.get("multiscales") is not None
+        # Test that we can open a store to write, without
+        # overwriting existing data
+        new_store = parse_url(str(self.path), mode="w").store
+        new_root = zarr.open_group(store=new_store)
+        new_root.attrs["extra"] = "test_no_overwrite"
+        # read...
+        read_store = parse_url(str(self.path)).store
+        read_root = zarr.open_group(store=read_store, mode="r")
+        assert read_root.attrs.get("extra") == "test_no_overwrite"
+        assert read_root.attrs.get("multiscales") is not None
