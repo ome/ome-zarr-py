@@ -1,4 +1,5 @@
 import filecmp
+import json
 import pathlib
 from tempfile import TemporaryDirectory
 from typing import Any
@@ -467,6 +468,10 @@ class TestMultiscalesMetadata:
         assert "multiscales" in self.root.attrs
         assert "version" in self.root.attrs["multiscales"][0]
         assert self.root.attrs["multiscales"][0]["datasets"] == datasets
+        # we want to be sure this is zarr v2 (no top-level 'attributes')
+        json_text = (self.path / ".zattrs").read_text(encoding="utf-8")
+        attrs_json = json.loads(json_text)
+        assert "multiscales" in attrs_json
 
     @pytest.mark.parametrize("fmt", (FormatV01(), FormatV02(), FormatV03()))
     def test_version(self, fmt):
