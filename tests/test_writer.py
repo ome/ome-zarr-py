@@ -39,7 +39,7 @@ class TestWriter:
     @pytest.fixture(autouse=True)
     def initdir(self, tmpdir):
         self.path = pathlib.Path(tmpdir.mkdir("data"))
-        self.store = parse_url(self.path, mode="w", fmt=FormatV04()).store
+        self.store = parse_url(self.path, mode="w").store
         self.root = zarr.group(store=self.store)
         self.group = self.root.create_group("test")
 
@@ -159,7 +159,7 @@ class TestWriter:
         if read_from_zarr:
             # write to zarr and re-read as dask...
             path = f"{self.path}/temp/"
-            store = parse_url(path, mode="w", fmt=FormatV04()).store
+            store = parse_url(path, mode="w").store
             temp_group = zarr.group(store=store).create_group("test")
             write_image(
                 data_delayed,
@@ -283,7 +283,7 @@ class TestWriter:
         arr = array_constructor(arr_np)
         with TemporaryDirectory(suffix=".ome.zarr") as tempdir:
             path = tempdir
-            store = parse_url(path, mode="w", fmt=FormatV04()).store
+            store = parse_url(path, mode="w").store
             root = zarr.group(store=store)
             # no compressor options, we are checking default
             write_multiscale(
@@ -456,7 +456,7 @@ class TestMultiscalesMetadata:
     @pytest.fixture(autouse=True)
     def initdir(self, tmpdir):
         self.path = pathlib.Path(tmpdir.mkdir("data"))
-        self.store = parse_url(self.path, mode="w", fmt=FormatV04()).store
+        self.store = parse_url(self.path, mode="w").store
         self.root = zarr.group(store=self.store)
 
     def test_multi_levels_transformations(self):
@@ -689,7 +689,7 @@ class TestPlateMetadata:
     @pytest.fixture(autouse=True)
     def initdir(self, tmpdir):
         self.path = pathlib.Path(tmpdir.mkdir("data"))
-        self.store = parse_url(self.path, mode="w", fmt=FormatV04()).store
+        self.store = parse_url(self.path, mode="w").store
         self.root = zarr.group(store=self.store)
 
     def test_minimal_plate(self):
@@ -1013,7 +1013,7 @@ class TestWellMetadata:
     @pytest.fixture(autouse=True)
     def initdir(self, tmpdir):
         self.path = pathlib.Path(tmpdir.mkdir("data"))
-        self.store = parse_url(self.path, mode="w", fmt=FormatV04()).store
+        self.store = parse_url(self.path, mode="w").store
         self.root = zarr.group(store=self.store)
 
     @pytest.mark.parametrize("images", (["0"], [{"path": "0"}]))
@@ -1091,7 +1091,7 @@ class TestLabelWriter:
     @pytest.fixture(autouse=True)
     def initdir(self, tmpdir):
         self.path = pathlib.Path(tmpdir.mkdir("data.ome.zarr"))
-        self.store = parse_url(self.path, mode="w", fmt=FormatV04()).store
+        self.store = parse_url(self.path, mode="w").store
         self.root = zarr.group(store=self.store)
 
     def create_image_data(self, shape, scaler, fmt, axes, transformations):
