@@ -13,7 +13,7 @@ of 2 in the X and Y dimensions.
 Alternatively, the :py:func:`ome_zarr.writer.write_multiscale` can be used, which takes a
 "pyramid" of pre-computed `numpy` arrays.
 
-NB: `ome-zarr-py` supports reading of OME-NGFF `v0.5` (the `CurrentFormat`) but writing
+NB: `ome-zarr-py v0.12.0 rc1` supports reading of OME-NGFF `v0.5` (the `CurrentFormat`) but writing
 is only supported for `v0.4` which must be specified explicitly.
 
 The following code creates a 3D Image in OME-Zarr::
