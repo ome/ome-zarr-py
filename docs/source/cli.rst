@@ -19,7 +19,7 @@ Use the `ome_zarr` command to interrogate Zarr datasets.
 
 Remote data::
 
-    ome_zarr info https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.1/6001240.zarr/
+    ome_zarr info https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.5/idr0062A/6001240_labels.zarr/
 
 Local data::
 

@@ -5,6 +5,7 @@ import zarr
 from numpy import ones, zeros
 
 from ome_zarr.data import create_zarr
+from ome_zarr.format import FormatV04
 from ome_zarr.io import parse_url
 from ome_zarr.reader import Node, Plate, Reader, Well
 from ome_zarr.writer import write_image, write_plate_metadata, write_well_metadata
@@ -42,6 +43,39 @@ class TestReader:
         assert isinstance(omero["channels"], list)
         assert len(omero["channels"]) == 1
 
+    def test_read_v05(self):
+        rng = np.random.default_rng(0)
+        data = rng.poisson(lam=10, size=(10, 128, 128)).astype(np.uint8)
+        img_path = str(self.path / "test_read_v05.zarr")
+        root = zarr.group(img_path)
+        arr = root.create_array(
+            name="s0", shape=data.shape, chunks=(10, 10, 10), dtype=data.dtype
+        )
+        arr[:, :] = data
+        root.attrs["ome"] = {
+            "version": "0.5",
+            "multiscales": [
+                {
+                    "datasets": [
+                        {
+                            "path": "s0",
+                            "coordinateTransformations": [
+                                {
+                                    "type": "scale",
+                                    "scale": [1, 1, 1],
+                                }
+                            ],
+                        }
+                    ]
+                }
+            ],
+        }
+        reader = Reader(parse_url(img_path))
+        nodes = list(reader())
+        assert len(nodes) == 1
+        image_node = nodes[0]
+        assert np.allclose(data, image_node.data[0])
+
 
 class TestInvalid:
     @pytest.fixture(autouse=True)
@@ -69,12 +103,12 @@ class TestHCSReader:
         self.root = zarr.group(store=self.store)
 
     def test_minimal_plate(self):
-        write_plate_metadata(self.root, ["A"], ["1"], ["A/1"])
+        write_plate_metadata(self.root, ["A"], ["1"], ["A/1"], fmt=FormatV04())
         row_group = self.root.require_group("A")
         well = row_group.require_group("1")
-        write_well_metadata(well, ["0"])
+        write_well_metadata(well, ["0"], fmt=FormatV04())
         image = well.require_group("0")
-        write_image(zeros((1, 1, 1, 256, 256)), image)
+        write_image(zeros((1, 1, 1, 256, 256)), image, fmt=FormatV04())
 
         reader = Reader(parse_url(str(self.path)))
         nodes = list(reader())
@@ -90,15 +124,17 @@ class TestHCSReader:
         row_names = ["A", "B", "C"]
         col_names = ["1", "2", "3", "4"]
         well_paths = ["A/1", "A/2", "A/4", "B/2", "B/3", "C/1", "C/3", "C/4"]
-        write_plate_metadata(self.root, row_names, col_names, well_paths)
+        write_plate_metadata(
+            self.root, row_names, col_names, well_paths, fmt=FormatV04()
+        )
         for wp in well_paths:
             row, col = wp.split("/")
             row_group = self.root.require_group(row)
             well = row_group.require_group(col)
-            write_well_metadata(well, field_paths)
+            write_well_metadata(well, field_paths, fmt=FormatV04())
             for field in field_paths:
                 image = well.require_group(str(field))
-                write_image(ones((1, 1, 1, 256, 256)), image)
+                write_image(ones((1, 1, 1, 256, 256)), image, fmt=FormatV04())
 
         reader = Reader(parse_url(str(self.path)))
         nodes = list(reader())

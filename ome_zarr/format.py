@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterator
 from typing import Any
 
-from zarr.storage import FSStore
+from zarr.storage import FsspecStore, LocalStore
 
 LOGGER = logging.getLogger("ome_zarr.format")
 
@@ -25,6 +25,7 @@ def format_implementations() -> Iterator["Format"]:
     """
     Return an instance of each format implementation, newest to oldest.
     """
+    yield FormatV05()
     yield FormatV04()
     yield FormatV03()
     yield FormatV02()
@@ -60,7 +61,7 @@ class Format(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def init_store(self, path: str, mode: str = "r") -> FSStore:
+    def init_store(self, path: str, mode: str = "r") -> FsspecStore | LocalStore:
         raise NotImplementedError()
 
     # @abstractmethod
@@ -134,9 +135,22 @@ class FormatV01(Format):
         LOGGER.debug("%s matches %s?", self.version, version)
         return version == self.version
 
-    def init_store(self, path: str, mode: str = "r") -> FSStore:
-        store = FSStore(path, mode=mode, dimension_separator=".")
-        LOGGER.debug("Created legacy flat FSStore(%s, %s)", path, mode)
+    def init_store(self, path: str, mode: str = "r") -> FsspecStore | LocalStore:
+        """
+        Not ideal. Stores should remain hidden
+        "dimension_separator" is specified at array creation time
+        """
+
+        if path.startswith(("http", "s3")):
+            store = FsspecStore.from_url(
+                path,
+                storage_options=None,
+                read_only=(mode in ("r", "r+", "a")),
+            )
+        else:
+            # No other kwargs supported
+            store = LocalStore(path, read_only=(mode in ("r", "r+", "a")))
+        LOGGER.debug("Created nested FsspecStore(%s, %s)", path, mode)
         return store
 
     def generate_well_dict(
@@ -179,32 +193,6 @@ class FormatV02(FormatV01):
     @property
     def version(self) -> str:
         return "0.2"
-
-    def init_store(self, path: str, mode: str = "r") -> FSStore:
-        """
-        Not ideal. Stores should remain hidden
-        TODO: could also check dimension_separator
-        """
-
-        kwargs = {
-            "dimension_separator": "/",
-            "normalize_keys": False,
-        }
-
-        mkdir = True
-        if "r" in mode or path.startswith(("http", "s3")):
-            # Could be simplified on the fsspec side
-            mkdir = False
-        if mkdir:
-            kwargs["auto_mkdir"] = True
-
-        store = FSStore(
-            path,
-            mode=mode,
-            **kwargs,
-        )  # TODO: open issue for using Path
-        LOGGER.debug("Created nested FSStore(%s, %s, %s)", path, mode, kwargs)
-        return store
 
 
 class FormatV03(FormatV02):  # inherits from V02 to avoid code duplication
@@ -343,4 +331,18 @@ class FormatV04(FormatV03):
                         )
 
 
-CurrentFormat = FormatV04
+class FormatV05(FormatV04):
+    """
+    Changelog: added FormatV05 (May 2025): writing not supported yet
+    """
+
+    @property
+    def version(self) -> str:
+        return "0.5"
+
+    @property
+    def zarr_format(self) -> int:
+        return 3
+
+
+CurrentFormat = FormatV05
