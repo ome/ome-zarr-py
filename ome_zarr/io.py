@@ -93,26 +93,12 @@ class ZarrLocation:
                 self.zgroup = self.zgroup["ome"]
             self.__metadata = self.zgroup
         except (ValueError, FileNotFoundError):
-            # doesn't exist. If we are in "w" mode, we need to create Zarr v2 group.
+            # group doesn't exist. If we are in "w" mode, we need to create Zarr v2 group.
             if self.__mode == "w":
                 group = zarr.open_group(
                     store=self.__store, path="/", mode="w", zarr_format=zarr_format
                 )
-                return
-            # If we are in "r" mode, we can try to open the array
-            try:
-                array = zarr.open_array(
-                    store=self.__store,
-                    path="/",
-                    mode=self.__mode,
-                    zarr_format=zarr_format,
-                )
-                self.zarray = array.attrs.asdict()
-                self.__metadata = self.zarray
-            except (ValueError, FileNotFoundError):
-                # We actually get a ValueError when the file is not found
-                # /zarr-python/src/zarr/abc/store.py", line 189, in _check_writable
-                #   raise ValueError("store mode does not support writing")
+            else:
                 self.__exists = False
 
     def __repr__(self) -> str:
