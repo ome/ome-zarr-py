@@ -22,29 +22,29 @@ repos:
           - --autofix
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.9.10
+    rev: v0.11.13
     hooks:
     - id: ruff
       args: ["--fix", "--show-fixes"]
 
   - repo: https://github.com/psf/black
-    rev: 24.10.0
+    rev: 25.1.0
     hooks:
       - id: black
 
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.13.0
+    rev: v1.16.0
     hooks:
       - id: mypy
         args: [--config-file=mypy.ini]
 
   - repo: https://github.com/adrienverge/yamllint.git
-    rev: v1.35.1
+    rev: v1.37.1
     hooks:
       - id: yamllint
         args: [--config-data=relaxed]
 
   - repo: https://github.com/codespell-project/codespell
-    rev: v2.3.0
+    rev: v2.4.1
     hooks:
       - id: codespell
