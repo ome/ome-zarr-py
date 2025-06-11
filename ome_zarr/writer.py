@@ -296,21 +296,15 @@ Please use the 'storage_options' argument instead."""
                 dask_delayed.append(da_delayed)
 
         else:
-            # v2 arguments
-            if fmt.version in ("0.1", "0.2", "0.3", "0.4"):
-                if chunks_opt is not None:
-                    options["chunks"] = chunks_opt
-                # default to zstd compression
-                # options["compressor"] = options.get(
-                #     "compressor", _blosc_compressor()
-                # )
-            else:
+            if fmt.zarr_format == 3:
                 if axes is not None:
                     # the array zarr.json also contains axes names
                     options["dimension_names"] = [
                         axis["name"] for axis in axes if isinstance(axis, dict)
                     ]
 
+            if chunks_opt is not None:
+                options["chunks"] = chunks_opt
             options["shape"] = data.shape
             options["chunk_key_encoding"] = fmt.chunk_key_encoding
             # otherwise we get 'null'

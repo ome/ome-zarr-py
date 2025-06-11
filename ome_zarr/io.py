@@ -93,10 +93,6 @@ class ZarrLocation:
             if self.__mode == "w":
                 # If we are creating a new group, we need to specify the zarr_format.
                 zarr_format = self.__fmt.zarr_format
-                if zarr_format != 2:
-                    raise ValueError(
-                        f"Currently writing supported for Zarr v2 only, got {zarr_format}"
-                    )
                 group = zarr.open_group(
                     store=self.__store, path="/", mode="w", zarr_format=zarr_format
                 )

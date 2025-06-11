@@ -11,7 +11,14 @@ import zarr
 from dask import persist
 from numcodecs import Blosc
 
-from ome_zarr.format import CurrentFormat, FormatV01, FormatV02, FormatV03, FormatV04
+from ome_zarr.format import (
+    CurrentFormat,
+    FormatV01,
+    FormatV02,
+    FormatV03,
+    FormatV04,
+    FormatV05,
+)
 from ome_zarr.io import ZarrLocation, parse_url
 from ome_zarr.reader import Multiscales, Reader
 from ome_zarr.scale import Scaler
@@ -40,9 +47,16 @@ class TestWriter:
     @pytest.fixture(autouse=True)
     def initdir(self, tmpdir):
         self.path = pathlib.Path(tmpdir.mkdir("data"))
+        # create zarr v2 group...
         self.store = parse_url(self.path, mode="w", fmt=FormatV04()).store
         self.root = zarr.group(store=self.store)
         self.group = self.root.create_group("test")
+
+        # let's create zarr v3 group too...
+        self.path_v3 = self.path / "v3"
+        store_v3 = parse_url(self.path_v3, mode="w").store
+        root_v3 = zarr.group(store=store_v3)
+        self.group_v3 = root_v3.create_group("test_v3")
 
     def create_data(self, shape, dtype=np.uint8, mean_val=10):
         rng = np.random.default_rng(0)
@@ -73,6 +87,7 @@ class TestWriter:
             pytest.param(FormatV02, id="V02"),
             pytest.param(FormatV03, id="V03"),
             pytest.param(FormatV04, id="V04"),
+            pytest.param(FormatV05, id="V05"),
         ),
     )
     @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])
@@ -80,10 +95,17 @@ class TestWriter:
     def test_writer(
         self, shape, scaler, format_version, array_constructor, storage_options_list
     ):
+        version = format_version()
+
+        if version.version == "0.5":
+            group = self.group_v3
+            grp_path = self.path_v3 / "test_v3"
+        else:
+            group = self.group
+            grp_path = self.path / "test"
 
         data = self.create_data(shape)
         data = array_constructor(data)
-        version = format_version()
         axes = "tczyx"[-len(shape) :]
         transformations = []
         for dataset_transfs in TRANSFORMATIONS:
@@ -100,7 +122,7 @@ class TestWriter:
             storage_options = [{"chunks": chunk} for chunk in chunks]
         write_image(
             image=data,
-            group=self.group,
+            group=group,
             scaler=scaler,
             fmt=version,
             axes=axes,
@@ -109,7 +131,7 @@ class TestWriter:
         )
 
         # Verify
-        reader = Reader(parse_url(f"{self.path}/test"))
+        reader = Reader(parse_url(f"{grp_path}"))
         node = next(iter(reader()))
         assert Multiscales.matches(node.zarr)
         if version.version in ("0.1", "0.2"):
@@ -138,17 +160,30 @@ class TestWriter:
             write_image(data, self.group, axes="zyx", fmt=CurrentFormat())
         assert "Group is zarr_format: 2" in str(err.value)
 
+    @pytest.mark.parametrize("zarr_format", [2, 3])
     @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])
-    def test_write_image_current(self, array_constructor):
+    def test_write_image_current(self, array_constructor, zarr_format):
         shape = (64, 64, 64)
         data = self.create_data(shape)
         data = array_constructor(data)
-        write_image(data, self.group, axes="zyx")
-        reader = Reader(parse_url(f"{self.path}/test"))
 
-        # we want to be sure this is zarr v2 (no top-level 'attributes')
-        json_text = (self.path / "test" / ".zattrs").read_text(encoding="utf-8")
-        attrs_json = json.loads(json_text)
+        if zarr_format == 2:
+            group = self.group
+            grp_path = self.path / "test"
+        else:
+            group = self.group_v3
+            grp_path = self.path_v3 / "test_v3"
+
+        write_image(data, group, axes="zyx")
+        reader = Reader(parse_url(f"{grp_path}"))
+
+        # manually check this is zarr v2 or v3
+        if zarr_format == 2:
+            json_text = (grp_path / ".zattrs").read_text(encoding="utf-8")
+            attrs_json = json.loads(json_text)
+        else:
+            json_text = (grp_path / "zarr.json").read_text(encoding="utf-8")
+            attrs_json = json.loads(json_text).get("attributes", {}).get("ome", {})
         assert "multiscales" in attrs_json
 
         image_node = next(iter(reader()))
