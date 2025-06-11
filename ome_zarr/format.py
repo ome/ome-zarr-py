@@ -3,7 +3,7 @@
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
-from typing import Any
+from typing import Any, Dict
 
 from zarr.storage import FsspecStore, LocalStore
 
@@ -54,6 +54,16 @@ class Format(ABC):
     @property
     @abstractmethod
     def version(self) -> str:  # pragma: no cover
+        raise NotImplementedError()
+
+    @property
+    @abstractmethod
+    def zarr_format(self) -> int:  # pragma: no cover
+        raise NotImplementedError()
+
+    @property
+    @abstractmethod
+    def chunk_key_encoding(self) -> Dict[str, str]:  # pragma: no cover
         raise NotImplementedError()
 
     @abstractmethod
@@ -130,6 +140,14 @@ class FormatV01(Format):
     def version(self) -> str:
         return "0.1"
 
+    @property
+    def zarr_format(self) -> int:
+        return 2
+
+    @property
+    def chunk_key_encoding(self) -> Dict[str, str]:
+        return {"name": "v2", "separator": "."}
+
     def matches(self, metadata: dict) -> bool:
         version = self._get_metadata_version(metadata)
         LOGGER.debug("%s matches %s?", self.version, version)
@@ -193,6 +211,10 @@ class FormatV02(FormatV01):
     @property
     def version(self) -> str:
         return "0.2"
+
+    @property
+    def chunk_key_encoding(self) -> Dict[str, str]:
+        return {"name": "v2", "separator": "/"}
 
 
 class FormatV03(FormatV02):  # inherits from V02 to avoid code duplication
@@ -343,6 +365,11 @@ class FormatV05(FormatV04):
     @property
     def zarr_format(self) -> int:
         return 3
+
+    @property
+    def chunk_key_encoding(self) -> Dict[str, str]:
+        # this is default for Zarr v3. Could return None?
+        return {"name": "default", "separator": "/"}
 
 
 CurrentFormat = FormatV05

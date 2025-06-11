@@ -13,7 +13,7 @@ from dask.graph_manipulation import bind
 from numcodecs import Blosc
 
 from .axes import Axes
-from .format import CurrentFormat, Format
+from .format import CurrentFormat, Format, FormatV04
 from .scale import Scaler
 from .types import JSONDict
 
@@ -178,22 +178,31 @@ def _blosc_compressor() -> Blosc:
 
 
 def _check_format(
-    fmt: Format = CurrentFormat(),
-) -> None:
-    """Check if the format is valid"""
-    if not isinstance(fmt, Format):
-        raise TypeError(f"Invalid format: {fmt}. Must be an instance of Format.")
-    if fmt.version == "0.5":
-        raise ValueError(
-            "Writing to format v0.5 is not supported yet. Use fmt=FormatV04() or earlier"
-        )
+    group: zarr.Group,
+    fmt: Format | None = None,
+) -> Format:
+    """Check if the format is valid for the given group"""
+
+    zarr_format = group.info._zarr_format
+    if fmt is not None:
+        if fmt.zarr_format != zarr_format:
+            raise ValueError(
+                f"Group is zarr_format: {zarr_format} but OME-Zarr {fmt.version} is {fmt.zarr_format}"
+            )
+    else:
+        if zarr_format == 2:
+            fmt = FormatV04()
+        elif zarr_format == 3:
+            fmt = CurrentFormat()
+    assert fmt is not None
+    return fmt
 
 
 def write_multiscale(
     pyramid: ListOfArrayLike,
     group: zarr.Group,
     chunks: tuple[Any, ...] | int | None = None,
-    fmt: Format = CurrentFormat(),
+    fmt: Format | None = None,
     axes: AxesType = None,
     coordinate_transformations: list[list[dict[str, Any]]] | None = None,
     storage_options: JSONDict | list[JSONDict] | None = None,
@@ -244,7 +253,7 @@ def write_multiscale(
         :class:`dask.delayed.Delayed` representing the value to be computed by
         dask.
     """
-    _check_format(fmt)
+    fmt = _check_format(group, fmt)
     dims = len(pyramid[0].shape)
     axes = _get_valid_axes(dims, axes, fmt)
     dask_delayed = []
@@ -288,14 +297,22 @@ Please use the 'storage_options' argument instead."""
 
         else:
             # v2 arguments
+            if fmt.version in ("0.1", "0.2", "0.3", "0.4"):
+                if chunks_opt is not None:
+                    options["chunks"] = chunks_opt
+                # default to zstd compression
+                # options["compressor"] = options.get(
+                #     "compressor", _blosc_compressor()
+                # )
+            else:
+                if axes is not None:
+                    # the array zarr.json also contains axes names
+                    options["dimension_names"] = [
+                        axis["name"] for axis in axes if isinstance(axis, dict)
+                    ]
+
             options["shape"] = data.shape
-            if chunks_opt is not None:
-                options["chunks"] = chunks_opt
-            options["chunk_key_encoding"] = {"name": "v2", "separator": "/"}
-
-            # default to zstd compression
-            options["compressor"] = options.get("compressor", _blosc_compressor())
-
+            options["chunk_key_encoding"] = fmt.chunk_key_encoding
             # otherwise we get 'null'
             options["fill_value"] = 0
 
@@ -331,7 +348,7 @@ Please use the 'storage_options' argument instead."""
 def write_multiscales_metadata(
     group: zarr.Group,
     datasets: list[dict],
-    fmt: Format = CurrentFormat(),
+    fmt: Format | None = None,
     axes: AxesType = None,
     name: str | None = None,
     **metadata: str | JSONDict | list[JSONDict],
@@ -356,7 +373,7 @@ def write_multiscales_metadata(
       Ignored for versions 0.1 and 0.2. Required for version 0.3 or greater.
     """
 
-    _check_format(fmt)
+    fmt = _check_format(group, fmt)
     ndim = -1
     if axes is not None:
         if fmt.version in ("0.1", "0.2"):
@@ -395,7 +412,6 @@ def write_multiscales_metadata(
     # (for {} this would silently over-write it, with dict() it explicitly fails)
     multiscales = [
         dict(
-            version=fmt.version,
             datasets=_validate_datasets(datasets, ndim, fmt),
             name=name or group.name,
             **metadata,
@@ -404,7 +420,12 @@ def write_multiscales_metadata(
     if axes is not None:
         multiscales[0]["axes"] = axes
 
-    group.attrs["multiscales"] = multiscales
+    if fmt.version in ("0.1", "0.2", "0.3", "0.4"):
+        multiscales[0]["version"] = fmt.version
+        group.attrs["multiscales"] = multiscales
+    else:
+        # Zarr v3 metadata under 'ome' with top-level version
+        group.attrs["ome"] = {"version": fmt.version, "multiscales": multiscales}
 
 
 def write_plate_metadata(
@@ -412,7 +433,7 @@ def write_plate_metadata(
     rows: list[str],
     columns: list[str],
     wells: list[str | dict],
-    fmt: Format = CurrentFormat(),
+    fmt: Format | None = None,
     acquisitions: list[dict] | None = None,
     field_count: int | None = None,
     name: str | None = None,
@@ -440,7 +461,7 @@ def write_plate_metadata(
     :param field_count: The maximum number of fields per view across wells.
     """
 
-    _check_format(fmt)
+    fmt = _check_format(group, fmt)
     plate: dict[str, str | int | list[dict]] = {
         "columns": _validate_plate_rows_columns(columns),
         "rows": _validate_plate_rows_columns(rows),
@@ -459,7 +480,7 @@ def write_plate_metadata(
 def write_well_metadata(
     group: zarr.Group,
     images: list[str | dict],
-    fmt: Format = CurrentFormat(),
+    fmt: Format | None = None,
 ) -> None:
     """
     Write the well metadata in the group.
@@ -474,7 +495,7 @@ def write_well_metadata(
       Defaults to the most current.
     """
 
-    _check_format(fmt)
+    fmt = _check_format(group, fmt)
     well = {
         "images": _validate_well_images(images),
         "version": fmt.version,
@@ -487,7 +508,7 @@ def write_image(
     group: zarr.Group,
     scaler: Scaler = Scaler(),
     chunks: tuple[Any, ...] | int | None = None,
-    fmt: Format = CurrentFormat(),
+    fmt: Format | None = None,
     axes: AxesType = None,
     coordinate_transformations: list[list[dict[str, Any]]] | None = None,
     storage_options: JSONDict | list[JSONDict] | None = None,
@@ -541,7 +562,7 @@ def write_image(
         :class:`dask.delayed.Delayed` representing the value to be computed by
         dask.
     """
-    _check_format(fmt)
+    fmt = _check_format(group, fmt)
     dask_delayed_jobs = []
 
     if isinstance(image, da.Array):
@@ -594,7 +615,7 @@ def _write_dask_image(
     group: zarr.Group,
     scaler: Scaler = Scaler(),
     chunks: tuple[Any, ...] | int | None = None,
-    fmt: Format = CurrentFormat(),
+    fmt: Format | None = None,
     axes: AxesType = None,
     coordinate_transformations: list[list[dict[str, Any]]] | None = None,
     storage_options: JSONDict | list[JSONDict] | None = None,
@@ -602,7 +623,7 @@ def _write_dask_image(
     compute: bool | None = True,
     **metadata: str | JSONDict | list[JSONDict],
 ) -> list:
-    _check_format(fmt)
+    fmt = _check_format(group, fmt)
     if fmt.version in ("0.1", "0.2"):
         # v0.1 and v0.2 are strictly 5D
         shape_5d: tuple[Any, ...] = (*(1,) * (5 - image.ndim), *image.shape)
@@ -695,7 +716,7 @@ def write_label_metadata(
     name: str,
     colors: list[JSONDict] | None = None,
     properties: list[JSONDict] | None = None,
-    fmt: Format = CurrentFormat(),
+    fmt: Format | None = None,
     **metadata: list[JSONDict] | JSONDict | str,
 ) -> None:
     """
@@ -724,7 +745,7 @@ def write_label_metadata(
       The format of the ome_zarr data which should be used.
       Defaults to the most current.
     """
-    _check_format(fmt)
+    fmt = _check_format(group, fmt)
     label_group = group[name]
     image_label_metadata = {**metadata}
     if colors is not None:
@@ -744,7 +765,7 @@ def write_multiscale_labels(
     group: zarr.Group,
     name: str,
     chunks: tuple[Any, ...] | int | None = None,
-    fmt: Format = CurrentFormat(),
+    fmt: Format | None = None,
     axes: AxesType = None,
     coordinate_transformations: list[list[dict[str, Any]]] | None = None,
     storage_options: JSONDict | list[JSONDict] | None = None,
@@ -803,7 +824,7 @@ def write_multiscale_labels(
         :class:`dask.delayed.Delayed` representing the value to be computed by
         dask.
     """
-    _check_format(fmt)
+    fmt = _check_format(group, fmt)
     sub_group = group.require_group(f"labels/{name}")
     dask_delayed_jobs = write_multiscale(
         pyramid,
@@ -833,7 +854,7 @@ def write_labels(
     name: str,
     scaler: Scaler = Scaler(),
     chunks: tuple[Any, ...] | int | None = None,
-    fmt: Format = CurrentFormat(),
+    fmt: Format | None = None,
     axes: AxesType = None,
     coordinate_transformations: list[list[dict[str, Any]]] | None = None,
     storage_options: JSONDict | list[JSONDict] | None = None,
@@ -897,7 +918,7 @@ def write_labels(
         :class:`dask.delayed.Delayed` representing the value to be computed by
         dask.
     """
-    _check_format(fmt)
+    fmt = _check_format(group, fmt)
     sub_group = group.require_group(f"labels/{name}")
     dask_delayed_jobs = []
 

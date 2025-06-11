@@ -44,7 +44,7 @@ class TestHCSNode:
     @pytest.fixture(autouse=True)
     def initdir(self, tmpdir):
         self.path = tmpdir.mkdir("data")
-        self.store = parse_url(str(self.path), mode="w").store
+        self.store = parse_url(str(self.path), mode="w", fmt=FormatV04()).store
         self.root = zarr.group(store=self.store)
 
     def test_minimal_plate(self):

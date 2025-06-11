@@ -77,10 +77,6 @@ class ZarrLocation:
         # If we want to *create* a new zarr v2 group, we need to specify
         # zarr_format. This is not needed for reading.
         zarr_format = None
-        if self.__mode == "w":
-            # For now, let's support writing of zarr v2
-            # TODO: handle writing of zarr v2 OR zarr v3
-            zarr_format = 2
         try:
             # this group is used to get zgroup metadata (is this used for anything?)
             # and to check if the group exists for reading. Only need "r" mode for this.
@@ -95,6 +91,12 @@ class ZarrLocation:
         except (ValueError, FileNotFoundError):
             # group doesn't exist. If we are in "w" mode, we need to create Zarr v2 group.
             if self.__mode == "w":
+                # If we are creating a new group, we need to specify the zarr_format.
+                zarr_format = self.__fmt.zarr_format
+                if zarr_format != 2:
+                    raise ValueError(
+                        f"Currently writing supported for Zarr v2 only, got {zarr_format}"
+                    )
                 group = zarr.open_group(
                     store=self.__store, path="/", mode="w", zarr_format=zarr_format
                 )

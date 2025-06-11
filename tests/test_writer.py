@@ -40,7 +40,7 @@ class TestWriter:
     @pytest.fixture(autouse=True)
     def initdir(self, tmpdir):
         self.path = pathlib.Path(tmpdir.mkdir("data"))
-        self.store = parse_url(self.path, mode="w").store
+        self.store = parse_url(self.path, mode="w", fmt=FormatV04()).store
         self.root = zarr.group(store=self.store)
         self.group = self.root.create_group("test")
 
@@ -131,13 +131,26 @@ class TestWriter:
             assert tuple(first_chunk) == _retuple(expected, nd_array.shape)
         assert np.allclose(data, node.data[0][...].compute())
 
+    def test_mix_zarr_formats(self):
+        # Since parse_url() used FormatV04(), this is not compatible with v0.5
+        data = self.create_data((64, 64, 64))
+        with pytest.raises(ValueError) as err:
+            write_image(data, self.group, axes="zyx", fmt=CurrentFormat())
+        assert "Group is zarr_format: 2" in str(err.value)
+
     @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])
     def test_write_image_current(self, array_constructor):
         shape = (64, 64, 64)
         data = self.create_data(shape)
         data = array_constructor(data)
-        write_image(data, self.group, axes="zyx", fmt=FormatV04())
+        write_image(data, self.group, axes="zyx")
         reader = Reader(parse_url(f"{self.path}/test"))
+
+        # we want to be sure this is zarr v2 (no top-level 'attributes')
+        json_text = (self.path / "test" / ".zattrs").read_text(encoding="utf-8")
+        attrs_json = json.loads(json_text)
+        assert "multiscales" in attrs_json
+
         image_node = next(iter(reader()))
         for transfs in image_node.metadata["coordinateTransformations"]:
             assert len(transfs) == 1
@@ -160,14 +173,13 @@ class TestWriter:
         if read_from_zarr:
             # write to zarr and re-read as dask...
             path = f"{self.path}/temp/"
-            store = parse_url(path, mode="w").store
+            store = parse_url(path, mode="w", fmt=FormatV04()).store
             temp_group = zarr.group(store=store).create_group("test")
             write_image(
                 data_delayed,
                 temp_group,
                 axes="zyx",
                 storage_options=opts,
-                fmt=FormatV04(),
             )
             loc = ZarrLocation(f"{self.path}/temp/test")
             reader = Reader(loc)()
@@ -186,7 +198,6 @@ class TestWriter:
             axes="zyx",
             storage_options={"chunks": chunks, "compressor": None},
             compute=compute,
-            fmt=FormatV04(),
         )
 
         assert not compute == len(dask_delayed_jobs)
@@ -235,11 +246,7 @@ class TestWriter:
         shape = (64, 64, 64)
         data = np.array(self.create_data(shape))
         write_image(
-            image=data,
-            group=self.group,
-            axes="xyz",
-            storage_options={"chunks": 32},
-            fmt=FormatV04(),
+            image=data, group=self.group, axes="xyz", storage_options={"chunks": 32}
         )
         for data in self.group.array_values():
             print(data)
@@ -256,7 +263,6 @@ class TestWriter:
             self.group,
             axes="zyx",
             storage_options={"compressor": compressor},
-            fmt=FormatV04(),
         )
         group = zarr.open(f"{self.path}/test", zarr_format=2)
         assert len(group["0"].info._compressors) > 0
@@ -284,7 +290,7 @@ class TestWriter:
         arr = array_constructor(arr_np)
         with TemporaryDirectory(suffix=".ome.zarr") as tempdir:
             path = tempdir
-            store = parse_url(path, mode="w").store
+            store = parse_url(path, mode="w", fmt=FormatV04()).store
             root = zarr.group(store=store)
             # no compressor options, we are checking default
             write_multiscale(
@@ -292,7 +298,6 @@ class TestWriter:
                 group=root,
                 axes="tzyx",
                 chunks=(1, 50, 200, 400),
-                fmt=FormatV04(),
             )
             # check chunk: multiscale level 0, 4D chunk at (0, 0, 0, 0)
             chunk_size = (pathlib.Path(path) / "0/0/0/0/0").stat().st_size
@@ -457,7 +462,7 @@ class TestMultiscalesMetadata:
     @pytest.fixture(autouse=True)
     def initdir(self, tmpdir):
         self.path = pathlib.Path(tmpdir.mkdir("data"))
-        self.store = parse_url(self.path, mode="w").store
+        self.store = parse_url(self.path, mode="w", fmt=FormatV04()).store
         self.root = zarr.group(store=self.store)
 
     def test_multi_levels_transformations(self):
@@ -678,7 +683,6 @@ class TestMultiscalesMetadata:
                         datasets,
                         axes="tczyx",
                         metadata={"omero": metadata},
-                        fmt=FormatV04(),
                     )
             else:
                 write_multiscales_metadata(
@@ -686,7 +690,6 @@ class TestMultiscalesMetadata:
                     datasets,
                     axes="tczyx",
                     metadata={"omero": metadata},
-                    fmt=FormatV04(),
                 )
 
 
@@ -694,7 +697,7 @@ class TestPlateMetadata:
     @pytest.fixture(autouse=True)
     def initdir(self, tmpdir):
         self.path = pathlib.Path(tmpdir.mkdir("data"))
-        self.store = parse_url(self.path, mode="w").store
+        self.store = parse_url(self.path, mode="w", fmt=FormatV04()).store
         self.root = zarr.group(store=self.store)
 
     def test_minimal_plate(self):
@@ -1018,12 +1021,12 @@ class TestWellMetadata:
     @pytest.fixture(autouse=True)
     def initdir(self, tmpdir):
         self.path = pathlib.Path(tmpdir.mkdir("data"))
-        self.store = parse_url(self.path, mode="w").store
+        self.store = parse_url(self.path, mode="w", fmt=FormatV04()).store
         self.root = zarr.group(store=self.store)
 
     @pytest.mark.parametrize("images", (["0"], [{"path": "0"}]))
     def test_minimal_well(self, images):
-        write_well_metadata(self.root, images, fmt=FormatV04())
+        write_well_metadata(self.root, images)
         assert "well" in self.root.attrs
         assert self.root.attrs["well"]["images"] == [{"path": "0"}]
         assert self.root.attrs["well"]["version"] == FormatV04().version
@@ -1096,7 +1099,7 @@ class TestLabelWriter:
     @pytest.fixture(autouse=True)
     def initdir(self, tmpdir):
         self.path = pathlib.Path(tmpdir.mkdir("data.ome.zarr"))
-        self.store = parse_url(self.path, mode="w").store
+        self.store = parse_url(self.path, mode="w", fmt=FormatV04()).store
         self.root = zarr.group(store=self.store)
 
     def create_image_data(self, shape, scaler, fmt, axes, transformations):
@@ -1150,13 +1153,11 @@ class TestLabelWriter:
         assert np.allclose(label_data, node.data[0][...].compute())
 
         # Verify label metadata
-        label_root = zarr.open(f"{self.path}/labels", mode="r", zarr_format=2)
+        label_root = zarr.open(f"{self.path}/labels", mode="r")
         assert "labels" in label_root.attrs
         assert label_name in label_root.attrs["labels"]
 
-        label_group = zarr.open(
-            f"{self.path}/labels/{label_name}", mode="r", zarr_format=2
-        )
+        label_group = zarr.open(f"{self.path}/labels/{label_name}", mode="r")
         assert "image-label" in label_group.attrs
         assert label_group.attrs["image-label"]["version"] == fmt.version
 
@@ -1300,7 +1301,7 @@ class TestLabelWriter:
             self.verify_label_data(label_name, label_data, fmt, shape, transformations)
 
         # Verify label metadata
-        label_root = zarr.open(f"{self.path}/labels", mode="r", zarr_format=2)
+        label_root = zarr.open(f"{self.path}/labels", mode="r")
         assert "labels" in label_root.attrs
         assert len(label_root.attrs["labels"]) == len(label_names)
         assert all(
