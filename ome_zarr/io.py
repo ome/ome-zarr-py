@@ -3,13 +3,14 @@
 Primary entry point is the :func:`~ome_zarr.io.parse_url` method.
 """
 
-import json
 import logging
+import warnings
 from pathlib import Path
 from urllib.parse import urljoin
 
 import dask.array as da
-from zarr.storage import FSStore
+import zarr
+from zarr.storage import FsspecStore, LocalStore, StoreLike
 
 from .format import CurrentFormat, Format, detect_format
 from .types import JSONDict
@@ -19,7 +20,7 @@ LOGGER = logging.getLogger("ome_zarr.io")
 
 class ZarrLocation:
     """
-    IO primitive for reading and writing Zarr data. Uses FSStore for all
+    IO primitive for reading and writing Zarr data. Uses a store for all
     data access.
 
     No assumptions about the existence of the given path string are made.
@@ -28,7 +29,7 @@ class ZarrLocation:
 
     def __init__(
         self,
-        path: Path | str | FSStore,
+        path: StoreLike,
         mode: str = "r",
         fmt: Format = CurrentFormat(),
     ) -> None:
@@ -39,18 +40,21 @@ class ZarrLocation:
             self.__path = str(path.resolve())
         elif isinstance(path, str):
             self.__path = path
-        elif isinstance(path, FSStore):
+        elif isinstance(path, FsspecStore):
             self.__path = path.path
+        elif isinstance(path, LocalStore):
+            self.__path = str(path.root)
         else:
             raise TypeError(f"not expecting: {type(path)}")
 
         loader = fmt
         if loader is None:
             loader = CurrentFormat()
-        self.__store: FSStore = (
-            path if isinstance(path, FSStore) else loader.init_store(self.__path, mode)
+        self.__store: FsspecStore = (
+            path
+            if isinstance(path, (FsspecStore, LocalStore))
+            else loader.init_store(self.__path, mode)
         )
-
         self.__init_metadata()
         detected = detect_format(self.__metadata, loader)
         LOGGER.debug("ZarrLocation.__init__ %s detected: %s", path, detected)
@@ -66,16 +70,38 @@ class ZarrLocation:
         """
         Load the Zarr metadata files for the given location.
         """
-        self.zarray: JSONDict = self.get_json(".zarray")
-        self.zgroup: JSONDict = self.get_json(".zgroup")
+        self.zgroup: JSONDict = {}
+        self.zarray: JSONDict = {}
         self.__metadata: JSONDict = {}
         self.__exists: bool = True
-        if self.zgroup:
-            self.__metadata = self.get_json(".zattrs")
-        elif self.zarray:
-            self.__metadata = self.get_json(".zattrs")
-        else:
-            self.__exists = False
+        # If we want to *create* a new zarr v2 group, we need to specify
+        # zarr_format. This is not needed for reading.
+        zarr_format = None
+        try:
+            # this group is used to get zgroup metadata (is this used for anything?)
+            # and to check if the group exists for reading. Only need "r" mode for this.
+            group = zarr.open_group(
+                store=self.__store, path="/", mode="r", zarr_format=zarr_format
+            )
+            self.zgroup = group.attrs.asdict()
+            # For zarr v3, everything is under the "ome" namespace
+            if "ome" in self.zgroup:
+                self.zgroup = self.zgroup["ome"]
+            self.__metadata = self.zgroup
+        except (ValueError, FileNotFoundError):
+            # group doesn't exist. If we are in "w" mode, we need to create Zarr v2 group.
+            if self.__mode == "w":
+                # If we are creating a new group, we need to specify the zarr_format.
+                zarr_format = self.__fmt.zarr_format
+                if zarr_format != 2:
+                    raise ValueError(
+                        f"Currently writing supported for Zarr v2 only, got {zarr_format}"
+                    )
+                group = zarr.open_group(
+                    store=self.__store, path="/", mode="w", zarr_format=zarr_format
+                )
+            else:
+                self.__exists = False
 
     def __repr__(self) -> str:
         """Print the path as well as whether this is a group or an array."""
@@ -103,7 +129,7 @@ class ZarrLocation:
         return self.__path
 
     @property
-    def store(self) -> FSStore:
+    def store(self) -> FsspecStore:
         """Return the initialized store for this location"""
         assert self.__store is not None
         return self.__store
@@ -148,16 +174,16 @@ class ZarrLocation:
         """
         Load and return a given subpath of store as JSON.
 
+        Deprecated: not needed in __init_metadata since zarr v3.
         HTTP 403 and 404 responses are treated as if the file does not exist.
         Exceptions during the remote connection are logged at the WARN level.
         All other exceptions log at the ERROR level.
         """
+        warnings.warn("get_json() deprecated", DeprecationWarning)
         try:
-            data = self.__store.get(subpath)
-            if not data:
-                return {}
-            return json.loads(data)
-        except KeyError:
+            array_or_group = zarr.open_group(store=self.__store, path="/")
+            return array_or_group.attrs.asdict()
+        except (KeyError, FileNotFoundError):
             LOGGER.debug("JSON not found: %s", subpath)
             return {}
         except Exception:
@@ -192,10 +218,7 @@ class ZarrLocation:
         Return whether the current underlying implementation
         points to a local file or not.
         """
-        return self.__store.fs.protocol == "file" or self.__store.fs.protocol == (
-            "file",
-            "local",
-        )
+        return isinstance(self.__store, LocalStore)
 
     def _ishttp(self) -> bool:
         """
@@ -220,13 +243,8 @@ def parse_url(
 
     >>> parse_url('does-not-exist')
     """
-    try:
-        loc = ZarrLocation(path, mode=mode, fmt=fmt)
-        if "r" in mode and not loc.exists():
-            return None
-        else:
-            return loc
-    except Exception:
-        LOGGER.exception("exception on parsing (stacktrace at DEBUG)")
-        LOGGER.debug("stacktrace:", exc_info=True)
+    loc = ZarrLocation(path, mode=mode, fmt=fmt)
+    if "r" in mode and not loc.exists():
         return None
+    else:
+        return loc

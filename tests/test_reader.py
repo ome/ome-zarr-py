@@ -5,6 +5,7 @@ import zarr
 from numpy import ones, zeros
 
 from ome_zarr.data import create_zarr
+from ome_zarr.format import FormatV04
 from ome_zarr.io import parse_url
 from ome_zarr.reader import Node, Plate, Reader, Well
 from ome_zarr.writer import write_image, write_plate_metadata, write_well_metadata
@@ -42,6 +43,39 @@ class TestReader:
         assert isinstance(omero["channels"], list)
         assert len(omero["channels"]) == 1
 
+    def test_read_v05(self):
+        rng = np.random.default_rng(0)
+        data = rng.poisson(lam=10, size=(10, 128, 128)).astype(np.uint8)
+        img_path = str(self.path / "test_read_v05.zarr")
+        root = zarr.group(img_path)
+        arr = root.create_array(
+            name="s0", shape=data.shape, chunks=(10, 10, 10), dtype=data.dtype
+        )
+        arr[:, :] = data
+        root.attrs["ome"] = {
+            "version": "0.5",
+            "multiscales": [
+                {
+                    "datasets": [
+                        {
+                            "path": "s0",
+                            "coordinateTransformations": [
+                                {
+                                    "type": "scale",
+                                    "scale": [1, 1, 1],
+                                }
+                            ],
+                        }
+                    ]
+                }
+            ],
+        }
+        reader = Reader(parse_url(img_path))
+        nodes = list(reader())
+        assert len(nodes) == 1
+        image_node = nodes[0]
+        assert np.allclose(data, image_node.data[0])
+
 
 class TestInvalid:
     @pytest.fixture(autouse=True)
@@ -65,7 +99,7 @@ class TestHCSReader:
     @pytest.fixture(autouse=True)
     def initdir(self, tmpdir):
         self.path = tmpdir.mkdir("data")
-        self.store = parse_url(str(self.path), mode="w").store
+        self.store = parse_url(str(self.path), mode="w", fmt=FormatV04()).store
         self.root = zarr.group(store=self.store)
 
     def test_minimal_plate(self):
