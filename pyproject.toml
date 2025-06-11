@@ -5,9 +5,6 @@ requires = [
 ]
 build-backend = "setuptools.build_meta"
 
-[tools.setuptools.dynamic]
-version = {attr = "ome_zarr.__version__"}
-
 [project]
 name = "ome-zarr"
 readme = "README.rst"
