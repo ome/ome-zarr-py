@@ -118,6 +118,11 @@ class TestCli:
 
     def test_finder(self):
         img_dir = (self.path / "images").mkdir()
+
+        # test with empty directory - for code coverage
+        finder(img_dir, 8000, True)
+        assert not (img_dir / "biofile_finder.csv").exists()
+
         img_dir2 = (img_dir / "dir2").mkdir()
         bf2raw_dir = (img_dir / "bf2raw.zarr").mkdir()
         main(["create", "--method=astronaut", (str(img_dir / "astronaut"))])
