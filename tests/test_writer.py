@@ -1,7 +1,6 @@
 import filecmp
 import json
 import pathlib
-from tempfile import TemporaryDirectory
 from typing import Any
 
 import dask.array as da
@@ -56,7 +55,7 @@ class TestWriter:
         self.path_v3 = self.path / "v3"
         store_v3 = parse_url(self.path_v3, mode="w").store
         root_v3 = zarr.group(store=store_v3)
-        self.group_v3 = root_v3.create_group("test_v3")
+        self.group_v3 = root_v3.create_group("test")
 
     def create_data(self, shape, dtype=np.uint8, mean_val=10):
         rng = np.random.default_rng(0)
@@ -99,7 +98,7 @@ class TestWriter:
 
         if version.version == "0.5":
             group = self.group_v3
-            grp_path = self.path_v3 / "test_v3"
+            grp_path = self.path_v3 / "test"
         else:
             group = self.group
             grp_path = self.path / "test"
@@ -157,6 +156,7 @@ class TestWriter:
         # Since parse_url() used FormatV04(), this is not compatible with v0.5
         data = self.create_data((64, 64, 64))
         with pytest.raises(ValueError) as err:
+            # self.group is zarr v2
             write_image(data, self.group, axes="zyx", fmt=CurrentFormat())
         assert "Group is zarr_format: 2" in str(err.value)
 
@@ -172,7 +172,7 @@ class TestWriter:
             grp_path = self.path / "test"
         else:
             group = self.group_v3
-            grp_path = self.path_v3 / "test_v3"
+            grp_path = self.path_v3 / "test"
 
         write_image(data, group, axes="zyx")
         reader = Reader(parse_url(f"{grp_path}"))
@@ -198,41 +198,61 @@ class TestWriter:
 
     @pytest.mark.parametrize("read_from_zarr", [True, False])
     @pytest.mark.parametrize("compute", [True, False])
-    def test_write_image_dask(self, read_from_zarr, compute):
+    @pytest.mark.parametrize("zarr_format", [2, 3])
+    def test_write_image_dask(self, read_from_zarr, compute, zarr_format):
+        if zarr_format == 2:
+            grp_path = self.path / "test"
+            fmt = FormatV04()
+            zarr_attrs = ".zattrs"
+            zarr_array = ".zarray"
+            group = self.group
+        else:
+            grp_path = self.path_v3 / "test"
+            fmt = CurrentFormat()
+            zarr_attrs = "zarr.json"
+            zarr_array = "zarr.json"
+            group = self.group_v3
+
         # Size 100 tests resize shapes: https://github.com/ome/ome-zarr-py/issues/219
         shape = (128, 200, 200)
         data = self.create_data(shape)
         data_delayed = da.from_array(data)
         chunks = (32, 32)
+        # same NAME needed for exact zarr_attrs match below
+        # (otherwise group.name is used)
+        NAME = "test_write_image_dask"
         opts = {"chunks": chunks, "compressor": None}
         if read_from_zarr:
             # write to zarr and re-read as dask...
-            path = f"{self.path}/temp/"
-            store = parse_url(path, mode="w", fmt=FormatV04()).store
-            temp_group = zarr.group(store=store).create_group("test")
+            path = f"{grp_path}/temp/"
+            store = parse_url(path, mode="w", fmt=fmt).store
+            # store and group will be zarr v2 or v3 depending on fmt
+            temp_group = zarr.group(store=store).create_group("to_dask")
+            assert temp_group.info._zarr_format == zarr_format
             write_image(
                 data_delayed,
                 temp_group,
                 axes="zyx",
                 storage_options=opts,
+                name=NAME,
             )
-            loc = ZarrLocation(f"{self.path}/temp/test")
+            print("PATH", f"{grp_path}/temp/to_dask")
+            loc = ZarrLocation(f"{grp_path}/temp/to_dask")
+
             reader = Reader(loc)()
             nodes = list(reader)
-            data_delayed = (
-                nodes[0]
-                .load(Multiscales)
-                .array(resolution="0", version=CurrentFormat().version)
-            )
+            data_delayed = nodes[0].load(Multiscales).array(resolution="0")
             # check that the data is the same
             assert np.allclose(data, data_delayed[...].compute())
 
+        assert group.info._zarr_format == zarr_format
         dask_delayed_jobs = write_image(
             data_delayed,
-            self.group,
+            group,
             axes="zyx",
             storage_options={"chunks": chunks, "compressor": None},
             compute=compute,
+            name=NAME,
         )
 
         assert not compute == len(dask_delayed_jobs)
@@ -242,7 +262,8 @@ class TestWriter:
             # before persisting the jobs
             dask_delayed_jobs = persist(*dask_delayed_jobs)
 
-        reader = Reader(parse_url(f"{self.path}/test"))
+        # check the data written to zarr v2 or v3 group
+        reader = Reader(parse_url(f"{grp_path}"))
         image_node = next(iter(reader()))
         first_chunk = [c[0] for c in image_node.data[0].chunks]
         assert tuple(first_chunk) == _retuple(chunks, image_node.data[0].shape)
@@ -260,16 +281,16 @@ class TestWriter:
                 # if shape smaller than chunk, dask writer uses chunk == shape
                 # so we only compare larger resolutions
                 assert filecmp.cmp(
-                    f"{self.path}/temp/test/{level}/.zarray",
-                    f"{self.path}/test/{level}/.zarray",
+                    f"{grp_path}/temp/to_dask/{level}/{zarr_array}",
+                    f"{grp_path}/{level}/{zarr_array}",
                     shallow=False,
                 )
 
         if read_from_zarr:
-            # .zattrs should be the same
+            # exact match, including NAME
             assert filecmp.cmp(
-                f"{self.path}/temp/test/.zattrs",
-                f"{self.path}/test/.zattrs",
+                f"{grp_path}/temp/to_dask/{zarr_attrs}",
+                f"{grp_path}/{zarr_attrs}",
                 shallow=False,
             )
 
@@ -299,7 +320,7 @@ class TestWriter:
             axes="zyx",
             storage_options={"compressor": compressor},
         )
-        group = zarr.open(f"{self.path}/test", zarr_format=2)
+        group = zarr.open(f"{self.path}/test")
         assert len(group["0"].info._compressors) > 0
         comp = group["0"].info._compressors[0]
         assert comp.get_config() == {
@@ -310,8 +331,15 @@ class TestWriter:
             "blocksize": 0,
         }
 
+    @pytest.mark.parametrize(
+        "format_version",
+        (
+            pytest.param(FormatV04, id="V04"),
+            pytest.param(FormatV05, id="V05"),
+        ),
+    )
     @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])
-    def test_default_compression(self, array_constructor):
+    def test_default_compression(self, array_constructor, format_version):
         """Test that the default compression is not None.
 
         We make an array of zeros which should compress trivially easily,
@@ -323,20 +351,29 @@ class TestWriter:
         arr_np[0, 0, 0, 0] = 1
         # 4MB chunks, trivially compressible
         arr = array_constructor(arr_np)
-        with TemporaryDirectory(suffix=".ome.zarr") as tempdir:
-            path = tempdir
-            store = parse_url(path, mode="w", fmt=FormatV04()).store
-            root = zarr.group(store=store)
-            # no compressor options, we are checking default
-            write_multiscale(
-                [arr],
-                group=root,
-                axes="tzyx",
-                chunks=(1, 50, 200, 400),
-            )
-            # check chunk: multiscale level 0, 4D chunk at (0, 0, 0, 0)
-            chunk_size = (pathlib.Path(path) / "0/0/0/0/0").stat().st_size
-            assert chunk_size < 4e6
+        # tempdir = TemporaryDirectory(suffix=".ome.zarr")
+        # self.path = pathlib.Path(tmpdir.mkdir("data"))
+        path = self.path / "test_default_compression"
+        store = parse_url(path, mode="w", fmt=format_version()).store
+        root = zarr.group(store=store)
+        assert root.info._zarr_format == format_version().zarr_format
+        # no compressor options, we are checking default
+        write_multiscale(
+            [arr],
+            group=root,
+            axes="tzyx",
+            chunks=(1, 50, 200, 400),
+        )
+
+        # check chunk: multiscale level 0, 4D chunk at (0, 0, 0, 0)
+        c = ""
+        if format_version().zarr_format == 3:
+            assert (path / "zarr.json").exists()
+            assert (path / "0/zarr.json").exists()
+            c = "c/"
+
+        chunk_size = (path / f"0/{c}0/0/0/0").stat().st_size
+        assert chunk_size < 4e6
 
     def test_validate_coordinate_transforms(self):
         fmt = FormatV04()

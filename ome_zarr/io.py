@@ -89,7 +89,7 @@ class ZarrLocation:
                 self.zgroup = self.zgroup["ome"]
             self.__metadata = self.zgroup
         except (ValueError, FileNotFoundError):
-            # group doesn't exist. If we are in "w" mode, we need to create Zarr v2 group.
+            # group doesn't exist. If we are in "w" mode, we need to create it.
             if self.__mode == "w":
                 # If we are creating a new group, we need to specify the zarr_format.
                 zarr_format = self.__fmt.zarr_format

@@ -299,7 +299,7 @@ class Multiscales(Spec):
         LOGGER.info("datasets %s", datasets)
 
         for resolution in self.datasets:
-            data: da.core.Array = self.array(resolution, version)
+            data: da.core.Array = self.array(resolution)
             chunk_sizes = [
                 str(c[0]) + (f" (+ {c[-1]})" if c[-1] != c[0] else "")
                 for c in data.chunks
@@ -320,7 +320,7 @@ class Multiscales(Spec):
         if child_zarr.exists():
             node.add(child_zarr, visibility=False)
 
-    def array(self, resolution: str, version: str) -> da.core.Array:
+    def array(self, resolution: str) -> da.core.Array:
         # data.shape is (t, c, z, y, x) by convention
         return self.zarr.load(resolution)
 

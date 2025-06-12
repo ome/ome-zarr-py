@@ -270,12 +270,27 @@ Please use the 'storage_options' argument instead."""
         # (which might have been changed for versions 0.1 or 0.2)
         # if chunks are explicitly set in the storage options
         chunks_opt = options.pop("chunks", chunks)
-        # switch to this code in 0.5
-        # chunks_opt = options.pop("chunks", None)
         if chunks_opt is not None:
             chunks_opt = _retuple(chunks_opt, data.shape)
 
+        options = {}
+        options["chunk_key_encoding"] = fmt.chunk_key_encoding
+        zarr_format = fmt.zarr_format
+        if zarr_format == 2:
+            # by default we use Blosc with zstd compression
+            options["compressor"] = options.get("compressor", _blosc_compressor())
+        else:
+            if axes is not None:
+                # the array zarr.json also contains axes names
+                # TODO: check if this is written by da.to_zarr
+                options["dimension_names"] = [
+                    axis["name"] for axis in axes if isinstance(axis, dict)
+                ]
+
         if isinstance(data, da.Array):
+            if zarr_format == 2:
+                options["dimension_separator"] = "/"
+                del options["chunk_key_encoding"]
             # handle any 'chunks' option from storage_options
             if chunks_opt is not None:
                 data = da.array(data).rechunk(chunks=chunks_opt)
@@ -285,28 +300,18 @@ Please use the 'storage_options' argument instead."""
                 component=str(Path(group.path, str(path))),
                 # IF we pass storage_options then dask NEEDS url to be a string
                 storage_options=None,
-                # by default we use Blosc with zstd compression
-                compressor=options.get("compressor", _blosc_compressor()),
-                dimension_separator="/",
                 compute=compute,
-                zarr_format=2,
+                zarr_format=zarr_format,
+                **options,
             )
 
             if not compute:
                 dask_delayed.append(da_delayed)
 
         else:
-            if fmt.zarr_format == 3:
-                if axes is not None:
-                    # the array zarr.json also contains axes names
-                    options["dimension_names"] = [
-                        axis["name"] for axis in axes if isinstance(axis, dict)
-                    ]
-
             if chunks_opt is not None:
                 options["chunks"] = chunks_opt
             options["shape"] = data.shape
-            options["chunk_key_encoding"] = fmt.chunk_key_encoding
             # otherwise we get 'null'
             options["fill_value"] = 0
 
@@ -559,6 +564,8 @@ def write_image(
     fmt = _check_format(group, fmt)
     dask_delayed_jobs = []
 
+    name = metadata.pop("name", None)
+    name = str(name) if name is not None else None
     if isinstance(image, da.Array):
         dask_delayed_jobs = _write_dask_image(
             image,
@@ -569,7 +576,7 @@ def write_image(
             axes=axes,
             coordinate_transformations=coordinate_transformations,
             storage_options=storage_options,
-            name=None,
+            name=name,
             compute=compute,
             **metadata,
         )
@@ -583,7 +590,7 @@ def write_image(
             axes=axes,
             coordinate_transformations=coordinate_transformations,
             storage_options=storage_options,
-            name=None,
+            name=name,
             compute=compute,
             **metadata,
         )
@@ -663,16 +670,23 @@ Please use the 'storage_options' argument instead."""
         LOGGER.debug(
             "write dask.array to_zarr shape: %s, dtype: %s", image.shape, image.dtype
         )
+        kwargs: dict[str, Any] = {}
+        zarr_format = fmt.zarr_format
+        if zarr_format == 2:
+            kwargs["dimension_separator"] = "/"
+            kwargs["compressor"] = options.pop("compressor", _blosc_compressor())
+        else:
+            kwargs["chunk_key_encoding"] = fmt.chunk_key_encoding
+
         delayed.append(
             da.to_zarr(
                 arr=image,
                 url=group.store,
                 component=str(Path(group.path, str(path))),
-                storage_options=options,
+                # storage_options=options,
                 compute=False,
-                compressor=options.pop("compressor", _blosc_compressor()),
-                dimension_separator="/",
-                zarr_format=2,
+                zarr_format=zarr_format,
+                **kwargs,
             )
         )
         datasets.append({"path": str(path)})
