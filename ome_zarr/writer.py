@@ -501,11 +501,16 @@ def write_well_metadata(
     """
 
     fmt = _check_format(group, fmt)
-    well = {
+    well: dict[str, Any] = {
         "images": _validate_well_images(images),
-        "version": fmt.version,
     }
     group.attrs["well"] = well
+    if fmt.version in ("0.1", "0.2", "0.3", "0.4"):
+        well["version"] = fmt.version
+        group.attrs["well"] = well
+    else:
+        # Zarr v3 metadata under 'ome' with top-level version
+        group.attrs["ome"] = {"version": fmt.version, "well": well}
 
 
 def write_image(

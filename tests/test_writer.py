@@ -153,12 +153,19 @@ class TestWriter:
         assert np.allclose(data, node.data[0][...].compute())
 
     def test_mix_zarr_formats(self):
-        # Since parse_url() used FormatV04(), this is not compatible with v0.5
+        # check group zarr v2 and v3 matches fmt
         data = self.create_data((64, 64, 64))
-        with pytest.raises(ValueError) as err:
-            # self.group is zarr v2
+        with pytest.raises(ValueError, match=r"Group is zarr_format: 2"):
             write_image(data, self.group, axes="zyx", fmt=CurrentFormat())
-        assert "Group is zarr_format: 2" in str(err.value)
+
+        with pytest.raises(ValueError, match=r"Group is zarr_format: 3"):
+            write_multiscale([data], self.group_v3, fmt=FormatV04())
+
+        with pytest.raises(ValueError, match=r"Group is zarr_format: 3"):
+            write_plate_metadata(self.group_v3, ["A"], ["1"], ["A/1"], fmt=FormatV04())
+
+        with pytest.raises(ValueError, match=r"Group is zarr_format: 2"):
+            write_well_metadata(self.group, [{"path": "0"}], fmt=CurrentFormat())
 
     @pytest.mark.parametrize("zarr_format", [2, 3])
     @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])
@@ -1142,15 +1149,37 @@ class TestWellMetadata:
     @pytest.fixture(autouse=True)
     def initdir(self, tmpdir):
         self.path = pathlib.Path(tmpdir.mkdir("data"))
+        # create zarr v2 group...
         self.store = parse_url(self.path, mode="w", fmt=FormatV04()).store
         self.root = zarr.group(store=self.store)
 
+        # create zarr v3 group too...
+        self.path_v3 = self.path / "v3"
+        store_v3 = parse_url(self.path_v3, mode="w").store
+        self.root_v3 = zarr.group(store=store_v3)
+
+    @pytest.mark.parametrize("fmt", (FormatV04(), FormatV05()))
     @pytest.mark.parametrize("images", (["0"], [{"path": "0"}]))
-    def test_minimal_well(self, images):
-        write_well_metadata(self.root, images)
-        assert "well" in self.root.attrs
-        assert self.root.attrs["well"]["images"] == [{"path": "0"}]
-        assert self.root.attrs["well"]["version"] == FormatV04().version
+    def test_minimal_well(self, images, fmt):
+        if fmt.version == "0.5":
+            group = self.root_v3
+        else:
+            group = self.root
+        write_well_metadata(group, images)
+        # we want to be sure this is zarr v2 / v3, so we load json manually too
+        attrs = group.attrs
+        if fmt.version == "0.5":
+            attrs = attrs.get("ome")
+            assert attrs["version"] == fmt.version
+            json_text = (self.path_v3 / "zarr.json").read_text(encoding="utf-8")
+            attrs_json = json.loads(json_text).get("attributes", {}).get("ome", {})
+        else:
+            json_text = (self.path / ".zattrs").read_text(encoding="utf-8")
+            attrs_json = json.loads(json_text)
+            assert attrs["well"]["version"] == fmt.version
+
+        assert "well" in attrs_json
+        assert attrs["well"]["images"] == [{"path": "0"}]
 
     @pytest.mark.parametrize(
         "images",
@@ -1164,14 +1193,14 @@ class TestWellMetadata:
         ),
     )
     def test_multiple_images(self, images):
-        write_well_metadata(self.root, images, fmt=FormatV04())
-        assert "well" in self.root.attrs
-        assert self.root.attrs["well"]["images"] == [
+        write_well_metadata(self.root_v3, images)
+        assert "well" in self.root_v3.attrs.get("ome", {})
+        assert self.root_v3.attrs["ome"]["well"]["images"] == [
             {"path": "0"},
             {"path": "1"},
             {"path": "2"},
         ]
-        assert self.root.attrs["well"]["version"] == FormatV04().version
+        self.root_v3.attrs["ome"]["version"] == FormatV05().version
 
     @pytest.mark.parametrize("fmt", (FormatV01(), FormatV02(), FormatV03()))
     def test_version(self, fmt):
@@ -1186,7 +1215,7 @@ class TestWellMetadata:
             {"path": "1", "acquisition": 2},
             {"path": "2", "acquisition": 3},
         ]
-        write_well_metadata(self.root, images, fmt=FormatV04())
+        write_well_metadata(self.root, images)
         assert "well" in self.root.attrs
         assert self.root.attrs["well"]["images"] == images
         assert self.root.attrs["well"]["version"] == FormatV04().version
@@ -1210,7 +1239,7 @@ class TestWellMetadata:
             {"path": "1", "acquisition": 2, "unspecified_key": "beta"},
             {"path": "2", "acquisition": 3, "unspecified_key": "gamma"},
         ]
-        write_well_metadata(self.root, images, fmt=FormatV04())
+        write_well_metadata(self.root, images)
         assert "well" in self.root.attrs
         assert self.root.attrs["well"]["images"] == images
         assert self.root.attrs["well"]["version"] == FormatV04().version
