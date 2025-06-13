@@ -1248,16 +1248,21 @@ class TestWellMetadata:
 class TestLabelWriter:
     @pytest.fixture(autouse=True)
     def initdir(self, tmpdir):
-        self.path = pathlib.Path(tmpdir.mkdir("data.ome.zarr"))
+        self.path = pathlib.Path(tmpdir.mkdir("data"))
+        # create zarr v2 group...
         self.store = parse_url(self.path, mode="w", fmt=FormatV04()).store
         self.root = zarr.group(store=self.store)
+        # create zarr v3 group...
+        self.path_v3 = self.path / "v3"
+        store_v3 = parse_url(self.path_v3, mode="w").store
+        self.root_v3 = zarr.group(store=store_v3)
 
-    def create_image_data(self, shape, scaler, fmt, axes, transformations):
+    def create_image_data(self, group, shape, scaler, fmt, axes, transformations):
         rng = np.random.default_rng(0)
         data = rng.poisson(10, size=shape).astype(np.uint8)
         write_image(
             image=data,
-            group=self.root,
+            group=group,
             scaler=scaler,
             fmt=fmt,
             axes=axes,
@@ -1283,9 +1288,11 @@ class TestLabelWriter:
         else:
             return None
 
-    def verify_label_data(self, label_name, label_data, fmt, shape, transformations):
+    def verify_label_data(
+        self, img_path, label_name, label_data, fmt, shape, transformations
+    ):
         # Verify image data
-        reader = Reader(parse_url(f"{self.path}/labels/{label_name}"))
+        reader = Reader(parse_url(f"{img_path}/labels/{label_name}"))
         node = next(iter(reader()))
         assert Multiscales.matches(node.zarr)
         if fmt.version in ("0.1", "0.2"):
@@ -1303,16 +1310,24 @@ class TestLabelWriter:
         assert np.allclose(label_data, node.data[0][...].compute())
 
         # Verify label metadata
-        label_root = zarr.open(f"{self.path}/labels", mode="r")
-        assert "labels" in label_root.attrs
-        assert label_name in label_root.attrs["labels"]
+        label_root = zarr.open(f"{img_path}/labels", mode="r")
+        label_attrs = label_root.attrs
+        if fmt.version == "0.5":
+            label_attrs = label_attrs["ome"]
+        assert "labels" in label_attrs
+        assert label_name in label_attrs["labels"]
 
-        label_group = zarr.open(f"{self.path}/labels/{label_name}", mode="r")
-        assert "image-label" in label_group.attrs
-        assert label_group.attrs["image-label"]["version"] == fmt.version
+        label_group = zarr.open(f"{img_path}/labels/{label_name}", mode="r")
+        imglabel_attrs = label_group.attrs
+        if fmt.version == "0.5":
+            imglabel_attrs = imglabel_attrs["ome"]
+            assert imglabel_attrs["version"] == fmt.version
+        else:
+            assert imglabel_attrs["image-label"]["version"] == fmt.version
+        assert "image-label" in imglabel_attrs
 
         # Verify multiscale metadata
-        name = label_group.attrs["multiscales"][0].get("name", "")
+        name = imglabel_attrs["multiscales"][0].get("name", "")
         assert label_name == name
 
     @pytest.mark.parametrize(
@@ -1322,11 +1337,19 @@ class TestLabelWriter:
             pytest.param(FormatV02, id="V02"),
             pytest.param(FormatV03, id="V03"),
             pytest.param(FormatV04, id="V04"),
+            pytest.param(FormatV05, id="V05"),
         ),
     )
     @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])
     def test_write_labels(self, shape, scaler, format_version, array_constructor):
         fmt = format_version()
+        if fmt.version == "0.5":
+            img_path = self.path_v3
+            group = self.root_v3
+        else:
+            img_path = self.path
+            group = self.root
+
         axes = "tczyx"[-len(shape) :]
         transformations = []
         for dataset_transfs in TRANSFORMATIONS:
@@ -1349,18 +1372,20 @@ class TestLabelWriter:
         label_data = array_constructor(label_data)
 
         # create the root level image data
-        self.create_image_data(shape, scaler, fmt, axes, transformations)
+        self.create_image_data(group, shape, scaler, fmt, axes, transformations)
 
         write_labels(
             label_data,
-            self.root,
+            group,
             scaler=scaler,
             name=label_name,
             fmt=fmt,
             axes=axes,
             coordinate_transformations=transformations,
         )
-        self.verify_label_data(label_name, label_data, fmt, shape, transformations)
+        self.verify_label_data(
+            img_path, label_name, label_data, fmt, shape, transformations
+        )
 
     @pytest.mark.parametrize(
         "format_version",
@@ -1402,7 +1427,7 @@ class TestLabelWriter:
             labels_mip = scaler.nearest(label_data)
 
         # create the root level image data
-        self.create_image_data(shape, scaler, fmt, axes, transformations)
+        self.create_image_data(self.root, shape, scaler, fmt, axes, transformations)
 
         write_multiscale_labels(
             labels_mip,
@@ -1412,7 +1437,9 @@ class TestLabelWriter:
             axes=axes,
             coordinate_transformations=transformations,
         )
-        self.verify_label_data(label_name, label_data, fmt, shape, transformations)
+        self.verify_label_data(
+            self.path, label_name, label_data, fmt, shape, transformations
+        )
 
     @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])
     def test_two_label_images(self, array_constructor):
@@ -1427,6 +1454,7 @@ class TestLabelWriter:
         scaler = Scaler()
         fmt = FormatV04()
         self.create_image_data(
+            self.root,
             shape,
             scaler,
             axes=axes,
@@ -1448,7 +1476,9 @@ class TestLabelWriter:
                 axes=axes,
                 coordinate_transformations=transformations,
             )
-            self.verify_label_data(label_name, label_data, fmt, shape, transformations)
+            self.verify_label_data(
+                self.path, label_name, label_data, fmt, shape, transformations
+            )
 
         # Verify label metadata
         label_root = zarr.open(f"{self.path}/labels", mode="r")

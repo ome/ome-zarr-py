@@ -772,11 +772,19 @@ def write_label_metadata(
     if properties is not None:
         image_label_metadata["properties"] = properties
     image_label_metadata["version"] = fmt.version
-    label_group.attrs["image-label"] = image_label_metadata
 
     label_list = group.attrs.get("labels", [])
     label_list.append(name)
-    group.attrs["labels"] = label_list
+
+    if fmt.version in ("0.1", "0.2", "0.3", "0.4"):
+        group.attrs["labels"] = label_list
+        label_group.attrs["image-label"] = image_label_metadata
+    else:
+        # Zarr v3 metadata under 'ome' with top-level version
+        group.attrs["ome"] = {"labels": label_list}
+        ome_metadata = label_group.attrs.get("ome", {})
+        ome_metadata["image-label"] = image_label_metadata
+        label_group.attrs["ome"] = ome_metadata
 
 
 def write_multiscale_labels(
