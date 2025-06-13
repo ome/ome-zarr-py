@@ -465,7 +465,6 @@ def write_plate_metadata(
         "columns": _validate_plate_rows_columns(columns),
         "rows": _validate_plate_rows_columns(rows),
         "wells": _validate_plate_wells(wells, rows, columns, fmt=fmt),
-        "version": fmt.version,
     }
     if name is not None:
         plate["name"] = name
@@ -474,6 +473,13 @@ def write_plate_metadata(
     if acquisitions is not None:
         plate["acquisitions"] = _validate_plate_acquisitions(acquisitions)
     group.attrs["plate"] = plate
+
+    if fmt.version in ("0.1", "0.2", "0.3", "0.4"):
+        plate["version"] = fmt.version
+        group.attrs["plate"] = plate
+    else:
+        # Zarr v3 metadata under 'ome' with top-level version
+        group.attrs["ome"] = {"version": fmt.version, "plate": plate}
 
 
 def write_well_metadata(

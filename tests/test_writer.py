@@ -375,8 +375,15 @@ class TestWriter:
         chunk_size = (path / f"0/{c}0/0/0/0").stat().st_size
         assert chunk_size < 4e6
 
-    def test_validate_coordinate_transforms(self):
-        fmt = FormatV04()
+    @pytest.mark.parametrize(
+        "format_version",
+        (
+            pytest.param(FormatV04, id="V04"),
+            pytest.param(FormatV05, id="V05"),
+        ),
+    )
+    def test_validate_coordinate_transforms(self, format_version):
+        fmt = format_version()
 
         transformations = [
             [{"type": "scale", "scale": (1, 1)}],
@@ -534,21 +541,39 @@ class TestMultiscalesMetadata:
     @pytest.fixture(autouse=True)
     def initdir(self, tmpdir):
         self.path = pathlib.Path(tmpdir.mkdir("data"))
+        # create zarr v2 group...
         self.store = parse_url(self.path, mode="w", fmt=FormatV04()).store
         self.root = zarr.group(store=self.store)
 
-    def test_multi_levels_transformations(self):
+        # let's create zarr v3 group too...
+        self.path_v3 = self.path / "v3"
+        store_v3 = parse_url(self.path_v3, mode="w").store
+        self.root_v3 = zarr.group(store=store_v3)
+
+    @pytest.mark.parametrize("fmt", (FormatV04(), FormatV05()))
+    def test_multi_levels_transformations(self, fmt):
         datasets = []
         for level, transf in enumerate(TRANSFORMATIONS):
             datasets.append({"path": str(level), "coordinateTransformations": transf})
-        write_multiscales_metadata(self.root, datasets, axes="tczyx", fmt=FormatV04())
-        assert "multiscales" in self.root.attrs
-        assert "version" in self.root.attrs["multiscales"][0]
-        assert self.root.attrs["multiscales"][0]["datasets"] == datasets
-        # we want to be sure this is zarr v2 (no top-level 'attributes')
-        json_text = (self.path / ".zattrs").read_text(encoding="utf-8")
-        attrs_json = json.loads(json_text)
+        if fmt.version == "0.5":
+            group = self.root_v3
+        else:
+            group = self.root
+        write_multiscales_metadata(group, datasets, axes="tczyx")
+        # we want to be sure this is zarr v2 / v3
+        attrs = group.attrs
+        if fmt.version == "0.5":
+            attrs = attrs.get("ome")
+            assert "version" in attrs
+            json_text = (self.path_v3 / "zarr.json").read_text(encoding="utf-8")
+            attrs_json = json.loads(json_text).get("attributes", {}).get("ome", {})
+        else:
+            json_text = (self.path / ".zattrs").read_text(encoding="utf-8")
+            attrs_json = json.loads(json_text)
+            assert "version" in attrs["multiscales"][0]
         assert "multiscales" in attrs_json
+        assert "multiscales" in attrs
+        assert attrs["multiscales"][0]["datasets"] == datasets
 
     @pytest.mark.parametrize("fmt", (FormatV01(), FormatV02(), FormatV03()))
     def test_version(self, fmt):
@@ -716,7 +741,6 @@ class TestMultiscalesMetadata:
                     datasets,
                     axes="tczyx",
                     metadata={"omero": metadata},
-                    fmt=FormatV04(),
                 )
         else:
             window_metadata = (
@@ -769,23 +793,40 @@ class TestPlateMetadata:
     @pytest.fixture(autouse=True)
     def initdir(self, tmpdir):
         self.path = pathlib.Path(tmpdir.mkdir("data"))
+        # create zarr v2 group...
         self.store = parse_url(self.path, mode="w", fmt=FormatV04()).store
         self.root = zarr.group(store=self.store)
+        # create zarr v3 group...
+        self.path_v3 = self.path / "v3"
+        store_v3 = parse_url(self.path_v3, mode="w").store
+        self.root_v3 = zarr.group(store=store_v3)
 
-    def test_minimal_plate(self):
-        write_plate_metadata(self.root, ["A"], ["1"], ["A/1"], fmt=FormatV04())
-        assert "plate" in self.root.attrs
-        assert self.root.attrs["plate"]["columns"] == [{"name": "1"}]
-        assert self.root.attrs["plate"]["rows"] == [{"name": "A"}]
-        assert self.root.attrs["plate"]["version"] == FormatV04().version
-        assert self.root.attrs["plate"]["wells"] == [
+    @pytest.mark.parametrize("fmt", (FormatV04(), FormatV05()))
+    def test_minimal_plate(self, fmt):
+        if fmt.version == "0.4":
+            group = self.root
+        else:
+            group = self.root_v3
+        write_plate_metadata(group, ["A"], ["1"], ["A/1"])
+        attrs = group.attrs
+        if fmt.version != "0.4":
+            attrs = attrs["ome"]
+            assert attrs["version"] == fmt.version
+        else:
+            attrs["plate"]["version"] == fmt.version
+
+        assert "plate" in attrs
+        assert attrs["plate"]["columns"] == [{"name": "1"}]
+        assert attrs["plate"]["rows"] == [{"name": "A"}]
+        assert attrs["plate"]["wells"] == [
             {"path": "A/1", "rowIndex": 0, "columnIndex": 0}
         ]
-        assert "name" not in self.root.attrs["plate"]
-        assert "field_count" not in self.root.attrs["plate"]
-        assert "acquisitions" not in self.root.attrs["plate"]
+        assert "name" not in attrs["plate"]
+        assert "field_count" not in attrs["plate"]
+        assert "acquisitions" not in attrs["plate"]
 
-    def test_12wells_plate(self):
+    @pytest.mark.parametrize("fmt", (FormatV04(), FormatV05()))
+    def test_12wells_plate(self, fmt):
         rows = ["A", "B", "C", "D"]
         cols = ["1", "2", "3"]
         wells = [
@@ -802,21 +843,28 @@ class TestPlateMetadata:
             "D/2",
             "D/3",
         ]
-        write_plate_metadata(self.root, rows, cols, wells, fmt=FormatV04())
-        assert "plate" in self.root.attrs
-        assert self.root.attrs["plate"]["columns"] == [
+        if fmt.version == "0.4":
+            group = self.root
+        else:
+            group = self.root_v3
+        write_plate_metadata(group, rows, cols, wells)
+        attrs = group.attrs
+        if fmt.version != "0.4":
+            attrs = attrs["ome"]
+
+        assert "plate" in attrs
+        assert attrs["plate"]["columns"] == [
             {"name": "1"},
             {"name": "2"},
             {"name": "3"},
         ]
-        assert self.root.attrs["plate"]["rows"] == [
+        assert attrs["plate"]["rows"] == [
             {"name": "A"},
             {"name": "B"},
             {"name": "C"},
             {"name": "D"},
         ]
-        assert self.root.attrs["plate"]["version"] == FormatV04().version
-        assert self.root.attrs["plate"]["wells"] == [
+        assert attrs["plate"]["wells"] == [
             {"path": "A/1", "rowIndex": 0, "columnIndex": 0},
             {"path": "A/2", "rowIndex": 0, "columnIndex": 1},
             {"path": "A/3", "rowIndex": 0, "columnIndex": 2},
@@ -830,41 +878,48 @@ class TestPlateMetadata:
             {"path": "D/2", "rowIndex": 3, "columnIndex": 1},
             {"path": "D/3", "rowIndex": 3, "columnIndex": 2},
         ]
-        assert "name" not in self.root.attrs["plate"]
-        assert "field_count" not in self.root.attrs["plate"]
-        assert "acquisitions" not in self.root.attrs["plate"]
+        assert "name" not in attrs["plate"]
+        assert "field_count" not in attrs["plate"]
+        assert "acquisitions" not in attrs["plate"]
 
-    def test_sparse_plate(self):
+    @pytest.mark.parametrize("fmt", (FormatV04(), FormatV05()))
+    def test_sparse_plate(self, fmt):
         rows = ["A", "B", "C", "D", "E"]
         cols = ["1", "2", "3", "4", "5"]
         wells = [
             "B/2",
             "E/5",
         ]
-        write_plate_metadata(self.root, rows, cols, wells, fmt=FormatV04())
-        assert "plate" in self.root.attrs
-        assert self.root.attrs["plate"]["columns"] == [
+        if fmt.version == "0.4":
+            group = self.root
+        else:
+            group = self.root_v3
+        write_plate_metadata(group, rows, cols, wells)
+        attrs = group.attrs
+        if fmt.version != "0.4":
+            attrs = attrs["ome"]
+        assert "plate" in attrs
+        assert attrs["plate"]["columns"] == [
             {"name": "1"},
             {"name": "2"},
             {"name": "3"},
             {"name": "4"},
             {"name": "5"},
         ]
-        assert self.root.attrs["plate"]["rows"] == [
+        assert attrs["plate"]["rows"] == [
             {"name": "A"},
             {"name": "B"},
             {"name": "C"},
             {"name": "D"},
             {"name": "E"},
         ]
-        assert self.root.attrs["plate"]["version"] == FormatV04().version
-        assert self.root.attrs["plate"]["wells"] == [
+        assert attrs["plate"]["wells"] == [
             {"path": "B/2", "rowIndex": 1, "columnIndex": 1},
             {"path": "E/5", "rowIndex": 4, "columnIndex": 4},
         ]
-        assert "name" not in self.root.attrs["plate"]
-        assert "field_count" not in self.root.attrs["plate"]
-        assert "acquisitions" not in self.root.attrs["plate"]
+        assert "name" not in attrs["plate"]
+        assert "field_count" not in attrs["plate"]
+        assert "acquisitions" not in attrs["plate"]
 
     @pytest.mark.parametrize("fmt", (FormatV01(), FormatV02(), FormatV03()))
     def test_legacy_wells(self, fmt):
@@ -879,19 +934,20 @@ class TestPlateMetadata:
         assert "acquisitions" not in self.root.attrs["plate"]
 
     def test_plate_name(self):
-        write_plate_metadata(
-            self.root, ["A"], ["1"], ["A/1"], name="test", fmt=FormatV04()
-        )
-        assert "plate" in self.root.attrs
-        assert self.root.attrs["plate"]["columns"] == [{"name": "1"}]
-        assert self.root.attrs["plate"]["name"] == "test"
-        assert self.root.attrs["plate"]["rows"] == [{"name": "A"}]
-        assert self.root.attrs["plate"]["version"] == FormatV04().version
-        assert self.root.attrs["plate"]["wells"] == [
+        # We don't need to test v04 and v05 for all tests since
+        # the metadata is the same
+        write_plate_metadata(self.root_v3, ["A"], ["1"], ["A/1"], name="test")
+        attrs = self.root_v3.attrs["ome"]
+        assert "plate" in attrs
+        assert attrs["plate"]["columns"] == [{"name": "1"}]
+        assert attrs["plate"]["name"] == "test"
+        assert attrs["plate"]["rows"] == [{"name": "A"}]
+        assert attrs["version"] == FormatV05().version
+        assert attrs["plate"]["wells"] == [
             {"path": "A/1", "rowIndex": 0, "columnIndex": 0}
         ]
-        assert "field_count" not in self.root.attrs["plate"]
-        assert "acquisitions" not in self.root.attrs["plate"]
+        assert "field_count" not in attrs["plate"]
+        assert "acquisitions" not in attrs["plate"]
 
     def test_field_count(self):
         write_plate_metadata(
@@ -960,19 +1016,12 @@ class TestPlateMetadata:
     def test_invalid_acquisition_keys(self, acquisitions):
         with pytest.raises(ValueError):
             write_plate_metadata(
-                self.root,
-                ["A"],
-                ["1"],
-                ["A/1"],
-                acquisitions=acquisitions,
-                fmt=FormatV04(),
+                self.root_v3, ["A"], ["1"], ["A/1"], acquisitions=acquisitions
             )
 
     def test_unspecified_acquisition_keys(self):
         a = [{"id": 0, "unspecified_key": "0"}]
-        write_plate_metadata(
-            self.root, ["A"], ["1"], ["A/1"], acquisitions=a, fmt=FormatV04()
-        )
+        write_plate_metadata(self.root, ["A"], ["1"], ["A/1"], acquisitions=a)
         assert "plate" in self.root.attrs
         assert self.root.attrs["plate"]["acquisitions"] == a
 
@@ -982,7 +1031,7 @@ class TestPlateMetadata:
     )
     def test_invalid_well_list(self, wells):
         with pytest.raises(ValueError):
-            write_plate_metadata(self.root, ["A"], ["1"], wells, fmt=FormatV04())
+            write_plate_metadata(self.root, ["A"], ["1"], wells)
 
     @pytest.mark.parametrize(
         "wells",
