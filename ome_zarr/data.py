@@ -12,10 +12,10 @@ from skimage.measure import label
 from skimage.morphology import closing, remove_small_objects, square
 from skimage.segmentation import clear_border
 
-from .format import Format, FormatV04
+from .format import CurrentFormat, Format
 from .io import parse_url
 from .scale import Scaler
-from .writer import write_multiscale
+from .writer import add_metadata, write_multiscale
 
 CHANNEL_DIMENSION = 1
 
@@ -121,7 +121,7 @@ def create_zarr(
     zarr_directory: str,
     method: Callable[..., tuple[list, list]] = coins,
     label_name: str = "coins",
-    fmt: Format = FormatV04(),
+    fmt: Format = CurrentFormat(),
     chunks: tuple | list | None = None,
 ) -> zarr.Group:
     """Generate a synthetic image pyramid with labels."""
@@ -129,7 +129,7 @@ def create_zarr(
 
     loc = parse_url(zarr_directory, mode="w", fmt=fmt)
     assert loc
-    grp = zarr.group(loc.store, zarr_format=2)
+    grp = zarr.group(loc.store)
     axes = None
     size_c = 1
     if fmt.version not in ("0.1", "0.2"):
@@ -162,6 +162,7 @@ def create_zarr(
                 {
                     "window": {"start": 0, "end": 255, "min": 0, "max": 255},
                     "color": "FF0000",
+                    "active": True,
                 }
             ],
             "rdefs": {"model": "greyscale"},
@@ -201,7 +202,7 @@ def create_zarr(
 
     if labels:
         labels_grp = grp.create_group("labels")
-        labels_grp.attrs["labels"] = [label_name]
+        add_metadata(labels_grp, {"labels": [label_name]})
 
         label_grp = labels_grp.create_group(label_name)
         if axes is not None:
@@ -215,11 +216,16 @@ def create_zarr(
             rgba = [randrange(0, 256) for i in range(4)]
             colors.append({"label-value": x, "rgba": rgba})
             properties.append({"label-value": x, "class": f"class {x}"})
-        label_grp.attrs["image-label"] = {
-            "version": fmt.version,
-            "colors": colors,
-            "properties": properties,
-            "source": {"image": "../../"},
-        }
+        add_metadata(
+            label_grp,
+            {
+                "image-label": {
+                    "version": fmt.version,
+                    "colors": colors,
+                    "properties": properties,
+                    "source": {"image": "../../"},
+                }
+            },
+        )
 
     return grp

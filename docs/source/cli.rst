@@ -59,13 +59,15 @@ create
 To create sample OME-Zarr image from the `skimage <https://scikit-image.org/docs/stable/api/skimage.data.html>`_
 data.
 
-Create an OME-Zarr image in coinsdata/ dir::
+Create an OME-Zarr image in coinsdata/ dir using 'coins' method in OME-Zarr latest version or v0.4::
 
-    ome_zarr create coinsdata
+    ome_zarr create coinsdata.zarr
+
+    ome_zarr create coinsdata.zarr --version 0.4
 
 Create an rgb image from skimage astronaut in testimage dir::
 
-    ome_zarr create testimage --method=astronaut
+    ome_zarr create testimage.zarr --method=astronaut
 
 csv to labels
 =============

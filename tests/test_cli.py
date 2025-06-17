@@ -6,9 +6,9 @@ import pytest
 import zarr
 
 from ome_zarr.cli import main
-from ome_zarr.format import FormatV04
+from ome_zarr.format import FormatV04, FormatV05
 from ome_zarr.io import parse_url
-from ome_zarr.utils import finder, strip_common_prefix, view
+from ome_zarr.utils import find_multiscales, finder, strip_common_prefix, view
 from ome_zarr.writer import write_plate_metadata
 
 
@@ -116,7 +116,11 @@ class TestCli:
         # we need dry_run to be True to avoid blocking the test with server
         view(filename, 8000, True)
 
-    def test_finder(self):
+    @pytest.mark.parametrize(
+        "fmt",
+        (pytest.param(FormatV04(), id="V04"), pytest.param(FormatV05(), id="V05")),
+    )
+    def test_finder(self, fmt):
         img_dir = (self.path / "images").mkdir()
 
         # test with empty directory - for code coverage
@@ -125,8 +129,24 @@ class TestCli:
 
         img_dir2 = (img_dir / "dir2").mkdir()
         bf2raw_dir = (img_dir / "bf2raw.zarr").mkdir()
-        main(["create", "--method=astronaut", (str(img_dir / "astronaut"))])
-        main(["create", "--method=coins", (str(img_dir2 / "coins"))])
+        main(
+            [
+                "create",
+                "--method=astronaut",
+                (str(img_dir / "astronaut")),
+                "--version",
+                fmt.version,
+            ]
+        )
+        main(
+            [
+                "create",
+                "--method=coins",
+                (str(img_dir2 / "coins")),
+                "--version",
+                fmt.version,
+            ]
+        )
         (bf2raw_dir / "OME").mkdir()
 
         # write minimal bioformats2raw and xml metadata
@@ -141,7 +161,7 @@ class TestCli:
 
         # create a plate
         plate_path = Path(img_dir2.mkdir("plate"))
-        store = parse_url(plate_path, mode="w", fmt=FormatV04()).store
+        store = parse_url(plate_path, mode="w", fmt=fmt).store
         root = zarr.group(store=store)
         write_plate_metadata(root, ["A"], ["1"], ["A/1"])
 
@@ -154,3 +174,8 @@ class TestCli:
         assert "dir2/plate/A/1/0,plate,dir2" in csv_text
         assert "coins,dir2" in csv_text
         assert "test.fake" in csv_text
+
+    def test_find_multiscales(self):
+        # for code coverage...
+        empty_dir = (self.path / "find_multiscales").mkdir()
+        assert len(find_multiscales(empty_dir)) == 0

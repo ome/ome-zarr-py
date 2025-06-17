@@ -6,6 +6,7 @@ from zarr.storage import LocalStore
 
 from ome_zarr.data import create_zarr
 from ome_zarr.io import ZarrLocation, parse_url
+from ome_zarr.writer import add_metadata, get_metadata
 
 
 class TestIO:
@@ -38,14 +39,16 @@ class TestIO:
 
     def test_no_overwrite(self):
         print("self.path:", self.path)
-        assert self.root.attrs.get("multiscales") is not None
+
+        assert self.root.attrs.get("ome") is not None
         # Test that we can open a store to write, without
         # overwriting existing data
         new_store = parse_url(str(self.path), mode="w").store
         new_root = zarr.open_group(store=new_store)
-        new_root.attrs["extra"] = "test_no_overwrite"
+        add_metadata(new_root, {"extra": "test_no_overwrite"})
         # read...
         read_store = parse_url(str(self.path)).store
         read_root = zarr.open_group(store=read_store, mode="r")
-        assert read_root.attrs.get("extra") == "test_no_overwrite"
-        assert read_root.attrs.get("multiscales") is not None
+        attrs = get_metadata(read_root)
+        assert attrs.get("extra") == "test_no_overwrite"
+        assert attrs.get("multiscales") is not None

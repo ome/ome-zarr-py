@@ -8,7 +8,13 @@ from ome_zarr.data import create_zarr
 from ome_zarr.format import FormatV04
 from ome_zarr.io import parse_url
 from ome_zarr.reader import Node, Plate, Reader, Well
-from ome_zarr.writer import write_image, write_plate_metadata, write_well_metadata
+from ome_zarr.writer import (
+    add_metadata,
+    get_metadata,
+    write_image,
+    write_plate_metadata,
+    write_well_metadata,
+)
 
 
 class TestReader:
@@ -85,9 +91,9 @@ class TestInvalid:
     def test_invalid_version(self):
         grp = create_zarr(str(self.path))
         # update version to something invalid
-        attrs = grp.attrs.asdict()
+        attrs = get_metadata(grp)
         attrs["multiscales"][0]["version"] = "invalid"
-        grp.attrs.put(attrs)
+        add_metadata(grp, attrs)
         # should raise exception
         with pytest.raises(ValueError) as exe:
             reader = Reader(parse_url(str(self.path)))

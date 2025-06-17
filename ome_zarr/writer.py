@@ -388,7 +388,7 @@ def write_multiscales_metadata(
         and isinstance(metadata["metadata"], dict)
         and "omero" in metadata["metadata"]
     ):
-        omero_metadata = metadata["metadata"].get("omero")
+        omero_metadata = metadata["metadata"].pop("omero")
         if omero_metadata is None:
             raise KeyError("If `'omero'` is present, value cannot be `None`.")
         for c in omero_metadata["channels"]:
@@ -404,27 +404,26 @@ def write_multiscales_metadata(
                     if not isinstance(c["window"][p], (int, float)):
                         raise TypeError(f"`'{p}'` must be an int or float.")
 
-        group.attrs["omero"] = omero_metadata
+        add_metadata(group, {"omero": omero_metadata})
 
     # note: we construct the multiscale metadata via dict(), rather than {}
     # to avoid duplication of protected keys like 'version' in **metadata
     # (for {} this would silently over-write it, with dict() it explicitly fails)
     multiscales = [
-        dict(
-            datasets=_validate_datasets(datasets, ndim, fmt),
-            name=name or group.name,
-            **metadata,
-        )
+        dict(datasets=_validate_datasets(datasets, ndim, fmt), name=name or group.name)
     ]
+    if len(metadata.get("metadata", {})) > 0:
+        multiscales[0]["metadata"] = metadata["metadata"]
     if axes is not None:
         multiscales[0]["axes"] = axes
 
     if fmt.version in ("0.1", "0.2", "0.3", "0.4"):
         multiscales[0]["version"] = fmt.version
-        group.attrs["multiscales"] = multiscales
     else:
-        # Zarr v3 metadata under 'ome' with top-level version
-        group.attrs["ome"] = {"version": fmt.version, "multiscales": multiscales}
+        # Zarr v3 top-level version
+        add_metadata(group, {"version": fmt.version})
+
+    add_metadata(group, {"multiscales": multiscales})
 
 
 def write_plate_metadata(
