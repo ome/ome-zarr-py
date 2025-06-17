@@ -773,18 +773,46 @@ def write_label_metadata(
         image_label_metadata["properties"] = properties
     image_label_metadata["version"] = fmt.version
 
-    label_list = group.attrs.get("labels", [])
+    label_list = get_metadata(group).get("labels", [])
     label_list.append(name)
 
+    add_metadata(group, {"labels": label_list}, fmt=fmt)
+    add_metadata(label_group, {"image-label": image_label_metadata}, fmt=fmt)
+
+
+def get_metadata(group: zarr.Group, fmt: Format | None = None) -> dict:
+    fmt = _check_format(group, fmt)
+    attrs = group.attrs
+    if fmt.version not in ("0.1", "0.2", "0.3", "0.4"):
+        attrs = attrs.get("ome", {})
+    else:
+        attrs = dict(attrs)
+    return attrs
+
+
+def add_metadata(
+    group: zarr.Group, metadata: JSONDict, fmt: Format | None = None
+) -> None:
+
+    fmt = _check_format(group, fmt)
+
+    attrs = group.attrs
+    if fmt.version not in ("0.1", "0.2", "0.3", "0.4"):
+        attrs = attrs.get("ome", {})
+
+    for key, value in metadata.items():
+        # merge dicts...
+        if isinstance(value, dict) and isinstance(attrs.get(key), dict):
+            attrs[key].update(value)
+        else:
+            attrs[key] = value
+
     if fmt.version in ("0.1", "0.2", "0.3", "0.4"):
-        group.attrs["labels"] = label_list
-        label_group.attrs["image-label"] = image_label_metadata
+        for key, value in attrs.items():
+            group.attrs[key] = value
     else:
         # Zarr v3 metadata under 'ome' with top-level version
-        group.attrs["ome"] = {"labels": label_list}
-        ome_metadata = label_group.attrs.get("ome", {})
-        ome_metadata["image-label"] = image_label_metadata
-        label_group.attrs["ome"] = ome_metadata
+        group.attrs["ome"] = attrs
 
 
 def write_multiscale_labels(

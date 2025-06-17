@@ -1394,6 +1394,7 @@ class TestLabelWriter:
             pytest.param(FormatV02, id="V02"),
             pytest.param(FormatV03, id="V03"),
             pytest.param(FormatV04, id="V04"),
+            pytest.param(FormatV05, id="V05"),
         ),
     )
     @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])
@@ -1401,6 +1402,12 @@ class TestLabelWriter:
         self, shape, scaler, format_version, array_constructor
     ):
         fmt = format_version()
+        if fmt.version == "0.5":
+            img_path = self.path_v3
+            group = self.root_v3
+        else:
+            img_path = self.path
+            group = self.root
         axes = "tczyx"[-len(shape) :]
         transformations = []
         for dataset_transfs in TRANSFORMATIONS:
@@ -1427,22 +1434,32 @@ class TestLabelWriter:
             labels_mip = scaler.nearest(label_data)
 
         # create the root level image data
-        self.create_image_data(self.root, shape, scaler, fmt, axes, transformations)
+        self.create_image_data(group, shape, scaler, fmt, axes, transformations)
 
         write_multiscale_labels(
             labels_mip,
-            self.root,
+            group,
             name=label_name,
             fmt=fmt,
             axes=axes,
             coordinate_transformations=transformations,
         )
         self.verify_label_data(
-            self.path, label_name, label_data, fmt, shape, transformations
+            img_path, label_name, label_data, fmt, shape, transformations
         )
 
+    @pytest.mark.parametrize(
+        "fmt",
+        (pytest.param(FormatV04(), id="V04"), pytest.param(FormatV05(), id="V05")),
+    )
     @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])
-    def test_two_label_images(self, array_constructor):
+    def test_two_label_images(self, array_constructor, fmt):
+        if fmt.version == "0.5":
+            img_path = self.path_v3
+            group = self.root_v3
+        else:
+            img_path = self.path
+            group = self.root
         axes = "tczyx"
         transformations = []
         for dataset_transfs in TRANSFORMATIONS:
@@ -1452,9 +1469,8 @@ class TestLabelWriter:
         # create the root level image data
         shape = (1, 2, 1, 256, 256)
         scaler = Scaler()
-        fmt = FormatV04()
         self.create_image_data(
-            self.root,
+            group,
             shape,
             scaler,
             axes=axes,
@@ -1470,20 +1486,21 @@ class TestLabelWriter:
 
             write_multiscale_labels(
                 labels_mip,
-                self.root,
+                group,
                 name=label_name,
                 fmt=fmt,
                 axes=axes,
                 coordinate_transformations=transformations,
             )
             self.verify_label_data(
-                self.path, label_name, label_data, fmt, shape, transformations
+                img_path, label_name, label_data, fmt, shape, transformations
             )
 
         # Verify label metadata
-        label_root = zarr.open(f"{self.path}/labels", mode="r")
-        assert "labels" in label_root.attrs
-        assert len(label_root.attrs["labels"]) == len(label_names)
-        assert all(
-            label_name in label_root.attrs["labels"] for label_name in label_names
-        )
+        label_root = zarr.open(f"{img_path}/labels", mode="r")
+        attrs = label_root.attrs
+        if fmt.version == "0.5":
+            attrs = attrs["ome"]
+        assert "labels" in attrs
+        assert len(attrs["labels"]) == len(label_names)
+        assert all(label_name in attrs["labels"] for label_name in label_names)
