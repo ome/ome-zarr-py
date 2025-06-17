@@ -23,7 +23,7 @@ The following code creates a 3D Image in OME-Zarr::
 
     from ome_zarr.io import parse_url
     from ome_zarr.format import FormatV04
-    from ome_zarr.writer import write_image
+    from ome_zarr.writer import write_image, add_metadata
 
     path = "test_ngff_image.zarr"
 
@@ -32,8 +32,8 @@ The following code creates a 3D Image in OME-Zarr::
     rng = np.random.default_rng(0)
     data = rng.poisson(lam=10, size=(size_z, size_xy, size_xy)).astype(np.uint8)
 
-    # write the image data
-    store = parse_url(path, mode="w", fmt=FormatV04()).store
+    # Use fmt=FormatV04() to write v0.4 format (zarr v2)
+    store = parse_url(path, mode="w").store
     root = zarr.group(store=store)
     write_image(image=data, group=root, axes="zyx",
                 storage_options=dict(chunks=(1, size_xy, size_xy)))
@@ -48,16 +48,16 @@ Rendering settings
 ------------------
 Render settings can be added to an existing zarr group::
 
-    store = parse_url(path, mode="w", fmt=FormatV04()).store
+    store = parse_url(path, mode="w").store
     root = zarr.group(store=store)
-    root.attrs["omero"] = {
+    add_metadata(root, {"omero": {
         "channels": [{
             "color": "00FFFF",
             "window": {"start": 0, "end": 20, "min": 0, "max": 255},
             "label": "random",
             "active": True,
         }]
-    }
+    }})
 
 Writing labels
 --------------
@@ -71,7 +71,7 @@ The following code creates a 3D Image in OME-Zarr with labels::
     from skimage.data import binary_blobs
     from ome_zarr.format import FormatV04
     from ome_zarr.io import parse_url
-    from ome_zarr.writer import write_image
+    from ome_zarr.writer import write_image, add_metadata
 
     path = "test_ngff_image_labels.zarr"
     os.mkdir(path)
@@ -82,20 +82,20 @@ The following code creates a 3D Image in OME-Zarr with labels::
     rng = np.random.default_rng(0)
     data = rng.poisson(mean_val, size=(size_z, size_xy, size_xy)).astype(np.uint8)
 
-    # write the image data
-    store = parse_url(path, mode="w", fmt=FormatV04()).store
+    # Use fmt=FormatV04() to write v0.4 format (zarr v2)
+    store = parse_url(path, mode="w").store
     root = zarr.group(store=store)
     write_image(image=data, group=root, axes="zyx",
                 storage_options=dict(chunks=(1, size_xy, size_xy)))
     # optional rendering settings
-    root.attrs["omero"] = {
+    add_metadata(root, {"omero": {
         "channels": [{
             "color": "00FFFF",
             "window": {"start": 0, "end": 20, "min": 0, "max": 255},
             "label": "random",
             "active": True,
         }]
-    }
+    }})
 
 
     # add labels...
@@ -111,18 +111,19 @@ The following code creates a 3D Image in OME-Zarr with labels::
     labels_grp = root.create_group("labels")
     # the 'labels' .zattrs lists the named labels data
     label_name = "blobs"
-    labels_grp.attrs["labels"] = [label_name]
+    add_metadata(labels_grp, {"labels": [label_name]})
     label_grp = labels_grp.create_group(label_name)
-    # need 'image-label' attr to be recognized as label
-    label_grp.attrs["image-label"] = {
+    write_image(label, label_grp, axes="zyx")
+
+    # we need 'image-label' attr to be recognized as label
+    add_metadata(label_grp, {"image-label": {
         "colors": [
             {"label-value": 1, "rgba": [255, 0, 0, 255]},
             {"label-value": 2, "rgba": [0, 255, 0, 255]},
             {"label-value": 3, "rgba": [255, 255, 0, 255]}
         ]
-    }
+    }})
 
-    write_image(label, label_grp, axes="zyx")
 
 Writing HCS datasets to OME-NGFF
 --------------------------------
