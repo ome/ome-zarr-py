@@ -15,7 +15,7 @@ from skimage.segmentation import clear_border
 from .format import CurrentFormat, Format
 from .io import parse_url
 from .scale import Scaler
-from .writer import write_multiscale
+from .writer import add_metadata, write_multiscale
 
 CHANNEL_DIMENSION = 1
 
@@ -127,7 +127,7 @@ def create_zarr(
     """Generate a synthetic image pyramid with labels."""
     pyramid, labels = method()
 
-    loc = parse_url(zarr_directory, mode="w")
+    loc = parse_url(zarr_directory, mode="w", fmt=fmt)
     assert loc
     grp = zarr.group(loc.store)
     axes = None
@@ -162,6 +162,7 @@ def create_zarr(
                 {
                     "window": {"start": 0, "end": 255, "min": 0, "max": 255},
                     "color": "FF0000",
+                    "active": True,
                 }
             ],
             "rdefs": {"model": "greyscale"},
@@ -196,17 +197,18 @@ def create_zarr(
         axes=axes,
         storage_options=storage_options,
         metadata={"omero": image_data},
+        fmt=fmt,
     )
 
     if labels:
         labels_grp = grp.create_group("labels")
-        labels_grp.attrs["labels"] = [label_name]
+        add_metadata(labels_grp, {"labels": [label_name]})
 
         label_grp = labels_grp.create_group(label_name)
         if axes is not None:
             # remove channel axis for masks
             axes = axes.replace("c", "")
-        write_multiscale(labels, label_grp, axes=axes)
+        write_multiscale(labels, label_grp, axes=axes, fmt=fmt)
 
         colors = []
         properties = []
@@ -214,11 +216,16 @@ def create_zarr(
             rgba = [randrange(0, 256) for i in range(4)]
             colors.append({"label-value": x, "rgba": rgba})
             properties.append({"label-value": x, "class": f"class {x}"})
-        label_grp.attrs["image-label"] = {
-            "version": fmt.version,
-            "colors": colors,
-            "properties": properties,
-            "source": {"image": "../../"},
-        }
+        add_metadata(
+            label_grp,
+            {
+                "image-label": {
+                    "version": fmt.version,
+                    "colors": colors,
+                    "properties": properties,
+                    "source": {"image": "../../"},
+                }
+            },
+        )
 
     return grp
