@@ -77,7 +77,8 @@ class ZarrLocation:
         # zarr_format. This is not needed for reading.
         zarr_format = None
         try:
-            # this group is used to get zgroup metadata (is this used for anything?)
+            # this group is used to get zgroup metadata
+            # used for info, download, Spec.match() via root_attrs() etc.
             # and to check if the group exists for reading. Only need "r" mode for this.
             group = zarr.open_group(
                 store=self.__store, path="/", mode="r", zarr_format=zarr_format
@@ -118,6 +119,11 @@ class ZarrLocation:
     @property
     def mode(self) -> str:
         return self.__mode
+
+    @property
+    def version(self) -> str:
+        """Return the version of the OME-NGFF spec used for this location."""
+        return self.__fmt.version
 
     @property
     def path(self) -> str:

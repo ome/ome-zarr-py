@@ -6,7 +6,7 @@ import pytest
 import zarr
 
 from ome_zarr.cli import main
-from ome_zarr.format import FormatV04, FormatV05
+from ome_zarr.format import CurrentFormat, FormatV04, FormatV05
 from ome_zarr.io import parse_url
 from ome_zarr.utils import find_multiscales, finder, strip_common_prefix, view
 from ome_zarr.writer import write_plate_metadata
@@ -33,45 +33,89 @@ class TestCli:
             "0.1": "https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.1/6001240.zarr",
             "0.2": "https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.2/6001240.zarr",
             "0.3": "https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.3/9836842.zarr",
+            "0.4": "https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.4/idr0062A/6001240.zarr",
+            "0.5": "https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.5/idr0062A/6001240_labels.zarr",
         }
         return urls[request.param]
 
-    def test_coins_info(self):
+    @pytest.mark.parametrize(
+        "fmt",
+        (
+            pytest.param(FormatV04(), id="V04"),
+            pytest.param(FormatV05(), id="V05"),
+            pytest.param(None, id="CurrentFormat"),
+        ),
+    )
+    def test_coins_info(self, capsys, fmt):
+        """Test create and info with various formats."""
         filename = str(self.path) + "-1"
-        main(["create", "--method=coins", filename])
+        args = ["create", "--method=coins", filename]
+        if fmt:
+            args += ["--version", fmt.version]
+        main(args)
         main(["info", filename])
+        out, err = capsys.readouterr()
+        print("Captured output:", out)
+        assert "labels/coins" in out
+        version = fmt.version if fmt else CurrentFormat().version
+        assert f"- version: {version}" in out
 
     def test_astronaut_info(self):
         filename = str(self.path) + "-2"
         main(["create", "--method=astronaut", filename])
         main(["info", filename])
 
-    def test_astronaut_download(self, tmpdir):
+    @pytest.mark.parametrize(
+        "fmt",
+        (
+            pytest.param(FormatV04(), id="V04"),
+            pytest.param(FormatV05(), id="V05"),
+            pytest.param(None, id="CurrentFormat"),
+        ),
+    )
+    def test_astronaut_download(self, tmpdir, fmt):
         out = str(tmpdir / "out")
         filename = str(self.path) + "-3"
         basename = os.path.split(filename)[-1]
-        main(["create", "--method=astronaut", filename])
+        args = ["create", "--method=astronaut", filename]
+        if fmt:
+            args += ["--version", fmt.version]
+        main(args)
         main(["download", filename, f"--output={out}"])
         main(["info", f"{out}/{basename}"])
 
-        assert directory_items(Path(out) / "data-3") == [
-            Path(".zattrs"),
-            Path(".zgroup"),
-            Path("0"),
-            Path("1"),
-            Path("2"),
-            Path("3"),
-            Path("4"),
-            Path("labels"),
-        ]
-
-        assert directory_items(Path(out) / "data-3" / "1") == [
-            Path(".zarray"),
-            Path(".zattrs"),  # empty '{}'
-            Path("0"),
-            Path("1"),
-            Path("2"),
-        ]
+        if fmt is not None and fmt.zarr_format == 2:
+            assert directory_items(Path(out) / "data-3") == [
+                Path(".zattrs"),
+                Path(".zgroup"),
+                Path("0"),
+                Path("1"),
+                Path("2"),
+                Path("3"),
+                Path("4"),
+                Path("labels"),
+            ]
+            assert directory_items(Path(out) / "data-3" / "1") == [
+                Path(".zarray"),
+                Path(".zattrs"),  # empty '{}'
+                Path("0"),
+                Path("1"),
+                Path("2"),
+            ]
+        else:
+            assert directory_items(Path(out) / "data-3") == [
+                Path("0"),
+                Path("1"),
+                Path("2"),
+                Path("3"),
+                Path("4"),
+                Path("labels"),
+                Path("zarr.json"),
+            ]
+            assert directory_items(Path(out) / "data-3" / "1") == [
+                Path("c"),
+                Path("zarr.json"),
+            ]
 
     def test_s3_info(self, s3_address):
         main(["info", s3_address])

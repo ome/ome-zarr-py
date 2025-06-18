@@ -21,9 +21,10 @@ import dask.array as da
 import zarr
 from dask.diagnostics import ProgressBar
 
+from .format import format_from_version
 from .io import parse_url
 from .reader import Multiscales, Node, Reader
-from .types import JSONDict
+from .types import Any, JSONDict
 
 LOGGER = logging.getLogger("ome_zarr.utils")
 
@@ -54,6 +55,11 @@ def info(path: str, stats: bool = False) -> Iterator[Node]:
             continue
 
         print(node)
+        loc = node.zarr
+        version = loc.zgroup.get("version")
+        if version is None:
+            version = loc.zgroup.get("multiscales", [{}])[0].get("version", "")
+        print(" - version:", version)
         print(" - metadata")
         for spec in node.specs:
             print(f"   - {spec.__class__.__name__}")
@@ -333,19 +339,46 @@ def download(input_path: str, output_dir: str = ".") -> None:
         target_path = output_path / Path(*path)
         target_path.mkdir(parents=True)
 
-        with (target_path / ".zgroup").open("w") as f:
+        # Use version etc...
+        version = node.zarr.version
+        fmt = format_from_version(version)
+
+        # store = parse_url(input_path, mode="w", fmt=fmt)
+        group_file = "zarr.json"
+        attrs_file = "zarr.json"
+        if fmt.zarr_format == 2:
+            group_file = ".zgroup"
+            attrs_file = ".zattrs"
+
+        with (target_path / group_file).open("w") as f:
             f.write(json.dumps(node.zarr.zgroup))
-        with (target_path / ".zattrs").open("w") as f:
+        with (target_path / attrs_file).open("w") as f:
             metadata: JSONDict = {}
             node.write_metadata(metadata)
+            if fmt.zarr_format == 3:
+                # For zarr v3, we need to put metadata under "ome" namespace
+                metadata = {
+                    "attributes": {"ome": metadata},
+                    "zarr_format": 3,
+                    "node_type": "group",
+                }
             f.write(json.dumps(metadata))
 
         resolutions: list[da.core.Array] = []
         datasets: list[str] = []
+
         for spec in node.specs:
             if isinstance(spec, Multiscales):
                 datasets = spec.datasets
                 resolutions = node.data
+                options: dict[str, Any] = {}
+                if fmt.zarr_format == 2:
+                    options["dimension_separator"] = "/"
+                else:
+                    options["chunk_key_encoding"] = fmt.chunk_key_encoding
+                    options["dimension_names"] = [
+                        axis["name"] for axis in node.metadata["axes"]
+                    ]
                 if datasets and resolutions:
                     pbar = ProgressBar()
                     for dataset, data in reversed(list(zip(datasets, resolutions))):
@@ -353,8 +386,8 @@ def download(input_path: str, output_dir: str = ".") -> None:
                         with pbar:
                             data.to_zarr(
                                 str(target_path / dataset),
-                                zarr_format=2,
-                                dimension_separator="/",
+                                zarr_format=fmt.zarr_format,
+                                **options,
                             )
             else:
                 # Assume a group that needs metadata, like labels
