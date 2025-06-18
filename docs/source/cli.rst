@@ -23,7 +23,7 @@ Remote data::
 
 Local data::
 
-    ome_zarr info 6001240.zarr/
+    ome_zarr info 6001240_labels.zarr/
 
 view
 ====
@@ -47,11 +47,11 @@ download
 
 To download all the resolutions and metadata for an image use ``ome_zarr download``. This creates ``6001240.zarr`` locally::
 
-    ome_zarr download https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.1/6001240.zarr/
+    ome_zarr download https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.5/idr0062A/6001240_labels.zarr
 
 Specify a different output directory::
 
-    ome_zarr download https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.1/6001240.zarr/ --output image_dir
+    ome_zarr download https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.5/idr0062A/6001240_labels.zarr --output image_dir
 
 create
 ======

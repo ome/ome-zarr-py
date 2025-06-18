@@ -153,7 +153,8 @@ This sample code shows how to write a high-content screening dataset (i.e. cultu
     data = rng.poisson(mean_val, size=(num_wells, num_fields, size_z, size_xy, size_xy)).astype(np.uint8)
 
     # write the plate of images and corresponding metadata
-    store = parse_url(path, mode="w", fmt=FormatV04()).store
+    # Use fmt=FormatV04() in parse_url() to write v0.4 format (zarr v2)
+    store = parse_url(path, mode="w").store
     root = zarr.group(store=store)
     write_plate_metadata(root, row_names, col_names, well_paths)
     for wi, wp in enumerate(well_paths):

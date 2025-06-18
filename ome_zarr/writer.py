@@ -471,7 +471,6 @@ def write_plate_metadata(
         plate["field_count"] = field_count
     if acquisitions is not None:
         plate["acquisitions"] = _validate_plate_acquisitions(acquisitions)
-    group.attrs["plate"] = plate
 
     if fmt.version in ("0.1", "0.2", "0.3", "0.4"):
         plate["version"] = fmt.version
@@ -503,7 +502,7 @@ def write_well_metadata(
     well: dict[str, Any] = {
         "images": _validate_well_images(images),
     }
-    group.attrs["well"] = well
+
     if fmt.version in ("0.1", "0.2", "0.3", "0.4"):
         well["version"] = fmt.version
         group.attrs["well"] = well
