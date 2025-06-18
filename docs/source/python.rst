@@ -188,7 +188,7 @@ the data is available as `dask` arrays::
     from ome_zarr.reader import Reader
     import napari
 
-    url = "https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.4/idr0062A/6001240.zarr"
+    url = "https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.5/idr0062A/6001240_labels.zarr"
 
     # read the image data
     store = parse_url(url, mode="r").store
@@ -218,7 +218,7 @@ Writing big image from tiles::
     import os
     import zarr
     from ome_zarr.io import parse_url
-    from ome_zarr.format import FormatV04
+    from ome_zarr.format import CurrentFormat, FormatV04
     from ome_zarr.reader import Reader
     from ome_zarr.writer import write_multiscales_metadata
     from ome_zarr.dask_utils import resize as da_resize
@@ -226,12 +226,16 @@ Writing big image from tiles::
     import dask.array as da
     from math import ceil
 
+    fmt = CurrentFormat()
+    # Use fmt=FormatV04() to write v0.4 format (zarr v2)
+
     url = "https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.3/9836842.zarr"
     reader = Reader(parse_url(url))
     nodes = list(reader())
     # first level of the pyramid
     dask_data = nodes[0].data[0]
     tile_size = 512
+    axes = [{"name": "c", "type": "channel"}, {"name": "y", "type": "space"}, {"name": "x", "type": "space"}]
 
     def downsample_pyramid_on_disk(parent, paths):
         """
@@ -259,10 +263,16 @@ Writing big image from tiles::
                 dask_image, tuple(dims), preserve_range=True, anti_aliasing=False
             )
 
+            options = {}
+            if fmt.zarr_format == 2:
+                options["dimension_separator"] = "/"
+            else:
+                options["chunk_key_encoding"] = fmt.chunk_key_encoding
+                options["dimension_names"] = [axis["name"] for axis in axes]
             # write to disk
             da.to_zarr(
                 arr=output, url=img_path, component=path,
-                dimension_separator="/", zarr_format=2,
+                zarr_format=fmt.zarr_format, **options
             )
         return paths
 
@@ -283,7 +293,7 @@ Writing big image from tiles::
     row_count = ceil(shape[-2]/tile_size)
     col_count = ceil(shape[-1]/tile_size)
 
-    store = parse_url("9836842.zarr", mode="w", fmt=FormatV04()).store
+    store = parse_url("9836842_v4.zarr", mode="w", fmt=fmt).store
     root = zarr.group(store=store)
 
     # create empty array at root of pyramid
@@ -293,7 +303,8 @@ Writing big image from tiles::
         exact=True,
         chunks=chunks,
         dtype=d_type,
-        chunk_key_encoding={"name": "v2", "separator": "/"},
+        chunk_key_encoding=fmt.chunk_key_encoding,
+        dimension_names=[axis["name"] for axis in axes], # omit for v0.4
     )
 
     print("row_count", row_count, "col_count", col_count)
@@ -310,7 +321,6 @@ Writing big image from tiles::
                 zarray[ch_index, y1:y2, x1:x2] = tile
 
     paths = ["0", "1", "2"]
-    axes = [{"name": "c", "type": "channel"}, {"name": "y", "type": "space"}, {"name": "x", "type": "space"}]
 
     # We have "0" array. This downsamples (in X and Y dims only) to create "1" and "2"
     downsample_pyramid_on_disk(root, paths)
@@ -339,10 +349,11 @@ When that dask data is passed to write_image() the tiles will be loaded on the f
 
     from ome_zarr.io import parse_url
     from ome_zarr.format import FormatV04
-    from ome_zarr.writer import write_image, write_multiscales_metadata
+    from ome_zarr.writer import write_image, add_metadata
 
     zarr_name = "test_dask.zarr"
-    store = parse_url(zarr_name, mode="w", fmt=FormatV04()).store
+    # Use fmt=FormatV04() in parse_url() to write v0.4 format (zarr v2)
+    store = parse_url(zarr_name, mode="w").store
     root = zarr.group(store=store)
 
     size_xy = 100
@@ -390,7 +401,7 @@ When that dask data is passed to write_image() the tiles will be loaded on the f
     # This will create a downsampled 'multiscales' pyramid
     write_image(dask_data, root, axes="czyx")
 
-    root.attrs["omero"] = {
+    add_metadata(root, {"omero": {
         "channels": [
             {
                 "color": "FF0000",
@@ -405,7 +416,7 @@ When that dask data is passed to write_image() the tiles will be loaded on the f
                 "active": True,
             },
         ]
-    }
+    }})
 
     print("Created image. Open with...")
     print(f"ome_zarr view {zarr_name}")

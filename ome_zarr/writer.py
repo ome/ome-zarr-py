@@ -686,6 +686,10 @@ Please use the 'storage_options' argument instead."""
             kwargs["compressor"] = options.pop("compressor", _blosc_compressor())
         else:
             kwargs["chunk_key_encoding"] = fmt.chunk_key_encoding
+            if axes is not None:
+                kwargs["dimension_names"] = [
+                    a["name"] for a in axes if isinstance(a, dict)
+                ]
 
         delayed.append(
             da.to_zarr(
