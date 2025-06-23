@@ -6,6 +6,7 @@ import sys
 
 from .csv import csv_to_zarr
 from .data import astronaut, coins, create_zarr
+from .format import CurrentFormat, Format, format_from_version
 from .scale import Scaler
 from .utils import download as zarr_download
 from .utils import finder as bff_finder
@@ -63,7 +64,11 @@ def create(args: argparse.Namespace) -> None:
         label_name = "circles"
     else:
         raise Exception(f"unknown method: {args.method}")
-    create_zarr(args.path, method=method, label_name=label_name)
+    fmt: Format = CurrentFormat()
+    if args.version:
+        fmt = format_from_version(args.version)
+
+    create_zarr(args.path, method=method, label_name=label_name, fmt=fmt)
 
 
 def scale(args: argparse.Namespace) -> None:
@@ -147,6 +152,9 @@ def main(args: list[str] | None = None) -> None:
         "--method", choices=("coins", "astronaut"), default="coins"
     )
     parser_create.add_argument("path")
+    parser_create.add_argument(
+        "--version", help="OME-Zarr version to create. e.g. '0.4'"
+    )
     parser_create.set_defaults(func=create)
 
     parser_scale = subparsers.add_parser("scale")
