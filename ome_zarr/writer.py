@@ -177,7 +177,7 @@ def _blosc_compressor() -> Blosc:
     return Blosc(cname="zstd", clevel=5, shuffle=Blosc.SHUFFLE)
 
 
-def _check_format(
+def check_format(
     group: zarr.Group,
     fmt: Format | None = None,
 ) -> Format:
@@ -253,7 +253,7 @@ def write_multiscale(
         :class:`dask.delayed.Delayed` representing the value to be computed by
         dask.
     """
-    fmt = _check_format(group, fmt)
+    fmt = check_format(group, fmt)
     dims = len(pyramid[0].shape)
     axes = _get_valid_axes(dims, axes, fmt)
     dask_delayed = []
@@ -372,7 +372,7 @@ def write_multiscales_metadata(
       Ignored for versions 0.1 and 0.2. Required for version 0.3 or greater.
     """
 
-    fmt = _check_format(group, fmt)
+    fmt = check_format(group, fmt)
     ndim = -1
     if axes is not None:
         if fmt.version in ("0.1", "0.2"):
@@ -459,7 +459,7 @@ def write_plate_metadata(
     :param field_count: The maximum number of fields per view across wells.
     """
 
-    fmt = _check_format(group, fmt)
+    fmt = check_format(group, fmt)
     plate: dict[str, str | int | list[dict]] = {
         "columns": _validate_plate_rows_columns(columns),
         "rows": _validate_plate_rows_columns(rows),
@@ -498,7 +498,7 @@ def write_well_metadata(
       Defaults to the most current.
     """
 
-    fmt = _check_format(group, fmt)
+    fmt = check_format(group, fmt)
     well: dict[str, Any] = {
         "images": _validate_well_images(images),
     }
@@ -570,7 +570,7 @@ def write_image(
         :class:`dask.delayed.Delayed` representing the value to be computed by
         dask.
     """
-    fmt = _check_format(group, fmt)
+    fmt = check_format(group, fmt)
     dask_delayed_jobs = []
 
     name = metadata.pop("name", None)
@@ -633,7 +633,7 @@ def _write_dask_image(
     compute: bool | None = True,
     **metadata: str | JSONDict | list[JSONDict],
 ) -> list:
-    fmt = _check_format(group, fmt)
+    fmt = check_format(group, fmt)
     if fmt.version in ("0.1", "0.2"):
         # v0.1 and v0.2 are strictly 5D
         shape_5d: tuple[Any, ...] = (*(1,) * (5 - image.ndim), *image.shape)
@@ -766,7 +766,7 @@ def write_label_metadata(
       The format of the ome_zarr data which should be used.
       Defaults to the most current.
     """
-    fmt = _check_format(group, fmt)
+    fmt = check_format(group, fmt)
     label_group = group[name]
     image_label_metadata = {**metadata}
     if colors is not None:
@@ -783,7 +783,7 @@ def write_label_metadata(
 
 
 def get_metadata(group: zarr.Group, fmt: Format | None = None) -> dict:
-    fmt = _check_format(group, fmt)
+    fmt = check_format(group, fmt)
     attrs = group.attrs
     if fmt.version not in ("0.1", "0.2", "0.3", "0.4"):
         attrs = attrs.get("ome", {})
@@ -796,7 +796,7 @@ def add_metadata(
     group: zarr.Group, metadata: JSONDict, fmt: Format | None = None
 ) -> None:
 
-    fmt = _check_format(group, fmt)
+    fmt = check_format(group, fmt)
 
     attrs = group.attrs
     if fmt.version not in ("0.1", "0.2", "0.3", "0.4"):
@@ -881,7 +881,7 @@ def write_multiscale_labels(
         :class:`dask.delayed.Delayed` representing the value to be computed by
         dask.
     """
-    fmt = _check_format(group, fmt)
+    fmt = check_format(group, fmt)
     sub_group = group.require_group(f"labels/{name}")
     dask_delayed_jobs = write_multiscale(
         pyramid,
@@ -975,7 +975,7 @@ def write_labels(
         :class:`dask.delayed.Delayed` representing the value to be computed by
         dask.
     """
-    fmt = _check_format(group, fmt)
+    fmt = check_format(group, fmt)
     sub_group = group.require_group(f"labels/{name}")
     dask_delayed_jobs = []
 
