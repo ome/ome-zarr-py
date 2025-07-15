@@ -191,8 +191,6 @@ the data is available as `dask` arrays::
     url = "https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.5/idr0062A/6001240_labels.zarr"
 
     # read the image data
-    store = parse_url(url, mode="r").store
-
     reader = Reader(parse_url(url))
     # nodes may include images, labels etc
     nodes = list(reader())
