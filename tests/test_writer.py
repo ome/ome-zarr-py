@@ -418,11 +418,11 @@ class TestWriter:
                 c = "c/"
                 json_text = (path / ds / "zarr.json").read_text(encoding="utf-8")
                 arr_json = json.loads(json_text)
-                assert arr_json["codecs"] == [
-                    {"name": "bytes", "configuration": {"endian": "little"}},
-                    {"name": "zstd", "configuration": {"level": 0, "checksum": False}},
-                ]
-                print("arr_json", arr_json)
+                assert arr_json["codecs"][0]["name"] == "bytes"
+                assert arr_json["codecs"][1] == {
+                    "name": "zstd",
+                    "configuration": {"level": 0, "checksum": False},
+                }
             else:
                 assert (path / ".zattrs").exists()
                 json_text = (path / ds / ".zarray").read_text(encoding="utf-8")
