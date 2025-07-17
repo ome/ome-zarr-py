@@ -273,13 +273,18 @@ Please use the 'storage_options' argument instead."""
         if chunks_opt is not None:
             chunks_opt = _retuple(chunks_opt, data.shape)
 
-        options = {}
         options["chunk_key_encoding"] = fmt.chunk_key_encoding
         zarr_format = fmt.zarr_format
+        compressor = options.pop("compressor", None)
         if zarr_format == 2:
             # by default we use Blosc with zstd compression
-            options["compressor"] = options.get("compressor", _blosc_compressor())
+            # Don't need this for zarr v3 as it has a default compressor
+            if compressor is None:
+                compressor = _blosc_compressor()
+            options["compressor"] = compressor
         else:
+            if compressor is not None:
+                options["compressors"] = [compressor]
             if axes is not None:
                 # the array zarr.json also contains axes names
                 # TODO: check if this is written by da.to_zarr
@@ -315,7 +320,12 @@ Please use the 'storage_options' argument instead."""
             # otherwise we get 'null'
             options["fill_value"] = 0
 
-            group.create_dataset(str(path), data=data, dtype=data.dtype, **options)
+            arr = group.create_array(
+                str(path),
+                dtype=data.dtype,
+                **options,
+            )
+            arr[slice(None)] = data
 
         datasets.append({"path": str(path)})
 
