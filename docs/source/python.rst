@@ -47,7 +47,7 @@ This image can be viewed in `napari` using the
 
 Rendering settings
 ------------------
-Render settings can be added to an existing zarr group::
+Rendering settings can be added to an existing zarr group::
 
     store = parse_url(path, mode="w").store
     root = zarr.group(store=store)
@@ -292,7 +292,7 @@ Writing big image from tiles::
     row_count = ceil(shape[-2]/tile_size)
     col_count = ceil(shape[-1]/tile_size)
 
-    store = parse_url("9836842_v4.zarr", mode="w", fmt=fmt).store
+    store = parse_url("9836842.zarr", mode="w", fmt=fmt).store
     root = zarr.group(store=store)
 
     # create empty array at root of pyramid
