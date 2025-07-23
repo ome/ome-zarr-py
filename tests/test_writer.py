@@ -230,7 +230,7 @@ class TestWriter:
         # same NAME needed for exact zarr_attrs match below
         # (otherwise group.name is used)
         NAME = "test_write_image_dask"
-        opts = {"chunks": chunks, "compressor": None}
+        opts = {"chunks": chunks}
         if read_from_zarr:
             # write to zarr and re-read as dask...
             path = f"{grp_path}/temp/"
@@ -259,7 +259,7 @@ class TestWriter:
             data_delayed,
             group,
             axes="zyx",
-            storage_options={"chunks": chunks, "compressor": None},
+            storage_options={"chunks": chunks},
             compute=compute,
             name=NAME,
         )
