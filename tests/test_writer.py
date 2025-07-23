@@ -341,7 +341,7 @@ class TestWriter:
                 # skip test - can't get this to pass. Fails with:
                 # ValueError: compressor cannot be used for arrays with zarr_format 3.
                 # Use bytes-to-bytes codecs instead.
-                pytest.skip("Dask arrays not supported with zarr v3")
+                pytest.skip("storage_options['compressor'] fails in da.to_zarr()")
         else:
             compressor = Blosc(cname=CNAME, clevel=LEVEL, shuffle=Blosc.SHUFFLE)
 

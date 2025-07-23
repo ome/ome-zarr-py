@@ -700,6 +700,15 @@ Please use the 'storage_options' argument instead."""
                 kwargs["dimension_names"] = [
                     a["name"] for a in axes if isinstance(a, dict)
                 ]
+            if "compressor" in options:
+                # We use 'compressors' for group.create_array() but da.to_zarr() below uses
+                # zarr.create() which doesn't support 'compressors'
+                # TypeError: AsyncArray._create() got an unexpected keyword argument 'compressors'
+                # kwargs["compressors"] = [options.pop("compressor", _blosc_compressor())]
+
+                # ValueError: compressor cannot be used for arrays with zarr_format 3.
+                # Use bytes-to-bytes codecs instead.
+                kwargs["compressor"] = options.pop("compressor")
 
         delayed.append(
             da.to_zarr(
