@@ -9,6 +9,7 @@ import pytest
 import zarr
 from dask import persist
 from numcodecs import Blosc
+from ome_zarr_models.v04.image import Image as Models04Image
 
 from ome_zarr.format import CurrentFormat, FormatV01, FormatV02, FormatV03, FormatV04
 from ome_zarr.io import ZarrLocation, parse_url
@@ -107,7 +108,8 @@ class TestWriter:
         )
 
         # Verify
-        reader = Reader(parse_url(f"{self.path}/test"))
+        loc = parse_url(f"{self.path}/test")
+        reader = Reader(loc)
         node = next(iter(reader()))
         assert Multiscales.matches(node.zarr)
         if version.version in ("0.1", "0.2"):
@@ -128,6 +130,11 @@ class TestWriter:
             first_chunk = [c[0] for c in nd_array.chunks]
             assert tuple(first_chunk) == _retuple(expected, nd_array.shape)
         assert np.allclose(data, node.data[0][...].compute())
+
+        if version.version == "0.4":
+            # Validate with ome-zarr-models-py: only supports v0.4
+            zarr_group = zarr.open(loc.store, mode="r")
+            Models04Image.from_zarr(zarr_group)
 
     @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])
     def test_write_image_current(self, array_constructor):
