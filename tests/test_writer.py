@@ -837,10 +837,7 @@ class TestPlateMetadata:
         ]
         assert "name" not in self.root.attrs["plate"]
         assert "field_count" not in self.root.attrs["plate"]
-
-        # https://github.com/ome-zarr-models/ome-zarr-models-py/issues/211
-        with pytest.raises(KeyError):
-            Models04HCS.from_zarr(self.root)
+        Models04HCS.from_zarr(self.root)
 
     def test_acquisitions_maximal(self):
         a = [
@@ -864,9 +861,7 @@ class TestPlateMetadata:
         ]
         assert "name" not in self.root.attrs["plate"]
         assert "field_count" not in self.root.attrs["plate"]
-        # https://github.com/ome-zarr-models/ome-zarr-models-py/issues/211
-        with pytest.raises(KeyError):
-            Models04HCS.from_zarr(self.root)
+        Models04HCS.from_zarr(self.root)
 
     @pytest.mark.parametrize(
         "acquisitions",
