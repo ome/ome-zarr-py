@@ -13,6 +13,9 @@ from ome_zarr_models.v04 import HCS as Models04HCS
 from ome_zarr_models.v04 import Image as Models04Image
 from ome_zarr_models.v04 import Labels as Models04Labels
 from ome_zarr_models.v04 import Well as Models04Well
+from ome_zarr_models.v05.hcs import HCS as Models05HCS
+from ome_zarr_models.v05.image import Image as Models05Image
+from ome_zarr_models.v05.well import Well as Models05Well
 from zarr.abc.codec import BytesBytesCodec
 from zarr.codecs import BloscCodec
 
@@ -161,6 +164,8 @@ class TestWriter:
         if version.version == "0.4":
             # Validate with ome-zarr-models-py: only supports v0.4
             Models04Image.from_zarr(group)
+        elif version.version == "0.5":
+            Models05Image.from_zarr(group)
 
     def test_mix_zarr_formats(self):
         # check group zarr v2 and v3 matches fmt
@@ -312,7 +317,10 @@ class TestWriter:
             )
 
         # Validate with ome-zarr-models-py
-        Models04Image.from_zarr(group)
+        if fmt.version == "0.4":
+            Models04Image.from_zarr(group)
+        elif fmt.version == "0.5":
+            Models05Image.from_zarr(group)
 
     def test_write_image_scalar_chunks(self):
         """
@@ -388,7 +396,11 @@ class TestWriter:
                     "shuffle": Blosc.SHUFFLE,
                     "blocksize": 0,
                 }
-        Models04Image.from_zarr(group)
+        assert format_version().version in ("0.4", "0.5")
+        if format_version().version == "0.4":
+            Models04Image.from_zarr(group)
+        elif format_version().version == "0.5":
+            Models05Image.from_zarr(group)
 
     @pytest.mark.parametrize(
         "format_version",
@@ -649,12 +661,16 @@ class TestMultiscalesMetadata:
         assert "multiscales" in attrs_json
         assert "multiscales" in attrs
         assert attrs["multiscales"][0]["datasets"] == datasets
-        # No arrays, so this is expected:
-        with pytest.raises(
-            ValueError,
-            match="Expected to find an array at /0, but no array was found there.",
-        ):
-            Models04Image.from_zarr(self.root)
+        if fmt.version == "0.4":
+            # No arrays, so this is expected:
+            with pytest.raises(
+                ValueError,
+                match="Expected to find an array at /0, but no array was found there.",
+            ):
+                Models04Image.from_zarr(group)
+        # No ValueError: https://github.com/ome-zarr-models/ome-zarr-models-py/issues/217
+        if fmt.version == "0.5":
+            Models05Image.from_zarr(group)
 
     @pytest.mark.parametrize("fmt", (FormatV01(), FormatV02(), FormatV03()))
     def test_version(self, fmt):
@@ -916,7 +932,12 @@ class TestPlateMetadata:
         assert "name" not in attrs["plate"]
         assert "field_count" not in attrs["plate"]
         assert "acquisitions" not in attrs["plate"]
-        Models04HCS.from_zarr(group)
+        assert fmt.version in ("0.4", "0.5")
+        if fmt.version == "0.4":
+            Models04HCS.from_zarr(group)
+        elif fmt.version == "0.5":
+            # https://github.com/ome-zarr-models/ome-zarr-models-py/issues/218
+            Models05HCS.from_zarr(group)
 
     @pytest.mark.parametrize("fmt", (FormatV04(), FormatV05()))
     def test_12wells_plate(self, fmt):
@@ -974,7 +995,11 @@ class TestPlateMetadata:
         assert "name" not in attrs["plate"]
         assert "field_count" not in attrs["plate"]
         assert "acquisitions" not in attrs["plate"]
-        Models04HCS.from_zarr(group)
+        assert fmt.version in ("0.4", "0.5")
+        if fmt.version == "0.4":
+            Models04HCS.from_zarr(group)
+        elif fmt.version == "0.5":
+            Models05HCS.from_zarr(group)
 
     @pytest.mark.parametrize("fmt", (FormatV04(), FormatV05()))
     def test_sparse_plate(self, fmt):
@@ -1014,7 +1039,11 @@ class TestPlateMetadata:
         assert "name" not in attrs["plate"]
         assert "field_count" not in attrs["plate"]
         assert "acquisitions" not in attrs["plate"]
-        Models04HCS.from_zarr(group)
+        assert fmt.version in ("0.4", "0.5")
+        if fmt.version == "0.4":
+            Models04HCS.from_zarr(group)
+        elif fmt.version == "0.5":
+            Models05HCS.from_zarr(group)
 
     @pytest.mark.parametrize("fmt", (FormatV01(), FormatV02(), FormatV03()))
     def test_legacy_wells(self, fmt):
@@ -1043,7 +1072,7 @@ class TestPlateMetadata:
         ]
         assert "field_count" not in attrs["plate"]
         assert "acquisitions" not in attrs["plate"]
-        Models04HCS.from_zarr(self.root_v3)
+        Models05HCS.from_zarr(self.root_v3)
 
     def test_field_count(self):
         write_plate_metadata(
@@ -1273,7 +1302,10 @@ class TestWellMetadata:
 
         assert "well" in attrs_json
         assert attrs["well"]["images"] == [{"path": "0"}]
-        Models04Well.from_zarr(group)
+        if fmt.version == "0.4":
+            Models04Well.from_zarr(group)
+        elif fmt.version == "0.5":
+            Models05Well.from_zarr(group)
 
     @pytest.mark.parametrize(
         "images",
@@ -1295,7 +1327,7 @@ class TestWellMetadata:
             {"path": "2"},
         ]
         self.root_v3.attrs["ome"]["version"] == FormatV05().version
-        Models04Well.from_zarr(self.root_v3)
+        Models05Well.from_zarr(self.root_v3)
 
     @pytest.mark.parametrize("fmt", (FormatV01(), FormatV02(), FormatV03()))
     def test_version(self, fmt):
