@@ -19,11 +19,11 @@ Use the `ome_zarr` command to interrogate Zarr datasets.
 
 Remote data::
 
-    ome_zarr info https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.1/6001240.zarr/
+    ome_zarr info https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.5/idr0062A/6001240_labels.zarr/
 
 Local data::
 
-    ome_zarr info 6001240.zarr/
+    ome_zarr info 6001240_labels.zarr/
 
 view
 ====
@@ -47,11 +47,11 @@ download
 
 To download all the resolutions and metadata for an image use ``ome_zarr download``. This creates ``6001240.zarr`` locally::
 
-    ome_zarr download https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.1/6001240.zarr/
+    ome_zarr download https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.5/idr0062A/6001240_labels.zarr
 
 Specify a different output directory::
 
-    ome_zarr download https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.1/6001240.zarr/ --output image_dir
+    ome_zarr download https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.5/idr0062A/6001240_labels.zarr --output image_dir
 
 create
 ======
@@ -59,13 +59,15 @@ create
 To create sample OME-Zarr image from the `skimage <https://scikit-image.org/docs/stable/api/skimage.data.html>`_
 data.
 
-Create an OME-Zarr image in coinsdata/ dir::
+Create an OME-Zarr image in coinsdata/ dir using 'coins' method in OME-Zarr latest version or v0.4::
 
-    ome_zarr create coinsdata
+    ome_zarr create coinsdata.zarr
+
+    ome_zarr create coinsdata.zarr --version 0.4
 
 Create an rgb image from skimage astronaut in testimage dir::
 
-    ome_zarr create testimage --method=astronaut
+    ome_zarr create testimage.zarr --method=astronaut
 
 csv to labels
 =============

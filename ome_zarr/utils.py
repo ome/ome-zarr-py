@@ -21,9 +21,10 @@ import dask.array as da
 import zarr
 from dask.diagnostics import ProgressBar
 
+from .format import format_from_version
 from .io import parse_url
 from .reader import Multiscales, Node, Reader
-from .types import JSONDict
+from .types import Any, JSONDict
 
 LOGGER = logging.getLogger("ome_zarr.utils")
 
@@ -54,6 +55,11 @@ def info(path: str, stats: bool = False) -> Iterator[Node]:
             continue
 
         print(node)
+        loc = node.zarr
+        version = loc.zgroup.get("version")
+        if version is None:
+            version = loc.zgroup.get("multiscales", [{}])[0].get("version", "")
+        print(" - version:", version)
         print(" - metadata")
         for spec in node.specs:
             print(f"   - {spec.__class__.__name__}")
@@ -72,7 +78,9 @@ def view(input_path: str, port: int = 8000, dry_run: bool = False) -> None:
     # dry_run is for testing, so we don't open the browser or start the server
 
     zarrs = []
-    if (Path(input_path) / ".zattrs").exists():
+    if (Path(input_path) / ".zattrs").exists() or (
+        Path(input_path) / "zarr.json"
+    ).exists():
         zarrs = find_multiscales(Path(input_path))
     if len(zarrs) == 0:
         print(
@@ -120,9 +128,18 @@ def find_multiscales(path_to_zattrs):
     # We want full path to find the multiscales Image. e.g. full/path/to/image.zarr/0
     # AND we want image Name, e.g. "image.zarr Series 0"
     # AND we want the dir path to use for Tags e.g. full/path/to
-    with open(path_to_zattrs / ".zattrs") as f:
-        text = f.read()
+    text = None
+    for name in (".zattrs", "zarr.json"):
+        if (Path(path_to_zattrs) / name).exists():
+            with open(path_to_zattrs / name) as f:
+                text = f.read()
+            break
+    if text is None:
+        print("No .zattrs or zarr.json found in {path_to_zattrs}")
+        return []
     zattrs = json.loads(text)
+    if "attributes" in zattrs and "ome" in zattrs["attributes"]:
+        zattrs = zattrs["attributes"]["ome"]
     if "plate" in zattrs:
         plate = zattrs.get("plate")
         wells = plate.get("wells")
@@ -208,11 +225,11 @@ def finder(input_path: str, port: int = 8000, dry_run=False) -> None:
 
     # walk the input path to find all .zattrs files...
     def walk(path: Path):
-        if (path / ".zattrs").exists():
+        if (path / ".zattrs").exists() or (path / "zarr.json").exists():
             yield from find_multiscales(path)
         else:
             for p in path.iterdir():
-                if (p / ".zattrs").exists():
+                if (p / ".zattrs").exists() or (p / "zarr.json").exists():
                     yield from find_multiscales(p)
                 elif p.is_dir():
                     yield from walk(p)
@@ -322,26 +339,55 @@ def download(input_path: str, output_dir: str = ".") -> None:
         target_path = output_path / Path(*path)
         target_path.mkdir(parents=True)
 
-        with (target_path / ".zgroup").open("w") as f:
+        # Use version etc...
+        version = node.zarr.version
+        fmt = format_from_version(version)
+
+        # store = parse_url(input_path, mode="w", fmt=fmt)
+        group_file = "zarr.json"
+        attrs_file = "zarr.json"
+        if fmt.zarr_format == 2:
+            group_file = ".zgroup"
+            attrs_file = ".zattrs"
+
+        with (target_path / group_file).open("w") as f:
             f.write(json.dumps(node.zarr.zgroup))
-        with (target_path / ".zattrs").open("w") as f:
+        with (target_path / attrs_file).open("w") as f:
             metadata: JSONDict = {}
             node.write_metadata(metadata)
+            if fmt.zarr_format == 3:
+                # For zarr v3, we need to put metadata under "ome" namespace
+                metadata = {
+                    "attributes": {"ome": metadata},
+                    "zarr_format": 3,
+                    "node_type": "group",
+                }
             f.write(json.dumps(metadata))
 
         resolutions: list[da.core.Array] = []
         datasets: list[str] = []
+
         for spec in node.specs:
             if isinstance(spec, Multiscales):
                 datasets = spec.datasets
                 resolutions = node.data
+                options: dict[str, Any] = {}
+                if fmt.zarr_format == 2:
+                    options["dimension_separator"] = "/"
+                else:
+                    options["chunk_key_encoding"] = fmt.chunk_key_encoding
+                    options["dimension_names"] = [
+                        axis["name"] for axis in node.metadata["axes"]
+                    ]
                 if datasets and resolutions:
                     pbar = ProgressBar()
                     for dataset, data in reversed(list(zip(datasets, resolutions))):
                         LOGGER.info("resolution %s...", dataset)
                         with pbar:
                             data.to_zarr(
-                                str(target_path / dataset), dimension_separator="/"
+                                str(target_path / dataset),
+                                zarr_format=fmt.zarr_format,
+                                **options,
                             )
             else:
                 # Assume a group that needs metadata, like labels

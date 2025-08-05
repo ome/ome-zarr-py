@@ -53,9 +53,7 @@ class Node:
             self.specs.append(Multiscales(self))
         if OMERO.matches(zarr):
             self.specs.append(OMERO(self))
-        if plate_labels:
-            self.specs.append(PlateLabels(self))
-        elif Plate.matches(zarr):
+        if Plate.matches(zarr):
             self.specs.append(Plate(self))
             # self.add(zarr, plate_labels=True)
         if Well.matches(zarr):
@@ -299,7 +297,7 @@ class Multiscales(Spec):
         LOGGER.info("datasets %s", datasets)
 
         for resolution in self.datasets:
-            data: da.core.Array = self.array(resolution, version)
+            data: da.core.Array = self.array(resolution)
             chunk_sizes = [
                 str(c[0]) + (f" (+ {c[-1]})" if c[-1] != c[0] else "")
                 for c in data.chunks
@@ -320,7 +318,7 @@ class Multiscales(Spec):
         if child_zarr.exists():
             node.add(child_zarr, visibility=False)
 
-    def array(self, resolution: str, version: str) -> da.core.Array:
+    def array(self, resolution: str) -> da.core.Array:
         # data.shape is (t, c, z, y, x) by convention
         return self.zarr.load(resolution)
 
@@ -560,51 +558,6 @@ class Plate(Spec):
             ]
             lazy_rows.append(da.concatenate(lazy_row, axis=len(self.axes) - 1))
         return da.concatenate(lazy_rows, axis=len(self.axes) - 2)
-
-
-class PlateLabels(Plate):
-    def get_tile_path(self, level: int, row: int, col: int) -> str:  # pragma: no cover
-        """251.zarr/A/1/0/labels/0/3/"""
-        path = (
-            f"{self.row_names[row]}/{self.col_names[col]}/"
-            f"{self.first_field_path}/labels/0/{level}"
-        )
-        return path
-
-    def get_pyramid_lazy(self, node: Node) -> None:  # pragma: no cover
-        super().get_pyramid_lazy(node)
-        # pyramid data may be multi-channel, but we only have 1 labels channel
-        # TODO: when PlateLabels are re-enabled, update the logic to handle
-        # 0.4 axes (list of dictionaries)
-        if "c" in self.axes:
-            c_index = self.axes.index("c")
-            idx = [slice(None)] * len(self.axes)
-            idx[c_index] = slice(0, 1)
-            node.data[0] = node.data[0][tuple(idx)]
-        # remove image metadata
-        node.metadata = {}
-
-        # combine 'properties' from each image
-        # from https://github.com/ome/ome-zarr-py/pull/61/
-        properties: dict[int, dict[str, Any]] = {}
-        for row in self.row_names:
-            for col in self.col_names:
-                path = f"{row}/{col}/{self.first_field_path}/labels/0/.zattrs"
-                labels_json = self.zarr.get_json(path).get("image-label", {})
-                # NB: assume that 'label_val' is unique across all images
-                props_list = labels_json.get("properties", [])
-                if props_list:
-                    for props in props_list:
-                        label_val = props["label-value"]
-                        properties[label_val] = dict(props)
-                        del properties[label_val]["label-value"]
-        node.metadata["properties"] = properties
-
-    def get_numpy_type(self, image_node: Node) -> np.dtype:  # pragma: no cover
-        # FIXME - don't assume Well A1 is valid
-        path = self.get_tile_path(0, 0, 0)
-        label_zarr = self.zarr.load(path)
-        return label_zarr.dtype
 
 
 class Reader:
