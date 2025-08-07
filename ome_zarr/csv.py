@@ -59,7 +59,7 @@ def csv_to_zarr(
             cols_types_by_name[col_name_type] = "s"
 
     csv_columns = None
-    id_column = None
+    id_column: int
 
     props_by_id: dict[str | int, dict] = {}
 
