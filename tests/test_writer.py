@@ -876,7 +876,7 @@ class TestPlateMetadata:
             attrs = attrs["ome"]
             assert attrs["version"] == fmt.version
         else:
-            attrs["plate"]["version"] == fmt.version
+            assert attrs["plate"]["version"] == fmt.version
 
         assert "plate" in attrs
         assert attrs["plate"]["columns"] == [{"name": "1"}]
@@ -1256,7 +1256,7 @@ class TestWellMetadata:
             {"path": "1"},
             {"path": "2"},
         ]
-        self.root_v3.attrs["ome"]["version"] == FormatV05().version
+        assert self.root_v3.attrs["ome"]["version"] == FormatV05().version
 
     @pytest.mark.parametrize("fmt", (FormatV01(), FormatV02(), FormatV03()))
     def test_version(self, fmt):
