@@ -3,7 +3,7 @@
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
-from typing import Any, Dict
+from typing import Any
 
 from zarr.storage import FsspecStore, LocalStore
 
@@ -63,7 +63,7 @@ class Format(ABC):
 
     @property
     @abstractmethod
-    def chunk_key_encoding(self) -> Dict[str, str]:  # pragma: no cover
+    def chunk_key_encoding(self) -> dict[str, str]:  # pragma: no cover
         raise NotImplementedError()
 
     @abstractmethod
@@ -145,7 +145,7 @@ class FormatV01(Format):
         return 2
 
     @property
-    def chunk_key_encoding(self) -> Dict[str, str]:
+    def chunk_key_encoding(self) -> dict[str, str]:
         return {"name": "v2", "separator": "."}
 
     def matches(self, metadata: dict) -> bool:
@@ -213,7 +213,7 @@ class FormatV02(FormatV01):
         return "0.2"
 
     @property
-    def chunk_key_encoding(self) -> Dict[str, str]:
+    def chunk_key_encoding(self) -> dict[str, str]:
         return {"name": "v2", "separator": "/"}
 
 
@@ -367,7 +367,7 @@ class FormatV05(FormatV04):
         return 3
 
     @property
-    def chunk_key_encoding(self) -> Dict[str, str]:
+    def chunk_key_encoding(self) -> dict[str, str]:
         # this is default for Zarr v3. Could return None?
         return {"name": "default", "separator": "/"}
 
