@@ -51,7 +51,7 @@ class TestCli:
         filename = str(self.path) + "-1"
         args = ["create", "--method=coins", filename]
         if fmt:
-            args += ["--version", fmt.version]
+            args += ["--format", fmt.version]
         main(args)
         main(["info", filename])
         out, err = capsys.readouterr()
@@ -79,7 +79,7 @@ class TestCli:
         basename = os.path.split(filename)[-1]
         args = ["create", "--method=astronaut", filename]
         if fmt:
-            args += ["--version", fmt.version]
+            args += ["--format", fmt.version]
         main(args)
         main(["download", filename, f"--output={out}"])
         main(["info", f"{out}/{basename}"])
@@ -178,7 +178,7 @@ class TestCli:
                 "create",
                 "--method=astronaut",
                 (str(img_dir / "astronaut")),
-                "--version",
+                "--format",
                 fmt.version,
             ]
         )
@@ -187,7 +187,7 @@ class TestCli:
                 "create",
                 "--method=coins",
                 (str(img_dir2 / "coins")),
-                "--version",
+                "--format",
                 fmt.version,
             ]
         )

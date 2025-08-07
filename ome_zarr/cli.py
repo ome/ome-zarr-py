@@ -65,8 +65,8 @@ def create(args: argparse.Namespace) -> None:
     else:
         raise Exception(f"unknown method: {args.method}")
     fmt: Format = CurrentFormat()
-    if args.version:
-        fmt = format_from_version(args.version)
+    if args.format:
+        fmt = format_from_version(args.format)
 
     create_zarr(args.path, method=method, label_name=label_name, fmt=fmt)
 
@@ -153,7 +153,7 @@ def main(args: list[str] | None = None) -> None:
     )
     parser_create.add_argument("path")
     parser_create.add_argument(
-        "--version", help="OME-Zarr version to create. e.g. '0.4'"
+        "--format", help="OME-Zarr version to create. e.g. '0.4'"
     )
     parser_create.set_defaults(func=create)
 
