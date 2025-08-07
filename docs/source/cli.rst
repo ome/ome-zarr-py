@@ -63,7 +63,7 @@ Create an OME-Zarr image in coinsdata/ dir using 'coins' method in OME-Zarr late
 
     ome_zarr create coinsdata.zarr
 
-    ome_zarr create coinsdata.zarr --version 0.4
+    ome_zarr create coinsdata.zarr --format 0.4
 
 Create an rgb image from skimage astronaut in testimage dir::
 
