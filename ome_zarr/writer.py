@@ -189,11 +189,10 @@ def check_format(
             raise ValueError(
                 f"Group is zarr_format: {zarr_format} but OME-Zarr {fmt.version} is {fmt.zarr_format}"
             )
-    else:
-        if zarr_format == 2:
-            fmt = FormatV04()
-        elif zarr_format == 3:
-            fmt = CurrentFormat()
+    elif zarr_format == 2:
+        fmt = FormatV04()
+    elif zarr_format == 3:
+        fmt = CurrentFormat()
     assert fmt is not None
     return fmt
 
