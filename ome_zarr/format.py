@@ -2,8 +2,8 @@
 
 import logging
 from abc import ABC, abstractmethod
-from collections.abc import Iterator
-from typing import Any, Dict
+from collections.abc import Iterator, Mapping
+from typing import Any
 
 from zarr.storage import FsspecStore, LocalStore
 
@@ -63,7 +63,7 @@ class Format(ABC):
 
     @property
     @abstractmethod
-    def chunk_key_encoding(self) -> Dict[str, str]:  # pragma: no cover
+    def chunk_key_encoding(self) -> dict[str, str]:  # pragma: no cover
         raise NotImplementedError()
 
     @abstractmethod
@@ -134,7 +134,7 @@ class FormatV01(Format):
     Initial format. (2020)
     """
 
-    REQUIRED_PLATE_WELL_KEYS: dict[str, type] = {"path": str}
+    REQUIRED_PLATE_WELL_KEYS: Mapping[str, type] = {"path": str}
 
     @property
     def version(self) -> str:
@@ -145,7 +145,7 @@ class FormatV01(Format):
         return 2
 
     @property
-    def chunk_key_encoding(self) -> Dict[str, str]:
+    def chunk_key_encoding(self) -> dict[str, str]:
         return {"name": "v2", "separator": "."}
 
     def matches(self, metadata: dict) -> bool:
@@ -179,7 +179,7 @@ class FormatV01(Format):
     def validate_well_dict(
         self, well: dict, rows: list[str], columns: list[str]
     ) -> None:
-        if any(e not in self.REQUIRED_PLATE_WELL_KEYS for e in well.keys()):
+        if any(e not in self.REQUIRED_PLATE_WELL_KEYS for e in well):
             LOGGER.debug("%s contains unspecified keys", well)
         for key, key_type in self.REQUIRED_PLATE_WELL_KEYS.items():
             if key not in well:
@@ -213,7 +213,7 @@ class FormatV02(FormatV01):
         return "0.2"
 
     @property
-    def chunk_key_encoding(self) -> Dict[str, str]:
+    def chunk_key_encoding(self) -> dict[str, str]:
         return {"name": "v2", "separator": "/"}
 
 
@@ -234,7 +234,11 @@ class FormatV04(FormatV03):
     introduce coordinate_transformations in multiscales (Nov 2021)
     """
 
-    REQUIRED_PLATE_WELL_KEYS = {"path": str, "rowIndex": int, "columnIndex": int}
+    REQUIRED_PLATE_WELL_KEYS: Mapping[str, type] = {
+        "path": str,
+        "rowIndex": int,
+        "columnIndex": int,
+    }
 
     @property
     def version(self) -> str:
@@ -367,7 +371,7 @@ class FormatV05(FormatV04):
         return 3
 
     @property
-    def chunk_key_encoding(self) -> Dict[str, str]:
+    def chunk_key_encoding(self) -> dict[str, str]:
         # this is default for Zarr v3. Could return None?
         return {"name": "default", "separator": "/"}
 

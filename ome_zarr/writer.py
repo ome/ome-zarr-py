@@ -77,7 +77,7 @@ def _validate_well_images(
         if isinstance(image, str):
             validated_images.append({"path": str(image)})
         elif isinstance(image, dict):
-            if any(e not in VALID_KEYS for e in image.keys()):
+            if any(e not in VALID_KEYS for e in image):
                 LOGGER.debug("%s contains unspecified keys", image)
             if "path" not in image:
                 raise ValueError(f"{image} must contain a path key")
@@ -106,7 +106,7 @@ def _validate_plate_acquisitions(
     for acquisition in acquisitions:
         if not isinstance(acquisition, dict):
             raise ValueError(f"{acquisition} must be a dictionary")
-        if any(e not in VALID_KEYS for e in acquisition.keys()):
+        if any(e not in VALID_KEYS for e in acquisition):
             LOGGER.debug("%s contains unspecified keys", acquisition)
         if "id" not in acquisition:
             raise ValueError(f"{acquisition} must contain an id key")
@@ -298,7 +298,7 @@ Please use the 'storage_options' argument instead."""
                 del options["chunk_key_encoding"]
             # handle any 'chunks' option from storage_options
             if chunks_opt is not None:
-                data = da.array(data).rechunk(chunks=chunks_opt)
+                data = da.array(data).rechunk(chunks=chunks_opt)  # noqa: PLW2901
             da_delayed = da.to_zarr(
                 arr=data,
                 url=group.store,
@@ -402,7 +402,7 @@ def write_multiscales_metadata(
         if omero_metadata is None:
             raise KeyError("If `'omero'` is present, value cannot be `None`.")
         for c in omero_metadata["channels"]:
-            if "color" in c:
+            if "color" in c:  # noqa: SIM102
                 if not isinstance(c["color"], str) or len(c["color"]) != 6:
                     raise TypeError("`'color'` must be a hex code string.")
             if "window" in c:

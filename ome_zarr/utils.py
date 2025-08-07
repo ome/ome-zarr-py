@@ -149,7 +149,7 @@ def find_multiscales(path_to_zattrs):
             plate_name = os.path.basename(path_to_zattrs)
             return [[path_to_zarr, plate_name, os.path.dirname(path_to_zattrs)]]
         else:
-            LOGGER.info(f"No wells found in plate{path_to_zattrs}")
+            LOGGER.info("No wells found in plate%s", path_to_zattrs)
             return []
     elif zattrs.get("bioformats2raw.layout") == 3:
         # Open OME/METADATA.ome.xml
@@ -178,7 +178,7 @@ def find_multiscales(path_to_zattrs):
                     )
                     series += 1
             return images
-        except Exception as ex:
+        except Exception as ex:  # noqa: BLE001
             print(ex)
     elif zattrs.get("multiscales"):
         return [

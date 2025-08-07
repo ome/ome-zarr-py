@@ -112,7 +112,7 @@ class Node:
         prepend: bool = False,
         visibility: bool | None = None,
         plate_labels: bool = False,
-    ) -> "Optional[Node]":
+    ) -> "Node | None":
         """Create a child node if this location has not yet been seen.
 
         Newly created nodes may be considered higher or lower priority than
@@ -269,10 +269,7 @@ class Multiscales(Spec):
     @staticmethod
     def matches(zarr: ZarrLocation) -> bool:
         """is multiscales metadata present?"""
-        if zarr.zgroup:
-            if "multiscales" in zarr.root_attrs:
-                return True
-        return False
+        return bool(zarr.zgroup) and "multiscales" in zarr.root_attrs
 
     def __init__(self, node: Node) -> None:
         super().__init__(node)
@@ -345,7 +342,7 @@ class OMERO(Spec):
 
             try:
                 len(channels)
-            except Exception:
+            except TypeError:
                 LOGGER.warning("error counting channels: %s", channels)
                 return  # EARLY EXIT
 

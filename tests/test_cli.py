@@ -144,7 +144,7 @@ class TestCli:
 
             copy = [list(x.parts) for x in firstpass]
             common = strip_common_prefix(copy)
-            assert "d" == common
+            assert common == "d"
             assert {tuple(x) for x in copy} == {tuple(x) for x in results}
 
         if reverse:

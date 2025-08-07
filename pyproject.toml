@@ -57,18 +57,53 @@ Changelog = "https://github.com/ome/ome-zarr-py/blob/master/CHANGELOG.md"
 
 [tool.ruff.lint]
 extend-select = [
-    "I",   # isort
-    # "D",    # pydocstyle            # FIXME
-    # "BLE",  # flake8-blind-except   # FIXME
-    "A",   # flake8-builtins
-    # "G",    # flake8-logging-format # FIXME
+    "S",    # flake8-bandit
+    "BLE",  # flake8-blind-except
+    "B",    # flake8-bugbear
+    "A",    # flake8-builtins
+    "C4",   # flake8-comprehensions
+    "ISC",  # flake8-implicit-str-concat
+    "LOG",  # flake8-logging
+    "G",    # flake8-logging-format
+    "PIE",  # flake8-pie
+    "PYI",  # flake8-pyi
+    "SIM",  # flake8-simplify
+    "TID",  # flake8-tidy-imports
+    "FLY",  # flynt
+    "I",    # isort
+    "PERF", # Perflint
+    # "D",  # pydocstyle  # FIXME
+    "PGH",  # pygrep-hooks
+    "PLE",  # Pylint Error
+    "PLW",  # Pylint Warning
+    "UP",   # pyupgrade
+    "FURB", # refurb
+    "RUF",  # Ruff-specific rules
+]
+
+ignore = [
+    "S101",    # assert
+    "S311",    # suspicious-non-cryptographic-random-usage
+    "S314",    # suspicious-xml-element-tree-usage  # FIXME
+    "B007",    # unused-loop-control-variable
+    "B008",    # function-call-in-default-argument  # FIXME
+    "B011",    # assert-false
+    "B024",    # abstract-base-class-without-abstract-method  # FIXME
+    "B028",    # no-explicit-stacklevel
+    "B905",    # zip-without-explicit-strict
+    "C408",    # unnecessary-collection-call
+    "SIM108",  # if-else-block-instead-of-if-exp
+    "PERF203", # try-except-in-loop
+    "PLW1641", # eq-without-hash  # FIXME
+    "UP038",   # non-pep604-isinstance
+    "RUF005",  # collection-literal-concatenation
 ]
 
 [tool.ruff.lint.extend-per-file-ignores]
 "ome_zarr/csv.py" = ["A005"]
 "ome_zarr/io.py" = ["A005"]
 "ome_zarr/types.py" = ["A005"]
-"tests/*.py" = ["D"]
+"tests/*.py" = ["SIM201", "D"]
 
 [tool.setuptools]
 packages = ["ome_zarr"]
