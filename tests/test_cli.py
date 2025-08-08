@@ -48,7 +48,7 @@ class TestCli:
     )
     def test_coins_info(self, capsys, fmt):
         """Test create and info with various formats."""
-        filename = str(self.path) + "-1"
+        filename = f"{self.path}-1"
         args = ["create", "--method=coins", filename]
         if fmt:
             args += ["--format", fmt.version]
@@ -61,7 +61,7 @@ class TestCli:
         assert f"- version: {version}" in out
 
     def test_astronaut_info(self):
-        filename = str(self.path) + "-2"
+        filename = f"{self.path}-2"
         main(["create", "--method=astronaut", filename])
         main(["info", filename])
 
@@ -75,7 +75,7 @@ class TestCli:
     )
     def test_astronaut_download(self, tmpdir, fmt):
         out = str(tmpdir / "out")
-        filename = str(self.path) + "-3"
+        filename = f"{self.path}-3"
         basename = os.path.split(filename)[-1]
         args = ["create", "--method=astronaut", filename]
         if fmt:
@@ -153,7 +153,7 @@ class TestCli:
             self._rotate_and_test(*list(secondpass), reverse=False)
 
     def test_view(self):
-        filename = str(self.path) + "-4"
+        filename = f"{self.path}-4"
         main(["create", "--method=astronaut", filename])
         # CLI doesn't support the dry_run option yet
         # main(["view", filename, "8000"])
