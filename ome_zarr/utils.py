@@ -164,7 +164,7 @@ def find_multiscales(path_to_zattrs):
             for child in root:
                 # tag is eg. {http://www.openmicroscopy.org/Schemas/OME/2016-06}Image
                 if child.tag.endswith("Image"):
-                    img_name = os.path.basename(path_to_zattrs) + f" Series:{series}"
+                    img_name = f"{os.path.basename(path_to_zattrs)} Series:{series}"
                     # Get Name from XML metadata, otherwise use path and Series
                     img_name = child.attrib.get("Name", img_name)
                     images.append(
