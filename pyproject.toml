@@ -24,7 +24,7 @@ dependencies = [
     # See https://github.com/fsspec/filesystem_spec/issues/819
     "aiohttp<4",
     "requests",
-    "scikit-image",
+    "scikit-image>=0.19.0",
     "toolz",
 ]
 classifiers = [
