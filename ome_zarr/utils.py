@@ -21,7 +21,7 @@ import dask.array as da
 import zarr
 from dask.diagnostics import ProgressBar
 
-from .format import format_from_version
+from .format import CurrentFormat, detect_format
 from .io import parse_url
 from .reader import Multiscales, Node, Reader
 from .types import Any, JSONDict
@@ -339,9 +339,8 @@ def download(input_path: str, output_dir: str = ".") -> None:
         target_path = output_path / Path(*path)
         target_path.mkdir(parents=True)
 
-        # Use version etc...
-        version = node.zarr.version
-        fmt = format_from_version(version)
+        # Use source version...
+        fmt = detect_format(location.zgroup, CurrentFormat())
 
         # store = parse_url(input_path, mode="w", fmt=fmt)
         group_file = "zarr.json"
