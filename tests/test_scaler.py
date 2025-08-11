@@ -1,11 +1,12 @@
+import pathlib
+
 import dask.array as da
 import numpy as np
-import pathlib
 import pytest
 import zarr
 
-from ome_zarr.scale import Scaler
 from ome_zarr.io import parse_url
+from ome_zarr.scale import Scaler
 from ome_zarr.writer import write_image
 
 
@@ -150,7 +151,7 @@ class TestScaler:
         # to zarr invokes compute
         data_dir = tmpdir.mkdir("test_big_dask_pyramid")
         da.to_zarr(level_1, str(data_dir))
-    
+
     @pytest.mark.parametrize("method", ["gaussian", "laplacian"])
     def test_pyramid_args(self, shape, tmpdir, method):
         path = pathlib.Path(tmpdir.mkdir("data"))
