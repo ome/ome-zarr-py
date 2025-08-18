@@ -159,15 +159,16 @@ class FormatV01(Format):
         "dimension_separator" is specified at array creation time
         """
 
+        read_only = mode == "r"
         if path.startswith(("http", "s3")):
             store = FsspecStore.from_url(
                 path,
                 storage_options=None,
-                read_only=(mode in ("r", "r+", "a")),
+                read_only=read_only,
             )
         else:
             # No other kwargs supported
-            store = LocalStore(path, read_only=(mode in ("r", "r+", "a")))
+            store = LocalStore(path, read_only=read_only)
         LOGGER.debug("Created nested FsspecStore(%s, %s)", path, mode)
         return store
 
