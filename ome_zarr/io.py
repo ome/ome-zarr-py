@@ -220,13 +220,6 @@ def parse_url(
     :param fmt: Version of the OME-NGFF spec to open path with.
 
     :return: `ZarrLocation`.
-        If mode is 'r', and the path does not exist returns None.
-        If there is an error opening the path, also returns None.
-
-    >>> parse_url('does-not-exist')
+        If mode is 'r', and the path does not exist, raises exception
     """
-    loc = ZarrLocation(path, mode=mode, fmt=fmt)
-    if "r" in mode and not loc.exists():
-        return None
-    else:
-        return loc
+    return ZarrLocation(path, mode=mode, fmt=fmt)
