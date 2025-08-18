@@ -11,9 +11,6 @@ repos:
       - id: check-json
         files: \.(json)$
       - id: check-yaml
-      - id: fix-encoding-pragma
-        args:
-          - --remove
       - id: check-case-conflict
       - id: check-merge-conflict
       - id: check-symlinks
