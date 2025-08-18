@@ -88,7 +88,8 @@ class ZarrLocation:
             if "ome" in self.zgroup:
                 self.zgroup = self.zgroup["ome"]
             self.__metadata = self.zgroup
-        except (ValueError, FileNotFoundError):
+        except (ValueError, FileNotFoundError) as e:
+            LOGGER.error("Failed to initialize metadata: %s", e)
             # group doesn't exist. If we are in "w" mode, we need to create it.
             if self.__mode == "w":
                 # If we are creating a new group, we need to specify the zarr_format.
@@ -97,7 +98,7 @@ class ZarrLocation:
                     store=self.__store, path="/", mode="w", zarr_format=zarr_format
                 )
             else:
-                self.__exists = False
+                raise e
 
     def __repr__(self) -> str:
         """Print the path as well as whether this is a group or an array."""
