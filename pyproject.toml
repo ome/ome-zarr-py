@@ -74,6 +74,7 @@ extend-select = [
     # "D",  # pydocstyle  # FIXME
     "PGH",  # pygrep-hooks
     "PLE",  # Pylint Error
+    "PLR",  # Pylint Refactor
     "PLW",  # Pylint Warning
     "UP",   # pyupgrade
     "FURB", # refurb
@@ -93,6 +94,8 @@ ignore = [
     "C408",    # unnecessary-collection-call
     "SIM108",  # if-else-block-instead-of-if-exp
     "PERF203", # try-except-in-loop
+    "PLR09",   # too-many-...
+    "PLR2004", # magic-value-comparison
     "PLW1641", # eq-without-hash  # FIXME
     "UP038",   # non-pep604-isinstance
     "RUF005",  # collection-literal-concatenation
