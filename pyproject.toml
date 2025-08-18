@@ -1,6 +1,6 @@
 [build-system]
 requires = [
-    "setuptools>=64",
+    "setuptools>=77.0.3",
     "setuptools-scm>=8.0",
 ]
 build-backend = "setuptools.build_meta"
@@ -10,6 +10,9 @@ name = "ome-zarr"
 readme = "README.rst"
 dynamic = ["version"]
 description="Implementation of images in Zarr files."
+
+license = "BSD-2-Clause"
+license-files = ["LICENSE"]
 
 requires-python = ">3.10"
 
@@ -32,7 +35,6 @@ classifiers = [
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
-    "License :: OSI Approved :: BSD License",
 ]
 
 authors = [
