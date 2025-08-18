@@ -100,6 +100,12 @@ class TestInvalid:
             assert len(list(reader())) == 2
         assert str(exe.value) == "Version invalid not recognized"
 
+    def test_not_found(self):
+        with pytest.raises(FileNotFoundError) as exe:
+            reader = Reader(parse_url(str(self.path / "not_found")))
+            assert len(list(reader())) == 0
+        assert "Unable to find group" in str(exe.value)
+
 
 class TestHCSReader:
     @pytest.fixture(autouse=True)
