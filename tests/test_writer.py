@@ -20,8 +20,6 @@ from ome_zarr.format import (
     FormatV04,
     FormatV05,
 )
-from ome_zarr.io import parse_url
-from ome_zarr.reader import Multiscales, Reader
 from ome_zarr.scale import Scaler
 from ome_zarr.writer import (
     _get_valid_axes,
@@ -244,7 +242,6 @@ class TestWriter:
         if read_from_zarr:
             # write to zarr and re-read as dask...
             path = f"{grp_path}/temp/"
-            # store = parse_url(path, mode="w", fmt=fmt).store
             # store and group will be zarr v2 or v3 depending on fmt
             root = zarr.open_group(store=path, mode="w", zarr_format=zarr_format)
             temp_group = root.create_group("to_dask")
@@ -1222,13 +1219,11 @@ class TestWellMetadata:
     def initdir(self, tmpdir):
         self.path = pathlib.Path(tmpdir.mkdir("data"))
         # create zarr v2 group...
-        self.store = parse_url(self.path, mode="w", fmt=FormatV04()).store
-        self.root = zarr.group(store=self.store)
+        self.root = zarr.open_group(self.path, mode="w", zarr_format=2)
 
         # create zarr v3 group too...
         self.path_v3 = self.path / "v3"
-        store_v3 = parse_url(self.path_v3, mode="w").store
-        self.root_v3 = zarr.group(store=store_v3)
+        self.root_v3 = zarr.open_group(self.path_v3, mode="w", zarr_format=3)
 
     @pytest.mark.parametrize("fmt", (FormatV04(), FormatV05()))
     @pytest.mark.parametrize("images", (["0"], [{"path": "0"}]))
@@ -1322,12 +1317,10 @@ class TestLabelWriter:
     def initdir(self, tmpdir):
         self.path = pathlib.Path(tmpdir.mkdir("data"))
         # create zarr v2 group...
-        self.store = parse_url(self.path, mode="w", fmt=FormatV04()).store
-        self.root = zarr.group(store=self.store)
+        self.root = zarr.open_group(self.path, mode="w", zarr_format=2)
         # create zarr v3 group...
         self.path_v3 = self.path / "v3"
-        store_v3 = parse_url(self.path_v3, mode="w").store
-        self.root_v3 = zarr.group(store=store_v3)
+        self.root_v3 = zarr.open_group(self.path_v3, mode="w", zarr_format=3)
 
     def create_image_data(self, group, shape, scaler, fmt, axes, transformations):
         rng = np.random.default_rng(0)
@@ -1364,22 +1357,27 @@ class TestLabelWriter:
         self, img_path, label_name, label_data, fmt, shape, transformations
     ):
         # Verify image data
-        reader = Reader(parse_url(f"{img_path}/labels/{label_name}"))
-        node = next(iter(reader()))
-        assert Multiscales.matches(node.zarr)
+        out = zarr.open_group(f"{img_path}/labels/{label_name}")
+        node_metadata = out.attrs
+        if "ome" in node_metadata:
+            node_metadata = node_metadata["ome"]
+        assert "multiscales" in node_metadata
+        paths = [d["path"] for d in node_metadata["multiscales"][0]["datasets"]]
+        node_data = [da.from_zarr(out[path]) for path in paths]
         if fmt.version in ("0.1", "0.2"):
             # v0.1 and v0.2 MUST be 5D
-            assert node.data[0].ndim == 5
+            assert node_data[0].ndim == 5
         else:
-            assert node.data[0].shape == shape
+            assert node_data[0].shape == shape
 
         if fmt.version not in ("0.1", "0.2", "0.3"):
-            for transf, expected in zip(
-                node.metadata["coordinateTransformations"], transformations
-            ):
+            cfs = [
+                d["coordinateTransformations"]
+                for d in node_metadata["multiscales"][0]["datasets"]
+            ]
+            for transf, expected in zip(cfs, transformations):
                 assert transf == expected
-            assert len(node.metadata["coordinateTransformations"]) == len(node.data)
-        assert np.allclose(label_data, node.data[0][...].compute())
+        assert np.allclose(label_data, node_data[0][...].compute())
 
         # Verify label metadata
         label_root = zarr.open(f"{img_path}/labels", mode="r")
