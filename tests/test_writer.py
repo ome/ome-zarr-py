@@ -49,14 +49,12 @@ class TestWriter:
     def initdir(self, tmpdir):
         self.path = pathlib.Path(tmpdir.mkdir("data"))
         # create zarr v2 group...
-        self.store = parse_url(self.path, mode="w", fmt=FormatV04()).store
-        self.root = zarr.group(store=self.store)
+        self.root = zarr.open_group(self.path, mode="w", zarr_format=2)
         self.group = self.root.create_group("test")
 
         # let's create zarr v3 group too...
         self.path_v3 = self.path / "v3"
-        store_v3 = parse_url(self.path_v3, mode="w").store
-        root_v3 = zarr.group(store=store_v3)
+        root_v3 = zarr.open_group(self.path_v3, mode="w", zarr_format=3)
         self.group_v3 = root_v3.create_group("test")
 
     def create_data(self, shape, dtype=np.uint8, mean_val=10):
@@ -132,27 +130,33 @@ class TestWriter:
         )
 
         # Verify
-        reader = Reader(parse_url(f"{grp_path}"))
-        node = next(iter(reader()))
-        assert Multiscales.matches(node.zarr)
+        out = zarr.open_group(grp_path)
+        node_metadata = out.attrs
+        if "ome" in node_metadata:
+            node_metadata = node_metadata["ome"]
+        assert "multiscales" in node_metadata
+        paths = [d["path"] for d in node_metadata["multiscales"][0]["datasets"]]
+        node_data = [da.from_zarr(out[path]) for path in paths]
         if version.version in ("0.1", "0.2"):
             # v0.1 and v0.2 MUST be 5D
-            assert node.data[0].ndim == 5
+            assert node_data[0].ndim == 5
         else:
-            assert node.data[0].shape == shape
-        print("node.metadata", node.metadata)
+            assert node_data[0].shape == shape
+        print("node.metadata", node_metadata)
         if version.version not in ("0.1", "0.2", "0.3"):
-            for transf, expected in zip(
-                node.metadata["coordinateTransformations"], transformations
-            ):
+            cts = [
+                d["coordinateTransformations"]
+                for d in node_metadata["multiscales"][0]["datasets"]
+            ]
+            for transf, expected in zip(cts, transformations):
                 assert transf == expected
-            assert len(node.metadata["coordinateTransformations"]) == len(node.data)
+            assert len(cts) == len(node_data)
         # check chunks for first 2 resolutions (before shape gets smaller than chunk)
-        for level, nd_array in enumerate(node.data[:2]):
+        for level, nd_array in enumerate(node_data[:2]):
             expected = chunks[level] if storage_options_list else chunks[0]
             first_chunk = [c[0] for c in nd_array.chunks]
             assert tuple(first_chunk) == _retuple(expected, nd_array.shape)
-        assert np.allclose(data, node.data[0][...].compute())
+        assert np.allclose(data, node_data[0][...].compute())
 
     def test_mix_zarr_formats(self):
         # check group zarr v2 and v3 matches fmt
