@@ -624,13 +624,11 @@ class TestMultiscalesMetadata:
     def initdir(self, tmpdir):
         self.path = pathlib.Path(tmpdir.mkdir("data"))
         # create zarr v2 group...
-        self.store = parse_url(self.path, mode="w", fmt=FormatV04()).store
-        self.root = zarr.group(store=self.store)
+        self.root = zarr.open_group(self.path, mode="w", zarr_format=2)
 
         # let's create zarr v3 group too...
         self.path_v3 = self.path / "v3"
-        store_v3 = parse_url(self.path_v3, mode="w").store
-        self.root_v3 = zarr.group(store=store_v3)
+        self.root_v3 = zarr.open_group(self.path_v3, mode="w", zarr_format=3)
 
     @pytest.mark.parametrize("fmt", (FormatV04(), FormatV05()))
     def test_multi_levels_transformations(self, fmt):
@@ -876,12 +874,11 @@ class TestPlateMetadata:
     def initdir(self, tmpdir):
         self.path = pathlib.Path(tmpdir.mkdir("data"))
         # create zarr v2 group...
-        self.store = parse_url(self.path, mode="w", fmt=FormatV04()).store
-        self.root = zarr.group(store=self.store)
+        self.root = zarr.open_group(self.path, mode="w", zarr_format=2)
+
         # create zarr v3 group...
         self.path_v3 = self.path / "v3"
-        store_v3 = parse_url(self.path_v3, mode="w").store
-        self.root_v3 = zarr.group(store=store_v3)
+        self.root_v3 = zarr.open_group(self.path_v3, mode="w", zarr_format=3)
 
     @pytest.mark.parametrize("fmt", (FormatV04(), FormatV05()))
     def test_minimal_plate(self, fmt):
