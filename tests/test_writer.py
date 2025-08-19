@@ -188,7 +188,6 @@ class TestWriter:
             grp_path = self.path_v3 / "test"
 
         write_image(data, group, axes="zyx")
-        reader = Reader(parse_url(f"{grp_path}"))
 
         # manually check this is zarr v2 or v3
         if zarr_format == 2:
@@ -199,8 +198,15 @@ class TestWriter:
             attrs_json = json.loads(json_text).get("attributes", {}).get("ome", {})
         assert "multiscales" in attrs_json
 
-        image_node = next(iter(reader()))
-        for transfs in image_node.metadata["coordinateTransformations"]:
+        out = zarr.open_group(grp_path)
+        node_metadata = out.attrs
+        if "ome" in node_metadata:
+            node_metadata = node_metadata["ome"]
+        cts = [
+            d["coordinateTransformations"]
+            for d in node_metadata["multiscales"][0]["datasets"]
+        ]
+        for transfs in cts:
             assert len(transfs) == 1
             assert transfs[0]["type"] == "scale"
             assert len(transfs[0]["scale"]) == len(shape)
