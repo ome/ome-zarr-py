@@ -349,8 +349,8 @@ class TestWriter:
         data = self.create_data(shape)
         data = array_constructor(data)
         path = self.path / "test_write_image_compressed"
-        store = parse_url(path, mode="w", fmt=format_version()).store
-        root = zarr.group(store=store)
+        fmt = format_version()
+        root = zarr.open_group(path, mode="w", zarr_format=fmt.zarr_format)
         CNAME = "lz4"
         LEVEL = 4
         if format_version().zarr_format == 3:
