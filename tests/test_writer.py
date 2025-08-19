@@ -20,7 +20,7 @@ from ome_zarr.format import (
     FormatV04,
     FormatV05,
 )
-from ome_zarr.io import ZarrLocation, parse_url
+from ome_zarr.io import parse_url
 from ome_zarr.reader import Multiscales, Reader
 from ome_zarr.scale import Scaler
 from ome_zarr.writer import (
@@ -221,13 +221,13 @@ class TestWriter:
     def test_write_image_dask(self, read_from_zarr, compute, zarr_format):
         if zarr_format == 2:
             grp_path = self.path / "test"
-            fmt = FormatV04()
+            # fmt = FormatV04()
             zarr_attrs = ".zattrs"
             zarr_array = ".zarray"
             group = self.group
         else:
             grp_path = self.path_v3 / "test"
-            fmt = CurrentFormat()
+            # fmt = CurrentFormat()
             zarr_attrs = "zarr.json"
             zarr_array = "zarr.json"
             group = self.group_v3
@@ -244,9 +244,10 @@ class TestWriter:
         if read_from_zarr:
             # write to zarr and re-read as dask...
             path = f"{grp_path}/temp/"
-            store = parse_url(path, mode="w", fmt=fmt).store
+            # store = parse_url(path, mode="w", fmt=fmt).store
             # store and group will be zarr v2 or v3 depending on fmt
-            temp_group = zarr.group(store=store).create_group("to_dask")
+            root = zarr.open_group(store=path, mode="w", zarr_format=zarr_format)
+            temp_group = root.create_group("to_dask")
             assert temp_group.info._zarr_format == zarr_format
             write_image(
                 data_delayed,
@@ -256,11 +257,12 @@ class TestWriter:
                 name=NAME,
             )
             print("PATH", f"{grp_path}/temp/to_dask")
-            loc = ZarrLocation(f"{grp_path}/temp/to_dask")
-
-            reader = Reader(loc)()
-            nodes = list(reader)
-            data_delayed = nodes[0].load(Multiscales).array(resolution="0")
+            out = zarr.open_group(f"{grp_path}/temp/to_dask")
+            node_metadata = out.attrs
+            if "ome" in node_metadata:
+                node_metadata = node_metadata["ome"]
+            paths = [d["path"] for d in node_metadata["multiscales"][0]["datasets"]]
+            data_delayed = da.from_zarr(out[paths[0]])
             # check that the data is the same
             assert np.allclose(data, data_delayed[...].compute())
 
@@ -282,13 +284,20 @@ class TestWriter:
             dask_delayed_jobs = persist(*dask_delayed_jobs)
 
         # check the data written to zarr v2 or v3 group
-        reader = Reader(parse_url(f"{grp_path}"))
-        image_node = next(iter(reader()))
-        first_chunk = [c[0] for c in image_node.data[0].chunks]
-        assert tuple(first_chunk) == _retuple(chunks, image_node.data[0].shape)
-        for level, transfs in enumerate(
-            image_node.metadata["coordinateTransformations"]
-        ):
+        out = zarr.open_group(grp_path)
+        node_metadata = out.attrs
+        if "ome" in node_metadata:
+            node_metadata = node_metadata["ome"]
+        paths = [d["path"] for d in node_metadata["multiscales"][0]["datasets"]]
+        image_node_data = [da.from_zarr(out[path]) for path in paths]
+        first_chunk = [c[0] for c in image_node_data[0].chunks]
+        assert tuple(first_chunk) == _retuple(chunks, image_node_data[0].shape)
+
+        cts = [
+            d["coordinateTransformations"]
+            for d in node_metadata["multiscales"][0]["datasets"]
+        ]
+        for level, transfs in enumerate(cts):
             assert len(transfs) == 1
             assert transfs[0]["type"] == "scale"
             assert len(transfs[0]["scale"]) == len(shape)
