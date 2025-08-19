@@ -420,8 +420,8 @@ class TestWriter:
         # tempdir = TemporaryDirectory(suffix=".ome.zarr")
         # self.path = pathlib.Path(tmpdir.mkdir("data"))
         path = self.path / "test_default_compression"
-        store = parse_url(path, mode="w", fmt=format_version()).store
-        root = zarr.group(store=store)
+        fmt = format_version()
+        root = zarr.open_group(path, mode="w", zarr_format=fmt.zarr_format)
         assert root.info._zarr_format == format_version().zarr_format
         # no compressor options, we are checking default
         write_image(
