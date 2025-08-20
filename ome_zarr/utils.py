@@ -149,7 +149,7 @@ def find_multiscales(path_to_zattrs):
             plate_name = os.path.basename(path_to_zattrs)
             return [[path_to_zarr, plate_name, os.path.dirname(path_to_zattrs)]]
         else:
-            LOGGER.info(f"No wells found in plate{path_to_zattrs}")
+            LOGGER.info("No wells found in plate%s", path_to_zattrs)
             return []
     elif zattrs.get("bioformats2raw.layout") == 3:
         # Open OME/METADATA.ome.xml
@@ -164,9 +164,7 @@ def find_multiscales(path_to_zattrs):
             for child in root:
                 # tag is eg. {http://www.openmicroscopy.org/Schemas/OME/2016-06}Image
                 if child.tag.endswith("Image"):
-                    img_name = (
-                        os.path.basename(path_to_zattrs) + " Series:" + str(series)
-                    )
+                    img_name = f"{os.path.basename(path_to_zattrs)} Series:{series}"
                     # Get Name from XML metadata, otherwise use path and Series
                     img_name = child.attrib.get("Name", img_name)
                     images.append(
@@ -178,7 +176,7 @@ def find_multiscales(path_to_zattrs):
                     )
                     series += 1
             return images
-        except Exception as ex:
+        except Exception as ex:  # noqa: BLE001
             print(ex)
     elif zattrs.get("multiscales"):
         return [

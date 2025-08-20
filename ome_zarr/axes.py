@@ -1,5 +1,4 @@
-"""Axes class for validating and transforming axes
-"""
+"""Axes class for validating and transforming axes"""
 
 from typing import Any
 
@@ -113,6 +112,5 @@ class Axes:
                 ("t", "c", "y", "x"),
             ]:
                 raise ValueError("4D data must have axes tzyx or czyx or tcyx")
-        else:
-            if val_axes != ("t", "c", "z", "y", "x"):
-                raise ValueError("5D data must have axes ('t', 'c', 'z', 'y', 'x')")
+        elif val_axes != ("t", "c", "z", "y", "x"):
+            raise ValueError("5D data must have axes ('t', 'c', 'z', 'y', 'x')")

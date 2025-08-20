@@ -40,7 +40,7 @@ def view(args: argparse.Namespace) -> None:
 
 def finder(args: argparse.Namespace) -> None:
     """Wrap the :func:`~ome_zarr.utils.finder` method."""
-    config_logging(logging.WARN, args)
+    config_logging(logging.WARNING, args)
     bff_finder(args.path, args.port)
 
 

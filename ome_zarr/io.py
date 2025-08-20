@@ -187,12 +187,11 @@ class ZarrLocation:
             if not url.endswith("/"):
                 url = f"{url}/"
             return urljoin(url, subpath)
+        # Might require a warning
+        elif self.__path.endswith("/"):
+            return f"{self.__path}{subpath}"
         else:
-            # Might require a warning
-            if self.__path.endswith("/"):
-                return f"{self.__path}{subpath}"
-            else:
-                return f"{self.__path}/{subpath}"
+            return f"{self.__path}/{subpath}"
 
     def _isfile(self) -> bool:
         """
