@@ -1,7 +1,6 @@
-"""Axes class for validating and transforming axes
-"""
+"""Axes class for validating and transforming axes"""
 
-from typing import Any, Dict, List, Union
+from typing import Any
 
 from .format import CurrentFormat, Format
 
@@ -11,7 +10,7 @@ KNOWN_AXES = {"x": "space", "y": "space", "z": "space", "c": "channel", "t": "ti
 class Axes:
     def __init__(
         self,
-        axes: Union[List[str], List[Dict[str, str]]],
+        axes: list[str] | list[dict[str, str]],
         fmt: Format = CurrentFormat(),
     ) -> None:
         """
@@ -41,15 +40,13 @@ class Axes:
 
     def to_list(
         self, fmt: Format = CurrentFormat()
-    ) -> Union[List[str], List[Dict[str, str]]]:
+    ) -> list[str] | list[dict[str, str]]:
         if fmt.version == "0.3":
             return self._get_names()
         return self.axes
 
     @staticmethod
-    def _axes_to_dicts(
-        axes: Union[List[str], List[Dict[str, str]]]
-    ) -> List[Dict[str, str]]:
+    def _axes_to_dicts(axes: list[str] | list[dict[str, str]]) -> list[dict[str, str]]:
         """Returns a list of axis dicts with name and type"""
         axes_dicts = []
         for axis in axes:
@@ -71,10 +68,10 @@ class Axes:
         unknown_types = [atype for atype in axes_types if atype not in known_types]
         if len(unknown_types) > 1:
             raise ValueError(
-                "Too many unknown axes types. 1 allowed, found: %s" % unknown_types
+                f"Too many unknown axes types. 1 allowed, found: {unknown_types}"
             )
 
-        def _last_index(item: str, item_list: List[Any]) -> int:
+        def _last_index(item: str, item_list: list[Any]) -> int:
             return max(loc for loc, val in enumerate(item_list) if val == item)
 
         if "time" in axes_types and _last_index("time", axes_types) > 0:
@@ -88,12 +85,12 @@ class Axes:
         ) > axes_types.index("space"):
             raise ValueError("'space' axes must come after 'channel'")
 
-    def _get_names(self) -> List[str]:
+    def _get_names(self) -> list[str]:
         """Returns a list of axis names"""
         axes_names = []
         for axis in self.axes:
             if "name" not in axis:
-                raise ValueError("Axis Dict %s has no 'name'" % axis)
+                raise ValueError(f"Axis Dict {axis} has no 'name'")
             axes_names.append(axis["name"])
         return axes_names
 
@@ -106,7 +103,7 @@ class Axes:
             if val_axes not in [("z", "y", "x"), ("c", "y", "x"), ("t", "y", "x")]:
                 raise ValueError(
                     "3D data must have axes ('z', 'y', 'x') or ('c', 'y', 'x')"
-                    " or ('t', 'y', 'x'), not %s" % (val_axes,)
+                    f" or ('t', 'y', 'x'), not {val_axes}"
                 )
         elif len(val_axes) == 4:
             if val_axes not in [
@@ -115,6 +112,5 @@ class Axes:
                 ("t", "c", "y", "x"),
             ]:
                 raise ValueError("4D data must have axes tzyx or czyx or tcyx")
-        else:
-            if val_axes != ("t", "c", "z", "y", "x"):
-                raise ValueError("5D data must have axes ('t', 'c', 'z', 'y', 'x')")
+        elif val_axes != ("t", "c", "z", "y", "x"):
+            raise ValueError("5D data must have axes ('t', 'c', 'z', 'y', 'x')")

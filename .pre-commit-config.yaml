@@ -1,31 +1,8 @@
 ---
 repos:
 
-  - repo: https://github.com/asottile/seed-isort-config
-    rev: v2.2.0
-    hooks:
-      - id: seed-isort-config
-
-  - repo: https://github.com/PyCQA/isort
-    rev: 5.13.2
-    hooks:
-      - id: isort
-
-  - repo: https://github.com/psf/black
-    rev: 24.4.2
-    hooks:
-      - id: black
-        args: [--target-version=py36]
-
-  - repo: https://github.com/asottile/pyupgrade
-    rev: v3.16.0
-    hooks:
-      - id: pyupgrade
-        args:
-          - --py36-plus
-
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.6.0
+    rev: v6.0.0
     hooks:
       - id: trailing-whitespace
         exclude: .bumpversion.cfg
@@ -34,9 +11,6 @@ repos:
       - id: check-json
         files: \.(json)$
       - id: check-yaml
-      - id: fix-encoding-pragma
-        args:
-          - --remove
       - id: check-case-conflict
       - id: check-merge-conflict
       - id: check-symlinks
@@ -44,42 +18,30 @@ repos:
         args:
           - --autofix
 
-  - repo: https://github.com/PyCQA/flake8
-    rev: 7.0.0
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.12.8
     hooks:
-      - id: flake8
-        additional_dependencies: [
-          # flake8-blind-except, FIXME
-          flake8-builtins,
-          flake8-rst-docstrings,
-          # flake8-logging-format, FIXME
-        ]
-        args: [
-          # default black line length is 88
-          "--max-line-length=88",
-          # Conflicts with black: E203 whitespace before ':'
-          # Conflicts with PEP8 and black:
-          # W503 line break before binary operator
-          # Does not recognize deprecated directive in docstrings
-          "--ignore=E203,RST303,W503",
-          "--builtins-allowed-modules=csv,io,types",
-          "--rst-roles=class,func,ref,mod,meth,const",
-        ]
+    - id: ruff-check
+      args: ["--fix", "--show-fixes"]
+
+  - repo: https://github.com/psf/black
+    rev: 25.1.0
+    hooks:
+      - id: black
 
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.10.0
+    rev: v1.17.1
     hooks:
       - id: mypy
         args: [--config-file=mypy.ini]
 
   - repo: https://github.com/adrienverge/yamllint.git
-    rev: v1.35.1
+    rev: v1.37.1
     hooks:
       - id: yamllint
-        # args: [--config-data=relaxed]
-        #
+        args: [--config-data=relaxed]
 
   - repo: https://github.com/codespell-project/codespell
-    rev: v2.3.0
+    rev: v2.4.1
     hooks:
       - id: codespell

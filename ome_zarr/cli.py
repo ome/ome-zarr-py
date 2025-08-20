@@ -3,12 +3,13 @@
 import argparse
 import logging
 import sys
-from typing import List, Union
 
 from .csv import csv_to_zarr
 from .data import astronaut, coins, create_zarr
+from .format import CurrentFormat, Format, format_from_version
 from .scale import Scaler
 from .utils import download as zarr_download
+from .utils import finder as bff_finder
 from .utils import info as zarr_info
 from .utils import view as zarr_view
 
@@ -27,19 +28,25 @@ def config_logging(loglevel: int, args: argparse.Namespace) -> None:
 
 def info(args: argparse.Namespace) -> None:
     """Wrap the :func:`~ome_zarr.utils.info` method."""
-    config_logging(logging.WARN, args)
+    config_logging(logging.WARNING, args)
     list(zarr_info(args.path, stats=args.stats))
 
 
 def view(args: argparse.Namespace) -> None:
     """Wrap the :func:`~ome_zarr.utils.view` method."""
-    config_logging(logging.WARN, args)
+    config_logging(logging.WARNING, args)
     zarr_view(args.path, args.port)
+
+
+def finder(args: argparse.Namespace) -> None:
+    """Wrap the :func:`~ome_zarr.utils.finder` method."""
+    config_logging(logging.WARNING, args)
+    bff_finder(args.path, args.port)
 
 
 def download(args: argparse.Namespace) -> None:
     """Wrap the :func:`~ome_zarr.utils.download` method."""
-    config_logging(logging.WARN, args)
+    config_logging(logging.WARNING, args)
     zarr_download(args.path, args.output)
 
 
@@ -48,7 +55,7 @@ def create(args: argparse.Namespace) -> None:
 
     :func:`~ome_zarr.data.coins` or :func:`~ome_zarr.data.astronaut`.
     """
-    config_logging(logging.WARN, args)
+    config_logging(logging.WARNING, args)
     if args.method == "coins":
         method = coins
         label_name = "coins"
@@ -57,7 +64,11 @@ def create(args: argparse.Namespace) -> None:
         label_name = "circles"
     else:
         raise Exception(f"unknown method: {args.method}")
-    create_zarr(args.path, method=method, label_name=label_name)
+    fmt: Format = CurrentFormat()
+    if args.format:
+        fmt = format_from_version(args.format)
+
+    create_zarr(args.path, method=method, label_name=label_name, fmt=fmt)
 
 
 def scale(args: argparse.Namespace) -> None:
@@ -81,7 +92,7 @@ def csv_to_labels(args: argparse.Namespace) -> None:
     csv_to_zarr(args.csv_path, args.csv_id, args.csv_keys, args.zarr_path, args.zarr_id)
 
 
-def main(args: Union[List[str], None] = None) -> None:
+def main(args: list[str] | None = None) -> None:
     """Run appropriate function with argparse arguments, handling errors."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -103,7 +114,7 @@ def main(args: Union[List[str], None] = None) -> None:
 
     # info
     parser_info = subparsers.add_parser("info")
-    parser_info.add_argument("path")
+    parser_info.add_argument("path", help="Path to image.zarr")
     parser_info.add_argument("--stats", action="store_true")
     parser_info.set_defaults(func=info)
 
@@ -115,9 +126,25 @@ def main(args: Union[List[str], None] = None) -> None:
 
     # view (in ome-ngff-validator in a browser)
     parser_view = subparsers.add_parser("view")
-    parser_view.add_argument("path")
-    parser_view.add_argument("--port", type=int, default=8000)
+    parser_view.add_argument(
+        "path",
+        help="Path to image.zarr to open in ome-ngff-validator",
+    )
+    parser_view.add_argument(
+        "--port", type=int, default=8000, help="Port to serve the data (default: 8000)"
+    )
     parser_view.set_defaults(func=view)
+
+    # finder (open a dir of images in BioFile Finder in a browser)
+    parser_finder = subparsers.add_parser("finder")
+    parser_finder.add_argument(
+        "path",
+        help="Directory to open in BioFile Finder",
+    )
+    parser_finder.add_argument(
+        "--port", type=int, default=8000, help="Port to serve the data (default: 8000)"
+    )
+    parser_finder.set_defaults(func=finder)
 
     # create
     parser_create = subparsers.add_parser("create")
@@ -125,6 +152,9 @@ def main(args: Union[List[str], None] = None) -> None:
         "--method", choices=("coins", "astronaut"), default="coins"
     )
     parser_create.add_argument("path")
+    parser_create.add_argument(
+        "--format", help="OME-Zarr version to create. e.g. '0.4'"
+    )
     parser_create.set_defaults(func=create)
 
     parser_scale = subparsers.add_parser("scale")

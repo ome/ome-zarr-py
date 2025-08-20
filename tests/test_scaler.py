@@ -1,8 +1,13 @@
+import pathlib
+
 import dask.array as da
 import numpy as np
 import pytest
+import zarr
 
+from ome_zarr.io import parse_url
 from ome_zarr.scale import Scaler
+from ome_zarr.writer import write_image
 
 
 class TestScaler:
@@ -145,4 +150,25 @@ class TestScaler:
         print("level_1", level_1)
         # to zarr invokes compute
         data_dir = tmpdir.mkdir("test_big_dask_pyramid")
-        da.to_zarr(level_1, data_dir)
+        da.to_zarr(level_1, str(data_dir))
+
+    @pytest.mark.parametrize("method", ["gaussian", "laplacian"])
+    def test_pyramid_args(self, shape, tmpdir, method):
+        path = pathlib.Path(tmpdir.mkdir("data"))
+        store = parse_url(path, mode="w").store
+        group = zarr.group(store=store, overwrite=True)
+        data = self.create_data(shape)
+
+        scaler = Scaler(
+            downscale=2,
+            method=method,
+            max_layer=2,
+        )
+
+        axes = "tczyx"[-len(shape) :]
+        write_image(
+            image=data,
+            group=group,
+            scaler=scaler,
+            axes=axes,
+        )

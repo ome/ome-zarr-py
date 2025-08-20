@@ -1,6 +1,5 @@
 import csv
 import os
-from typing import Dict, Union
 
 from zarr.convenience import open as zarr_open
 
@@ -13,14 +12,14 @@ from .io import parse_url
 COLUMN_TYPES = ["d", "l", "s", "b"]
 
 
-def parse_csv_value(value: str, col_type: str) -> Union[str, float, int, bool]:
+def parse_csv_value(value: str, col_type: str) -> str | float | int | bool:
     """Parse string value from csv, according to COLUMN_TYPES"""
-    rv: Union[str, float, int, bool] = value
+    rv: str | float | int | bool = value
     try:
         if col_type == "d":
             rv = float(value)
         elif col_type == "l":
-            rv = int(round(float(value)))
+            rv = round(float(value))
         elif col_type == "b":
             rv = bool(value)
     except ValueError:
@@ -50,7 +49,7 @@ def csv_to_zarr(
 
     # Use #d to denote double etc.
     # e.g. "area (pixels)#d,well_label#s,Width#l,Height#l"
-    cols_types_by_name: Dict[str, str] = {}
+    cols_types_by_name: dict[str, str] = {}
     for col_name_type in csv_keys.split(","):
         if "#" in col_name_type:
             col_name, col_type = col_name_type.rsplit("#", 1)
@@ -60,9 +59,9 @@ def csv_to_zarr(
             cols_types_by_name[col_name_type] = "s"
 
     csv_columns = None
-    id_column = None
+    id_column: int
 
-    props_by_id: Dict[Union[str, int], Dict] = {}
+    props_by_id: dict[str | int, dict] = {}
 
     with open(csv_path, newline="") as csvfile:
         row_reader = csv.reader(csvfile, delimiter=",")
@@ -90,7 +89,7 @@ def csv_to_zarr(
 
 
 def dict_to_zarr(
-    props_to_add: Dict[Union[str, int], Dict], zarr_path: str, zarr_id: str
+    props_to_add: dict[str | int, dict], zarr_path: str, zarr_id: str
 ) -> None:
     """
     Add keys:values to the label properties of a ome-zarr Plate or Image.
@@ -114,16 +113,15 @@ def dict_to_zarr(
     if plate_attrs is None and not multiscales:
         raise Exception("zarr_path must be to plate.zarr or image.zarr")
 
-    labels_paths = []
     if plate_attrs is not None:
         # look for 'label/0' under the first field of each Well
         field = "0"
-        for w in plate_attrs.get("wells", []):
-            labels_paths.append(
-                os.path.join(zarr_path, w["path"], field, "labels", "0")
-            )
+        labels_paths = [
+            os.path.join(zarr_path, w["path"], field, "labels", "0")
+            for w in plate_attrs.get("wells", [])
+        ]
     else:
-        labels_paths.append(os.path.join(zarr_path, "labels", "0"))
+        labels_paths = [os.path.join(zarr_path, "labels", "0")]
 
     for path_to_labels in labels_paths:
         label_group = zarr_open(path_to_labels)

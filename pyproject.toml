@@ -1,0 +1,114 @@
+[build-system]
+requires = [
+    "setuptools>=77.0.3",
+    "setuptools-scm>=8.0",
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ome-zarr"
+readme = "README.rst"
+dynamic = ["version"]
+description="Implementation of images in Zarr files."
+
+license = "BSD-2-Clause"
+license-files = ["LICENSE"]
+
+requires-python = ">3.10"
+
+dependencies = [
+    "numpy",
+    "dask",
+    "zarr>=v3.0.0",
+    "fsspec[s3]>=0.8,!=2021.07.0,!=2023.9.0",
+    "aiohttp",
+    "requests",
+    "scikit-image>=0.19.0",
+    "toolz",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+
+authors = [
+    {name = "The Open Microscopy Team"},
+]
+
+[project.entry-points."console_scripts"]
+ome_zarr = "ome_zarr.cli:main"
+
+[project.optional-dependencies]
+tests = [
+    "pytest",
+]
+
+[project.urls]
+Documentation = "https://ome-zarr.readthedocs.io"
+Repository = "https://github.com/ome/ome-zarr-py"
+Changelog = "https://github.com/ome/ome-zarr-py/blob/master/CHANGELOG.md"
+
+[tool.ruff.lint]
+extend-select = [
+    "S",    # flake8-bandit
+    "BLE",  # flake8-blind-except
+    "B",    # flake8-bugbear
+    "A",    # flake8-builtins
+    "C4",   # flake8-comprehensions
+    "ISC",  # flake8-implicit-str-concat
+    "LOG",  # flake8-logging
+    "G",    # flake8-logging-format
+    "PIE",  # flake8-pie
+    "PYI",  # flake8-pyi
+    "SIM",  # flake8-simplify
+    "TID",  # flake8-tidy-imports
+    "FLY",  # flynt
+    "I",    # isort
+    "PERF", # Perflint
+    # "D",  # pydocstyle  # FIXME
+    "PGH",  # pygrep-hooks
+    "PLE",  # Pylint Error
+    "PLR",  # Pylint Refactor
+    "PLW",  # Pylint Warning
+    "UP",   # pyupgrade
+    "FURB", # refurb
+    "RUF",  # Ruff-specific rules
+]
+
+ignore = [
+    "S101",    # assert
+    "S311",    # suspicious-non-cryptographic-random-usage
+    "S314",    # suspicious-xml-element-tree-usage  # FIXME
+    "B007",    # unused-loop-control-variable
+    "B008",    # function-call-in-default-argument  # FIXME
+    "B011",    # assert-false
+    "B024",    # abstract-base-class-without-abstract-method  # FIXME
+    "B028",    # no-explicit-stacklevel
+    "B905",    # zip-without-explicit-strict
+    "C408",    # unnecessary-collection-call
+    "SIM108",  # if-else-block-instead-of-if-exp
+    "PERF203", # try-except-in-loop
+    "PLR09",   # too-many-...
+    "PLR2004", # magic-value-comparison
+    "PLW1641", # eq-without-hash  # FIXME
+    "UP038",   # non-pep604-isinstance
+    "RUF005",  # collection-literal-concatenation
+]
+
+[tool.ruff.lint.extend-per-file-ignores]
+"ome_zarr/csv.py" = ["A005"]
+"ome_zarr/io.py" = ["A005"]
+"ome_zarr/types.py" = ["A005"]
+"tests/*.py" = ["SIM201", "D"]
+
+[tool.setuptools]
+packages = ["ome_zarr"]
+py-modules = ["ome_zarr"]
+
+[tool.setuptools_scm]
+version_file = "ome_zarr/_version.py"

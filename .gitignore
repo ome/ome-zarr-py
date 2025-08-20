@@ -6,7 +6,7 @@ build
 dist/
 target/
 docs/build/
-
+*.DS_Store
 # Testing files
 .tox*
 .coverage*

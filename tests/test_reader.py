@@ -5,9 +5,16 @@ import zarr
 from numpy import ones, zeros
 
 from ome_zarr.data import create_zarr
+from ome_zarr.format import FormatV04
 from ome_zarr.io import parse_url
 from ome_zarr.reader import Node, Plate, Reader, Well
-from ome_zarr.writer import write_image, write_plate_metadata, write_well_metadata
+from ome_zarr.writer import (
+    add_metadata,
+    get_metadata,
+    write_image,
+    write_plate_metadata,
+    write_well_metadata,
+)
 
 
 class TestReader:
@@ -36,11 +43,44 @@ class TestReader:
 
     def test_omero(self):
         reader = Reader(parse_url(str(self.path)))()
-        image_node = list(reader)[0]
+        image_node = next(iter(reader))
         omero = image_node.zarr.root_attrs.get("omero")
         assert "channels" in omero
         assert isinstance(omero["channels"], list)
         assert len(omero["channels"]) == 1
+
+    def test_read_v05(self):
+        rng = np.random.default_rng(0)
+        data = rng.poisson(lam=10, size=(10, 128, 128)).astype(np.uint8)
+        img_path = str(self.path / "test_read_v05.zarr")
+        root = zarr.group(img_path)
+        arr = root.create_array(
+            name="s0", shape=data.shape, chunks=(10, 10, 10), dtype=data.dtype
+        )
+        arr[:, :] = data
+        root.attrs["ome"] = {
+            "version": "0.5",
+            "multiscales": [
+                {
+                    "datasets": [
+                        {
+                            "path": "s0",
+                            "coordinateTransformations": [
+                                {
+                                    "type": "scale",
+                                    "scale": [1, 1, 1],
+                                }
+                            ],
+                        }
+                    ]
+                }
+            ],
+        }
+        reader = Reader(parse_url(img_path))
+        nodes = list(reader())
+        assert len(nodes) == 1
+        image_node = nodes[0]
+        assert np.allclose(data, image_node.data[0])
 
 
 class TestInvalid:
@@ -51,9 +91,9 @@ class TestInvalid:
     def test_invalid_version(self):
         grp = create_zarr(str(self.path))
         # update version to something invalid
-        attrs = grp.attrs.asdict()
+        attrs = get_metadata(grp)
         attrs["multiscales"][0]["version"] = "invalid"
-        grp.attrs.put(attrs)
+        add_metadata(grp, attrs)
         # should raise exception
         with pytest.raises(ValueError) as exe:
             reader = Reader(parse_url(str(self.path)))
@@ -65,7 +105,7 @@ class TestHCSReader:
     @pytest.fixture(autouse=True)
     def initdir(self, tmpdir):
         self.path = tmpdir.mkdir("data")
-        self.store = parse_url(str(self.path), mode="w").store
+        self.store = parse_url(str(self.path), mode="w", fmt=FormatV04()).store
         self.root = zarr.group(store=self.store)
 
     def test_minimal_plate(self):
