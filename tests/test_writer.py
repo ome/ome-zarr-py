@@ -661,16 +661,15 @@ class TestMultiscalesMetadata:
         assert "multiscales" in attrs_json
         assert "multiscales" in attrs
         assert attrs["multiscales"][0]["datasets"] == datasets
-        if fmt.version == "0.4":
-            # No arrays, so this is expected:
-            with pytest.raises(
-                ValueError,
-                match="Expected to find an array at /0, but no array was found there.",
-            ):
+        # No arrays, so this is expected:
+        with pytest.raises(
+            ValueError,
+            match="Expected to find an array at /0, but no array was found there.",
+        ):
+            if fmt.version == "0.4":
                 Models04Image.from_zarr(group)
-        # No ValueError: https://github.com/ome-zarr-models/ome-zarr-models-py/issues/217
-        if fmt.version == "0.5":
-            Models05Image.from_zarr(group)
+            if fmt.version == "0.5":
+                Models05Image.from_zarr(group)
 
     @pytest.mark.parametrize("fmt", (FormatV01(), FormatV02(), FormatV03()))
     def test_version(self, fmt):
