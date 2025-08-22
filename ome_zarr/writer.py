@@ -302,8 +302,6 @@ Please use the 'storage_options' argument instead."""
                 arr=data,
                 url=group.store,
                 component=str(Path(group.path, str(path))),
-                # IF we pass storage_options then dask NEEDS url to be a string
-                storage_options=None,
                 compute=compute,
                 zarr_format=zarr_format,
                 **options,
@@ -714,7 +712,6 @@ Please use the 'storage_options' argument instead."""
                 arr=image,
                 url=group.store,
                 component=str(Path(group.path, str(path))),
-                # storage_options=options,
                 compute=False,
                 zarr_format=zarr_format,
                 **kwargs,
