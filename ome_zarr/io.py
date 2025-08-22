@@ -88,7 +88,8 @@ class ZarrLocation:
             if "ome" in self.zgroup:
                 self.zgroup = self.zgroup["ome"]
             self.__metadata = self.zgroup
-        except (ValueError, FileNotFoundError):
+        except (ValueError, FileNotFoundError) as e:
+            LOGGER.error("Failed to initialize metadata: %s", e)
             # group doesn't exist. If we are in "w" mode, we need to create it.
             if self.__mode == "w":
                 # If we are creating a new group, we need to specify the zarr_format.
@@ -97,7 +98,7 @@ class ZarrLocation:
                     store=self.__store, path="/", mode="w", zarr_format=zarr_format
                 )
             else:
-                self.__exists = False
+                raise e
 
     def __repr__(self) -> str:
         """Print the path as well as whether this is a group or an array."""
@@ -218,13 +219,6 @@ def parse_url(
     :param fmt: Version of the OME-NGFF spec to open path with.
 
     :return: `ZarrLocation`.
-        If mode is 'r', and the path does not exist returns None.
-        If there is an error opening the path, also returns None.
-
-    >>> parse_url('does-not-exist')
+        If mode is 'r', and the path does not exist, raises exception
     """
-    loc = ZarrLocation(path, mode=mode, fmt=fmt)
-    if "r" in mode and not loc.exists():
-        return None
-    else:
-        return loc
+    return ZarrLocation(path, mode=mode, fmt=fmt)
