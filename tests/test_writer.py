@@ -454,9 +454,15 @@ class TestWriter:
         ]
         fmt.validate_coordinate_transformations(2, 2, transformations)
 
+        # We allow the number of transformations to be greater than
+        # the number of levels... (extra transformations are ignored)
+        levels = 1
+        fmt.validate_coordinate_transformations(2, levels, transformations)
+
         with pytest.raises(ValueError):
-            # transformations different length than levels
-            fmt.validate_coordinate_transformations(2, 1, transformations)
+            # ...but not fewer
+            levels = 3
+            fmt.validate_coordinate_transformations(2, levels, transformations)
 
         with pytest.raises(ValueError):
             transf = [[{"type": "scale", "scale": ("1", 1)}]]
