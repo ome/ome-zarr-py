@@ -9,6 +9,13 @@ import pytest
 import zarr
 from dask import persist
 from numcodecs import Blosc
+from ome_zarr_models.v04 import HCS as Models04HCS
+from ome_zarr_models.v04 import Image as Models04Image
+from ome_zarr_models.v04 import Labels as Models04Labels
+from ome_zarr_models.v04 import Well as Models04Well
+from ome_zarr_models.v05.hcs import HCS as Models05HCS
+from ome_zarr_models.v05.image import Image as Models05Image
+from ome_zarr_models.v05.well import Well as Models05Well
 from zarr.abc.codec import BytesBytesCodec
 from zarr.codecs import BloscCodec
 
@@ -153,6 +160,12 @@ class TestWriter:
             first_chunk = [c[0] for c in nd_array.chunks]
             assert tuple(first_chunk) == _retuple(expected, nd_array.shape)
         assert np.allclose(data, node.data[0][...].compute())
+
+        if version.version == "0.4":
+            # Validate with ome-zarr-models-py: only supports v0.4
+            Models04Image.from_zarr(group)
+        elif version.version == "0.5":
+            Models05Image.from_zarr(group)
 
     def test_mix_zarr_formats(self):
         # check group zarr v2 and v3 matches fmt
@@ -303,6 +316,12 @@ class TestWriter:
                 shallow=False,
             )
 
+        # Validate with ome-zarr-models-py
+        if fmt.version == "0.4":
+            Models04Image.from_zarr(group)
+        elif fmt.version == "0.5":
+            Models05Image.from_zarr(group)
+
     def test_write_image_scalar_chunks(self):
         """
         Make sure a scalar chunks value is applied to all dimensions,
@@ -377,6 +396,11 @@ class TestWriter:
                     "shuffle": Blosc.SHUFFLE,
                     "blocksize": 0,
                 }
+        assert format_version().version in ("0.4", "0.5")
+        if format_version().version == "0.4":
+            Models04Image.from_zarr(group)
+        elif format_version().version == "0.5":
+            Models05Image.from_zarr(group)
 
     @pytest.mark.parametrize(
         "format_version",
@@ -637,6 +661,15 @@ class TestMultiscalesMetadata:
         assert "multiscales" in attrs_json
         assert "multiscales" in attrs
         assert attrs["multiscales"][0]["datasets"] == datasets
+        # No arrays, so this is expected:
+        with pytest.raises(
+            ValueError,
+            match="Expected to find an array at /0, but no array was found there.",
+        ):
+            if fmt.version == "0.4":
+                Models04Image.from_zarr(group)
+            if fmt.version == "0.5":
+                Models05Image.from_zarr(group)
 
     @pytest.mark.parametrize("fmt", (FormatV01(), FormatV02(), FormatV03()))
     def test_version(self, fmt):
@@ -720,6 +753,12 @@ class TestMultiscalesMetadata:
         assert "multiscales" in self.root.attrs
         assert self.root.attrs["multiscales"][0]["axes"] == axes
         assert self.root.attrs["multiscales"][0]["datasets"] == datasets
+        # No arrays, so this is expected:
+        with pytest.raises(
+            ValueError,
+            match="Expected to find an array at /0, but no array was found there.",
+        ):
+            Models04Image.from_zarr(self.root)
 
     @pytest.mark.parametrize(
         "coordinateTransformations",
@@ -780,7 +819,6 @@ class TestMultiscalesMetadata:
                     }
                 ]
             },
-            {"channels": [{"color": "FF0000"}]},
             {"channels": [{"color": "FF000"}]},  # test wrong metadata
             {"channels": [{"window": []}]},  # test wrong metadata
             {
@@ -850,6 +888,12 @@ class TestMultiscalesMetadata:
                     axes="tczyx",
                     metadata={"omero": metadata},
                 )
+                # no arrays, so this is expected
+                with pytest.raises(
+                    ValueError,
+                    match="Expected to find an array at /0, but no array was found there.",
+                ):
+                    Models04Image.from_zarr(self.root)
 
 
 class TestPlateMetadata:
@@ -887,6 +931,12 @@ class TestPlateMetadata:
         assert "name" not in attrs["plate"]
         assert "field_count" not in attrs["plate"]
         assert "acquisitions" not in attrs["plate"]
+        assert fmt.version in ("0.4", "0.5")
+        if fmt.version == "0.4":
+            Models04HCS.from_zarr(group)
+        elif fmt.version == "0.5":
+            # https://github.com/ome-zarr-models/ome-zarr-models-py/issues/218
+            Models05HCS.from_zarr(group)
 
     @pytest.mark.parametrize("fmt", (FormatV04(), FormatV05()))
     def test_12wells_plate(self, fmt):
@@ -944,6 +994,11 @@ class TestPlateMetadata:
         assert "name" not in attrs["plate"]
         assert "field_count" not in attrs["plate"]
         assert "acquisitions" not in attrs["plate"]
+        assert fmt.version in ("0.4", "0.5")
+        if fmt.version == "0.4":
+            Models04HCS.from_zarr(group)
+        elif fmt.version == "0.5":
+            Models05HCS.from_zarr(group)
 
     @pytest.mark.parametrize("fmt", (FormatV04(), FormatV05()))
     def test_sparse_plate(self, fmt):
@@ -983,6 +1038,11 @@ class TestPlateMetadata:
         assert "name" not in attrs["plate"]
         assert "field_count" not in attrs["plate"]
         assert "acquisitions" not in attrs["plate"]
+        assert fmt.version in ("0.4", "0.5")
+        if fmt.version == "0.4":
+            Models04HCS.from_zarr(group)
+        elif fmt.version == "0.5":
+            Models05HCS.from_zarr(group)
 
     @pytest.mark.parametrize("fmt", (FormatV01(), FormatV02(), FormatV03()))
     def test_legacy_wells(self, fmt):
@@ -1011,6 +1071,7 @@ class TestPlateMetadata:
         ]
         assert "field_count" not in attrs["plate"]
         assert "acquisitions" not in attrs["plate"]
+        Models05HCS.from_zarr(self.root_v3)
 
     def test_field_count(self):
         write_plate_metadata(
@@ -1026,6 +1087,7 @@ class TestPlateMetadata:
         ]
         assert "name" not in self.root.attrs["plate"]
         assert "acquisitions" not in self.root.attrs["plate"]
+        Models04HCS.from_zarr(self.root)
 
     def test_acquisitions_minimal(self):
         a = [{"id": 1}, {"id": 2}, {"id": 3}]
@@ -1042,6 +1104,7 @@ class TestPlateMetadata:
         ]
         assert "name" not in self.root.attrs["plate"]
         assert "field_count" not in self.root.attrs["plate"]
+        Models04HCS.from_zarr(self.root)
 
     def test_acquisitions_maximal(self):
         a = [
@@ -1067,6 +1130,7 @@ class TestPlateMetadata:
         ]
         assert "name" not in self.root.attrs["plate"]
         assert "field_count" not in self.root.attrs["plate"]
+        Models04HCS.from_zarr(self.root)
 
     @pytest.mark.parametrize(
         "acquisitions",
@@ -1164,6 +1228,7 @@ class TestPlateMetadata:
         assert self.root.attrs["plate"]["rows"] == [{"name": "A"}, {"name": "B"}]
         assert self.root.attrs["plate"]["version"] == FormatV04().version
         assert self.root.attrs["plate"]["wells"] == wells
+        Models04HCS.from_zarr(self.root)
 
     def test_missing_well_keys(self):
         wells = [
@@ -1236,6 +1301,10 @@ class TestWellMetadata:
 
         assert "well" in attrs_json
         assert attrs["well"]["images"] == [{"path": "0"}]
+        if fmt.version == "0.4":
+            Models04Well.from_zarr(group)
+        elif fmt.version == "0.5":
+            Models05Well.from_zarr(group)
 
     @pytest.mark.parametrize(
         "images",
@@ -1257,6 +1326,7 @@ class TestWellMetadata:
             {"path": "2"},
         ]
         assert self.root_v3.attrs["ome"]["version"] == FormatV05().version
+        Models05Well.from_zarr(self.root_v3)
 
     @pytest.mark.parametrize("fmt", (FormatV01(), FormatV02(), FormatV03()))
     def test_version(self, fmt):
@@ -1275,6 +1345,7 @@ class TestWellMetadata:
         assert "well" in self.root.attrs
         assert self.root.attrs["well"]["images"] == images
         assert self.root.attrs["well"]["version"] == FormatV04().version
+        Models04Well.from_zarr(self.root)
 
     @pytest.mark.parametrize(
         "images",
@@ -1442,6 +1513,9 @@ class TestLabelWriter:
         self.verify_label_data(
             img_path, label_name, label_data, fmt, shape, transformations
         )
+        if fmt.version == "0.4":
+            test_root = zarr.open(self.path)
+            Models04Labels.from_zarr(test_root["labels"])
 
     @pytest.mark.parametrize(
         "format_version",

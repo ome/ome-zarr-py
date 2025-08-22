@@ -1,2 +1,3 @@
 pytest
 pytest-cov
+git+https://github.com/lorenzocerrone/ome-zarr-models-py.git@improve_v05_validation#egg=ome-zarr-models
