@@ -53,7 +53,7 @@ class TestReader:
         rng = np.random.default_rng(0)
         data = rng.poisson(lam=10, size=(10, 128, 128)).astype(np.uint8)
         img_path = str(self.path / "test_read_v05.zarr")
-        root = zarr.group(img_path)
+        root = zarr.open_group(img_path)
         arr = root.create_array(
             name="s0", shape=data.shape, chunks=(10, 10, 10), dtype=data.dtype
         )
