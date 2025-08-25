@@ -105,8 +105,9 @@ class TestHCSReader:
     @pytest.fixture(autouse=True)
     def initdir(self, tmpdir):
         self.path = tmpdir.mkdir("data")
-        self.store = parse_url(str(self.path), mode="w", fmt=FormatV04()).store
-        self.root = zarr.group(store=self.store)
+        self.root = zarr.open_group(
+            str(self.path), mode="w", zarr_format=FormatV04().zarr_format
+        )
 
     def test_minimal_plate(self):
         write_plate_metadata(self.root, ["A"], ["1"], ["A/1"])
