@@ -177,20 +177,21 @@ This sample code reads an image stored on remote s3 server, but the same
 code can be used to read data on a local file system. In either case,
 the data is available as `dask` arrays::
 
-    from ome_zarr.io import parse_url
-    from ome_zarr.reader import Reader
+    from dask import array as da
+    import zarr
     import napari
 
     url = "https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.5/idr0062A/6001240_labels.zarr"
 
     # read the image data
-    reader = Reader(parse_url(url))
-    # nodes may include images, labels etc
-    nodes = list(reader())
-    # first node will be the image pixel data
-    image_node = nodes[0]
+    root = zarr.open_group(url)
+    zattrs = root.attrs.asdict()
+    # Handle v0.5+ - unwrap 'ome' namespace
+    if "ome" in zattrs:
+        zattrs = zattrs["ome"]
 
-    dask_data = image_node.data
+    paths = [ds["path"] for ds in zattrs["multiscales"][0]["datasets"]]
+    dask_data = [da.from_zarr(root[path]) for path in paths]
 
     # We can view this in napari
     # NB: image axes are CZYX: split channels by C axis=0
@@ -208,7 +209,6 @@ Writing big image from tiles::
 
     import os
     import zarr
-    from ome_zarr.io import parse_url
     from ome_zarr.format import CurrentFormat, FormatV04
     from ome_zarr.reader import Reader
     from ome_zarr.writer import write_multiscales_metadata
@@ -221,10 +221,14 @@ Writing big image from tiles::
     # Use fmt=FormatV04() to write v0.4 format (zarr v2)
 
     url = "https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.3/9836842.zarr"
-    reader = Reader(parse_url(url))
-    nodes = list(reader())
+    root = zarr.open_group(url)
+    zattrs = root.attrs.asdict()
+    # Handle v0.5+ - unwrap 'ome' namespace
+    if "ome" in zattrs:
+        zattrs = zattrs["ome"]
+    paths = [ds["path"] for ds in zattrs["multiscales"][0]["datasets"]]
     # first level of the pyramid
-    dask_data = nodes[0].data[0]
+    dask_data = da.from_zarr(root[paths[0]])
     tile_size = 512
     axes = [{"name": "c", "type": "channel"}, {"name": "y", "type": "space"}, {"name": "x", "type": "space"}]
 
@@ -284,7 +288,7 @@ Writing big image from tiles::
     row_count = ceil(shape[-2]/tile_size)
     col_count = ceil(shape[-1]/tile_size)
 
-    root = zarr.group("9836842.zarr", mode="w")
+    root = zarr.open_group("9836842.zarr", mode="w")
 
     # create empty array at root of pyramid
     zarray = root.require_array(
@@ -341,7 +345,7 @@ When that dask data is passed to write_image() the tiles will be loaded on the f
     from ome_zarr.writer import write_image, add_metadata
 
     zarr_name = "test_dask.zarr"
-    root = zarr.group(zarr_name, mode="w")
+    root = zarr.open_group(zarr_name, mode="w")
 
     size_xy = 100
     channel_count = 2
