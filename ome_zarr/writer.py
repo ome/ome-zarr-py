@@ -924,7 +924,7 @@ def write_labels(
     labels: np.ndarray | da.Array,
     group: zarr.Group,
     name: str,
-    scaler: Scaler = Scaler(),
+    scaler: Scaler = Scaler(order=0),
     chunks: tuple[Any, ...] | int | None = None,
     fmt: Format | None = None,
     axes: AxesType = None,
@@ -954,6 +954,8 @@ def write_labels(
     :param scaler:
       Scaler implementation for downsampling the image argument. If None,
       no downsampling will be performed.
+      If no scaler is provided, the default scaler with nearest neighbour
+      interpolation will be used.
     :type chunks: int or tuple of ints, optional
     :param chunks:
         The size of the saved chunks to store the image.
