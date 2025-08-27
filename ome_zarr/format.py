@@ -296,6 +296,7 @@ class FormatV04(FormatV03):
         Validates that a list of dicts contains a 'scale' transformation
 
         Raises ValueError if no 'scale' found or doesn't match ndim.
+        Raises ValueError if len(coordinate_transformations) < nlevels.
 
         :param ndim: Number of image dimensions.
         """
@@ -303,7 +304,10 @@ class FormatV04(FormatV03):
         if coordinate_transformations is None:
             raise ValueError("coordinate_transformations must be provided")
         ct_count = len(coordinate_transformations)
-        if ct_count != nlevels:
+
+        # If MORE transformations than levels, we just ignore the extra ones
+        # but we do require at least as many as levels
+        if ct_count < nlevels:
             raise ValueError(
                 f"coordinate_transformations count: {ct_count} must match "
                 f"datasets {nlevels}"
