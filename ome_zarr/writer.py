@@ -484,6 +484,9 @@ def write_plate_metadata(
         group.attrs["plate"] = plate
     else:
         # Zarr v3 metadata under 'ome' with top-level version
+        if fmt.version == "0.5":
+            # See https://github.com/ome-zarr-models/ome-zarr-models-py/issues/218
+            plate["version"] = fmt.version
         group.attrs["ome"] = {"version": fmt.version, "plate": plate}
 
 
