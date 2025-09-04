@@ -952,10 +952,11 @@ def write_labels(
     :param name: The name of this labels data.
     :type scaler: :class:`ome_zarr.scale.Scaler`
     :param scaler:
-      Scaler implementation for downsampling the image argument. If None,
-      no downsampling will be performed.
+      Scaler implementation for downsampling the image argument.
+      NB: Labels downsampling should avoid interpolation.
       If no scaler is provided, the default scaler with nearest neighbour
       interpolation will be used.
+      If scaler=None, no downsampling will be performed.
     :type chunks: int or tuple of ints, optional
     :param chunks:
         The size of the saved chunks to store the image.
