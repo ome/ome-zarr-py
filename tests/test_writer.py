@@ -16,6 +16,7 @@ from ome_zarr_models.v04 import Well as Models04Well
 from ome_zarr_models.v05.hcs import HCS as Models05HCS
 from ome_zarr_models.v05.image import Image as Models05Image
 from ome_zarr_models.v05.well import Well as Models05Well
+from skimage.data import binary_blobs
 from zarr.abc.codec import BytesBytesCodec
 from zarr.codecs import BloscCodec
 
@@ -1457,6 +1458,12 @@ class TestLabelWriter:
         name = imglabel_attrs["multiscales"][0].get("name", "")
         assert label_name == name
 
+        labels_paths = [
+            ds["path"] for ds in imglabel_attrs["multiscales"][0]["datasets"]
+        ]
+        label_data = [da.from_zarr(label_group[path]) for path in labels_paths]
+        return label_data
+
     @pytest.mark.parametrize(
         "format_version",
         (
@@ -1468,7 +1475,9 @@ class TestLabelWriter:
         ),
     )
     @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])
-    def test_write_labels(self, shape, scaler, format_version, array_constructor):
+    @pytest.mark.parametrize("scale_type", ["custom", "noop", "default"])
+    def test_write_labels(self, shape, format_version, array_constructor, scale_type):
+
         fmt = format_version()
         if fmt.version == "0.5":
             img_path = self.path_v3
@@ -1485,11 +1494,23 @@ class TestLabelWriter:
             transformations.append(
                 [{"type": "scale", "scale": transf["scale"][-len(shape) :]}]
             )
-            if scaler is None:
+            if scale_type == "noop":
                 break
 
-        # create the actual label data
-        label_data = np.random.randint(0, 1000, size=shape)
+        # create the actual label data: zeros with blobs
+        label_data = np.zeros(shape, dtype=np.uint8)
+        # add some blobs, corresponding to shape
+        blobs = binary_blobs(length=256, volume_fraction=0.1, n_dim=2).astype("int8")
+        # we only apply blobs to the last two dimensions of label_data
+        slices = [slice(None)] * (len(shape) - blobs.ndim)
+        slices += [slice(0, 256), slice(0, 256)]
+        label_data[tuple(slices)] = 2 * blobs
+
+        print("label_data.shape:", label_data.shape, shape)
+        assert label_data.max() == 2
+        assert label_data.min() == 0
+        assert np.unique(label_data).tolist() == [0, 2]
+
         if fmt.version in ("0.1", "0.2"):
             # v0.1 and v0.2 require 5d
             expand_dims = (np.s_[None],) * (5 - len(shape))
@@ -1498,21 +1519,33 @@ class TestLabelWriter:
         label_name = "my-labels"
         label_data = array_constructor(label_data)
 
+        scaler = Scaler()
+        if scale_type == "noop":
+            scaler = None
+        kwargs = {"scaler": scaler}
+        if scale_type == "default":
+            del kwargs["scaler"]
+
         # create the root level image data
         self.create_image_data(group, shape, scaler, fmt, axes, transformations)
 
         write_labels(
             label_data,
             group,
-            scaler=scaler,
             name=label_name,
             fmt=fmt,
             axes=axes,
             coordinate_transformations=transformations,
+            **kwargs,
         )
-        self.verify_label_data(
+        label_data = self.verify_label_data(
             img_path, label_name, label_data, fmt, shape, transformations
         )
+
+        for level in label_data:
+            if scale_type == "default":
+                assert np.unique(level.compute()).tolist() == [0, 2]
+
         if fmt.version == "0.4":
             test_root = zarr.open(self.path)
             Models04Labels.from_zarr(test_root["labels"])
