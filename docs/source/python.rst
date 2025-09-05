@@ -31,10 +31,8 @@ The following code creates a 3D Image in OME-Zarr::
     rng = np.random.default_rng(0)
     data = rng.poisson(lam=10, size=(size_z, size_xy, size_xy)).astype(np.uint8)
 
-    # Use zarr_format=2 to write v0.4 format (zarr v2)
-    root = zarr.open_group(path, mode="w")
-    write_image(image=data, group=root, axes="zyx",
-                storage_options=dict(chunks=(1, size_xy, size_xy)))
+    # Add fmt=FormatV04() parameter to write v0.4 format (zarr v2)
+    write_image(data, path, axes="zyx")
 
 
 This image can be viewed in `napari` using the
@@ -46,8 +44,7 @@ Rendering settings
 ------------------
 Rendering settings can be added to an existing zarr group::
 
-    root = zarr.open_group(path, mode="a")
-    add_metadata(root, {"omero": {
+    add_metadata(path, {"omero": {
         "channels": [{
             "color": "00FFFF",
             "window": {"start": 0, "end": 20, "min": 0, "max": 255},
