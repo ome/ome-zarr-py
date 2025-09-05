@@ -19,11 +19,13 @@ from ome_zarr.format import (
     FormatV03,
     FormatV04,
     FormatV05,
+    format_from_version,
 )
 from ome_zarr.scale import Scaler
 from ome_zarr.writer import (
     _get_valid_axes,
     _retuple,
+    get_metadata,
     write_image,
     write_labels,
     write_multiscale,
@@ -95,10 +97,8 @@ class TestWriter:
         version = format_version()
 
         if version.version == "0.5":
-            group = self.group_v3
             grp_path = self.path_v3 / "test"
         else:
-            group = self.group
             grp_path = self.path / "test"
 
         data = self.create_data(shape)
@@ -119,7 +119,7 @@ class TestWriter:
             storage_options = [{"chunks": chunk} for chunk in chunks]
         write_image(
             image=data,
-            group=group,
+            group=str(grp_path),
             scaler=scaler,
             fmt=version,
             axes=axes,
@@ -170,6 +170,26 @@ class TestWriter:
 
         with pytest.raises(ValueError, match=r"Group is zarr_format: 2"):
             write_well_metadata(self.group, [{"path": "0"}], fmt=CurrentFormat())
+
+    @pytest.mark.parametrize(
+        "omezarr_format",
+        [None, "0.4", "0.5"],
+    )
+    def test_group_from_path(self, omezarr_format):
+        fmt = format_from_version(omezarr_format) if omezarr_format else None
+        data = self.create_data((64, 64, 64))
+        path = str(self.path / "test_from_path.zarr")
+        write_multiscale([data], path, axes="zyx", fmt=fmt)
+        out = zarr.open_group(path)
+        if omezarr_format in (None, "0.5"):
+            assert out.info._zarr_format == 3
+            assert "multiscales" in out.attrs.get("ome", {})
+        else:
+            assert out.info._zarr_format == 2
+            assert "multiscales" in out.attrs
+        ds_path = get_metadata(path)["multiscales"][0]["datasets"][0]["path"]
+        arr = da.from_zarr(f"{path}/{ds_path}")
+        assert np.allclose(data, arr[...].compute())
 
     @pytest.mark.parametrize("zarr_format", [2, 3])
     @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])
@@ -327,7 +347,7 @@ class TestWriter:
         shape = (64, 64, 64)
         data = np.array(self.create_data(shape))
         write_image(
-            image=data, group=self.group, axes="xyz", storage_options={"chunks": 32}
+            image=data, group=str(self.path), axes="xyz", storage_options={"chunks": 32}
         )
         for data in self.group.array_values():
             print(data)
@@ -347,7 +367,6 @@ class TestWriter:
         data = array_constructor(data)
         path = self.path / "test_write_image_compressed"
         fmt = format_version()
-        root = zarr.open_group(path, mode="w", zarr_format=fmt.zarr_format)
         CNAME = "lz4"
         LEVEL = 4
         if format_version().zarr_format == 3:
@@ -363,8 +382,9 @@ class TestWriter:
 
         write_image(
             data,
-            root,
+            str(path),
             axes="zyx",
+            fmt=fmt,
             storage_options={"compressor": compressor},
         )
         group = zarr.open(f"{path}")
@@ -633,12 +653,12 @@ class TestMultiscalesMetadata:
         for level, transf in enumerate(TRANSFORMATIONS):
             datasets.append({"path": str(level), "coordinateTransformations": transf})
         if fmt.version == "0.5":
-            group = self.root_v3
+            path = self.path_v3
         else:
-            group = self.root
-        write_multiscales_metadata(group, datasets, axes="tczyx")
+            path = self.path
+        write_multiscales_metadata(str(path), datasets, axes="tczyx", fmt=fmt)
         # we want to be sure this is zarr v2 / v3
-        attrs = group.attrs
+        attrs = zarr.open_group(path).attrs
         if fmt.version == "0.5":
             attrs = attrs.get("ome")
             assert "version" in attrs
@@ -1012,8 +1032,8 @@ class TestPlateMetadata:
     def test_plate_name(self):
         # We don't need to test v04 and v05 for all tests since
         # the metadata is the same
-        write_plate_metadata(self.root_v3, ["A"], ["1"], ["A/1"], name="test")
-        attrs = self.root_v3.attrs["ome"]
+        write_plate_metadata(str(self.path_v3), ["A"], ["1"], ["A/1"], name="test")
+        attrs = zarr.open_group(self.path_v3).attrs.get("ome")
         assert "plate" in attrs
         assert attrs["plate"]["columns"] == [{"name": "1"}]
         assert attrs["plate"]["name"] == "test"
@@ -1043,18 +1063,19 @@ class TestPlateMetadata:
     def test_acquisitions_minimal(self):
         a = [{"id": 1}, {"id": 2}, {"id": 3}]
         write_plate_metadata(
-            self.root, ["A"], ["1"], ["A/1"], acquisitions=a, fmt=FormatV04()
+            str(self.path), ["A"], ["1"], ["A/1"], acquisitions=a, fmt=FormatV04()
         )
-        assert "plate" in self.root.attrs
-        assert self.root.attrs["plate"]["acquisitions"] == a
-        assert self.root.attrs["plate"]["columns"] == [{"name": "1"}]
-        assert self.root.attrs["plate"]["rows"] == [{"name": "A"}]
-        assert self.root.attrs["plate"]["version"] == FormatV04().version
-        assert self.root.attrs["plate"]["wells"] == [
+        plate_attrs = zarr.open_group(str(self.path), mode="r").attrs
+        assert "plate" in dict(plate_attrs)
+        assert plate_attrs["plate"]["acquisitions"] == a
+        assert plate_attrs["plate"]["columns"] == [{"name": "1"}]
+        assert plate_attrs["plate"]["rows"] == [{"name": "A"}]
+        assert plate_attrs["plate"]["version"] == FormatV04().version
+        assert plate_attrs["plate"]["wells"] == [
             {"path": "A/1", "rowIndex": 0, "columnIndex": 0}
         ]
-        assert "name" not in self.root.attrs["plate"]
-        assert "field_count" not in self.root.attrs["plate"]
+        assert "name" not in plate_attrs["plate"]
+        assert "field_count" not in plate_attrs["plate"]
 
     def test_acquisitions_maximal(self):
         a = [
