@@ -803,7 +803,7 @@ def write_label_metadata(
 def get_metadata(group: zarr.Group, fmt: Format | None = None) -> dict:
     fmt = check_format(group, fmt)
     attrs = group.attrs
-    if fmt.version.startswith(("0.1", "0.2", "0.3", "0.4")):
+    if not fmt.version.startswith(("0.1", "0.2", "0.3", "0.4")):
         attrs = attrs.get("ome", {})
     else:
         attrs = dict(attrs)
@@ -817,7 +817,7 @@ def add_metadata(
     fmt = check_format(group, fmt)
 
     attrs = group.attrs
-    if fmt.version.startswith(("0.1", "0.2", "0.3", "0.4")):
+    if not fmt.version.startswith(("0.1", "0.2", "0.3", "0.4")):
         attrs = attrs.get("ome", {})
 
     for key, value in metadata.items():
