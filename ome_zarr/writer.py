@@ -32,7 +32,7 @@ def _get_valid_axes(
 ) -> list[str] | list[dict[str, str]] | None:
     """Returns list of axes valid for fmt.version or raise exception if invalid"""
 
-    if fmt.version[:3] in ("0.1", "0.2"):
+    if fmt.version.startswith(("0.1", "0.2")):
         if axes is not None:
             LOGGER.info("axes ignored for version 0.1 or 0.2")
         return None
@@ -382,7 +382,7 @@ def write_multiscales_metadata(
     fmt = check_format(group, fmt)
     ndim = -1
     if axes is not None:
-        if fmt.version[:3] in ("0.1", "0.2"):
+        if fmt.version.startswith(("0.1", "0.2")):
             LOGGER.info("axes ignored for version 0.1 or 0.2")
             axes = None
         else:
@@ -424,7 +424,7 @@ def write_multiscales_metadata(
     if axes is not None:
         multiscales[0]["axes"] = axes
 
-    if fmt.version[:3] in ("0.1", "0.2", "0.3", "0.4"):
+    if fmt.version.startswith(("0.1", "0.2", "0.3", "0.4")):
         multiscales[0]["version"] = fmt.version
     else:
         # Zarr v3 top-level version
@@ -479,12 +479,12 @@ def write_plate_metadata(
     if acquisitions is not None:
         plate["acquisitions"] = _validate_plate_acquisitions(acquisitions)
 
-    if fmt.version[:3] in ("0.1", "0.2", "0.3", "0.4"):
+    if fmt.version.startswith(("0.1", "0.2", "0.3", "0.4")):
         plate["version"] = fmt.version
         group.attrs["plate"] = plate
     else:
         # Zarr v3 metadata under 'ome' with top-level version
-        if fmt.version[:3] == "0.5":
+        if fmt.version.startswith("0.5"):
             # See https://github.com/ome-zarr-models/ome-zarr-models-py/issues/218
             plate["version"] = fmt.version
         group.attrs["ome"] = {"version": fmt.version, "plate": plate}
@@ -513,7 +513,7 @@ def write_well_metadata(
         "images": _validate_well_images(images),
     }
 
-    if fmt.version[:3] in ("0.1", "0.2", "0.3", "0.4"):
+    if fmt.version.startswith(("0.1", "0.2", "0.3", "0.4")):
         well["version"] = fmt.version
         group.attrs["well"] = well
     else:
@@ -644,7 +644,7 @@ def _write_dask_image(
     **metadata: str | JSONDict | list[JSONDict],
 ) -> list:
     fmt = check_format(group, fmt)
-    if fmt.version[:3] in ("0.1", "0.2"):
+    if fmt.version.startswith(("0.1", "0.2")):
         # v0.1 and v0.2 are strictly 5D
         shape_5d: tuple[Any, ...] = (*(1,) * (5 - image.ndim), *image.shape)
         image = image.reshape(shape_5d)
@@ -803,7 +803,7 @@ def write_label_metadata(
 def get_metadata(group: zarr.Group, fmt: Format | None = None) -> dict:
     fmt = check_format(group, fmt)
     attrs = group.attrs
-    if fmt.version[:3] not in ("0.1", "0.2", "0.3", "0.4"):
+    if fmt.version.startswith(("0.1", "0.2", "0.3", "0.4")):
         attrs = attrs.get("ome", {})
     else:
         attrs = dict(attrs)
@@ -817,7 +817,7 @@ def add_metadata(
     fmt = check_format(group, fmt)
 
     attrs = group.attrs
-    if fmt.version[:3] not in ("0.1", "0.2", "0.3", "0.4"):
+    if fmt.version.startswith(("0.1", "0.2", "0.3", "0.4")):
         attrs = attrs.get("ome", {})
 
     for key, value in metadata.items():
@@ -827,7 +827,7 @@ def add_metadata(
         else:
             attrs[key] = value
 
-    if fmt.version[:3] in ("0.1", "0.2", "0.3", "0.4"):
+    if fmt.version.startswith(("0.1", "0.2", "0.3", "0.4")):
         for key, value in attrs.items():
             group.attrs[key] = value
     else:
@@ -1052,7 +1052,7 @@ def _create_mip(
     if image.ndim > 5:
         raise ValueError("Only images of 5D or less are supported")
 
-    if fmt.version[:3] in ("0.1", "0.2"):
+    if fmt.version.startswith(("0.1", "0.2")):
         # v0.1 and v0.2 are strictly 5D
         shape_5d: tuple[Any, ...] = (*(1,) * (5 - image.ndim), *image.shape)
         image = image.reshape(shape_5d)
