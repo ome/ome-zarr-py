@@ -19,10 +19,9 @@ requires-python = ">3.10"
 dependencies = [
     "numpy",
     "dask",
-    "zarr>=v3.0.0",
+    "zarr>=3.0.0",
     "fsspec[s3]>=0.8,!=2021.07.0,!=2023.9.0",
-    # See https://github.com/fsspec/filesystem_spec/issues/819
-    "aiohttp<4",
+    "aiohttp",
     "requests",
     "scikit-image>=0.19.0",
     "toolz",
