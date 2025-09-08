@@ -19,6 +19,7 @@ from ome_zarr.format import (
     FormatV03,
     FormatV04,
     FormatV05,
+    FormatV06,
     format_from_version,
 )
 from ome_zarr.scale import Scaler
@@ -87,6 +88,7 @@ class TestWriter:
             pytest.param(FormatV03, id="V03"),
             pytest.param(FormatV04, id="V04"),
             pytest.param(FormatV05, id="V05"),
+            pytest.param(FormatV06, id="V06"),
         ),
     )
     @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])
@@ -96,21 +98,33 @@ class TestWriter:
     ):
         version = format_version()
 
-        if version.version == "0.5":
-            grp_path = self.path_v3 / "test"
-        else:
+        if version.version in ("0.1", "0.2", "0.3", "0.4"):
             grp_path = self.path / "test"
+        else:
+            grp_path = self.path_v3 / "test"
 
         data = self.create_data(shape)
         data = array_constructor(data)
         axes = "tczyx"[-len(shape) :]
         transformations = []
+        # We're testing that what we pass in is what gets written (and validated)
         for dataset_transfs in TRANSFORMATIONS:
             transf = dataset_transfs[0]
             # e.g. slice [1, 1, z, x, y] -> [z, x, y] for 3D
-            transformations.append(
-                [{"type": "scale", "scale": transf["scale"][-len(shape) :]}]
-            )
+            scale_transform = {"type": "scale", "scale": transf["scale"][-len(shape) :]}
+            if version.version.startswith("0.6"):
+                transformations.append(
+                    [
+                        {
+                            "type": "sequence",
+                            "transformations": [scale_transform],
+                            "input": "",
+                            "output": "physical",
+                        }
+                    ]
+                )
+            else:
+                transformations.append([scale_transform])
         if scaler is None:
             transformations = [transformations[0]]
         chunks = [(128, 128), (50, 50), (25, 25), (25, 25), (25, 25), (25, 25)]
@@ -191,14 +205,14 @@ class TestWriter:
         arr = da.from_zarr(f"{path}/{ds_path}")
         assert np.allclose(data, arr[...].compute())
 
-    @pytest.mark.parametrize("zarr_format", [2, 3])
+    @pytest.mark.parametrize("fmt", [FormatV04(), CurrentFormat()])
     @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])
-    def test_write_image_current(self, array_constructor, zarr_format):
+    def test_write_image_current(self, array_constructor, fmt):
         shape = (64, 64, 64)
         data = self.create_data(shape)
         data = array_constructor(data)
 
-        if zarr_format == 2:
+        if fmt.zarr_format == 2:
             group = self.group
             grp_path = self.path / "test"
         else:
@@ -208,7 +222,7 @@ class TestWriter:
         write_image(data, group, axes="zyx")
 
         # manually check this is zarr v2 or v3
-        if zarr_format == 2:
+        if fmt.zarr_format == 2:
             json_text = (grp_path / ".zattrs").read_text(encoding="utf-8")
             attrs_json = json.loads(json_text)
         else:
@@ -225,19 +239,25 @@ class TestWriter:
             for d in node_metadata["multiscales"][0]["datasets"]
         ]
         for transfs in cts:
+            scale_trnsf = None
+            if fmt.version.startswith("0.4"):
+                scale_trnsf = transfs[0]
+            else:
+                assert transfs[0]["type"] == "sequence"
+                scale_trnsf = transfs[0]["transformations"][0]
             assert len(transfs) == 1
-            assert transfs[0]["type"] == "scale"
-            assert len(transfs[0]["scale"]) == len(shape)
+            assert scale_trnsf["type"] == "scale"
+            assert len(scale_trnsf["scale"]) == len(shape)
             # Scaler only downsamples x and y. z scale will be 1
-            assert transfs[0]["scale"][0] == 1
-            for value in transfs[0]["scale"]:
+            assert scale_trnsf["scale"][0] == 1
+            for value in scale_trnsf["scale"]:
                 assert value >= 1
 
     @pytest.mark.parametrize("read_from_zarr", [True, False])
     @pytest.mark.parametrize("compute", [True, False])
-    @pytest.mark.parametrize("zarr_format", [2, 3])
-    def test_write_image_dask(self, read_from_zarr, compute, zarr_format):
-        if zarr_format == 2:
+    @pytest.mark.parametrize("fmt", [FormatV04(), CurrentFormat()])
+    def test_write_image_dask(self, read_from_zarr, compute, fmt):
+        if fmt.zarr_format == 2:
             grp_path = self.path / "test"
             # fmt = FormatV04()
             zarr_attrs = ".zattrs"
@@ -263,9 +283,9 @@ class TestWriter:
             # write to zarr and re-read as dask...
             path = f"{grp_path}/temp/"
             # store and group will be zarr v2 or v3 depending on fmt
-            root = zarr.open_group(store=path, mode="w", zarr_format=zarr_format)
+            root = zarr.open_group(store=path, mode="w", zarr_format=fmt.zarr_format)
             temp_group = root.create_group("to_dask")
-            assert temp_group.info._zarr_format == zarr_format
+            assert temp_group.info._zarr_format == fmt.zarr_format
             write_image(
                 data_delayed,
                 temp_group,
@@ -283,7 +303,7 @@ class TestWriter:
             # check that the data is the same
             assert np.allclose(data, data_delayed[...].compute())
 
-        assert group.info._zarr_format == zarr_format
+        assert group.info._zarr_format == fmt.zarr_format
         dask_delayed_jobs = write_image(
             data_delayed,
             group,
@@ -316,11 +336,16 @@ class TestWriter:
         ]
         for level, transfs in enumerate(cts):
             assert len(transfs) == 1
-            assert transfs[0]["type"] == "scale"
-            assert len(transfs[0]["scale"]) == len(shape)
+            scale_trnsf = None
+            if fmt.version.startswith("0.4"):
+                scale_trnsf = transfs[0]
+            else:
+                assert transfs[0]["type"] == "sequence"
+                scale_trnsf = transfs[0]["transformations"][0]
+            assert len(scale_trnsf["scale"]) == len(shape)
             # Scaler only downsamples x and y. z scale will be 1
-            assert transfs[0]["scale"][0] == 1
-            for value in transfs[0]["scale"]:
+            assert scale_trnsf["scale"][0] == 1
+            for value in scale_trnsf["scale"]:
                 assert value >= 1
             if read_from_zarr and level < 3:
                 # if shape smaller than chunk, dask writer uses chunk == shape
@@ -897,7 +922,7 @@ class TestPlateMetadata:
         self.path_v3 = self.path / "v3"
         self.root_v3 = zarr.open_group(self.path_v3, mode="w", zarr_format=3)
 
-    @pytest.mark.parametrize("fmt", (FormatV04(), FormatV05()))
+    @pytest.mark.parametrize("fmt", (FormatV04(), CurrentFormat()))
     def test_minimal_plate(self, fmt):
         if fmt.version == "0.4":
             group = self.root
@@ -943,7 +968,7 @@ class TestPlateMetadata:
             group = self.root
         else:
             group = self.root_v3
-        write_plate_metadata(group, rows, cols, wells)
+        write_plate_metadata(group, rows, cols, wells, fmt=fmt)
         attrs = group.attrs
         if fmt.version != "0.4":
             attrs = attrs["ome"]
@@ -1038,7 +1063,7 @@ class TestPlateMetadata:
         assert attrs["plate"]["columns"] == [{"name": "1"}]
         assert attrs["plate"]["name"] == "test"
         assert attrs["plate"]["rows"] == [{"name": "A"}]
-        assert attrs["version"] == FormatV05().version
+        assert attrs["version"] == CurrentFormat().version
         assert attrs["plate"]["wells"] == [
             {"path": "A/1", "rowIndex": 0, "columnIndex": 0}
         ]
@@ -1246,17 +1271,18 @@ class TestWellMetadata:
         self.path_v3 = self.path / "v3"
         self.root_v3 = zarr.open_group(self.path_v3, mode="w", zarr_format=3)
 
-    @pytest.mark.parametrize("fmt", (FormatV04(), FormatV05()))
+    @pytest.mark.parametrize("fmt", (FormatV04(), CurrentFormat()))
     @pytest.mark.parametrize("images", (["0"], [{"path": "0"}]))
     def test_minimal_well(self, images, fmt):
-        if fmt.version == "0.5":
-            group = self.root_v3
-        else:
+        if fmt.version == "0.4":
             group = self.root
-        write_well_metadata(group, images)
+        else:
+            group = self.root_v3
+        write_well_metadata(group, images, fmt)
         # we want to be sure this is zarr v2 / v3, so we load json manually too
-        attrs = group.attrs
-        if fmt.version == "0.5":
+        attrs = dict(group.attrs)
+        print(fmt.version, fmt.version.startswith(("0.1", "0.2", "0.3", "0.4")), attrs)
+        if not fmt.version.startswith(("0.1", "0.2", "0.3", "0.4")):
             attrs = attrs.get("ome")
             assert attrs["version"] == fmt.version
             json_text = (self.path_v3 / "zarr.json").read_text(encoding="utf-8")
@@ -1288,7 +1314,7 @@ class TestWellMetadata:
             {"path": "1"},
             {"path": "2"},
         ]
-        assert self.root_v3.attrs["ome"]["version"] == FormatV05().version
+        assert self.root_v3.attrs["ome"]["version"] == CurrentFormat().version
 
     @pytest.mark.parametrize("fmt", (FormatV01(), FormatV02(), FormatV03()))
     def test_version(self, fmt):

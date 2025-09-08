@@ -442,7 +442,8 @@ def write_multiscales_metadata(
     if len(metadata.get("metadata", {})) > 0:
         multiscales[0]["metadata"] = metadata["metadata"]
     if axes is not None:
-        multiscales[0]["axes"] = axes
+        # multiscales[0]["axes"] = axes
+        fmt.write_axes(multiscales[0], axes)
 
     if fmt.version in ("0.1", "0.2", "0.3", "0.4"):
         multiscales[0]["version"] = fmt.version

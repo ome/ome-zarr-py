@@ -9,8 +9,7 @@ from typing import Any, Optional, Union, cast, overload
 import dask.array as da
 import numpy as np
 
-from .axes import Axes
-from .format import format_from_version
+from .format import FormatV06
 from .io import ZarrLocation
 from .types import JSONDict
 
@@ -275,15 +274,17 @@ class Multiscales(Spec):
         super().__init__(node)
 
         multiscales = self.lookup("multiscales", [])
-        version = multiscales[0].get(
-            "version", "0.1"
-        )  # should this be matched with Format.version?
+        # FIXME: version isn't on multiscales for zarr v3
+        # version = multiscales[0].get(
+        #     "version", "0.1"
+        # )  # should this be matched with Format.version?
         datasets = multiscales[0]["datasets"]
-        axes = multiscales[0].get("axes")
-        fmt = format_from_version(version)
-        # Raises ValueError if not valid
-        axes_obj = Axes(axes, fmt)
-        node.metadata["axes"] = axes_obj.to_list()
+        if "coordinateSystems" in multiscales[0]:
+            fmt = FormatV06()
+            axes = fmt.read_axes(multiscales[0])
+        else:
+            axes = multiscales[0].get("axes")
+        node.metadata["axes"] = axes
         # This will get overwritten by 'omero' metadata if present
         node.metadata["name"] = multiscales[0].get("name")
         paths = [d["path"] for d in datasets]
