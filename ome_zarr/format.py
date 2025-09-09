@@ -137,13 +137,6 @@ class Format(ABC):
     ) -> None:  # pragma: no cover
         raise NotImplementedError()
 
-    @abstractmethod
-    def read_axes(
-        self,
-        multiscales: dict[str, Any],
-    ) -> list:
-        raise NotImplementedError()
-
 
 class FormatV01(Format):
     """
@@ -226,12 +219,6 @@ class FormatV01(Format):
     ) -> None:
         return None
 
-    def read_axes(
-        self,
-        multiscales: dict[str, Any],
-    ) -> list:
-        return []
-
 
 class FormatV02(FormatV01):
     """
@@ -263,15 +250,6 @@ class FormatV03(FormatV02):  # inherits from V02 to avoid code duplication
         axes: list,
     ) -> None:
         multiscales["axes"] = axes
-
-    def read_axes(
-        self,
-        multiscales: dict[str, Any],
-    ) -> list:
-        axes = multiscales.get("axes", [])
-        if not axes:
-            raise ValueError("Missing axes in multiscales")
-        return axes
 
 
 class FormatV04(FormatV03):
@@ -533,20 +511,6 @@ class FormatV06(FormatV05):
         axes: list,
     ) -> None:
         multiscales["coordinateSystems"] = [{"name": "physical", "axes": axes}]
-
-    def read_axes(
-        self,
-        multiscales: dict[str, Any],
-    ) -> list:
-        coordinate_systems = multiscales.get("coordinateSystems", [])
-        if not coordinate_systems:
-            raise ValueError("Missing coordinateSystems in multiscales")
-        if len(coordinate_systems) > 1:
-            raise ValueError("Only one coordinateSystem supported")
-        axes = coordinate_systems[0].get("axes", [])
-        if not axes:
-            raise ValueError("Missing axes in coordinateSystems")
-        return axes
 
 
 CurrentFormat = FormatV06
