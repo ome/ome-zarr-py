@@ -165,9 +165,9 @@ class TestWriter:
 
         if version.version == "0.4":
             # Validate with ome-zarr-models-py: only supports v0.4
-            Models04Image.from_zarr(self.group)
+            Models04Image.from_zarr(out)
         elif version.version == "0.5":
-            Models05Image.from_zarr(self.group_v3)
+            Models05Image.from_zarr(out)
 
     def test_mix_zarr_formats(self):
         # check group zarr v2 and v3 matches fmt
@@ -700,10 +700,11 @@ class TestMultiscalesMetadata:
             ValueError,
             match="Expected to find an array at /0, but no array was found there.",
         ):
+            out = zarr.open_group(path)
             if fmt.version == "0.4":
-                Models04Image.from_zarr(self.root)
+                Models04Image.from_zarr(out)
             if fmt.version == "0.5":
-                Models05Image.from_zarr(self.root_v3)
+                Models05Image.from_zarr(out)
 
     @pytest.mark.parametrize("fmt", (FormatV01(), FormatV02(), FormatV03()))
     def test_version(self, fmt):
@@ -1104,7 +1105,8 @@ class TestPlateMetadata:
         ]
         assert "field_count" not in attrs["plate"]
         assert "acquisitions" not in attrs["plate"]
-        Models05HCS.from_zarr(self.root_v3)
+        out = zarr.open_group(self.path_v3)
+        Models05HCS.from_zarr(out)
 
     def test_field_count(self):
         write_plate_metadata(
@@ -1127,7 +1129,8 @@ class TestPlateMetadata:
         write_plate_metadata(
             str(self.path), ["A"], ["1"], ["A/1"], acquisitions=a, fmt=FormatV04()
         )
-        plate_attrs = zarr.open_group(str(self.path), mode="r").attrs
+        out = zarr.open_group(str(self.path), mode="r")
+        plate_attrs = out.attrs
         assert "plate" in dict(plate_attrs)
         assert plate_attrs["plate"]["acquisitions"] == a
         assert plate_attrs["plate"]["columns"] == [{"name": "1"}]
@@ -1138,7 +1141,7 @@ class TestPlateMetadata:
         ]
         assert "name" not in plate_attrs["plate"]
         assert "field_count" not in plate_attrs["plate"]
-        Models04HCS.from_zarr(self.root)
+        Models04HCS.from_zarr(out)
 
     def test_acquisitions_maximal(self):
         a = [
