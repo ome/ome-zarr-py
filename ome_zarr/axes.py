@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from .format import CurrentFormat, Format
+from .format import CurrentFormat, Format, format_from_version
 
 KNOWN_AXES = {"x": "space", "y": "space", "z": "space", "c": "channel", "t": "time"}
 DISCRETE_AXES = ["c", "t"]
@@ -118,3 +118,18 @@ class Axes:
                 raise ValueError("4D data must have axes tzyx or czyx or tcyx")
         elif val_axes != ("t", "c", "z", "y", "x"):
             raise ValueError("5D data must have axes ('t', 'c', 'z', 'y', 'x')")
+
+    @staticmethod
+    def from_multiscales(
+        multiscales: dict[str, Any],
+    ) -> list[str] | list[dict[str, str]]:
+        """Create Axes from the multiscales object"""
+        if "version" in multiscales:
+            fmt = format_from_version(multiscales["version"])
+            axesObj = Axes(multiscales.get("axes", []), fmt=fmt)
+            return axesObj.to_list(fmt=fmt)
+        else:
+            # v0.5 or later - no version on multiscales, so we guess!
+            if "coordinateSystems" in multiscales:
+                return multiscales["coordinateSystems"][0].get("axes", [])
+            return multiscales.get("axes", [])

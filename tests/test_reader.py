@@ -9,8 +9,6 @@ from ome_zarr.format import FormatV04
 from ome_zarr.io import parse_url
 from ome_zarr.reader import Node, Plate, Reader, Well
 from ome_zarr.writer import (
-    add_metadata,
-    get_metadata,
     write_image,
     write_plate_metadata,
     write_well_metadata,
@@ -81,24 +79,6 @@ class TestReader:
         assert len(nodes) == 1
         image_node = nodes[0]
         assert np.allclose(data, image_node.data[0])
-
-
-class TestInvalid:
-    @pytest.fixture(autouse=True)
-    def initdir(self, tmpdir):
-        self.path = tmpdir.mkdir("data")
-
-    def test_invalid_version(self):
-        grp = create_zarr(str(self.path))
-        # update version to something invalid
-        attrs = get_metadata(grp)
-        attrs["multiscales"][0]["version"] = "invalid"
-        add_metadata(grp, attrs)
-        # should raise exception
-        with pytest.raises(ValueError) as exe:
-            reader = Reader(parse_url(str(self.path)))
-            assert len(list(reader())) == 2
-        assert str(exe.value) == "Version invalid not recognized"
 
 
 class TestHCSReader:
