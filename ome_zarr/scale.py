@@ -204,25 +204,25 @@ class Scaler:
 
     def gaussian(self, base: np.ndarray) -> list[np.ndarray]:
         """Downsample using :func:`skimage.transform.pyramid_gaussian`."""
-        return list(
-            pyramid_gaussian(
-                base,
-                downscale=self.downscale,
-                max_layer=self.max_layer,
-                channel_axis=None,
-            )
+        dtype = base.dtype
+        pyramid = pyramid_gaussian(
+            base,
+            downscale=self.downscale,
+            max_layer=self.max_layer,
+            channel_axis=None,
         )
+        return [level.astype(dtype) for level in pyramid]
 
     def laplacian(self, base: np.ndarray) -> list[np.ndarray]:
         """Downsample using :func:`skimage.transform.pyramid_laplacian`."""
-        return list(
-            pyramid_laplacian(
-                base,
-                downscale=self.downscale,
-                max_layer=self.max_layer,
-                channel_axis=None,
-            )
+        dtype = base.dtype
+        pyramid = pyramid_laplacian(
+            base,
+            downscale=self.downscale,
+            max_layer=self.max_layer,
+            channel_axis=None,
         )
+        return [level.astype(dtype) for level in pyramid]
 
     def local_mean(self, base: np.ndarray) -> list[np.ndarray]:
         """Downsample using :func:`skimage.transform.downscale_local_mean`."""
