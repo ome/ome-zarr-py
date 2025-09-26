@@ -13,16 +13,14 @@ of 2 in the X and Y dimensions.
 Alternatively, the :py:func:`ome_zarr.writer.write_multiscale` can be used, which takes a
 "pyramid" of pre-computed `numpy` arrays.
 
-The default version of OME-NGFF is v0.5, is based on Zarr v3. A zarr v3 store is created
-by `parse_url()` below. To write OME-NGFF v0.4 (Zarr v2), use the `fmt=FormatV04()` argument
-in `parse_url()`, which will create a Zarr v2 store.
+The default version of OME-NGFF is v0.5, is based on Zarr v3. A zarr v3 group and store is created
+by `zarr.open_group()` below. To write OME-NGFF v0.4 (Zarr v2), add the `zarr_format=2` argument.
 
 The following code creates a 3D Image in OME-Zarr::
 
     import numpy as np
     import zarr
 
-    from ome_zarr.io import parse_url
     from ome_zarr.format import FormatV04
     from ome_zarr.writer import write_image, add_metadata
 
@@ -33,11 +31,8 @@ The following code creates a 3D Image in OME-Zarr::
     rng = np.random.default_rng(0)
     data = rng.poisson(lam=10, size=(size_z, size_xy, size_xy)).astype(np.uint8)
 
-    # Use fmt=FormatV04() to write v0.4 format (zarr v2)
-    store = parse_url(path, mode="w").store
-    root = zarr.group(store=store)
-    write_image(image=data, group=root, axes="zyx",
-                storage_options=dict(chunks=(1, size_xy, size_xy)))
+    # Add fmt=FormatV04() parameter to write v0.4 format (zarr v2)
+    write_image(data, path, axes="zyx")
 
 
 This image can be viewed in `napari` using the
@@ -49,9 +44,7 @@ Rendering settings
 ------------------
 Rendering settings can be added to an existing zarr group::
 
-    store = parse_url(path, mode="w").store
-    root = zarr.group(store=store)
-    add_metadata(root, {"omero": {
+    add_metadata(path, {"omero": {
         "channels": [{
             "color": "00FFFF",
             "window": {"start": 0, "end": 20, "min": 0, "max": 255},
@@ -71,7 +64,6 @@ The following code creates a 3D Image in OME-Zarr with labels::
 
     from skimage.data import binary_blobs
     from ome_zarr.format import FormatV04
-    from ome_zarr.io import parse_url
     from ome_zarr.writer import write_image, add_metadata
 
     path = "test_ngff_image_labels.zarr"
@@ -83,9 +75,8 @@ The following code creates a 3D Image in OME-Zarr with labels::
     rng = np.random.default_rng(0)
     data = rng.poisson(mean_val, size=(size_z, size_xy, size_xy)).astype(np.uint8)
 
-    # Use fmt=FormatV04() to write v0.4 format (zarr v2)
-    store = parse_url(path, mode="w").store
-    root = zarr.group(store=store)
+    # Use zarr_format=2 to write v0.4 format (zarr v2)
+    root = zarr.open_group(path, mode="w")
     write_image(image=data, group=root, axes="zyx",
                 storage_options=dict(chunks=(1, size_xy, size_xy)))
     # optional rendering settings
@@ -135,7 +126,6 @@ This sample code shows how to write a high-content screening dataset (i.e. cultu
     import zarr
 
     from ome_zarr.format import FormatV04
-    from ome_zarr.io import parse_url
     from ome_zarr.writer import write_image, write_plate_metadata, write_well_metadata
 
     path = "test_ngff_plate.zarr"
@@ -154,9 +144,8 @@ This sample code shows how to write a high-content screening dataset (i.e. cultu
     data = rng.poisson(mean_val, size=(num_wells, num_fields, size_z, size_xy, size_xy)).astype(np.uint8)
 
     # write the plate of images and corresponding metadata
-    # Use fmt=FormatV04() in parse_url() to write v0.4 format (zarr v2)
-    store = parse_url(path, mode="w").store
-    root = zarr.group(store=store)
+    # Use zarr_format=2 to write v0.4 format (zarr v2)
+    root = zarr.open_group(path, mode="w")
     write_plate_metadata(root, row_names, col_names, well_paths)
     for wi, wp in enumerate(well_paths):
         row, col = wp.split("/")
@@ -185,20 +174,21 @@ This sample code reads an image stored on remote s3 server, but the same
 code can be used to read data on a local file system. In either case,
 the data is available as `dask` arrays::
 
-    from ome_zarr.io import parse_url
-    from ome_zarr.reader import Reader
+    from dask import array as da
+    import zarr
     import napari
 
     url = "https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.5/idr0062A/6001240_labels.zarr"
 
     # read the image data
-    reader = Reader(parse_url(url))
-    # nodes may include images, labels etc
-    nodes = list(reader())
-    # first node will be the image pixel data
-    image_node = nodes[0]
+    root = zarr.open_group(url)
+    zattrs = root.attrs.asdict()
+    # Handle v0.5+ - unwrap 'ome' namespace
+    if "ome" in zattrs:
+        zattrs = zattrs["ome"]
 
-    dask_data = image_node.data
+    paths = [ds["path"] for ds in zattrs["multiscales"][0]["datasets"]]
+    dask_data = [da.from_zarr(root[path]) for path in paths]
 
     # We can view this in napari
     # NB: image axes are CZYX: split channels by C axis=0
@@ -216,7 +206,6 @@ Writing big image from tiles::
 
     import os
     import zarr
-    from ome_zarr.io import parse_url
     from ome_zarr.format import CurrentFormat, FormatV04
     from ome_zarr.reader import Reader
     from ome_zarr.writer import write_multiscales_metadata
@@ -229,10 +218,14 @@ Writing big image from tiles::
     # Use fmt=FormatV04() to write v0.4 format (zarr v2)
 
     url = "https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.3/9836842.zarr"
-    reader = Reader(parse_url(url))
-    nodes = list(reader())
+    root = zarr.open_group(url)
+    zattrs = root.attrs.asdict()
+    # Handle v0.5+ - unwrap 'ome' namespace
+    if "ome" in zattrs:
+        zattrs = zattrs["ome"]
+    paths = [ds["path"] for ds in zattrs["multiscales"][0]["datasets"]]
     # first level of the pyramid
-    dask_data = nodes[0].data[0]
+    dask_data = da.from_zarr(root[paths[0]])
     tile_size = 512
     axes = [{"name": "c", "type": "channel"}, {"name": "y", "type": "space"}, {"name": "x", "type": "space"}]
 
@@ -292,8 +285,7 @@ Writing big image from tiles::
     row_count = ceil(shape[-2]/tile_size)
     col_count = ceil(shape[-1]/tile_size)
 
-    store = parse_url("9836842.zarr", mode="w", fmt=fmt).store
-    root = zarr.group(store=store)
+    root = zarr.open_group("9836842.zarr", mode="w")
 
     # create empty array at root of pyramid
     zarray = root.require_array(
@@ -346,14 +338,11 @@ When that dask data is passed to write_image() the tiles will be loaded on the f
     import zarr
     from dask import delayed
 
-    from ome_zarr.io import parse_url
     from ome_zarr.format import FormatV04
     from ome_zarr.writer import write_image, add_metadata
 
     zarr_name = "test_dask.zarr"
-    # Use fmt=FormatV04() in parse_url() to write v0.4 format (zarr v2)
-    store = parse_url(zarr_name, mode="w").store
-    root = zarr.group(store=store)
+    root = zarr.open_group(zarr_name, mode="w")
 
     size_xy = 100
     channel_count = 2
