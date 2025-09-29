@@ -1,6 +1,7 @@
 import filecmp
 import json
 import pathlib
+import re
 from typing import Any
 
 import dask.array as da
@@ -665,7 +666,9 @@ class TestMultiscalesMetadata:
         # No arrays, so this is expected:
         with pytest.raises(
             ValueError,
-            match="Expected to find an array at /0, but no array was found there.",
+            match=re.escape(
+                "Expected to find an array at 0, but no array was found there."
+            ),
         ):
             if fmt.version == "0.4":
                 Models04Image.from_zarr(group)
@@ -757,7 +760,9 @@ class TestMultiscalesMetadata:
         # No arrays, so this is expected:
         with pytest.raises(
             ValueError,
-            match="Expected to find an array at /0, but no array was found there.",
+            match=re.escape(
+                "Expected to find an array at 0, but no array was found there."
+            ),
         ):
             Models04Image.from_zarr(self.root)
 
@@ -836,7 +841,8 @@ class TestMultiscalesMetadata:
             datasets.append({"path": str(level), "coordinateTransformations": transf})
         if metadata is None:
             with pytest.raises(
-                KeyError, match="If `'omero'` is present, value cannot be `None`."
+                KeyError,
+                match=re.escape("If `'omero'` is present, value cannot be `None`."),
             ):
                 write_multiscales_metadata(
                     self.root,
@@ -857,7 +863,8 @@ class TestMultiscalesMetadata:
             )
             if window_metadata is not None and len(window_metadata) < 4:
                 if isinstance(window_metadata, dict):
-                    with pytest.raises(KeyError, match=".*`'window'`.*"):
+                    # escape metadata characters for regex
+                    with pytest.raises(KeyError, match=re.escape(".*`'window'`.*")):
                         write_multiscales_metadata(
                             self.root,
                             datasets,
@@ -866,7 +873,7 @@ class TestMultiscalesMetadata:
                             fmt=FormatV04(),
                         )
                 elif isinstance(window_metadata, list):
-                    with pytest.raises(TypeError, match=".*`'window'`.*"):
+                    with pytest.raises(TypeError, match=re.escape(".*`'window'`.*")):
                         write_multiscales_metadata(
                             self.root,
                             datasets,
@@ -875,7 +882,7 @@ class TestMultiscalesMetadata:
                             fmt=FormatV04(),
                         )
             elif color_metadata is not None and len(color_metadata) != 6:
-                with pytest.raises(TypeError, match=".*`'color'`.*"):
+                with pytest.raises(TypeError, match=re.escape(".*`'color'`.*")):
                     write_multiscales_metadata(
                         self.root,
                         datasets,
@@ -892,7 +899,9 @@ class TestMultiscalesMetadata:
                 # no arrays, so this is expected
                 with pytest.raises(
                     ValueError,
-                    match="Expected to find an array at /0, but no array was found there.",
+                    match=re.escape(
+                        "Expected to find an array at 0, but no array was found there."
+                    ),
                 ):
                     Models04Image.from_zarr(self.root)
 
