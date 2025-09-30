@@ -864,7 +864,7 @@ class TestMultiscalesMetadata:
             if window_metadata is not None and len(window_metadata) < 4:
                 if isinstance(window_metadata, dict):
                     # escape metadata characters for regex
-                    with pytest.raises(KeyError, match=re.escape(".*`'window'`.*")):
+                    with pytest.raises(KeyError, match="window"):
                         write_multiscales_metadata(
                             self.root,
                             datasets,
@@ -873,7 +873,7 @@ class TestMultiscalesMetadata:
                             fmt=FormatV04(),
                         )
                 elif isinstance(window_metadata, list):
-                    with pytest.raises(TypeError, match=re.escape(".*`'window'`.*")):
+                    with pytest.raises(TypeError, match="window"):
                         write_multiscales_metadata(
                             self.root,
                             datasets,
@@ -882,7 +882,7 @@ class TestMultiscalesMetadata:
                             fmt=FormatV04(),
                         )
             elif color_metadata is not None and len(color_metadata) != 6:
-                with pytest.raises(TypeError, match=re.escape(".*`'color'`.*")):
+                with pytest.raises(TypeError, match="color"):
                     write_multiscales_metadata(
                         self.root,
                         datasets,
