@@ -863,7 +863,6 @@ class TestMultiscalesMetadata:
             )
             if window_metadata is not None and len(window_metadata) < 4:
                 if isinstance(window_metadata, dict):
-                    # escape metadata characters for regex
                     with pytest.raises(KeyError, match="window"):
                         write_multiscales_metadata(
                             self.root,
