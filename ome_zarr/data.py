@@ -67,7 +67,7 @@ def astronaut() -> tuple[list, list]:
     pyramid = scaler.nearest(pixels)
 
     shape = list(pyramid[0].shape)
-    c, y, x = shape
+    _c, y, x = shape
     label = np.zeros((y, x), dtype=np.int8)
     make_circle(100, 100, 1, label[200:300, 200:300])
     make_circle(150, 150, 2, label[250:400, 250:400])

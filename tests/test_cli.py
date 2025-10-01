@@ -54,7 +54,7 @@ class TestCli:
             args += ["--format", fmt.version]
         main(args)
         main(["info", filename])
-        out, err = capsys.readouterr()
+        out, _err = capsys.readouterr()
         print("Captured output:", out)
         assert os.path.join("labels", "coins") in out
         version = fmt.version if fmt else CurrentFormat().version
