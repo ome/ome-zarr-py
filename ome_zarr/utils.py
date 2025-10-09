@@ -77,18 +77,6 @@ def view(input_path: str, port: int = 8000, dry_run: bool = False) -> None:
     # serve the parent directory in a simple server with CORS. Open browser
     # dry_run is for testing, so we don't open the browser or start the server
 
-    zarrs = []
-    if (Path(input_path) / ".zattrs").exists() or (
-        Path(input_path) / "zarr.json"
-    ).exists():
-        zarrs = find_multiscales(Path(input_path))
-    if len(zarrs) == 0:
-        print(
-            f"No OME-Zarr images found in {input_path}. "
-            f"Try $ ome_zarr finder {input_path}"
-        )
-        return
-
     parent_dir, image_name = os.path.split(input_path)
     if len(image_name) == 0:
         parent_dir, image_name = os.path.split(parent_dir)
