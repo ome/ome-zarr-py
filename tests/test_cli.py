@@ -154,6 +154,7 @@ class TestCli:
 
     def test_view(self):
         # view empty dir for code coverage
+        view(str(self.path), 8000, True)
         view(str(self.path), 8000, True, force=True)
 
         filename = f"{self.path}-4"
