@@ -88,7 +88,7 @@ def view(
         if len(zarrs) == 0:
             print(
                 f"No OME-Zarr images found in {input_path}. "
-                f"Try $ ome_zarr finder {input_path}"
+                f"Try $ ome_zarr finder {input_path} or use -f to force open in browser."
             )
             return
 
