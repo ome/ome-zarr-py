@@ -7,3 +7,5 @@ coverage:
     patch: off
 comment:
   require_changes: true  # if true: only comment if coverage changes
+ignore:
+  - "ome_zarr/http_request_handlers.py"   # Tests don't run http server
