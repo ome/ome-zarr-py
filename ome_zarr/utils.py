@@ -20,6 +20,8 @@ import dask
 import dask.array as da
 import zarr
 from dask.diagnostics import ProgressBar
+
+# Not needed with python 3.15+? https://github.com/python/cpython/issues/86809
 from RangeHTTPServer import RangeRequestHandler
 
 from .format import format_from_version
