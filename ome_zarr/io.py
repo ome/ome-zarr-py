@@ -11,7 +11,7 @@ import dask.array as da
 import zarr
 from zarr.storage import FsspecStore, LocalStore, StoreLike
 
-from .format import CurrentFormat, Format, detect_format
+from .format import CurrentFormat, Format
 from .types import JSONDict
 
 LOGGER = logging.getLogger("ome_zarr.io")
@@ -55,15 +55,6 @@ class ZarrLocation:
             else loader.init_store(self.__path, mode)
         )
         self.__init_metadata()
-        detected = detect_format(self.__metadata, loader)
-        LOGGER.debug("ZarrLocation.__init__ %s detected: %s", path, detected)
-        if detected != fmt:
-            LOGGER.warning(
-                "version mismatch: detected: %s, requested: %s", detected, fmt
-            )
-            self.__fmt = detected
-            self.__store = detected.init_store(self.__path, mode)
-            self.__init_metadata()
 
     def __init_metadata(self) -> None:
         """
