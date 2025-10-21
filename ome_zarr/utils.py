@@ -20,9 +20,9 @@ import dask
 import dask.array as da
 import zarr
 from dask.diagnostics import ProgressBar
+from RangeHTTPServer import RangeRequestHandler
 
 from .format import format_from_version
-from .http_request_handlers import RangeHTTPRequestHandler
 from .io import parse_url
 from .reader import Multiscales, Node, Reader
 from .types import Any, JSONDict
@@ -101,7 +101,7 @@ def view(input_path: str, port: int = 8000, dry_run: bool = False) -> None:
         f"?source=http://localhost:{port}/{image_name}"
     )
 
-    class CORSRequestHandler(RangeHTTPRequestHandler):
+    class CORSRequestHandler(RangeRequestHandler):
         def end_headers(self) -> None:
             self.send_header("Access-Control-Allow-Origin", "*")
             SimpleHTTPRequestHandler.end_headers(self)
@@ -285,7 +285,7 @@ def finder(input_path: str, port: int = 8000, dry_run=False) -> None:
         # show small thumbnails view by default. (v=3 for big thumbnails)
         url += "&v=2"
 
-    class CORSRequestHandler(RangeHTTPRequestHandler):
+    class CORSRequestHandler(RangeRequestHandler):
         def end_headers(self) -> None:
             self.send_header("Access-Control-Allow-Origin", "*")
             SimpleHTTPRequestHandler.end_headers(self)
