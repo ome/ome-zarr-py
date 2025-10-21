@@ -28,9 +28,12 @@ Local data::
 view
 ====
 
-Use the `ome_zarr` command to view Zarr data in the https://ome.github.io/ome-ngff-validator::
+Use the `ome_zarr` command to serve local Zarr data and view in the https://ome.github.io/ome-ngff-validator::
 
     ome_zarr view 6001240.zarr/
+
+    # Use -f or --force to open in browser even if no valid data is found
+    ome_zarr view 6001240.zarr/ -f
 
 finder
 ======
