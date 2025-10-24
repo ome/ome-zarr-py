@@ -35,7 +35,7 @@ def info(args: argparse.Namespace) -> None:
 def view(args: argparse.Namespace) -> None:
     """Wrap the :func:`~ome_zarr.utils.view` method."""
     config_logging(logging.WARNING, args)
-    zarr_view(args.path, args.port)
+    zarr_view(args.path, args.port, force=args.force)
 
 
 def finder(args: argparse.Namespace) -> None:
@@ -132,6 +132,12 @@ def main(args: list[str] | None = None) -> None:
     )
     parser_view.add_argument(
         "--port", type=int, default=8000, help="Port to serve the data (default: 8000)"
+    )
+    parser_view.add_argument(
+        "--force",
+        "-f",
+        action="store_true",
+        help="Force open in browser. Don't check for OME-Zarr data first.",
     )
     parser_view.set_defaults(func=view)
 
