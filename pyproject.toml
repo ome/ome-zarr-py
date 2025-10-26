@@ -96,7 +96,6 @@ ignore = [
     "PLR09",   # too-many-...
     "PLR2004", # magic-value-comparison
     "PLW1641", # eq-without-hash  # FIXME
-    "UP038",   # non-pep604-isinstance
     "RUF005",  # collection-literal-concatenation
 ]
 
