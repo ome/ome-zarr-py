@@ -4,5 +4,6 @@ fsspec
 zarr>=v3.0.0
 dask
 numpy
+rangehttpserver
 scipy
 scikit-image
