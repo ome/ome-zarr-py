@@ -116,7 +116,7 @@ class Format(ABC):
 
     @abstractmethod
     def generate_coordinate_transformations(
-        self, shapes: list[tuple]
+        self, shapes: list[tuple], scale: list[float] | None = None
     ) -> list[list[dict[str, Any]]] | None:  # pragma: no cover
         raise NotImplementedError()
 
@@ -200,7 +200,7 @@ class FormatV01(Format):
                 raise ValueError("%s path must be of %s type", well, key_type)
 
     def generate_coordinate_transformations(
-        self, shapes: list[tuple]
+        self, shapes: list[tuple], scale: list[float] | None = None
     ) -> list[list[dict[str, Any]]] | None:
         return None
 
@@ -297,18 +297,26 @@ class FormatV04(FormatV03):
             raise ValueError("Mismatching column index for %s", well)
 
     def generate_coordinate_transformations(
-        self, shapes: list[tuple]
+        self, shapes: list[tuple], scale: list[float] | None = None
     ) -> list[list[dict[str, Any]]] | None:
         data_shape = shapes[0]
+        scale_0 = scale or [1.0] * len(data_shape)
         coordinate_transformations: list[list[dict[str, Any]]] = []
         # calculate minimal 'scale' transform based on pyramid dims
         for shape in shapes:
             assert len(shape) == len(data_shape)
-            scale = [full / level for full, level in zip(data_shape, shape)]
-            # center the pixels/voxels - see #403
-            trans = [(sc / 2) - 0.5 for sc in scale]
+            # ratio of full res to current level
+            ds_scale = [full / level for full, level in zip(data_shape, shape)]
+            ds_scale = [s * scale_0[i] for i, s in enumerate(ds_scale)]
+            # scaling is centered on center of 0,0 pixel/voxel - see #403
+            # Any expansion into negative coordinates needs to be offset
+            # by subsequent translation (half of the difference in scale)
+            trans = [((sc - scale_0[i]) / 2) for i, sc in enumerate(ds_scale)]
             coordinate_transformations.append(
-                [{"type": "scale", "scale": scale, "translate": trans}]
+                [
+                    {"type": "scale", "scale": ds_scale},
+                    {"type": "translation", "translation": trans},
+                ]
             )
 
         return coordinate_transformations
@@ -428,7 +436,7 @@ class FormatV06(FormatV05):
 
     @property
     def version(self) -> str:
-        return "0.6"
+        return "0.6dev2"
 
     def validate_coordinate_transformations(
         self,
@@ -485,10 +493,15 @@ class FormatV06(FormatV05):
     #                 )
 
     def generate_coordinate_transformations(
-        self, shapes: list[tuple]
+        self, shapes: list[tuple], scale: list[float] | None = None
     ) -> list[list[dict[str, Any]]] | None:
-        # 2D list - (list for each level of pyramid)
-        cts_for_datasets = super().generate_coordinate_transformations(shapes)
+        """
+        Returns coordinate_transformations for each dataset
+
+        shapes is a 2D list - (list for each level of pyramid)
+        scale is an optional list of floats to use for scaling instead of
+        """
+        cts_for_datasets = super().generate_coordinate_transformations(shapes, scale)
         if cts_for_datasets is None:
             raise ValueError("coordinate_transformations must be provided")
         # wrap each list in sequenceTransformation

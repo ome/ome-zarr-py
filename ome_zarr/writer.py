@@ -222,6 +222,7 @@ def write_multiscale(
     fmt: Format | None = None,
     axes: AxesType = None,
     coordinate_transformations: list[list[dict[str, Any]]] | None = None,
+    scale: list[float] | None = None,
     storage_options: JSONDict | list[JSONDict] | None = None,
     name: str | None = None,
     compute: bool | None = True,
@@ -346,7 +347,9 @@ Please use the 'storage_options' argument instead."""
 
     if coordinate_transformations is None:
         shapes = [data.shape for data in pyramid]
-        coordinate_transformations = fmt.generate_coordinate_transformations(shapes)
+        coordinate_transformations = fmt.generate_coordinate_transformations(
+            shapes, scale
+        )
 
     # we validate again later, but this catches length mismatch before zip(datasets...)
     fmt.validate_coordinate_transformations(
@@ -548,6 +551,7 @@ def write_image(
     fmt: Format | None = None,
     axes: AxesType = None,
     coordinate_transformations: list[list[dict[str, Any]]] | None = None,
+    scale: list[float] | None = None,
     storage_options: JSONDict | list[JSONDict] | None = None,
     compute: bool | None = True,
     **metadata: str | JSONDict | list[JSONDict],
@@ -585,6 +589,10 @@ def write_image(
     :param coordinate_transformations:
       For each resolution, we have a List of transformation Dicts (not validated).
       Each list of dicts are added to each datasets in order.
+    :type scale: list of float, optional
+    :param scale:
+      Scale of the image. Used to generate coordinate transformations if
+      coordinate_transformations is None.
     :type storage_options: dict or list of dict, optional
     :param storage_options:
         Options to be passed on to the storage backend.
@@ -616,6 +624,7 @@ def write_image(
             fmt=fmt,
             axes=axes,
             coordinate_transformations=coordinate_transformations,
+            scale=scale,
             storage_options=storage_options,
             name=name,
             compute=compute,
@@ -630,6 +639,7 @@ def write_image(
             fmt=fmt,
             axes=axes,
             coordinate_transformations=coordinate_transformations,
+            scale=scale,
             storage_options=storage_options,
             name=name,
             compute=compute,
@@ -660,6 +670,7 @@ def _write_dask_image(
     fmt: Format | None = None,
     axes: AxesType = None,
     coordinate_transformations: list[list[dict[str, Any]]] | None = None,
+    scale: list[float] | None = None,
     storage_options: JSONDict | list[JSONDict] | None = None,
     name: str | None = None,
     compute: bool | None = True,
@@ -751,7 +762,9 @@ Please use the 'storage_options' argument instead."""
 
     if coordinate_transformations is None:
         # shapes = [data.shape for data in delayed]
-        coordinate_transformations = fmt.generate_coordinate_transformations(shapes)
+        coordinate_transformations = fmt.generate_coordinate_transformations(
+            shapes, scale
+        )
 
     # we validate again later, but this catches length mismatch before zip(datasets...)
     fmt.validate_coordinate_transformations(
@@ -867,6 +880,7 @@ def write_multiscale_labels(
     fmt: Format | None = None,
     axes: AxesType = None,
     coordinate_transformations: list[list[dict[str, Any]]] | None = None,
+    scale: list[float] | None = None,
     storage_options: JSONDict | list[JSONDict] | None = None,
     label_metadata: JSONDict | None = None,
     compute: bool | None = True,
@@ -906,6 +920,10 @@ def write_multiscale_labels(
     :param coordinate_transformations:
       For each resolution, we have a List of transformation Dicts (not validated).
       Each list of dicts are added to each datasets in order.
+    :type scale: list of float, optional
+    :param scale:
+      Scale of the image. Used to generate coordinate transformations if
+      coordinate_transformations is None.
     :type storage_options: dict or list of dict, optional
     :param storage_options:
         Options to be passed on to the storage backend.
@@ -932,6 +950,7 @@ def write_multiscale_labels(
         fmt=fmt,
         axes=axes,
         coordinate_transformations=coordinate_transformations,
+        scale=scale,
         storage_options=storage_options,
         name=name,
         compute=compute,
@@ -956,6 +975,7 @@ def write_labels(
     fmt: Format | None = None,
     axes: AxesType = None,
     coordinate_transformations: list[list[dict[str, Any]]] | None = None,
+    scale: list[float] | None = None,
     storage_options: JSONDict | list[JSONDict] | None = None,
     label_metadata: JSONDict | None = None,
     compute: bool | None = True,
@@ -1033,6 +1053,7 @@ def write_labels(
             fmt=fmt,
             axes=axes,
             coordinate_transformations=coordinate_transformations,
+            scale=scale,
             storage_options=storage_options,
             name=name,
             compute=compute,
@@ -1047,6 +1068,7 @@ def write_labels(
             fmt=fmt,
             axes=axes,
             coordinate_transformations=coordinate_transformations,
+            scale=scale,
             storage_options=storage_options,
             name=name,
             compute=compute,
