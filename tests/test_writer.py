@@ -220,7 +220,7 @@ class TestWriter:
         arr = da.from_zarr(f"{path}/{ds_path}")
         assert np.allclose(data, arr[...].compute())
 
-    @pytest.mark.parametrize("fmt", [FormatV04(), CurrentFormat()])
+    @pytest.mark.parametrize("fmt", [FormatV04(), FormatV05(), CurrentFormat()])
     @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])
     def test_write_image_current(self, array_constructor, fmt):
         shape = (64, 64, 64)
@@ -234,7 +234,7 @@ class TestWriter:
             group = self.group_v3
             grp_path = self.path_v3 / "test"
 
-        write_image(data, group, axes="zyx")
+        write_image(data, group, axes="zyx", fmt=fmt)
 
         # manually check this is zarr v2 or v3
         if fmt.zarr_format == 2:
@@ -255,12 +255,19 @@ class TestWriter:
         ]
         for transfs in cts:
             scale_trnsf = None
-            if fmt.version.startswith("0.4"):
+            if fmt.version in ("0.4", "0.5"):
+                # expect separate scale and translate
+                assert len(transfs) == 2
                 scale_trnsf = transfs[0]
+                translate = transfs[1]
             else:
+                # scale and translate combined in sequence
+                assert len(transfs) == 1
                 assert transfs[0]["type"] == "sequence"
+                assert len(transfs[0]["transformations"]) == 2
                 scale_trnsf = transfs[0]["transformations"][0]
-            assert len(transfs) == 1
+                translate = transfs[0]["transformations"][1]
+
             assert scale_trnsf["type"] == "scale"
             assert len(scale_trnsf["scale"]) == len(shape)
             # Scaler only downsamples x and y. z scale will be 1
@@ -268,19 +275,27 @@ class TestWriter:
             for value in scale_trnsf["scale"]:
                 assert value >= 1
 
+            assert translate["type"] == "translation"
+            assert len(translate["translation"]) == len(shape)
+            assert translate["translation"][0] == 0
+
+        # Validate with ome-zarr-models-py
+        if fmt.version == "0.4":
+            Models04Image.from_zarr(group)
+        elif fmt.version == "0.5":
+            Models05Image.from_zarr(group)
+
     @pytest.mark.parametrize("read_from_zarr", [True, False])
     @pytest.mark.parametrize("compute", [True, False])
     @pytest.mark.parametrize("fmt", [FormatV04(), CurrentFormat()])
     def test_write_image_dask(self, read_from_zarr, compute, fmt):
         if fmt.zarr_format == 2:
             grp_path = self.path / "test"
-            fmt = FormatV04()
             zarr_attrs = ".zattrs"
             zarr_array = ".zarray"
             group = self.group
         else:
             grp_path = self.path_v3 / "test"
-            fmt = CurrentFormat()
             zarr_attrs = "zarr.json"
             zarr_array = "zarr.json"
             group = self.group_v3
@@ -350,18 +365,30 @@ class TestWriter:
             for d in node_metadata["multiscales"][0]["datasets"]
         ]
         for level, transfs in enumerate(cts):
-            assert len(transfs) == 1
-            scale_trnsf = None
             if fmt.version.startswith("0.4"):
+                # expect separate scale and translate
+                assert len(transfs) == 2
                 scale_trnsf = transfs[0]
+                translate = transfs[1]
             else:
+                # scale and translate combined in sequence
+                assert len(transfs) == 1
                 assert transfs[0]["type"] == "sequence"
+                assert len(transfs[0]["transformations"]) == 2
                 scale_trnsf = transfs[0]["transformations"][0]
+                translate = transfs[0]["transformations"][1]
+
+            assert scale_trnsf["type"] == "scale"
             assert len(scale_trnsf["scale"]) == len(shape)
             # Scaler only downsamples x and y. z scale will be 1
             assert scale_trnsf["scale"][0] == 1
             for value in scale_trnsf["scale"]:
                 assert value >= 1
+
+            assert translate["type"] == "translation"
+            assert len(translate["translation"]) == len(shape)
+            assert translate["translation"][0] == 0
+
             if read_from_zarr and level < 3:
                 # if shape smaller than chunk, dask writer uses chunk == shape
                 # so we only compare larger resolutions
