@@ -116,7 +116,10 @@ class Format(ABC):
 
     @abstractmethod
     def generate_coordinate_transformations(
-        self, shapes: list[tuple], scale: list[float] | None = None
+        self,
+        shapes: list[tuple],
+        scale: list[float] | None = None,
+        paths: list[str] | None = None,
     ) -> list[list[dict[str, Any]]] | None:  # pragma: no cover
         raise NotImplementedError()
 
@@ -200,7 +203,10 @@ class FormatV01(Format):
                 raise ValueError("%s path must be of %s type", well, key_type)
 
     def generate_coordinate_transformations(
-        self, shapes: list[tuple], scale: list[float] | None = None
+        self,
+        shapes: list[tuple],
+        scale: list[float] | None = None,
+        paths: list[str] | None = None,
     ) -> list[list[dict[str, Any]]] | None:
         return None
 
@@ -297,7 +303,10 @@ class FormatV04(FormatV03):
             raise ValueError("Mismatching column index for %s", well)
 
     def generate_coordinate_transformations(
-        self, shapes: list[tuple], scale: list[float] | None = None
+        self,
+        shapes: list[tuple],
+        scale: list[float] | None = None,
+        paths: list[str] | None = None,
     ) -> list[list[dict[str, Any]]] | None:
         data_shape = shapes[0]
         scale_0 = scale or [1.0] * len(data_shape)
@@ -493,7 +502,10 @@ class FormatV06(FormatV05):
     #                 )
 
     def generate_coordinate_transformations(
-        self, shapes: list[tuple], scale: list[float] | None = None
+        self,
+        shapes: list[tuple],
+        scale: list[float] | None = None,
+        paths: list[str] | None = None,
     ) -> list[list[dict[str, Any]]] | None:
         """
         Returns coordinate_transformations for each dataset
@@ -501,7 +513,9 @@ class FormatV06(FormatV05):
         shapes is a 2D list - (list for each level of pyramid)
         scale is an optional list of floats to use for scaling instead of
         """
-        cts_for_datasets = super().generate_coordinate_transformations(shapes, scale)
+        cts_for_datasets = super().generate_coordinate_transformations(
+            shapes, scale, paths
+        )
         if cts_for_datasets is None:
             raise ValueError("coordinate_transformations must be provided")
         # wrap each list in sequenceTransformation
@@ -510,11 +524,11 @@ class FormatV06(FormatV05):
                 {
                     "type": "sequence",
                     "transformations": ct,
-                    "input": "",
+                    "input": paths[i] if paths else str(i),
                     "output": "physical",
                 }
             ]
-            for ct in cts_for_datasets
+            for i, ct in enumerate(cts_for_datasets)
         ]
         return coordinate_transformations
 
