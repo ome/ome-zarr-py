@@ -8,7 +8,7 @@ from ome_zarr.utils import download, info
 
 
 def log_strings(idx, c, y, x, cc, cy, cx, dtype):
-    yield f"resolution: {idx}"
+    yield f"resolution: s{idx}"
     yield f" - shape ('c', 'y', 'x') = ({c}, {y}, {x})"
     yield f" - chunks =  ['{cc}', '{cx}', '{cy}']"
     yield f" - dtype = {dtype}"
