@@ -281,8 +281,9 @@ def write_multiscale(
 Please use the 'storage_options' argument instead."""
         warnings.warn(msg, DeprecationWarning)
     datasets: list[dict] = []
-    for path, data in enumerate(pyramid):
-        options = _resolve_storage_options(storage_options, path)
+    for level, data in enumerate(pyramid):
+        options = _resolve_storage_options(storage_options, level)
+        path = f"s{level}"
 
         # ensure that the chunk dimensions match the image dimensions
         # (which might have been changed for versions 0.1 or 0.2)
@@ -320,7 +321,7 @@ Please use the 'storage_options' argument instead."""
             da_delayed = da.to_zarr(
                 arr=data,
                 url=group.store,
-                component=str(Path(group.path, str(path))),
+                component=str(Path(group.path, path)),
                 compute=compute,
                 zarr_format=zarr_format,
                 **options,
@@ -337,18 +338,19 @@ Please use the 'storage_options' argument instead."""
             options["fill_value"] = 0
 
             arr = group.create_array(
-                str(path),
+                path,
                 dtype=data.dtype,
                 **options,
             )
             arr[slice(None)] = data
 
-        datasets.append({"path": str(path)})
+        datasets.append({"path": path})
 
     if coordinate_transformations is None:
         shapes = [data.shape for data in pyramid]
+        paths = [ds["path"] for ds in datasets]
         coordinate_transformations = fmt.generate_coordinate_transformations(
-            shapes, scale
+            shapes, scale, paths
         )
 
     # we validate again later, but this catches length mismatch before zip(datasets...)
@@ -698,12 +700,14 @@ Please use the 'storage_options' argument instead."""
     # for path, data in enumerate(pyramid):
     max_layer: int = scaler.max_layer if scaler is not None else 0
     shapes = []
-    for path in range(max_layer + 1):
+    for level in range(max_layer + 1):
         # LOGGER.debug(f"write_image path: {path}")
-        options = _resolve_storage_options(storage_options, path)
+        options = _resolve_storage_options(storage_options, level)
+
+        path = f"s{level}"
 
         # don't downsample top level of pyramid
-        if str(path) != "0" and scaler is not None:
+        if level != 0 and scaler is not None:
             image = scaler.resize_image(image)
 
         # ensure that the chunk dimensions match the image dimensions
@@ -747,13 +751,13 @@ Please use the 'storage_options' argument instead."""
             da.to_zarr(
                 arr=image,
                 url=group.store,
-                component=str(Path(group.path, str(path))),
+                component=str(Path(group.path, path)),
                 compute=False,
                 zarr_format=zarr_format,
                 **kwargs,
             )
         )
-        datasets.append({"path": str(path)})
+        datasets.append({"path": path})
 
     # Computing delayed jobs if necessary
     if compute:
@@ -762,8 +766,9 @@ Please use the 'storage_options' argument instead."""
 
     if coordinate_transformations is None:
         # shapes = [data.shape for data in delayed]
+        paths = [ds["path"] for ds in datasets]
         coordinate_transformations = fmt.generate_coordinate_transformations(
-            shapes, scale
+            shapes, scale, paths
         )
 
     # we validate again later, but this catches length mismatch before zip(datasets...)
