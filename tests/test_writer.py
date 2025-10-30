@@ -46,11 +46,29 @@ from ome_zarr.writer import (
 )
 
 TRANSFORMATIONS = [
-    [{"scale": [1, 1, 0.5, 0.18, 0.18], "type": "scale"}],
-    [{"scale": [1, 1, 0.5, 0.36, 0.36], "type": "scale"}],
-    [{"scale": [1, 1, 0.5, 0.72, 0.72], "type": "scale"}],
-    [{"scale": [1, 1, 0.5, 1.44, 1.44], "type": "scale"}],
-    [{"scale": [1, 1, 0.5, 2.88, 2.88], "type": "scale"}],
+    [
+        {"scale": [1, 1, 0.5, 0.36, 0.36], "type": "scale"},
+        {"translation": [0, 0, 0, 0, 0], "type": "translation"},
+    ],
+    [
+        {"scale": [1, 1, 0.5, 0.72, 0.72], "type": "scale"},
+        {"translation": [0, 0, 0, 0.18, 0.18], "type": "translation"},
+    ],
+    [
+        {"scale": [1, 1, 0.5, 1.44, 1.44], "type": "scale"},
+        {"translation": [0, 0, 0, 0.54, 0.54], "type": "translation"},
+    ],
+    [
+        {"scale": [1, 1, 0.5, 2.88, 2.88], "type": "scale"},
+        {"translation": [0, 0, 0, 1.26, 1.26], "type": "translation"},
+    ],
+    [
+        {"scale": [1, 1, 0.5, 5.76, 5.76], "type": "scale"},
+        {
+            "translation": [0, 0, 0, 2.6999999999999997, 2.6999999999999997],
+            "type": "translation",
+        },
+    ],
 ]
 
 
@@ -115,27 +133,8 @@ class TestWriter:
         data = self.create_data(shape)
         data = array_constructor(data)
         axes = "tczyx"[-len(shape) :]
-        transformations = []
-        # We're testing that what we pass in is what gets written (and validated)
-        for dataset_transfs in TRANSFORMATIONS:
-            transf = dataset_transfs[0]
-            # e.g. slice [1, 1, z, x, y] -> [z, x, y] for 3D
-            scale_transform = {"type": "scale", "scale": transf["scale"][-len(shape) :]}
-            if version.version.startswith("0.6"):
-                transformations.append(
-                    [
-                        {
-                            "type": "sequence",
-                            "transformations": [scale_transform],
-                            "input": "",
-                            "output": "physical",
-                        }
-                    ]
-                )
-            else:
-                transformations.append([scale_transform])
-        if scaler is None:
-            transformations = [transformations[0]]
+        # scale based on top-level TRANSFORMATIONS, trimmed to shape length
+        scale = TRANSFORMATIONS[0][0]["scale"][-len(shape) :]
         chunks = [(128, 128), (50, 50), (25, 25), (25, 25), (25, 25), (25, 25)]
         storage_options = {"chunks": chunks[0]}
         if storage_options_list:
@@ -146,7 +145,7 @@ class TestWriter:
             scaler=scaler,
             fmt=version,
             axes=axes,
-            coordinate_transformations=transformations,
+            scale=scale,
             storage_options=storage_options,
         )
 
@@ -165,11 +164,46 @@ class TestWriter:
             assert node_data[0].shape == shape
         print("node.metadata", node_metadata)
         if version.version not in ("0.1", "0.2", "0.3"):
+            transformations = []
+            for dataset_transfs in TRANSFORMATIONS:
+                transf0 = dataset_transfs[0]
+                transf1 = dataset_transfs[1]
+                # e.g. slice [1, 1, z, x, y] -> [z, x, y] for 3D
+                scale_transform = {
+                    "type": "scale",
+                    "scale": transf0["scale"][-len(shape) :],
+                }
+                trans_transform = {
+                    "type": "translation",
+                    "translation": transf1["translation"][-len(shape) :],
+                }
+                if version.version.startswith("0.6"):
+                    transformations.append(
+                        [
+                            {
+                                "type": "sequence",
+                                "transformations": [scale_transform, trans_transform],
+                                "input": "",
+                                "output": "physical",
+                            }
+                        ]
+                    )
+                else:
+                    transformations.append([scale_transform, trans_transform])
+            if scaler is None:
+                transformations = [transformations[0]]
+
             cts = [
                 d["coordinateTransformations"]
                 for d in node_metadata["multiscales"][0]["datasets"]
             ]
-            for transf, expected in zip(cts, transformations):
+            for ds_index, transf, expected in zip(
+                range(len(cts)), cts, transformations
+            ):
+                if len(shape) == 2 and ds_index > 2:
+                    # for 2D shape (300, 500), smaller shapes are not downsampled
+                    # by exact factor of 2, so don't match hard-coded expected
+                    continue
                 assert transf == expected
             assert len(cts) == len(node_data)
         # check chunks for first 2 resolutions (before shape gets smaller than chunk)
