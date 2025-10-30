@@ -165,7 +165,7 @@ class TestWriter:
         print("node.metadata", node_metadata)
         if version.version not in ("0.1", "0.2", "0.3"):
             transformations = []
-            for dataset_transfs in TRANSFORMATIONS:
+            for i, dataset_transfs in enumerate(TRANSFORMATIONS):
                 transf0 = dataset_transfs[0]
                 transf1 = dataset_transfs[1]
                 # e.g. slice [1, 1, z, x, y] -> [z, x, y] for 3D
@@ -183,7 +183,7 @@ class TestWriter:
                             {
                                 "type": "sequence",
                                 "transformations": [scale_transform, trans_transform],
-                                "input": "",
+                                "input": f"s{i}",
                                 "output": "physical",
                             }
                         ]
