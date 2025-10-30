@@ -427,8 +427,8 @@ class TestWriter:
                 # if shape smaller than chunk, dask writer uses chunk == shape
                 # so we only compare larger resolutions
                 assert filecmp.cmp(
-                    f"{grp_path}/temp/to_dask/{level}/{zarr_array}",
-                    f"{grp_path}/{level}/{zarr_array}",
+                    f"{grp_path}/temp/to_dask/{paths[level]}/{zarr_array}",
+                    f"{grp_path}/{paths[level]}/{zarr_array}",
                     shallow=False,
                 )
 
@@ -495,7 +495,7 @@ class TestWriter:
             storage_options={"compressor": compressor},
         )
         group = zarr.open(f"{path}")
-        for ds in ["0", "1"]:
+        for ds in ["s0", "s1"]:
             assert len(group[ds].info._compressors) > 0
             comp = group[ds].info._compressors[0]
             if format_version().zarr_format == 3:
@@ -559,7 +559,7 @@ class TestWriter:
 
         # check chunk: multiscale level 0, 4D chunk at (0, 0, 0, 0)
         c = ""
-        for ds in ["0", "1"]:
+        for ds in ["s0", "s1"]:
             if format_version().zarr_format == 3:
                 assert (path / "zarr.json").exists()
                 assert (path / ds / "zarr.json").exists()
@@ -583,7 +583,7 @@ class TestWriter:
                     "shuffle": 1,
                 }
 
-        chunk_size = (path / f"0/{c}0/0/0/0").stat().st_size
+        chunk_size = (path / f"s0/{c}0/0/0/0").stat().st_size
         assert chunk_size < 4e6
 
     @pytest.mark.parametrize(
