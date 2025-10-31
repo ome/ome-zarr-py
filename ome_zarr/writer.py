@@ -562,7 +562,7 @@ def write_image(
     :param axes:
       The names of the axes. e.g. ["t", "c", "z", "y", "x"].
       Ignored for versions 0.1 and 0.2. Required for version 0.3 or greater.
-    :type coordinate_transformations: list of dict
+    :type coordinate_transformations: list of list of dict
     :param coordinate_transformations:
       For each resolution, we have a List of transformation Dicts (not validated).
       Each list of dicts are added to each datasets in order.
