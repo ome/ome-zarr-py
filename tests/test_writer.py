@@ -143,6 +143,14 @@ class TestWriter:
             image=data,
             group=str(grp_path),
             scaler=scaler,
+            coordinateTransformations=[
+                {
+                    "type": "scale",
+                    "output": "scaled",
+                    "scale": [1] * (len(shape) - 2) + [2, 2],
+                    "name": "double size",
+                }
+            ],
             fmt=version,
             axes=axes,
             scale=scale,
@@ -155,6 +163,20 @@ class TestWriter:
         if "ome" in node_metadata:
             node_metadata = node_metadata["ome"]
         assert "multiscales" in node_metadata
+
+        if version.version.startswith("0.6"):
+            print("node_metadata", node_metadata)
+            assert "coordinateTransformations" in node_metadata["multiscales"][0]
+            assert (
+                len(node_metadata["multiscales"][0]["coordinateTransformations"]) == 1
+            )
+            assert (
+                node_metadata["multiscales"][0]["coordinateTransformations"][0]["name"]
+                == "double size"
+            )
+            assert "coordinateSystems" in node_metadata["multiscales"][0]
+            assert len(node_metadata["multiscales"][0]["coordinateSystems"]) == 2
+
         paths = [d["path"] for d in node_metadata["multiscales"][0]["datasets"]]
         node_data = [da.from_zarr(out[path]) for path in paths]
         if version.version in ("0.1", "0.2"):
@@ -1704,6 +1726,7 @@ class TestLabelWriter:
             img_path = self.path
             group = self.root
         axes = "tczyx"[-len(shape) :]
+        scale = TRANSFORMATIONS[0][0]["scale"][-len(shape) :]
         transformations = []
         for dataset_transfs in TRANSFORMATIONS:
             transf = dataset_transfs[0]
@@ -1737,7 +1760,8 @@ class TestLabelWriter:
             name=label_name,
             fmt=fmt,
             axes=axes,
-            coordinate_transformations=transformations,
+            # coordinate_transformations=transformations,
+            scales=scale,
         )
         self.verify_label_data(
             img_path, label_name, label_data, fmt, shape, transformations

@@ -222,6 +222,7 @@ def write_multiscale(
     fmt: Format | None = None,
     axes: AxesType = None,
     coordinate_transformations: list[list[dict[str, Any]]] | None = None,
+    coordinateTransformations: list[dict[str, Any]] | None = None,
     scale: list[float] | None = None,
     storage_options: JSONDict | list[JSONDict] | None = None,
     name: str | None = None,
@@ -254,9 +255,18 @@ def write_multiscale(
         this must be provided
     :type coordinate_transformations: 2Dlist of dict, optional
     :param coordinate_transformations:
-        List of transformations for each path.
-        Each list of dicts are added to each datasets in order and must include a
-        'scale' transform.
+        Deprecated: use 'scale' to specify pixel sizes. coordinate_transformations
+        (dataset arrays to physical) will be generated automatically from the scale parameter.
+    :type coordinateTransformations: list of dict
+    :param coordinateTransformations:
+        Additional coordinateTransformations to add to the multiscales metadata.
+        These apply to the 'physical' coordinate system. 'input' is not needed as it will be
+        set automatically to 'physical'. 'output' must be provided. A coordinateSystem
+        will be generated with the name of the output.
+    :type scale: list of float, optional
+    :param scale:
+        Scale of the image. Used to generate datasets coordinate transformations if
+        coordinate_transformations is None.
     :type storage_options: dict or list of dict, optional
     :param storage_options:
         Options to be passed on to the storage backend.
@@ -365,11 +375,13 @@ Please use the 'storage_options' argument instead."""
         write_multiscales_metadata_delayed = dask.delayed(write_multiscales_metadata)
         return dask_delayed + [
             bind(write_multiscales_metadata_delayed, dask_delayed)(
-                group, datasets, fmt, axes, name, **metadata
+                group, datasets, fmt, axes, name, coordinateTransformations, **metadata
             )
         ]
     else:
-        write_multiscales_metadata(group, datasets, fmt, axes, name, **metadata)
+        write_multiscales_metadata(
+            group, datasets, fmt, axes, name, coordinateTransformations, **metadata
+        )
 
     return dask_delayed
 
@@ -380,6 +392,7 @@ def write_multiscales_metadata(
     fmt: Format | None = None,
     axes: AxesType = None,
     name: str | None = None,
+    coordinateTransformations: list[dict[str, Any]] | None = None,
     **metadata: str | JSONDict | list[JSONDict],
 ) -> None:
     """
@@ -400,6 +413,12 @@ def write_multiscales_metadata(
     :param axes:
       The names of the axes. e.g. ["t", "c", "z", "y", "x"].
       Ignored for versions 0.1 and 0.2. Required for version 0.3 or greater.
+    :type coordinateTransformations: list of dict
+    :param coordinateTransformations:
+      Additional coordinateTransformations to add to the multiscales metadata.
+      These apply to the 'physical' coordinate system. 'input' is not needed as it will be
+      set automatically to 'physical'. 'output' must be provided. A coordinateSystem
+      will be generated with the name of the output.
     """
 
     group, fmt = check_group_fmt(group, fmt)
@@ -453,6 +472,12 @@ def write_multiscales_metadata(
     else:
         # Zarr v3 top-level version
         add_metadata(group, {"version": fmt.version})
+
+    if coordinateTransformations is not None and hasattr(
+        fmt, "add_coordinate_transform"
+    ):
+        for transf in coordinateTransformations:
+            fmt.add_coordinate_transform(multiscales[0], transf)
 
     add_metadata(group, {"multiscales": multiscales})
 
@@ -553,6 +578,7 @@ def write_image(
     fmt: Format | None = None,
     axes: AxesType = None,
     coordinate_transformations: list[list[dict[str, Any]]] | None = None,
+    coordinateTransformations: list[dict[str, Any]] | None = None,
     scale: list[float] | None = None,
     storage_options: JSONDict | list[JSONDict] | None = None,
     compute: bool | None = True,
@@ -589,11 +615,17 @@ def write_image(
       Ignored for versions 0.1 and 0.2. Required for version 0.3 or greater.
     :type coordinate_transformations: list of dict
     :param coordinate_transformations:
-      For each resolution, we have a List of transformation Dicts (not validated).
-      Each list of dicts are added to each datasets in order.
+      Deprecated: use 'scale' to specify pixel sizes. coordinate_transformations
+      (dataset arrays to physical) will be generated automatically from the scale parameter.
+    :type coordinateTransformations: list of dict
+    :param coordinateTransformations:
+      Additional coordinateTransformations to add to the multiscales metadata.
+      These apply to the 'physical' coordinate system. 'input' is not needed as it will be
+      set automatically to 'physical'. 'output' must be provided. A coordinateSystem
+      will be generated with the name of the output.
     :type scale: list of float, optional
     :param scale:
-      Scale of the image. Used to generate coordinate transformations if
+      Scale of the image. Used to generate datasets coordinate transformations if
       coordinate_transformations is None.
     :type storage_options: dict or list of dict, optional
     :param storage_options:
@@ -626,6 +658,7 @@ def write_image(
             fmt=fmt,
             axes=axes,
             coordinate_transformations=coordinate_transformations,
+            coordinateTransformations=coordinateTransformations,
             scale=scale,
             storage_options=storage_options,
             name=name,
@@ -641,6 +674,7 @@ def write_image(
             fmt=fmt,
             axes=axes,
             coordinate_transformations=coordinate_transformations,
+            coordinateTransformations=coordinateTransformations,
             scale=scale,
             storage_options=storage_options,
             name=name,
@@ -672,6 +706,7 @@ def _write_dask_image(
     fmt: Format | None = None,
     axes: AxesType = None,
     coordinate_transformations: list[list[dict[str, Any]]] | None = None,
+    coordinateTransformations: list[dict[str, Any]] | None = None,
     scale: list[float] | None = None,
     storage_options: JSONDict | list[JSONDict] | None = None,
     name: str | None = None,
@@ -782,11 +817,13 @@ Please use the 'storage_options' argument instead."""
         write_multiscales_metadata_delayed = dask.delayed(write_multiscales_metadata)
         return delayed + [
             bind(write_multiscales_metadata_delayed, delayed)(
-                group, datasets, fmt, axes, name, **metadata
+                group, datasets, fmt, axes, name, coordinateTransformations, **metadata
             )
         ]
     else:
-        write_multiscales_metadata(group, datasets, fmt, axes, name, **metadata)
+        write_multiscales_metadata(
+            group, datasets, fmt, axes, name, coordinateTransformations, **metadata
+        )
         return delayed
 
 
@@ -885,6 +922,7 @@ def write_multiscale_labels(
     fmt: Format | None = None,
     axes: AxesType = None,
     coordinate_transformations: list[list[dict[str, Any]]] | None = None,
+    coordinateTransformations: list[dict[str, Any]] | None = None,
     scale: list[float] | None = None,
     storage_options: JSONDict | list[JSONDict] | None = None,
     label_metadata: JSONDict | None = None,
@@ -923,11 +961,17 @@ def write_multiscale_labels(
       Ignored for versions 0.1 and 0.2. Required for version 0.3 or greater.
     :type coordinate_transformations: list of dict
     :param coordinate_transformations:
-      For each resolution, we have a List of transformation Dicts (not validated).
-      Each list of dicts are added to each datasets in order.
+        Deprecated: use 'scale' to specify pixel sizes. coordinate_transformations
+      (dataset arrays to physical) will be generated automatically from the scale parameter.
+    :type coordinateTransformations: list of dict
+    :param coordinateTransformations:
+      Additional coordinateTransformations to add to the multiscales metadata.
+      These apply to the 'physical' coordinate system. 'input' is not needed as it will be
+      set automatically to 'physical'. 'output' must be provided. A coordinateSystem
+      will be generated with the name of the output.
     :type scale: list of float, optional
     :param scale:
-      Scale of the image. Used to generate coordinate transformations if
+      Scale of the image. Used to generate datasets coordinate transformations if
       coordinate_transformations is None.
     :type storage_options: dict or list of dict, optional
     :param storage_options:
@@ -955,6 +999,7 @@ def write_multiscale_labels(
         fmt=fmt,
         axes=axes,
         coordinate_transformations=coordinate_transformations,
+        coordinateTransformations=coordinateTransformations,
         scale=scale,
         storage_options=storage_options,
         name=name,
@@ -980,6 +1025,7 @@ def write_labels(
     fmt: Format | None = None,
     axes: AxesType = None,
     coordinate_transformations: list[list[dict[str, Any]]] | None = None,
+    coordinateTransformations: list[dict[str, Any]] | None = None,
     scale: list[float] | None = None,
     storage_options: JSONDict | list[JSONDict] | None = None,
     label_metadata: JSONDict | None = None,
@@ -1026,8 +1072,18 @@ def write_labels(
       Ignored for versions 0.1 and 0.2. Required for version 0.3 or greater.
     :type coordinate_transformations: list of dict
     :param coordinate_transformations:
-      For each resolution, we have a List of transformation Dicts (not validated).
-      Each list of dicts are added to each datasets in order.
+      Deprecated: use 'scale' to specify pixel sizes. coordinate_transformations
+      (dataset arrays to physical) will be generated automatically from the scale parameter.
+    :type coordinateTransformations: list of dict
+    :param coordinateTransformations:
+      Additional coordinateTransformations to add to the multiscales metadata.
+      These apply to the 'physical' coordinate system. 'input' is not needed as it will be
+      set automatically to 'physical'. 'output' must be provided. A coordinateSystem
+      will be generated with the name of the output.
+    :type scale: list of float, optional
+    :param scale:
+      Scale of the image. Used to generate datasets coordinate transformations if
+      coordinate_transformations is None.
     :type storage_options: dict or list of dict, optional
     :param storage_options:
         Options to be passed on to the storage backend.
@@ -1058,6 +1114,7 @@ def write_labels(
             fmt=fmt,
             axes=axes,
             coordinate_transformations=coordinate_transformations,
+            coordinateTransformations=coordinateTransformations,
             scale=scale,
             storage_options=storage_options,
             name=name,
@@ -1073,6 +1130,7 @@ def write_labels(
             fmt=fmt,
             axes=axes,
             coordinate_transformations=coordinate_transformations,
+            coordinateTransformations=coordinateTransformations,
             scale=scale,
             storage_options=storage_options,
             name=name,

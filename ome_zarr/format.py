@@ -9,6 +9,8 @@ from zarr.storage import FsspecStore, LocalStore
 
 LOGGER = logging.getLogger("ome_zarr.format")
 
+COORDINATE_SYSTEM_NAME = "physical"
+
 
 def format_from_version(version: str) -> "Format":
     for fmt in format_implementations():
@@ -310,6 +312,10 @@ class FormatV04(FormatV03):
     ) -> list[list[dict[str, Any]]] | None:
         data_shape = shapes[0]
         scale_0 = scale or [1.0] * len(data_shape)
+        if len(scale_0) != len(data_shape):
+            raise ValueError(
+                f"scale length {len(scale_0)} must match ndim: {len(data_shape)}"
+            )
         coordinate_transformations: list[list[dict[str, Any]]] = []
         # calculate minimal 'scale' transform based on pyramid dims
         for shape in shapes:
@@ -525,7 +531,7 @@ class FormatV06(FormatV05):
                     "type": "sequence",
                     "transformations": ct,
                     "input": paths[i] if paths else str(i),
-                    "output": "physical",
+                    "output": COORDINATE_SYSTEM_NAME,
                 }
             ]
             for i, ct in enumerate(cts_for_datasets)
@@ -537,7 +543,44 @@ class FormatV06(FormatV05):
         multiscales: dict[str, Any],
         axes: list,
     ) -> None:
-        multiscales["coordinateSystems"] = [{"name": "physical", "axes": axes}]
+        multiscales["coordinateSystems"] = [
+            {"name": COORDINATE_SYSTEM_NAME, "axes": axes}
+        ]
+
+    def add_coordinate_system(
+        self,
+        multiscales: dict[str, Any],
+        name: str,
+        axes: list | None = None,
+    ) -> None:
+        if "coordinateSystems" not in multiscales:
+            multiscales["coordinateSystems"] = []
+        if axes is None:
+            if len(multiscales["coordinateSystems"]) == 0:
+                raise ValueError(
+                    "axes must be provided for the first coordinate system"
+                )
+            axes = multiscales["coordinateSystems"][0]["axes"]
+
+        multiscales["coordinateSystems"].append({"name": name, "axes": axes})
+
+    def add_coordinate_transform(
+        self,
+        multiscales: dict[str, Any],
+        transformation: dict[str, Any],
+    ) -> None:
+        print("add_coordinate_transform: transformation=", transformation)
+        if "coordinateTransformations" not in multiscales:
+            multiscales["coordinateTransformations"] = []
+        multiscales["coordinateTransformations"].append(transformation)
+
+        output = transformation.get("output")
+        if output is None or not isinstance(output, str):
+            raise ValueError("Each coordinate transformation must have an 'output' key")
+        if transformation.get("input") is None:
+            transformation["input"] = COORDINATE_SYSTEM_NAME
+        print("add_coordinate_transform: multiscales=", multiscales)
+        self.add_coordinate_system(multiscales, output)
 
 
 CurrentFormat = FormatV06
