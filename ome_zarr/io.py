@@ -4,6 +4,7 @@ Primary entry point is the :func:`~ome_zarr.io.parse_url` method.
 """
 
 import logging
+import warnings
 from pathlib import Path
 from urllib.parse import urljoin
 
@@ -223,6 +224,10 @@ def parse_url(
 
     >>> parse_url('does-not-exist')
     """
+    warnings.warn(
+        "parse_url() is deprecated. Use zarr.open_group() instead.", DeprecationWarning
+    )
+
     loc = ZarrLocation(path, mode=mode, fmt=fmt)
     if "r" in mode and not loc.exists():
         return None
