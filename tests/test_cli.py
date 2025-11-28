@@ -7,7 +7,6 @@ import zarr
 
 from ome_zarr.cli import main
 from ome_zarr.format import CurrentFormat, FormatV04, FormatV05
-from ome_zarr.io import parse_url
 from ome_zarr.utils import find_multiscales, finder, strip_common_prefix, view
 from ome_zarr.writer import write_plate_metadata
 
@@ -88,14 +87,14 @@ class TestCli:
             assert directory_items(Path(out) / "data-3") == [
                 Path(".zattrs"),
                 Path(".zgroup"),
-                Path("0"),
-                Path("1"),
-                Path("2"),
-                Path("3"),
-                Path("4"),
                 Path("labels"),
+                Path("s0"),
+                Path("s1"),
+                Path("s2"),
+                Path("s3"),
+                Path("s4"),
             ]
-            assert directory_items(Path(out) / "data-3" / "1") == [
+            assert directory_items(Path(out) / "data-3" / "s1") == [
                 Path(".zarray"),
                 Path(".zattrs"),  # empty '{}'
                 Path("0"),
@@ -104,15 +103,15 @@ class TestCli:
             ]
         else:
             assert directory_items(Path(out) / "data-3") == [
-                Path("0"),
-                Path("1"),
-                Path("2"),
-                Path("3"),
-                Path("4"),
                 Path("labels"),
+                Path("s0"),
+                Path("s1"),
+                Path("s2"),
+                Path("s3"),
+                Path("s4"),
                 Path("zarr.json"),
             ]
-            assert directory_items(Path(out) / "data-3" / "1") == [
+            assert directory_items(Path(out) / "data-3" / "s1") == [
                 Path("c"),
                 Path("zarr.json"),
             ]
@@ -209,8 +208,7 @@ class TestCli:
 
         # create a plate
         plate_path = Path(img_dir2.mkdir("plate"))
-        store = parse_url(plate_path, mode="w", fmt=fmt).store
-        root = zarr.group(store=store)
+        root = zarr.open_group(plate_path, mode="w", zarr_format=fmt.zarr_format)
         write_plate_metadata(root, ["A"], ["1"], ["A/1"])
 
         finder(img_dir, 8000, True)
