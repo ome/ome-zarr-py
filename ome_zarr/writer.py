@@ -3,16 +3,14 @@
 import logging
 import warnings
 from pathlib import Path
-from typing import Any, TypeAlias, Literal
+from typing import Any, TypeAlias
 
 import dask
 import dask.array as da
 import numpy as np
 import zarr
 from dask.graph_manipulation import bind
-from dask.array.core import _zarr_v3
 from numcodecs import Blosc
-from zarr.core.array import ShardsLike
 
 from .axes import Axes
 from .format import CurrentFormat, Format, FormatV04
@@ -259,8 +257,10 @@ def write_multiscale(
 
     datasets: list[dict] = []
     for path, data in enumerate(pyramid):
-        options = _resolve_storage_options(zarr_array_kwargs.get("storage_options", None), path)
-        #del zarr_array_kwargs["storage_options"]
+        options = _resolve_storage_options(
+            zarr_array_kwargs.get("storage_options", None), path
+        )
+        # del zarr_array_kwargs["storage_options"]
         # ensure that the chunk dimensions match the image dimensions
         # (which might have been changed for versions 0.1 or 0.2)
         # if chunks are explicitly set in the storage options
@@ -289,7 +289,7 @@ def write_multiscale(
         if isinstance(data, da.Array):
             if zarr_format == 2:
                 zarr_array_kwargs["chunk_key_encoding"] = fmt.chunk_key_encoding
-                zarr_array_kwargs["chunk_key_encoding"]['separator'] = "/"
+                zarr_array_kwargs["chunk_key_encoding"]["separator"] = "/"
                 # options["dimension_separator"] = "/"
                 # del options["chunk_key_encoding"]
             # handle any 'chunks' option from storage_options
@@ -345,7 +345,9 @@ def write_multiscale(
             )
         ]
     else:
-        write_multiscales_metadata(group, datasets, fmt, axes, zarr_array_kwargs["name"], **metadata)
+        write_multiscales_metadata(
+            group, datasets, fmt, axes, zarr_array_kwargs["name"], **metadata
+        )
 
     return dask_delayed
 
@@ -529,7 +531,7 @@ def write_image(
     coordinate_transformations: list[list[dict[str, Any]]] | None = None,
     storage_options: JSONDict | list[JSONDict] | None = None,
     compute: bool | None = True,
-    zarr_array_kwargs = None,
+    zarr_array_kwargs=None,
     **metadata: str | JSONDict | list[JSONDict],
 ) -> list:
     """Writes an image to the zarr store according to ome-zarr specification
@@ -678,7 +680,9 @@ def _write_dask_image(
         zarr_array_kwargs["chunk_key_encoding"] = fmt.chunk_key_encoding
         zarr_format = fmt.zarr_format
         if zarr_format == 2:
-            zarr_array_kwargs["compressor"] = options.pop("compressor", _blosc_compressor())
+            zarr_array_kwargs["compressor"] = options.pop(
+                "compressor", _blosc_compressor()
+            )
         else:
             if axes is not None:
                 zarr_array_kwargs["dimension_names"] = [
@@ -689,7 +693,7 @@ def _write_dask_image(
                 # the zarr.create_array API.
                 zarr_array_kwargs["compressor"] = options.pop("compressor")
 
-        zarr_array_kwargs['name'] = str(Path(group.path, str(path)))
+        zarr_array_kwargs["name"] = str(Path(group.path, str(path)))
         delayed.append(
             da.to_zarr(
                 arr=image,
