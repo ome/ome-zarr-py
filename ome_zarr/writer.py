@@ -3,14 +3,16 @@
 import logging
 import warnings
 from pathlib import Path
-from typing import Any, TypeAlias
+from typing import Any, TypeAlias, Literal
 
 import dask
 import dask.array as da
 import numpy as np
 import zarr
 from dask.graph_manipulation import bind
+from dask.array.core import _zarr_v3
 from numcodecs import Blosc
+from zarr.core.array import ShardsLike
 
 from .axes import Axes
 from .format import CurrentFormat, Format, FormatV04
@@ -200,12 +202,10 @@ def check_format(
 def write_multiscale(
     pyramid: ListOfArrayLike,
     group: zarr.Group,
-    chunks: tuple[Any, ...] | int | None = None,
+    zarr_array_kwargs,
     fmt: Format | None = None,
     axes: AxesType = None,
     coordinate_transformations: list[list[dict[str, Any]]] | None = None,
-    storage_options: JSONDict | list[JSONDict] | None = None,
-    name: str | None = None,
     compute: bool | None = True,
     **metadata: str | JSONDict | list[JSONDict],
 ) -> list:
@@ -257,44 +257,41 @@ def write_multiscale(
     axes = _get_valid_axes(dims, axes, fmt)
     dask_delayed = []
 
-    if chunks is not None:
-        msg = """The 'chunks' argument is deprecated and will be removed in version 0.5.
-Please use the 'storage_options' argument instead."""
-        warnings.warn(msg, DeprecationWarning)
     datasets: list[dict] = []
     for path, data in enumerate(pyramid):
-        options = _resolve_storage_options(storage_options, path)
-
+        options = _resolve_storage_options(zarr_array_kwargs.get("storage_options", None), path)
+        #del zarr_array_kwargs["storage_options"]
         # ensure that the chunk dimensions match the image dimensions
         # (which might have been changed for versions 0.1 or 0.2)
         # if chunks are explicitly set in the storage options
-        chunks_opt = options.pop("chunks", chunks)
+        chunks_opt = zarr_array_kwargs.get("chunks", None)
         if chunks_opt is not None:
             chunks_opt = _retuple(chunks_opt, data.shape)
 
         options["chunk_key_encoding"] = fmt.chunk_key_encoding
         zarr_format = fmt.zarr_format
-        compressor = options.pop("compressor", None)
+        compressor = zarr_array_kwargs.get("compressor", None)
         if zarr_format == 2:
             # by default we use Blosc with zstd compression
             # Don't need this for zarr v3 as it has a default compressor
             if compressor is None:
                 compressor = _blosc_compressor()
-            options["compressor"] = compressor
+            zarr_array_kwargs["compressor"] = compressor
         else:
             if compressor is not None:
-                options["compressors"] = [compressor]
+                zarr_array_kwargs["compressors"] = [compressor]
             if axes is not None:
                 # the array zarr.json also contains axes names
-                # TODO: check if this is written by da.to_zarr
-                options["dimension_names"] = [
+                zarr_array_kwargs["dimension_names"] = [
                     axis["name"] for axis in axes if isinstance(axis, dict)
                 ]
 
         if isinstance(data, da.Array):
             if zarr_format == 2:
-                options["dimension_separator"] = "/"
-                del options["chunk_key_encoding"]
+                zarr_array_kwargs["chunk_key_encoding"] = fmt.chunk_key_encoding
+                zarr_array_kwargs["chunk_key_encoding"]['separator'] = "/"
+                # options["dimension_separator"] = "/"
+                # del options["chunk_key_encoding"]
             # handle any 'chunks' option from storage_options
             if chunks_opt is not None:
                 data = da.array(data).rechunk(chunks=chunks_opt)  # noqa: PLW2901
@@ -304,7 +301,7 @@ Please use the 'storage_options' argument instead."""
                 component=str(Path(group.path, str(path))),
                 compute=compute,
                 zarr_format=zarr_format,
-                **options,
+                zarr_array_kwargs=zarr_array_kwargs,
             )
 
             if not compute:
@@ -312,15 +309,17 @@ Please use the 'storage_options' argument instead."""
 
         else:
             if chunks_opt is not None:
-                options["chunks"] = chunks_opt
-            options["shape"] = data.shape
+                zarr_array_kwargs["chunks"] = chunks_opt
+            zarr_array_kwargs["shape"] = data.shape
             # otherwise we get 'null'
-            options["fill_value"] = 0
+            zarr_array_kwargs["fill_value"] = 0
+            zarr_array_kwargs["name"] = str(path)
+            if "storage_options" in zarr_array_kwargs:
+                del zarr_array_kwargs["storage_options"]
 
             arr = group.create_array(
-                str(path),
                 dtype=data.dtype,
-                **options,
+                **zarr_array_kwargs,
             )
             arr[slice(None)] = data
 
@@ -342,11 +341,11 @@ Please use the 'storage_options' argument instead."""
         write_multiscales_metadata_delayed = dask.delayed(write_multiscales_metadata)
         return dask_delayed + [
             bind(write_multiscales_metadata_delayed, dask_delayed)(
-                group, datasets, fmt, axes, name, **metadata
+                group, datasets, fmt, axes, zarr_array_kwargs["name"], **metadata
             )
         ]
     else:
-        write_multiscales_metadata(group, datasets, fmt, axes, name, **metadata)
+        write_multiscales_metadata(group, datasets, fmt, axes, zarr_array_kwargs["name"], **metadata)
 
     return dask_delayed
 
@@ -525,12 +524,12 @@ def write_image(
     image: ArrayLike,
     group: zarr.Group,
     scaler: Scaler = Scaler(),
-    chunks: tuple[Any, ...] | int | None = None,
     fmt: Format | None = None,
     axes: AxesType = None,
     coordinate_transformations: list[list[dict[str, Any]]] | None = None,
     storage_options: JSONDict | list[JSONDict] | None = None,
     compute: bool | None = True,
+    zarr_array_kwargs = None,
     **metadata: str | JSONDict | list[JSONDict],
 ) -> list:
     """Writes an image to the zarr store according to ome-zarr specification
@@ -547,13 +546,6 @@ def write_image(
     :param scaler:
       Scaler implementation for downsampling the image argument. If None,
       no downsampling will be performed.
-    :type chunks: int or tuple of ints, optional
-    :param chunks:
-        The size of the saved chunks to store the image.
-
-        .. deprecated:: 0.4.0
-            This argument is deprecated and will be removed in a future version.
-            Use :attr:`storage_options` instead.
     :type fmt: :class:`ome_zarr.format.Format`, optional
     :param fmt:
       The format of the ome_zarr data which should be used.
@@ -581,22 +573,30 @@ def write_image(
         dask.
     """
     fmt = check_format(group, fmt)
-    dask_delayed_jobs = []
-
+    zarr_array_kwargs = zarr_array_kwargs or {}
     name = metadata.pop("name", None)
-    name = str(name) if name is not None else None
+    if name is not None:
+        msg = """The 'name' argument in **metadata is deprecated and will be removed in version 0.6.
+                Please provide the 'name' argument as key, field in `zarr_array_kwargs` instead."""
+        warnings.warn(msg, DeprecationWarning)
+    if storage_options and "chunks" in storage_options:
+        msg = """The 'chunks' argument in storage_options is deprecated and will be removed in version 0.13
+        Please provide the 'chunks' argument in `zarr_array_kwargs` instead."""
+        warnings.warn(msg, DeprecationWarning)
+        zarr_array_kwargs["chunks"] = storage_options.pop("chunks")
+    zarr_array_kwargs["name"] = str(name) if name is not None else None
+    zarr_array_kwargs["storage_options"] = storage_options
+
     if isinstance(image, da.Array):
         dask_delayed_jobs = _write_dask_image(
             image,
             group,
             scaler,
-            chunks=chunks,
             fmt=fmt,
             axes=axes,
             coordinate_transformations=coordinate_transformations,
-            storage_options=storage_options,
-            name=name,
             compute=compute,
+            zarr_array_kwargs=zarr_array_kwargs,
             **metadata,
         )
     else:
@@ -604,13 +604,11 @@ def write_image(
         dask_delayed_jobs = write_multiscale(
             mip,
             group,
-            chunks=chunks,
             fmt=fmt,
             axes=axes,
             coordinate_transformations=coordinate_transformations,
-            storage_options=storage_options,
-            name=name,
             compute=compute,
+            zarr_array_kwargs=zarr_array_kwargs,
             **metadata,
         )
 
@@ -634,13 +632,11 @@ def _write_dask_image(
     image: da.Array,
     group: zarr.Group,
     scaler: Scaler = Scaler(),
-    chunks: tuple[Any, ...] | int | None = None,
     fmt: Format | None = None,
     axes: AxesType = None,
     coordinate_transformations: list[list[dict[str, Any]]] | None = None,
-    storage_options: JSONDict | list[JSONDict] | None = None,
-    name: str | None = None,
     compute: bool | None = True,
+    zarr_array_kwargs: dict[str, Any] | None = None,
     **metadata: str | JSONDict | list[JSONDict],
 ) -> list:
     fmt = check_format(group, fmt)
@@ -654,11 +650,6 @@ def _write_dask_image(
     dims = len(image.shape)
     axes = _get_valid_axes(dims, axes, fmt)
 
-    if chunks is not None:
-        msg = """The 'chunks' argument is deprecated and will be removed in version 0.5.
-Please use the 'storage_options' argument instead."""
-        warnings.warn(msg, DeprecationWarning)
-
     datasets: list[dict] = []
     delayed = []
 
@@ -667,18 +658,12 @@ Please use the 'storage_options' argument instead."""
     shapes = []
     for path in range(max_layer + 1):
         # LOGGER.debug(f"write_image path: {path}")
-        options = _resolve_storage_options(storage_options, path)
+        options = _resolve_storage_options(zarr_array_kwargs["storage_options"], path)
 
         # don't downsample top level of pyramid
         if str(path) != "0" and scaler is not None:
             image = scaler.resize_image(image)
 
-        # ensure that the chunk dimensions match the image dimensions
-        # (which might have been changed for versions 0.1 or 0.2)
-        # if chunks are explicitly set in the storage options
-        chunks_opt = options.pop("chunks", chunks)
-        # switch to this code in 0.5
-        # chunks_opt = options.pop("chunks", None)
         if chunks_opt is not None:
             chunks_opt = _retuple(chunks_opt, image.shape)
             # image.chunks will be used by da.to_zarr
@@ -689,35 +674,28 @@ Please use the 'storage_options' argument instead."""
         LOGGER.debug(
             "write dask.array to_zarr shape: %s, dtype: %s", image.shape, image.dtype
         )
-        kwargs: dict[str, Any] = {}
+
+        zarr_array_kwargs["chunk_key_encoding"] = fmt.chunk_key_encoding
         zarr_format = fmt.zarr_format
         if zarr_format == 2:
-            kwargs["dimension_separator"] = "/"
-            kwargs["compressor"] = options.pop("compressor", _blosc_compressor())
+            zarr_array_kwargs["compressor"] = options.pop("compressor", _blosc_compressor())
         else:
-            kwargs["chunk_key_encoding"] = fmt.chunk_key_encoding
             if axes is not None:
-                kwargs["dimension_names"] = [
+                zarr_array_kwargs["dimension_names"] = [
                     a["name"] for a in axes if isinstance(a, dict)
                 ]
             if "compressor" in options:
-                # We use 'compressors' for group.create_array() but da.to_zarr() below uses
-                # zarr.create() which doesn't support 'compressors'
-                # TypeError: AsyncArray._create() got an unexpected keyword argument 'compressors'
-                # kwargs["compressors"] = [options.pop("compressor", _blosc_compressor())]
+                # da.to_zarr now supports compressor in the zarr array kwargs as this is directly passed on to
+                # the zarr.create_array API.
+                zarr_array_kwargs["compressor"] = options.pop("compressor")
 
-                # ValueError: compressor cannot be used for arrays with zarr_format 3.
-                # Use bytes-to-bytes codecs instead.
-                kwargs["compressor"] = options.pop("compressor")
-
+        zarr_array_kwargs['name'] = str(Path(group.path, str(path)))
         delayed.append(
             da.to_zarr(
                 arr=image,
                 url=group.store,
-                component=str(Path(group.path, str(path))),
                 compute=False,
-                zarr_format=zarr_format,
-                **kwargs,
+                zarr_array_kwargs=zarr_array_kwargs,
             )
         )
         datasets.append({"path": str(path)})

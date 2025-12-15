@@ -95,7 +95,7 @@ class TestCli:
                 Path("4"),
                 Path("labels"),
             ]
-            assert directory_items(Path(out) / "data-3" / "1") == [
+            assert directory_items(Path(out) / "data-3" / "1" / "c") == [
                 Path(".zarray"),
                 Path(".zattrs"),  # empty '{}'
                 Path("0"),
