@@ -155,6 +155,7 @@ def create_zarr(
                 chunks[zct] = 1
 
     storage_options = dict(chunks=tuple(chunks))
+    zarr_array_kwargs = {"storage_options": storage_options}
 
     if size_c == 1:
         image_data = {
@@ -196,6 +197,7 @@ def create_zarr(
         grp,
         axes=axes,
         storage_options=storage_options,
+        zarr_array_kwargs=zarr_array_kwargs,
         metadata={"omero": image_data},
         fmt=fmt,
     )
