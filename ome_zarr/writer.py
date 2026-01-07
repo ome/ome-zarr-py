@@ -691,13 +691,15 @@ Please use the 'storage_options' argument instead."""
         )
         kwargs: dict[str, Any] = {}
         zarr_format = fmt.zarr_format
+        # zarr_array_kwargs needs dask 2025.12.0 or later
+        zarr_array_kwargs: dict[str, Any] = {}
         if zarr_format == 2:
             kwargs["dimension_separator"] = "/"
             kwargs["compressor"] = options.pop("compressor", _blosc_compressor())
         else:
             kwargs["chunk_key_encoding"] = fmt.chunk_key_encoding
             if axes is not None:
-                kwargs["dimension_names"] = [
+                zarr_array_kwargs["dimension_names"] = [
                     a["name"] for a in axes if isinstance(a, dict)
                 ]
             if "compressor" in options:
@@ -717,6 +719,7 @@ Please use the 'storage_options' argument instead."""
                 component=str(Path(group.path, str(path))),
                 compute=False,
                 zarr_format=zarr_format,
+                zarr_array_kwargs=zarr_array_kwargs,
                 **kwargs,
             )
         )
