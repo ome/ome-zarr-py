@@ -53,7 +53,7 @@ class TestCli:
             args += ["--format", fmt.version]
         main(args)
         main(["info", filename])
-        out, err = capsys.readouterr()
+        out, _err = capsys.readouterr()
         print("Captured output:", out)
         assert os.path.join("labels", "coins") in out
         version = fmt.version if fmt else CurrentFormat().version
@@ -152,6 +152,10 @@ class TestCli:
             self._rotate_and_test(*list(secondpass), reverse=False)
 
     def test_view(self):
+        # view empty dir for code coverage
+        view(str(self.path), 8000, True)
+        view(str(self.path), 8000, True, force=True)
+
         filename = f"{self.path}-4"
         main(["create", "--method=astronaut", filename])
         # CLI doesn't support the dry_run option yet
