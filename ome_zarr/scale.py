@@ -74,6 +74,10 @@ class Scaler:
     max_layer: int = 4
     method: str = "nearest"
 
+    # 0: Nearest-neighbor
+    # 1: Bi-linear (default)
+    order: int = 1  # only used for resize
+
     @staticmethod
     def methods() -> Iterator[str]:
         """Return the name of all methods which define a downsampling.
@@ -172,7 +176,11 @@ class Scaler:
 
         dtype = image.dtype
         image = _resize(
-            image.astype(float), out_shape, order=1, mode="reflect", anti_aliasing=False
+            image.astype(float),
+            out_shape,
+            order=self.order,
+            mode="reflect",
+            anti_aliasing=False,
         )
         return image.astype(dtype)
 
