@@ -354,7 +354,7 @@ class TestWriter:
         store = parse_url(path, mode="w", fmt=format_version()).store
         root = zarr.group(store=store)
         CNAME = "lz4"
-        LEVEL = 4
+        LEVEL = 5
         if format_version().zarr_format == 3:
             compressor = BloscCodec(cname=CNAME, clevel=LEVEL, shuffle="shuffle")
             assert isinstance(compressor, BytesBytesCodec)
@@ -451,12 +451,13 @@ class TestWriter:
                 }
             else:
                 assert (path / ".zattrs").exists()
+                default_cname = "lz4" if isinstance(arr, da.Array) else "zstd"
                 json_text = (path / ds / ".zarray").read_text(encoding="utf-8")
                 arr_json = json.loads(json_text)
                 assert arr_json["compressor"] == {
                     "blocksize": 0,
                     "clevel": 5,
-                    "cname": "zstd",
+                    "cname": default_cname,
                     "id": "blosc",
                     "shuffle": 1,
                 }
