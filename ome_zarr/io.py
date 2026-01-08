@@ -225,6 +225,7 @@ def parse_url(
 
     >>> parse_url('does-not-exist')
     """
+
     loc = ZarrLocation(path, mode=mode, fmt=fmt)
     if "r" in mode and not loc.exists():
         return None
