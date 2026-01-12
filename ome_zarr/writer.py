@@ -963,7 +963,7 @@ def write_multiscale_labels(
       Ignored for versions 0.1 and 0.2. Required for version 0.3 or greater.
     :type coordinate_transformations: list of dict
     :param coordinate_transformations:
-        Deprecated: use 'scale' to specify pixel sizes. coordinate_transformations
+      Deprecated: use 'scale' to specify pixel sizes. coordinate_transformations
       (dataset arrays to physical) will be generated automatically from the scale parameter.
     :type coordinateTransformations: list of dict
     :param coordinateTransformations:
