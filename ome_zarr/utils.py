@@ -102,7 +102,9 @@ def view(
 
     # open ome-ngff-validator in a web browser...
     url = (
-        f"https://ome.github.io/ome-ngff-validator/"
+        # f"https://ome.github.io/ome-ngff-validator/"
+        # TEMP URL for RFC5 deployment of validator
+        "https://deploy-preview-48--ome-ngff-validator.netlify.app/"
         f"?source=http://localhost:{port}/{image_name}"
     )
 
