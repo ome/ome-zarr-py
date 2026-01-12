@@ -249,16 +249,16 @@ Writing big image from tiles::
                 dask_image, tuple(dims), preserve_range=True, anti_aliasing=False
             )
 
-            options = {}
+            zarr_array_kwargs = {}
             if fmt.zarr_format == 2:
-                options["dimension_separator"] = "/"
+                zarr_array_kwargs["chunk_key_encoding"] = {"name": "v2", "separator": "/"}
             else:
-                options["chunk_key_encoding"] = fmt.chunk_key_encoding
-                options["dimension_names"] = [axis["name"] for axis in axes]
+                # zarr_array_kwargs["chunk_key_encoding"] = fmt.chunk_key_encoding
+                zarr_array_kwargs["dimension_names"] = [axis["name"] for axis in axes]
             # write to disk
             da.to_zarr(
                 arr=output, url=img_path, component=path,
-                zarr_format=fmt.zarr_format, **options
+                zarr_format=fmt.zarr_format, zarr_array_kwargs=zarr_array_kwargs
             )
         return paths
 
