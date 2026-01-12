@@ -21,6 +21,9 @@ import dask.array as da
 import zarr
 from dask.diagnostics import ProgressBar
 
+# Not needed with python 3.15+? https://github.com/python/cpython/issues/86809
+from RangeHTTPServer import RangeRequestHandler
+
 from .format import format_from_version
 from .io import parse_url
 from .reader import Multiscales, Node, Reader
@@ -103,7 +106,7 @@ def view(
         f"?source=http://localhost:{port}/{image_name}"
     )
 
-    class CORSRequestHandler(SimpleHTTPRequestHandler):
+    class CORSRequestHandler(RangeRequestHandler):
         def end_headers(self) -> None:
             self.send_header("Access-Control-Allow-Origin", "*")
             SimpleHTTPRequestHandler.end_headers(self)
@@ -287,7 +290,7 @@ def finder(input_path: str, port: int = 8000, dry_run=False) -> None:
         # show small thumbnails view by default. (v=3 for big thumbnails)
         url += "&v=2"
 
-    class CORSRequestHandler(SimpleHTTPRequestHandler):
+    class CORSRequestHandler(RangeRequestHandler):
         def end_headers(self) -> None:
             self.send_header("Access-Control-Allow-Origin", "*")
             SimpleHTTPRequestHandler.end_headers(self)
@@ -344,26 +347,20 @@ def download(input_path: str, output_dir: str = ".") -> None:
         version = node.zarr.version
         fmt = format_from_version(version)
 
-        # store = parse_url(input_path, mode="w", fmt=fmt)
-        group_file = "zarr.json"
-        attrs_file = "zarr.json"
-        if fmt.zarr_format == 2:
-            group_file = ".zgroup"
-            attrs_file = ".zattrs"
+        metadata: JSONDict = {}
+        node.write_metadata(metadata)
 
-        with (target_path / group_file).open("w") as f:
-            f.write(json.dumps(node.zarr.zgroup))
-        with (target_path / attrs_file).open("w") as f:
-            metadata: JSONDict = {}
-            node.write_metadata(metadata)
-            if fmt.zarr_format == 3:
-                # For zarr v3, we need to put metadata under "ome" namespace
-                metadata = {
-                    "attributes": {"ome": metadata},
-                    "zarr_format": 3,
-                    "node_type": "group",
-                }
-            f.write(json.dumps(metadata))
+        if fmt.zarr_format == 3:
+            # For zarr v3, we need to put metadata under "ome" namespace
+            metadata = {
+                "attributes": {"ome": metadata},
+                "zarr_format": 3,
+                "node_type": "group",
+            }
+
+        root = zarr.open_group(
+            target_path, mode="w", zarr_format=fmt.zarr_format, attributes=metadata
+        )
 
         resolutions: list[da.core.Array] = []
         datasets: list[str] = []
@@ -372,12 +369,15 @@ def download(input_path: str, output_dir: str = ".") -> None:
             if isinstance(spec, Multiscales):
                 datasets = spec.datasets
                 resolutions = node.data
-                options: dict[str, Any] = {}
+                zarr_array_kwargs: dict[str, Any] = {}
                 if fmt.zarr_format == 2:
-                    options["dimension_separator"] = "/"
+                    zarr_array_kwargs["chunk_key_encoding"] = {
+                        "name": "v2",
+                        "separator": "/",
+                    }
                 else:
-                    options["chunk_key_encoding"] = fmt.chunk_key_encoding
-                    options["dimension_names"] = [
+                    zarr_array_kwargs["chunk_key_encoding"] = fmt.chunk_key_encoding
+                    zarr_array_kwargs["dimension_names"] = [
                         axis["name"] for axis in node.metadata["axes"]
                     ]
                 if datasets and resolutions:
@@ -385,10 +385,11 @@ def download(input_path: str, output_dir: str = ".") -> None:
                     for dataset, data in reversed(list(zip(datasets, resolutions))):
                         LOGGER.info("resolution %s...", dataset)
                         with pbar:
-                            data.to_zarr(
-                                str(target_path / dataset),
-                                zarr_format=fmt.zarr_format,
-                                **options,
+                            da.to_zarr(
+                                arr=data,
+                                url=root.store,
+                                component=dataset,
+                                zarr_array_kwargs=zarr_array_kwargs,
                             )
             else:
                 # Assume a group that needs metadata, like labels
