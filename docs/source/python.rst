@@ -21,7 +21,6 @@ The following code creates a 3D Image in OME-Zarr::
     import numpy as np
     import zarr
 
-    from ome_zarr.format import
     from ome_zarr.writer import write_image, add_metadata
 
     path = "test_ngff_image.zarr"
