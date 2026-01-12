@@ -205,6 +205,8 @@ class ZarrLocation:
         Return whether the current underlying implementation
         points to a URL
         """
+        if isinstance(self.__store.fs.protocol, tuple):
+            return any(proto in ["http", "https"] for proto in self.__store.fs.protocol)
         return self.__store.fs.protocol in ["http", "https"]
 
 
@@ -223,6 +225,7 @@ def parse_url(
 
     >>> parse_url('does-not-exist')
     """
+
     loc = ZarrLocation(path, mode=mode, fmt=fmt)
     if "r" in mode and not loc.exists():
         return None

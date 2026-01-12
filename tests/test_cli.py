@@ -84,7 +84,7 @@ class TestCli:
         main(["info", f"{out}/{basename}"])
 
         if fmt is not None and fmt.zarr_format == 2:
-            assert directory_items(Path(out) / "data-3") == [
+            assert directory_items(Path(out) / basename) == [
                 Path(".zattrs"),
                 Path(".zgroup"),
                 Path("labels"),
@@ -94,7 +94,8 @@ class TestCli:
                 Path("s3"),
                 Path("s4"),
             ]
-            assert directory_items(Path(out) / "data-3" / "s1") == [
+
+            assert directory_items(Path(out) / basename / "s1") == [
                 Path(".zarray"),
                 Path(".zattrs"),  # empty '{}'
                 Path("0"),
@@ -102,7 +103,7 @@ class TestCli:
                 Path("2"),
             ]
         else:
-            assert directory_items(Path(out) / "data-3") == [
+            assert directory_items(Path(out) / basename) == [
                 Path("labels"),
                 Path("s0"),
                 Path("s1"),
@@ -111,7 +112,7 @@ class TestCli:
                 Path("s4"),
                 Path("zarr.json"),
             ]
-            assert directory_items(Path(out) / "data-3" / "s1") == [
+            assert directory_items(Path(out) / basename / "s1") == [
                 Path("c"),
                 Path("zarr.json"),
             ]

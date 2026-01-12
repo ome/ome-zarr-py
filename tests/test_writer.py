@@ -478,7 +478,9 @@ class TestWriter:
         write_image(
             image=data, group=str(self.path), axes="xyz", storage_options={"chunks": 32}
         )
-        for data in self.group.array_values():
+        test_group = zarr.open_group(self.path)
+        assert len(list(test_group.array_values())) > 0
+        for data in test_group.array_values():
             print(data)
             assert data.chunks == (32, 32, 32)
 
@@ -497,7 +499,7 @@ class TestWriter:
         path = self.path / "test_write_image_compressed"
         fmt = format_version()
         CNAME = "lz4"
-        LEVEL = 4
+        LEVEL = 5
         if format_version().zarr_format == 3:
             compressor = BloscCodec(cname=CNAME, clevel=LEVEL, shuffle="shuffle")
             assert isinstance(compressor, BytesBytesCodec)
@@ -595,12 +597,13 @@ class TestWriter:
                 }
             else:
                 assert (path / ".zattrs").exists()
+                default_cname = "lz4" if isinstance(arr, da.Array) else "zstd"
                 json_text = (path / ds / ".zarray").read_text(encoding="utf-8")
                 arr_json = json.loads(json_text)
                 assert arr_json["compressor"] == {
                     "blocksize": 0,
                     "clevel": 5,
-                    "cname": "zstd",
+                    "cname": default_cname,
                     "id": "blosc",
                     "shuffle": 1,
                 }
@@ -1583,11 +1586,13 @@ class TestLabelWriter:
             assert node_data[0].shape == shape
 
         if fmt.version not in ("0.1", "0.2", "0.3"):
-            cfs = [
+            cts = [
                 d["coordinateTransformations"]
                 for d in node_metadata["multiscales"][0]["datasets"]
             ]
-            for transf, expected in zip(cfs, transformations):
+            for transf, expected in zip(cts, transformations):
+                print("transf:", transf)
+                print("expected:", expected)
                 assert transf == expected
         assert np.allclose(label_data, node_data[0][...].compute())
 
@@ -1729,10 +1734,17 @@ class TestLabelWriter:
         scale = TRANSFORMATIONS[0][0]["scale"][-len(shape) :]
         transformations = []
         for dataset_transfs in TRANSFORMATIONS:
-            transf = dataset_transfs[0]
+            trans0 = dataset_transfs[0]
+            trans1 = dataset_transfs[1]
             # e.g. slice [1, 1, z, x, y] -> [z, x, y] for 3D
             transformations.append(
-                [{"type": "scale", "scale": transf["scale"][-len(shape) :]}]
+                [
+                    {"type": "scale", "scale": trans0["scale"][-len(shape) :]},
+                    {
+                        "type": "translation",
+                        "translation": trans1["translation"][-len(shape) :],
+                    },
+                ]
             )
 
         # create the actual label data
@@ -1760,7 +1772,7 @@ class TestLabelWriter:
             name=label_name,
             fmt=fmt,
             axes=axes,
-            # coordinate_transformations=transformations,
+            coordinate_transformations=transformations,
             scales=scale,
         )
         self.verify_label_data(
