@@ -21,7 +21,7 @@ The following code creates a 3D Image in OME-Zarr::
     import numpy as np
     import zarr
 
-    from ome_zarr.format import FormatV04
+    from ome_zarr.format import
     from ome_zarr.writer import write_image, add_metadata
 
     path = "test_ngff_image.zarr"
@@ -31,7 +31,6 @@ The following code creates a 3D Image in OME-Zarr::
     rng = np.random.default_rng(0)
     data = rng.poisson(lam=10, size=(size_z, size_xy, size_xy)).astype(np.uint8)
 
-    # Add fmt=FormatV04() parameter to write v0.4 format (zarr v2)
     write_image(data, path, axes="zyx")
 
 
