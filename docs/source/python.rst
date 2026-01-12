@@ -63,7 +63,6 @@ The following code creates a 3D Image in OME-Zarr with labels::
     import os
 
     from skimage.data import binary_blobs
-    from ome_zarr.format import FormatV04
     from ome_zarr.writer import write_image, add_metadata
 
     path = "test_ngff_image_labels.zarr"
@@ -125,7 +124,6 @@ This sample code shows how to write a high-content screening dataset (i.e. cultu
     import numpy as np
     import zarr
 
-    from ome_zarr.format import FormatV04
     from ome_zarr.writer import write_image, write_plate_metadata, write_well_metadata
 
     path = "test_ngff_plate.zarr"
@@ -174,21 +172,20 @@ This sample code reads an image stored on remote s3 server, but the same
 code can be used to read data on a local file system. In either case,
 the data is available as `dask` arrays::
 
-    from dask import array as da
-    import zarr
+    from ome_zarr.io import parse_url
+    from ome_zarr.reader import Reader
     import napari
 
     url = "https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.5/idr0062A/6001240_labels.zarr"
 
     # read the image data
-    root = zarr.open_group(url)
-    zattrs = root.attrs.asdict()
-    # Handle v0.5+ - unwrap 'ome' namespace
-    if "ome" in zattrs:
-        zattrs = zattrs["ome"]
+    reader = Reader(parse_url(url))
+    # nodes may include images, labels etc
+    nodes = list(reader())
+    # first node will be the image pixel data
+    image_node = nodes[0]
 
-    paths = [ds["path"] for ds in zattrs["multiscales"][0]["datasets"]]
-    dask_data = [da.from_zarr(root[path]) for path in paths]
+    dask_data = image_node.data
 
     # We can view this in napari
     # NB: image axes are CZYX: split channels by C axis=0
@@ -206,6 +203,7 @@ Writing big image from tiles::
 
     import os
     import zarr
+    from ome_zarr.io import parse_url
     from ome_zarr.format import CurrentFormat, FormatV04
     from ome_zarr.reader import Reader
     from ome_zarr.writer import write_multiscales_metadata
@@ -218,14 +216,10 @@ Writing big image from tiles::
     # Use fmt=FormatV04() to write v0.4 format (zarr v2)
 
     url = "https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.3/9836842.zarr"
-    root = zarr.open_group(url)
-    zattrs = root.attrs.asdict()
-    # Handle v0.5+ - unwrap 'ome' namespace
-    if "ome" in zattrs:
-        zattrs = zattrs["ome"]
-    paths = [ds["path"] for ds in zattrs["multiscales"][0]["datasets"]]
+    reader = Reader(parse_url(url))
+    nodes = list(reader())
     # first level of the pyramid
-    dask_data = da.from_zarr(root[paths[0]])
+    dask_data = nodes[0].data[0]
     tile_size = 512
     axes = [{"name": "c", "type": "channel"}, {"name": "y", "type": "space"}, {"name": "x", "type": "space"}]
 
