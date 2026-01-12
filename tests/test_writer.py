@@ -370,7 +370,9 @@ class TestWriter:
         write_image(
             image=data, group=str(self.path), axes="xyz", storage_options={"chunks": 32}
         )
-        for data in self.group.array_values():
+        test_group = zarr.open_group(self.path)
+        assert len(list(test_group.array_values())) > 0
+        for data in test_group.array_values():
             print(data)
             assert data.chunks == (32, 32, 32)
 
@@ -1476,11 +1478,11 @@ class TestLabelWriter:
             assert node_data[0].shape == shape
 
         if fmt.version not in ("0.1", "0.2", "0.3"):
-            cfs = [
+            cts = [
                 d["coordinateTransformations"]
                 for d in node_metadata["multiscales"][0]["datasets"]
             ]
-            for transf, expected in zip(cfs, transformations):
+            for transf, expected in zip(cts, transformations):
                 assert transf == expected
         assert np.allclose(label_data, node_data[0][...].compute())
 

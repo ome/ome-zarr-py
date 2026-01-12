@@ -836,7 +836,7 @@ def get_metadata(group: zarr.Group | str) -> dict:
 
 
 def add_metadata(
-    group: zarr.Group, metadata: JSONDict, fmt: Format | None = None
+    group: zarr.Group | str, metadata: JSONDict, fmt: Format | None = None
 ) -> None:
 
     group, fmt = check_group_fmt(group, fmt)
