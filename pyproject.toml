@@ -46,7 +46,7 @@ ome_zarr = "ome_zarr.cli:main"
 
 [project.optional-dependencies]
 tests = [
-    "pytest",
+    "pytest", "ome-zarr-models",
 ]
 
 [project.urls]
