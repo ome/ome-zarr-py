@@ -169,6 +169,7 @@ def create_zarr(
             "rdefs": {"model": "greyscale"},
         }
     else:
+        # TODO: is it valid to just assume RGB / 8bit?
         image_data = {
             "channels": [
                 {
@@ -210,7 +211,9 @@ def create_zarr(
         if axes is not None:
             # remove channel axis for masks
             axes = axes.replace("c", "")
-        write_multiscale(labels, label_grp, axes=axes, fmt=fmt)
+        write_multiscale(
+            labels, label_grp, zarr_array_kwargs=zarr_array_kwargs, axes=axes, fmt=fmt
+        )
 
         colors = []
         properties = []

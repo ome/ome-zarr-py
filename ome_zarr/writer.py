@@ -980,7 +980,6 @@ def write_labels(
     """
     fmt = check_format(group, fmt)
     sub_group = group.require_group(f"labels/{name}")
-    dask_delayed_jobs = []
 
     if isinstance(labels, da.Array):
         dask_delayed_jobs = _write_dask_image(
