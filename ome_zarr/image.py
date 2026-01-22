@@ -11,43 +11,6 @@ from zarr import Group
 
 from .scale import Scaler
 
-
-class Spec(ABC):
-    def __init__(self, group: Group) -> None:
-        self.group = group
-
-    @staticmethod
-    def matches(group: Group) -> bool:
-        return False
-
-    def data(self) -> list[da.core.Array]:
-        return []
-
-    def metadata(self) -> dict[str, Any]:
-        # napari layer metadata
-        return {}
-
-    def children(self) -> list["Spec"]:
-        return []
-
-    def iter_nodes(self) -> Iterable["Spec"]:
-        yield self
-        for child in self.children():
-            yield from child.iter_nodes()
-
-    def iter_data(self) -> Iterable[da.core.Array]:
-        for node in self.iter_nodes():
-            data = node.data()
-            if data:
-                yield data
-
-    @staticmethod
-    def get_attrs(group: Group) -> dict:
-        if "ome" in group.attrs:
-            return group.attrs["ome"]
-        return group.attrs
-
-
 @dataclass
 class Image:
     data: da.core.Array | np.ndarray
