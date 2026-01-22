@@ -1,20 +1,21 @@
 from abc import ABC
 from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Union, Optional
 
 import dask
+import zarr
 import dask.array as da
 import numpy as np
 from yaozarrs import v05
-from zarr import Group
+from pathlib import Path
 
 from .scale import Scaler
 
 @dataclass
 class Image:
     data: da.core.Array | np.ndarray
-    dims: list[str]
+    dims: Union[list[str], str]
     scale_factors: list[int] | None = field(default_factory=lambda: [2, 4, 8])
     scale: list[float] | None = None
     scale_method: str | None = "nearest"
@@ -28,8 +29,13 @@ class Image:
 
     def __post_init__(self):
 
+        # set default scale if unset
         if not self.scale:
             self.scale = [1.0 for s in range(len(self.dims))]
+
+        # coerce dims to list of dims
+        if isinstance(self.dims, str):
+            self.dims = [d for d in self.dims]
 
         # Create multiscales
         images = [self.data]
@@ -62,7 +68,7 @@ class Image:
             ).func
 
             new_image = da.from_delayed(
-                dask.delayed(scale_function)(images[-1]),
+                dask.delayed(scale_function)(images[-1])[0],
                 shape=target_shape,
                 dtype=images[-1].dtype,
             )
@@ -93,28 +99,26 @@ class Image:
             name=self.name,
         )
 
-    def to_ome_zarr(self, path: str, version: str = "0.5"):
+    def to_ome_zarr(
+            self,
+            group: zarr.Group,
+            version: str = "0.5",
+            chunks: Optional[Union[tuple[Any, ...], int]] = None
+            ):
         import os
         import shutil
-        from pathlib import Path
+        from .writer import write_multiscale
+        
 
-        import zarr
+        if os.path.exists(str(group)):
+            shutil.rmtree(str(group))
 
-        if os.path.exists(path) and os.path.isdir(path):
-            shutil.rmtree(path)
+        write_multiscale(
+            self.multiscales,
+            group=group,
+            chunks=chunks,
+        )
 
-        # Create the Zarr store
-        root = zarr.open_group(path, mode="w")
-
-        # Write the multiscale metadata
-        # self.metadata.to_zarr(store)
-
-        # Write each multiscale level
-        for index, image in enumerate(self.multiscales):
-            # group = root.create_group(f'scale{index}')
-            da.to_zarr(
-                image,
-                url=root.store,
-                component=str(Path(root.path, f"scale{index}")),
-                write_empty_chunks=False,
-            )
+        group.attrs['ome'] = self.metadata.model_dump(
+            exclude_none=True
+        )
