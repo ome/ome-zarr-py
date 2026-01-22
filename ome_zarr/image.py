@@ -1,21 +1,19 @@
-from abc import ABC
-from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import Any, Union, Optional
+from typing import Any
 
 import dask
-import zarr
 import dask.array as da
 import numpy as np
+import zarr
 from yaozarrs import v05
-from pathlib import Path
 
 from .scale import Scaler
+
 
 @dataclass
 class Image:
     data: da.core.Array | np.ndarray
-    dims: Union[list[str], str]
+    dims: list[str] | str
     scale_factors: list[int] | None = field(default_factory=lambda: [2, 4, 8])
     scale: list[float] | None = None
     scale_method: str | None = "nearest"
@@ -100,15 +98,15 @@ class Image:
         )
 
     def to_ome_zarr(
-            self,
-            group: zarr.Group,
-            version: str = "0.5",
-            chunks: Optional[Union[tuple[Any, ...], int]] = None
-            ):
+        self,
+        group: zarr.Group,
+        version: str = "0.5",
+        chunks: tuple[Any, ...] | int | None = None,
+    ):
         import os
         import shutil
+
         from .writer import write_multiscale
-        
 
         if os.path.exists(str(group)):
             shutil.rmtree(str(group))
@@ -119,6 +117,4 @@ class Image:
             chunks=chunks,
         )
 
-        group.attrs['ome'] = self.metadata.model_dump(
-            exclude_none=True
-        )
+        group.attrs["ome"] = self.metadata.model_dump(exclude_none=True)
