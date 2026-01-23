@@ -1,46 +1,82 @@
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Union, Optional, Sequence
 
 import dask
 import dask.array as da
 import numpy as np
 import zarr
 from yaozarrs import v05
-
+from enum import Enum
 from .scale import Scaler
 
+class Methods(Enum):
+    RESIZE = "resize"
+
+SPATIAL_DIMS = ["z", "y", "x"]
 
 @dataclass
 class Image:
-    data: da.core.Array | np.ndarray
-    dims: list[str] | str
-    scale_factors: list[int] | None = field(default_factory=lambda: [2, 4, 8])
-    scale: list[float] | None = None
-    scale_method: str | None = "nearest"
+    data: da.Array | np.ndarray
+    dims: Union[Sequence[str], str]
+    scale_factors: list[int] = field(default_factory=lambda: [2, 4, 8])
+    scale: Sequence[float] | None = None
+    scale_method: Union[str, Methods] = Methods.RESIZE
     axes_units: dict[str, str] | None = field(default_factory=dict)
     labels: dict[str, Any] | None = field(default_factory=dict)
     name: str | None = "image"
 
-    scaler: Scaler = field(init=False)
-    multiscales: list = field(init=False)
+    multiscales: list["Image"] | None = None
     metadata: v05.Multiscale = field(init=False)
+    _build_multiscales: bool = field(default=True, repr=False)
 
     def __post_init__(self):
 
         # set default scale if unset
         if not self.scale:
-            self.scale = [1.0 for s in range(len(self.dims))]
+            self.scale = tuple(1.0 for s in range(len(self.dims)))
 
         # coerce dims to list of dims
         if isinstance(self.dims, str):
             self.dims = [d for d in self.dims]
 
-        # Create multiscales
-        images = [self.data]
         datasets = [
             v05.Dataset(
                 path="s0",
-                coordinateTransformations=[v05.ScaleTransformation(scale=self.scale)],
+                coordinateTransformations=[
+                    v05.ScaleTransformation(scale=list(self.scale))],
+            )
+        ]
+
+        axes = []
+        for d in self.dims:
+            if d in SPATIAL_DIMS:
+                axes.append(v05.SpaceAxis(name=d))
+            elif d == "t":
+                axes.append(v05.TimeAxis(name=d))
+            elif d == "c":
+                axes.append(v05.ChannelAxis(name=d))
+
+        self.metadata = v05.Multiscale(
+            axes=axes,
+            datasets=datasets,
+            name=self.name,
+        )
+
+        if not self._build_multiscales:
+            return
+
+        # Create multiscales
+        images = [
+            Image(
+                data=self.data,
+                dims=self.dims,
+                scale_factors=[],
+                scale=self.scale,
+                scale_method=self.scale_method,
+                axes_units=self.axes_units,
+                labels=self.labels,
+                name=self.name,
+                _build_multiscales=False,
             )
         ]
 
@@ -52,26 +88,36 @@ class Image:
             else:
                 relative_factor = self.scale_factors[idx] // self.scale_factors[idx - 1]
 
-            spatial_dims = ["z", "y", "x"]
-            target_shape = [
-                s // relative_factor if d in spatial_dims else s
-                for s, d in zip(images[-1].shape, self.dims)
-            ]
-
-            scale_function = Scaler(
-                method=self.scale_method,
-                downscale=relative_factor,
-                max_layer=1,
-                order=1,
-            ).func
-
-            new_image = da.from_delayed(
-                dask.delayed(scale_function)(images[-1])[0],
-                shape=target_shape,
-                dtype=images[-1].dtype,
+            relative_factor = tuple(
+                relative_factor if d in SPATIAL_DIMS else 1 for d in self.dims
             )
 
-            images.append(new_image)
+            # Calculate target shape, leave non-spatial dims unchanged
+            target_shape = [
+                s // f if d in SPATIAL_DIMS else s
+                for s, d, f in zip(images[-1].data.shape, self.dims, relative_factor)
+            ]
+
+            if self.scale_method == Methods.RESIZE:
+                from .dask_utils import resize
+                new_image = resize(
+                    images[-1].data,
+                    output_shape=tuple(target_shape)
+                )
+
+            images.append(
+                Image(
+                    data=new_image,
+                    dims=self.dims,
+                    scale_factors=[],
+                    scale=tuple(s * factor for s in self.scale),
+                    scale_method=self.scale_method,
+                    axes_units=self.axes_units,
+                    labels=self.labels,
+                    name=self.name,
+                    _build_multiscales=False,
+                )
+            )
             ds = v05.Dataset(
                 path=f"s{idx+1}",
                 coordinateTransformations=[
@@ -81,16 +127,6 @@ class Image:
             datasets.append(ds)
 
         self.multiscales = images
-
-        axes = []
-        for d in self.dims:
-            if d in spatial_dims:
-                axes.append(v05.SpaceAxis(name=d))
-            elif d == "t":
-                axes.append(v05.TimeAxis(name=d))
-            elif d == "c":
-                axes.append(v05.ChannelAxis(name=d))
-
         self.metadata = v05.Multiscale(
             axes=axes,
             datasets=datasets,
