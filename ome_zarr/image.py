@@ -1,26 +1,28 @@
+from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Any, Union, Optional, Sequence
+from enum import Enum
+from typing import Any
 
-import dask
 import dask.array as da
 import numpy as np
 import zarr
 from yaozarrs import v05
-from enum import Enum
-from .scale import Scaler
+
 
 class Methods(Enum):
     RESIZE = "resize"
 
+
 SPATIAL_DIMS = ["z", "y", "x"]
+
 
 @dataclass
 class Image:
     data: da.Array | np.ndarray
-    dims: Union[Sequence[str], str]
+    dims: Sequence[str] | str
     scale_factors: list[int] = field(default_factory=lambda: [2, 4, 8])
     scale: Sequence[float] | None = None
-    scale_method: Union[str, Methods] = Methods.RESIZE
+    scale_method: str | Methods = Methods.RESIZE
     axes_units: dict[str, str] | None = field(default_factory=dict)
     labels: dict[str, Any] | None = field(default_factory=dict)
     name: str | None = "image"
@@ -43,7 +45,8 @@ class Image:
             v05.Dataset(
                 path="s0",
                 coordinateTransformations=[
-                    v05.ScaleTransformation(scale=list(self.scale))],
+                    v05.ScaleTransformation(scale=list(self.scale))
+                ],
             )
         ]
 
@@ -100,10 +103,8 @@ class Image:
 
             if self.scale_method == Methods.RESIZE:
                 from .dask_utils import resize
-                new_image = resize(
-                    images[-1].data,
-                    output_shape=tuple(target_shape)
-                )
+
+                new_image = resize(images[-1].data, output_shape=tuple(target_shape))
 
             images.append(
                 Image(
