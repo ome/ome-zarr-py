@@ -742,8 +742,8 @@ Please use the 'storage_options' argument instead."""
             compute=False,
             zarr_array_kwargs=zarr_array_kwargs,
             **kwargs,
-            )
-        ]
+        )
+    ]
     for idx, image in enumerate(pyramid):
 
         # LOGGER.debug(f"write_image path: {path}")
@@ -758,14 +758,16 @@ Please use the 'storage_options' argument instead."""
         if chunks_opt is not None:
             chunks_opt = _retuple(chunks_opt, image.shape)
             # image.chunks will be used by da.to_zarr
-            level_image = da.array(pyramid[idx]).rechunk(chunks=chunks_opt)
+            level_image = da.array(image).rechunk(chunks=chunks_opt)
         else:
-            level_image = pyramid[idx]
+            level_image = image
         LOGGER.debug("chunks_opt: %s", chunks_opt)
         shapes.append(level_image.shape)
 
         LOGGER.debug(
-            "write dask.array to_zarr shape: %s, dtype: %s", level_image.shape, level_image.dtype
+            "write dask.array to_zarr shape: %s, dtype: %s",
+            level_image.shape,
+            level_image.dtype,
         )
 
         delayed.append(
