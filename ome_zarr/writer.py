@@ -591,7 +591,7 @@ def write_image(
             "Using the `Scaler` class for downsampling is deprecated and will be removed in version 0.13.0."
             "Please use the `scale_factors` argument instead."
         )
-    
+
     if method is None:
         method = Methods.RESIZE
     fmt = check_format(group, fmt)
@@ -617,6 +617,7 @@ def write_image(
         )
     else:
         from .scale import build_pyramid
+
         pyramid = build_pyramid(
             image=image,
             scale_factors=list(scale_factors),
@@ -1094,6 +1095,7 @@ def write_labels(
     )
 
     return dask_delayed_jobs
+
 
 def _retuple(chunks: tuple[Any, ...] | int, shape: tuple[Any, ...]) -> tuple[Any, ...]:
     """
