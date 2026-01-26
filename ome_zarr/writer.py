@@ -65,6 +65,36 @@ def _get_valid_axes(
     return axes_obj.to_list(fmt)
 
 
+def _extract_dims_from_axes(
+    axes: list[str] | list[dict[str, str]] | None,
+) -> tuple[str, ...]:
+    """Extract dimension names from axes, with proper type narrowing.
+    
+    Parameters
+    ----------
+    axes : list[str] | list[dict[str, str]] | None
+        Axes returned from _get_valid_axes (must not be None).
+    
+    Returns
+    -------
+    tuple[str, ...]
+        Dimension names as tuple.
+    
+    Raises
+    ------
+    ValueError
+        If axes is None.
+    """
+    if axes is None:
+        raise ValueError("axes must be provided for build_pyramid")
+    
+    # Type guard: check first element to determine type
+    if axes and isinstance(axes[0], dict):
+        return tuple(ax["name"] for ax in axes)  # type: ignore
+    else:
+        return tuple(str(ax) for ax in axes)
+
+
 def _validate_well_images(
     images: list[str | dict], fmt: Format = CurrentFormat()
 ) -> list[dict]:
@@ -618,6 +648,8 @@ def write_image(
     else:
         from .scale import build_pyramid
 
+
+        _extract_dims_from_axes(axes)
         pyramid = build_pyramid(
             image=image,
             scale_factors=list(scale_factors),
@@ -684,8 +716,8 @@ def _write_dask_image(
             "Please use the `scale_factors` argument instead."
         )
 
-    dims = len(image.shape)
-    axes = _get_valid_axes(dims, axes, fmt)
+    axes = _get_valid_axes(len(image.shape), axes, fmt)
+    dims = _extract_dims_from_axes(axes)
 
     if chunks is not None:
         msg = """The 'chunks' argument is deprecated and will be removed in version 0.5.
@@ -725,13 +757,6 @@ Please use the 'storage_options' argument instead."""
             kwargs["compressor"] = options.pop("compressor")
 
     # Create the pyramid
-    # axes is always a list[str] or list[dict[str, str]] after _get_valid_axes
-    if axes is None:
-        raise ValueError("axes must be provided for build_pyramid")
-    if all(isinstance(ax, dict) for ax in axes):
-        dims = tuple(ax['name'] for ax in axes)  # type: ignore
-    else:
-        dims = tuple(str(ax) for ax in axes)
     pyramid = build_pyramid(
         image,
         list(scale_factors),
@@ -800,7 +825,7 @@ Please use the 'storage_options' argument instead."""
 
     # we validate again later, but this catches length mismatch before zip(datasets...)
     fmt.validate_coordinate_transformations(
-        dims, len(datasets), coordinate_transformations
+        len(image.shape), len(datasets), coordinate_transformations
     )
     if coordinate_transformations is not None:
         for dataset, transform in zip(datasets, coordinate_transformations):
@@ -1073,14 +1098,8 @@ def write_labels(
     sub_group = group.require_group(f"labels/{name}")
     dask_delayed_jobs = []
 
-    dims = len(labels.shape)
-    axes = _get_valid_axes(dims, axes, fmt)
-    if axes is None:
-        raise ValueError("axes must be provided for build_pyramid")
-    if all(isinstance(ax, dict) for ax in axes):
-        dims = tuple(ax['name'] for ax in axes)  # type: ignore
-    else:
-        dims = tuple(str(ax) for ax in axes)
+    axes = _get_valid_axes(len(labels.shape), axes, fmt)
+    dims = _extract_dims_from_axes(axes)
 
     if isinstance(labels, da.Array):
         dask_delayed_jobs = _write_dask_image(
