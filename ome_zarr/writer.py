@@ -591,6 +591,9 @@ def write_image(
             "Using the `Scaler` class for downsampling is deprecated and will be removed in version 0.13.0."
             "Please use the `scale_factors` argument instead."
         )
+    
+    if method is None:
+        method = Methods.RESIZE
     fmt = check_format(group, fmt)
     dask_delayed_jobs = []
 
@@ -613,9 +616,15 @@ def write_image(
             **metadata,
         )
     else:
-        mip = _create_mip(image, fmt, scaler, axes)
+        from .scale import build_pyramid
+        pyramid = build_pyramid(
+            image=image,
+            scale_factors=list(scale_factors),
+            dims=tuple(_get_valid_axes(len(image.shape), axes, fmt)),
+            method=method,
+        )
         dask_delayed_jobs = write_multiscale(
-            mip,
+            pyramid,
             group,
             chunks=chunks,
             fmt=fmt,
@@ -1085,45 +1094,6 @@ def write_labels(
     )
 
     return dask_delayed_jobs
-
-
-def _create_mip(
-    image: np.ndarray,
-    fmt: Format,
-    scaler: Scaler,
-    axes: AxesType,
-) -> list[np.ndarray]:
-    """
-    Generate a downsampled pyramid of images.
-
-    Returns
-    -------
-    pyramid :
-        List of numpy arrays that are the downsampled pyramid levels.
-    """
-    if image.ndim > 5:
-        raise ValueError("Only images of 5D or less are supported")
-
-    if fmt.version in ("0.1", "0.2"):
-        # v0.1 and v0.2 are strictly 5D
-        shape_5d: tuple[Any, ...] = (*(1,) * (5 - image.ndim), *image.shape)
-        image = image.reshape(shape_5d)
-
-    # check axes before trying to scale
-    _get_valid_axes(image.ndim, axes, fmt)
-
-    if scaler is not None:
-        if image.shape[-1] == 1 or image.shape[-2] == 1:
-            raise ValueError(
-                "Can't downsample if size of x or y dimension is 1. "
-                f"Shape: {image.shape}"
-            )
-        mip = scaler.func(image)
-    else:
-        LOGGER.debug("disabling pyramid")
-        mip = [image]
-    return mip
-
 
 def _retuple(chunks: tuple[Any, ...] | int, shape: tuple[Any, ...]) -> tuple[Any, ...]:
     """
