@@ -69,17 +69,17 @@ def _extract_dims_from_axes(
     axes: list[str] | list[dict[str, str]] | None,
 ) -> tuple[str, ...]:
     """Extract dimension names from axes, with proper type narrowing.
-    
+
     Parameters
     ----------
     axes : list[str] | list[dict[str, str]] | None
         Axes returned from _get_valid_axes (must not be None).
-    
+
     Returns
     -------
     tuple[str, ...]
         Dimension names as tuple.
-    
+
     Raises
     ------
     ValueError
@@ -87,7 +87,7 @@ def _extract_dims_from_axes(
     """
     if axes is None:
         raise ValueError("axes must be provided for build_pyramid")
-    
+
     # Type guard: check first element to determine type
     if axes and isinstance(axes[0], dict):
         return tuple(ax["name"] for ax in axes)  # type: ignore
@@ -647,7 +647,6 @@ def write_image(
         )
     else:
         from .scale import build_pyramid
-
 
         _extract_dims_from_axes(axes)
         pyramid = build_pyramid(
