@@ -692,9 +692,6 @@ def _write_dask_image(
 Please use the 'storage_options' argument instead."""
         warnings.warn(msg, DeprecationWarning)
 
-    datasets: list[dict] = []
-    delayed = []
-
     # for path, data in enumerate(pyramid):
     if scaler is not None:
         scale_factors = tuple(2**i for i in range(scaler.max_layer))
@@ -702,6 +699,32 @@ Please use the 'storage_options' argument instead."""
     if method is None:
         method = Methods.RESIZE
 
+    # Set up common kwargs for da.to_zarr
+    kwargs: dict[str, Any] = {}
+    zarr_format = fmt.zarr_format
+    options = _resolve_storage_options(storage_options, 0)
+    # zarr_array_kwargs needs dask 2025.12.0 or later
+    zarr_array_kwargs: dict[str, Any] = {}
+    if zarr_format == 2:
+        zarr_array_kwargs["chunk_key_encoding"] = {"name": "v2", "separator": "/"}
+        kwargs["compressor"] = options.pop("compressor", _blosc_compressor())
+    else:
+        # zarr_array_kwargs["chunk_key_encoding"] = fmt.chunk_key_encoding
+        if axes is not None:
+            zarr_array_kwargs["dimension_names"] = [
+                a["name"] for a in axes if isinstance(a, dict)
+            ]
+        if "compressor" in options:
+            # We use 'compressors' for group.create_array() but da.to_zarr() below uses
+            # zarr.create() which doesn't support 'compressors'
+            # TypeError: AsyncArray._create() got an unexpected keyword argument 'compressors'
+            # kwargs["compressors"] = [options.pop("compressor", _blosc_compressor())]
+
+            # ValueError: compressor cannot be used for arrays with zarr_format 3.
+            # Use bytes-to-bytes codecs instead.
+            kwargs["compressor"] = options.pop("compressor")
+
+    # Create the pyramid
     pyramid = build_pyramid(
         image,
         list(scale_factors),
@@ -710,10 +733,21 @@ Please use the 'storage_options' argument instead."""
     )
 
     shapes = []
-    for path, (factor, image) in enumerate(zip(scale_factors, pyramid)):
+    datasets: list[dict] = []
+    delayed = [
+        da.to_zarr(
+            arr=image,
+            url=group.store,
+            component=str(Path(group.path, str(0))),
+            compute=False,
+            zarr_array_kwargs=zarr_array_kwargs,
+            **kwargs,
+            )
+        ]
+    for idx, image in enumerate(pyramid):
 
         # LOGGER.debug(f"write_image path: {path}")
-        options = _resolve_storage_options(storage_options, path)
+        options = _resolve_storage_options(storage_options, idx)
 
         # ensure that the chunk dimensions match the image dimensions
         # (which might have been changed for versions 0.1 or 0.2)
@@ -724,47 +758,27 @@ Please use the 'storage_options' argument instead."""
         if chunks_opt is not None:
             chunks_opt = _retuple(chunks_opt, image.shape)
             # image.chunks will be used by da.to_zarr
-            image = da.array(image).rechunk(chunks=chunks_opt)
+            level_image = da.array(pyramid[idx]).rechunk(chunks=chunks_opt)
+        else:
+            level_image = pyramid[idx]
         LOGGER.debug("chunks_opt: %s", chunks_opt)
-        shapes.append(image.shape)
+        shapes.append(level_image.shape)
 
         LOGGER.debug(
-            "write dask.array to_zarr shape: %s, dtype: %s", image.shape, image.dtype
+            "write dask.array to_zarr shape: %s, dtype: %s", level_image.shape, level_image.dtype
         )
-        kwargs: dict[str, Any] = {}
-        zarr_format = fmt.zarr_format
-        # zarr_array_kwargs needs dask 2025.12.0 or later
-        zarr_array_kwargs: dict[str, Any] = {}
-        if zarr_format == 2:
-            zarr_array_kwargs["chunk_key_encoding"] = {"name": "v2", "separator": "/"}
-            kwargs["compressor"] = options.pop("compressor", _blosc_compressor())
-        else:
-            # zarr_array_kwargs["chunk_key_encoding"] = fmt.chunk_key_encoding
-            if axes is not None:
-                zarr_array_kwargs["dimension_names"] = [
-                    a["name"] for a in axes if isinstance(a, dict)
-                ]
-            if "compressor" in options:
-                # We use 'compressors' for group.create_array() but da.to_zarr() below uses
-                # zarr.create() which doesn't support 'compressors'
-                # TypeError: AsyncArray._create() got an unexpected keyword argument 'compressors'
-                # kwargs["compressors"] = [options.pop("compressor", _blosc_compressor())]
-
-                # ValueError: compressor cannot be used for arrays with zarr_format 3.
-                # Use bytes-to-bytes codecs instead.
-                kwargs["compressor"] = options.pop("compressor")
 
         delayed.append(
             da.to_zarr(
-                arr=image,
+                arr=level_image,
                 url=group.store,
-                component=str(Path(group.path, str(path))),
+                component=str(Path(group.path, str(idx))),
                 compute=False,
                 zarr_array_kwargs=zarr_array_kwargs,
                 **kwargs,
             )
         )
-        datasets.append({"path": str(path)})
+        datasets.append({"path": str(idx)})
 
     # Computing delayed jobs if necessary
     if compute:
