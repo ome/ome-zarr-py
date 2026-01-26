@@ -806,13 +806,13 @@ Please use the 'storage_options' argument instead."""
             da.to_zarr(
                 arr=level_image,
                 url=group.store,
-                component=str(Path(group.path, str(idx+1))),
+                component=str(Path(group.path, str(idx + 1))),
                 compute=False,
                 zarr_array_kwargs=zarr_array_kwargs,
                 **kwargs,
             )
         )
-        datasets.append({"path": str(idx+1)})
+        datasets.append({"path": str(idx + 1)})
 
     # Computing delayed jobs if necessary
     if compute:
@@ -1119,7 +1119,6 @@ def write_labels(
         )
     else:
         from .scale import build_pyramid
-
 
         pyramid = build_pyramid(
             labels,
