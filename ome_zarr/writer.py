@@ -14,9 +14,8 @@ from numcodecs import Blosc
 
 from .axes import Axes
 from .format import CurrentFormat, Format, FormatV04
-from .scale import Scaler, Methods
+from .scale import Methods, Scaler
 from .types import JSONDict
-from deprecated import deprecated
 
 LOGGER = logging.getLogger("ome_zarr.writer")
 
@@ -660,6 +659,7 @@ def _write_dask_image(
     **metadata: str | JSONDict | list[JSONDict],
 ) -> list:
     from .scale import build_pyramid
+
     fmt = check_format(group, fmt)
     if fmt.version in ("0.1", "0.2"):
         # v0.1 and v0.2 are strictly 5D
@@ -697,7 +697,7 @@ Please use the 'storage_options' argument instead."""
         list(scale_factors),
         dims=tuple(axes),
         method=method,
-        )
+    )
 
     shapes = []
     for path, (factor, image) in enumerate(zip(scale_factors, pyramid)):
@@ -1058,6 +1058,7 @@ def write_labels(
         )
     else:
         from .scale import build_pyramid
+
         pyramid = build_pyramid(
             labels,
             list(scale_factors),

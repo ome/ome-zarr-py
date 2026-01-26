@@ -3,18 +3,18 @@
 See the :class:`~ome_zarr.scale.Scaler` class for details.
 """
 
-from ast import List
 import inspect
 import logging
 import os
 from collections.abc import Callable, Iterator, MutableMapping
 from dataclasses import dataclass
-from typing import Any, Union
 from enum import Enum
+from typing import Any, Union
 
 import dask.array as da
 import numpy as np
 import zarr
+from deprecated import deprecated
 from scipy.ndimage import zoom
 from skimage.transform import (
     downscale_local_mean,
@@ -25,7 +25,6 @@ from skimage.transform import (
 
 from .dask_utils import resize as dask_resize
 from .io import parse_url
-from deprecated import deprecated
 
 LOGGER = logging.getLogger("ome_zarr.scale")
 
@@ -303,14 +302,17 @@ class Scaler:
             rv.append(new_stack)
         return rv
 
+
 SPATIAL_DIMS = ("z", "y", "x")
+
 
 class Methods(Enum):
     RESIZE = "resize"
     NEAREST = "nearest"
 
+
 def build_pyramid(
-    image: Union[da.Array, np.ndarray],
+    image: da.Array | np.ndarray,
     scale_factors: list[int],
     dims: tuple[str, ...],
     method: str | Methods = "nearest",
@@ -337,7 +339,7 @@ def build_pyramid(
         if idx == 0:
             relative_factor = scale_factors[0]
         else:
-            relative_factor = scale_factors[idx] // scale_factors[idx - 1]
+            relative_factor = factor // scale_factors[idx - 1]
 
         # Build per-dimension factor (only spatial dims are downsampled)
         per_dim_factor = tuple(
@@ -351,10 +353,7 @@ def build_pyramid(
         )
 
         if method == Methods.RESIZE:
-            new_image = dask_resize(
-                images[-1],
-                output_shape=target_shape
-                )
+            new_image = dask_resize(images[-1], output_shape=target_shape)
         elif method == Methods.NEAREST:
             new_image = dask_resize(
                 images[-1],
@@ -362,7 +361,7 @@ def build_pyramid(
                 order=0,
                 preserve_range=True,
                 anti_aliasing=False,
-                )
+            )
         else:
             raise ValueError(f"Unknown downsampling method: {method}")
 
