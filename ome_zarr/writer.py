@@ -1065,7 +1065,7 @@ def write_labels(
             method=method,
         )
         dask_delayed_jobs = write_multiscale(
-            mip,
+            pyramid,
             sub_group,
             chunks=chunks,
             fmt=fmt,
