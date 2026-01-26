@@ -729,7 +729,7 @@ Please use the 'storage_options' argument instead."""
     if axes is None:
         raise ValueError("axes must be provided for build_pyramid")
     if all(isinstance(ax, dict) for ax in axes):
-        dims = tuple(ax['name'] for ax in axes)  # type: ignore
+        dims = tuple(ax["name"] for ax in axes)  # type: ignore
     else:
         dims = tuple(str(ax) for ax in axes)
     pyramid = build_pyramid(
@@ -781,13 +781,13 @@ Please use the 'storage_options' argument instead."""
             da.to_zarr(
                 arr=level_image,
                 url=group.store,
-                component=str(Path(group.path, str(idx+1))),
+                component=str(Path(group.path, str(idx + 1))),
                 compute=False,
                 zarr_array_kwargs=zarr_array_kwargs,
                 **kwargs,
             )
         )
-        datasets.append({"path": str(idx+1)})
+        datasets.append({"path": str(idx + 1)})
 
     # Computing delayed jobs if necessary
     if compute:
@@ -1078,7 +1078,7 @@ def write_labels(
     if axes is None:
         raise ValueError("axes must be provided for build_pyramid")
     if all(isinstance(ax, dict) for ax in axes):
-        dims = tuple(ax['name'] for ax in axes)  # type: ignore
+        dims = tuple(ax["name"] for ax in axes)  # type: ignore
     else:
         dims = tuple(str(ax) for ax in axes)
 
@@ -1100,7 +1100,6 @@ def write_labels(
         )
     else:
         from .scale import build_pyramid
-
 
         pyramid = build_pyramid(
             labels,
