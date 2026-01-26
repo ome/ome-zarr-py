@@ -725,10 +725,17 @@ Please use the 'storage_options' argument instead."""
             kwargs["compressor"] = options.pop("compressor")
 
     # Create the pyramid
+    # axes is always a list[str] or list[dict[str, str]] after _get_valid_axes
+    if axes is None:
+        raise ValueError("axes must be provided for build_pyramid")
+    if all(isinstance(ax, dict) for ax in axes):
+        dims = tuple(ax['name'] for ax in axes)  # type: ignore
+    else:
+        dims = tuple(str(ax) for ax in axes)
     pyramid = build_pyramid(
         image,
         list(scale_factors),
-        dims=tuple(axes),
+        dims=dims,
         method=method,
     )
 
@@ -774,13 +781,13 @@ Please use the 'storage_options' argument instead."""
             da.to_zarr(
                 arr=level_image,
                 url=group.store,
-                component=str(Path(group.path, str(idx))),
+                component=str(Path(group.path, str(idx+1))),
                 compute=False,
                 zarr_array_kwargs=zarr_array_kwargs,
                 **kwargs,
             )
         )
-        datasets.append({"path": str(idx)})
+        datasets.append({"path": str(idx+1)})
 
     # Computing delayed jobs if necessary
     if compute:
@@ -1066,6 +1073,15 @@ def write_labels(
     sub_group = group.require_group(f"labels/{name}")
     dask_delayed_jobs = []
 
+    dims = len(labels.shape)
+    axes = _get_valid_axes(dims, axes, fmt)
+    if axes is None:
+        raise ValueError("axes must be provided for build_pyramid")
+    if all(isinstance(ax, dict) for ax in axes):
+        dims = tuple(ax['name'] for ax in axes)  # type: ignore
+    else:
+        dims = tuple(str(ax) for ax in axes)
+
     if isinstance(labels, da.Array):
         dask_delayed_jobs = _write_dask_image(
             labels,
@@ -1085,10 +1101,11 @@ def write_labels(
     else:
         from .scale import build_pyramid
 
+
         pyramid = build_pyramid(
             labels,
             list(scale_factors),
-            dims=tuple(axes) if axes is not None else None,
+            dims=dims,
             method=method,
         )
         dask_delayed_jobs = write_multiscale(
