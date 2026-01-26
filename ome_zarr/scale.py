@@ -3,12 +3,14 @@
 See the :class:`~ome_zarr.scale.Scaler` class for details.
 """
 
+from ast import List
 import inspect
 import logging
 import os
 from collections.abc import Callable, Iterator, MutableMapping
 from dataclasses import dataclass
 from typing import Any, Union
+from enum import Enum
 
 import dask.array as da
 import numpy as np
@@ -23,6 +25,7 @@ from skimage.transform import (
 
 from .dask_utils import resize as dask_resize
 from .io import parse_url
+from deprecated import deprecated
 
 LOGGER = logging.getLogger("ome_zarr.scale")
 
@@ -30,6 +33,10 @@ ListOfArrayLike = Union[list[da.Array], list[np.ndarray]]  # noqa: UP007  # FIXM
 ArrayLike = Union[da.Array, np.ndarray]  # noqa: UP007  # FIXME
 
 
+@deprecated(
+    reason="Downsampling via the `Scaler` class has been deprecated. Please use the `scale_Factors` argument instead.",
+    version="0.13.0",
+)
 @dataclass
 class Scaler:
     """Helper class for performing various types of downsampling.
@@ -295,3 +302,70 @@ class Scaler:
                         new_stack[(dims_to_slice)] = out
             rv.append(new_stack)
         return rv
+
+SPATIAL_DIMS = ("z", "y", "x")
+
+class Methods(Enum):
+    RESIZE = "resize"
+    NEAREST = "nearest"
+
+def build_pyramid(
+    image: Union[da.Array, np.ndarray],
+    scale_factors: list[int],
+    dims: tuple[str, ...],
+    method: str | Methods = "nearest",
+    chunks: tuple[int, ...] | None | str = None,
+) -> list[da.Array]:
+    """Build a pyramid of downscaled images.
+
+    :type image: :class:`dask.array` or :class:`numpy.ndarray`
+    """
+
+    if isinstance(image, np.ndarray):
+        if chunks is not None:
+            image = da.from_array(image, chunks=chunks)
+        else:
+            image = da.from_array(image)
+
+    if isinstance(method, str):
+        method = Methods(method)
+
+    images: list[da.Array] = [image]
+
+    for idx, factor in enumerate(scale_factors):
+        # Compute relative factor for this level
+        if idx == 0:
+            relative_factor = scale_factors[0]
+        else:
+            relative_factor = scale_factors[idx] // scale_factors[idx - 1]
+
+        # Build per-dimension factor (only spatial dims are downsampled)
+        per_dim_factor = tuple(
+            relative_factor if d in SPATIAL_DIMS else 1 for d in dims
+        )
+
+        # Calculate target shape, leave non-spatial dims unchanged
+        target_shape = tuple(
+            int(s // f) if d in SPATIAL_DIMS else int(s)
+            for s, d, f in zip(images[-1].shape, dims, per_dim_factor)
+        )
+
+        if method == Methods.RESIZE:
+            new_image = dask_resize(
+                images[-1],
+                output_shape=target_shape
+                )
+        elif method == Methods.NEAREST:
+            new_image = dask_resize(
+                images[-1],
+                output_shape=target_shape,
+                order=0,
+                preserve_range=True,
+                anti_aliasing=False,
+                )
+        else:
+            raise ValueError(f"Unknown downsampling method: {method}")
+
+        images.append(new_image)
+
+    return images
