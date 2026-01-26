@@ -3,7 +3,7 @@
 import logging
 import warnings
 from pathlib import Path
-from typing import Any, TypeAlias
+from typing import Any, TypeAlias, cast
 
 import dask
 import dask.array as da
@@ -90,9 +90,9 @@ def _extract_dims_from_axes(
     
     # Type guard: check first element to determine type
     if axes and isinstance(axes[0], dict):
-        return tuple(ax["name"] for ax in axes)  # type: ignore
+        return tuple(ax["name"] for ax in cast(list[dict[str, str]], axes))
     else:
-        return tuple(str(ax) for ax in axes)
+        return tuple(str(ax) for ax in cast(list[str], axes))
 
 
 def _validate_well_images(
