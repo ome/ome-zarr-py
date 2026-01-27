@@ -648,11 +648,11 @@ def write_image(
     else:
         from .scale import build_pyramid
 
-        _extract_dims_from_axes(axes)
+        dims = _extract_dims_from_axes(axes)
         pyramid = build_pyramid(
             image=image,
             scale_factors=list(scale_factors),
-            dims=tuple(_get_valid_axes(len(image.shape), axes, fmt)),
+            dims=dims,
             method=method,
         )
         dask_delayed_jobs = write_multiscale(
