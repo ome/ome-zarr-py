@@ -13,6 +13,7 @@ from typing import Any, Union
 
 import dask.array as da
 import numpy as np
+import warnings
 import zarr
 from deprecated import deprecated
 from scipy.ndimage import zoom
@@ -347,10 +348,20 @@ def build_pyramid(
         )
 
         # Calculate target shape, leave non-spatial dims unchanged
-        target_shape = tuple(
-            int(s // f) if d in SPATIAL_DIMS else int(s)
-            for s, d, f in zip(images[-1].shape, dims, per_dim_factor)
-        )
+        target_shape = []
+        for s, d, f in zip(images[-1].shape, dims, per_dim_factor):
+            if d in SPATIAL_DIMS:
+                if s // f == 0:
+                    target_shape.append(1)
+                    warnings.warn(
+                        f"Dimension {d} is too small to downsample further.",
+                        UserWarning,
+                        stacklevel=3,
+                    )
+                else:
+                    target_shape.append(int(s // f))
+            else:
+                target_shape.append(int(s))
 
         if method == Methods.RESIZE:
             new_image = dask_resize(images[-1], output_shape=target_shape)
