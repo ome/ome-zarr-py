@@ -554,7 +554,7 @@ def write_well_metadata(
 def write_image(
     image: ArrayLike,
     group: zarr.Group,
-    scale_factors: tuple[int, ...] = (2, 4, 8),
+    scale_factors: tuple[int, ...] = (2, 4, 8, 16),
     method: Methods | None = Methods.RESIZE,
     scaler: Scaler | None = None,
     chunks: tuple[Any, ...] | int | None = None,
@@ -1019,7 +1019,7 @@ def write_labels(
     group: zarr.Group,
     name: str,
     scaler: Scaler | None = Scaler(order=0),
-    scale_factors: tuple[int, ...] = (2, 4, 8),
+    scale_factors: tuple[int, ...] = (2, 4, 8, 16),
     method: Methods = Methods.NEAREST,
     chunks: tuple[Any, ...] | int | None = None,
     fmt: Format | None = None,
