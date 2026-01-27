@@ -31,7 +31,6 @@ from ome_zarr.format import (
 )
 from ome_zarr.io import ZarrLocation, parse_url
 from ome_zarr.reader import Multiscales, Reader
-from ome_zarr.scale import Scaler
 from ome_zarr.writer import (
     _get_valid_axes,
     _retuple,
@@ -344,7 +343,7 @@ class TestWriter:
         path = self.path / "test_write_image_compressed"
         store = parse_url(path, mode="w", fmt=format_version()).store
         root = zarr.group(store=store)
-        
+
         CNAME = "lz4"
         LEVEL = 5
         if format_version().zarr_format == 3:
@@ -1547,9 +1546,7 @@ class TestLabelWriter:
         ),
     )
     @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])
-    def test_write_multiscale_labels(
-        self, shape, format_version, array_constructor
-    ):
+    def test_write_multiscale_labels(self, shape, format_version, array_constructor):
         fmt = format_version()
         if fmt.version == "0.5":
             img_path = self.path_v3

@@ -6,6 +6,7 @@ See the :class:`~ome_zarr.scale.Scaler` class for details.
 import inspect
 import logging
 import os
+import warnings
 from collections.abc import Callable, Iterator, MutableMapping
 from dataclasses import dataclass
 from enum import Enum
@@ -13,7 +14,6 @@ from typing import Any, Union
 
 import dask.array as da
 import numpy as np
-import warnings
 import zarr
 from deprecated import deprecated
 from scipy.ndimage import zoom
