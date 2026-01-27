@@ -648,7 +648,7 @@ def write_image(
     else:
         from .scale import build_pyramid
 
-        dims = _extract_dims_from_axes(axes)
+        dims = _extract_dims_from_axes(_get_valid_axes(len(image.shape), axes, fmt))
         pyramid = build_pyramid(
             image=image,
             scale_factors=list(scale_factors),
