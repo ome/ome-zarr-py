@@ -31,6 +31,7 @@ from ome_zarr.format import (
 )
 from ome_zarr.io import ZarrLocation, parse_url
 from ome_zarr.reader import Multiscales, Reader
+from ome_zarr.scale import build_pyramid
 from ome_zarr.writer import (
     _get_valid_axes,
     _retuple,
@@ -201,14 +202,14 @@ class TestWriter:
         assert "multiscales" in attrs_json
 
         image_node = next(iter(reader()))
-        for idx, transfs in enumerate(image_node.metadata["coordinateTransformations"]):
+        for level, transfs in enumerate(image_node.metadata["coordinateTransformations"]):
             assert len(transfs) == 1
             assert transfs[0]["type"] == "scale"
             assert len(transfs[0]["scale"]) == len(shape)
 
             # default downsamples by factor 2 each level
-            for value in transfs[0]["scale"]:
-                assert value == 2**idx
+            for idx, value in enumerate(transfs[0]["scale"]):
+                assert value == shape[idx] / (shape[idx] // (2**level))
 
     @pytest.mark.parametrize("read_from_zarr", [True, False])
     @pytest.mark.parametrize("compute", [True, False])
@@ -287,10 +288,9 @@ class TestWriter:
             assert len(transfs) == 1
             assert transfs[0]["type"] == "scale"
             assert len(transfs[0]["scale"]) == len(shape)
-            # Scaler only downsamples x and y. z scale will be 1
-            assert transfs[0]["scale"][0] == 1
-            for value in transfs[0]["scale"]:
-                assert value >= 1
+
+            for idx, value in enumerate(transfs[0]["scale"]):
+                assert value == shape[idx] / (shape[idx] // (2**level))
             if read_from_zarr and level < 3:
                 # if shape smaller than chunk, dask writer uses chunk == shape
                 # so we only compare larger resolutions
@@ -1521,7 +1521,6 @@ class TestLabelWriter:
             fmt=fmt,
             axes=axes,
             coordinate_transformations=transformations,
-            **kwargs,
         )
         label_data = self.verify_label_data(
             img_path, label_name, label_data, fmt, shape, transformations
@@ -1577,8 +1576,24 @@ class TestLabelWriter:
         # create the root level image data
         self.create_image_data(group, shape, fmt, axes, transformations)
 
+        # TODO: remove test or cleaner passage of dims
+        dims = ()
+        if len(shape) == 5:
+            dims = ('t', 'c', 'z', 'y', 'x')
+        elif len(shape) == 3:
+            dims = ('z', 'y', 'x')
+        elif len(shape) == 2:
+            dims = ('y', 'x')
+
+        pyramid = build_pyramid(
+            label_data,
+            method="nearest",
+            scale_factors=[2, 4, 8, 16],
+            dims=dims
+        )
+
         write_multiscale_labels(
-            labels_mip,
+            pyramid,
             group,
             name=label_name,
             fmt=fmt,
@@ -1621,7 +1636,12 @@ class TestLabelWriter:
         for label_name in label_names:
             label_data = np.random.randint(0, 1000, size=shape)
             label_data = array_constructor(label_data)
-            labels_mip = scaler.nearest(label_data)
+            labels_mip = build_pyramid(
+                label_data,
+                method="nearest",
+                scale_factors=[2, 4, 8, 16],
+                dims=('t', 'c', 'z', 'y', 'x')
+            )
 
             write_multiscale_labels(
                 labels_mip,
