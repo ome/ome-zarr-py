@@ -85,14 +85,15 @@ def _extract_dims_from_axes(
     ValueError
         If axes is None.
     """
-    if axes is None:
-        raise ValueError("axes must be provided for build_pyramid")
-
-    # Type guard: check first element to determine type
-    if axes and isinstance(axes[0], dict):
-        return tuple(ax["name"] for ax in cast(list[dict[str, str]], axes))
-    else:
-        return tuple(str(ax) for ax in cast(list[str], axes))
+    if isinstance(axes, str):
+        return tuple(str(s) for s in axes)
+    elif isinstance(axes, list):
+        return tuple(str(s) for s in axes)
+    elif isinstance(axes, dict):
+        return tuple(str(s["name"]) for s in axes)
+    elif axes is None:
+        # only the case for v0.1 and v0.2, which are always 5D
+        return ("t", "c", "z", "y", "x")
 
 
 def _validate_well_images(
