@@ -2,8 +2,9 @@
 
 import logging
 import warnings
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, TypeAlias, cast, Sequence
+from typing import Any, TypeAlias, cast
 
 import dask
 import dask.array as da
@@ -13,7 +14,7 @@ from dask.graph_manipulation import bind
 from numcodecs import Blosc
 
 from .axes import Axes
-from .format import CurrentFormat, Format, FormatV04, FormatV01, FormatV02
+from .format import CurrentFormat, Format, FormatV01, FormatV02, FormatV04
 from .scale import Methods, Scaler
 from .types import JSONDict
 
@@ -85,9 +86,7 @@ def _extract_dims_from_axes(
     ValueError
         If axes is None.
     """
-    if isinstance(axes, str):
-        return tuple(str(s) for s in axes)
-    elif isinstance(axes, list):
+    if isinstance(axes, str) or isinstance(axes, list):
         return tuple(str(s) for s in axes)
     elif isinstance(axes, dict):
         return tuple(str(s["name"]) for s in axes)
@@ -322,9 +321,8 @@ Please use the 'storage_options' argument instead."""
                     axis["name"] for axis in axes if isinstance(axis, dict)
                 ]
 
-
         if zarr_format == 2:
-            #options["dimension_separator"] = "/"
+            # options["dimension_separator"] = "/"
             del options["chunk_key_encoding"]
         # handle any 'chunks' option from storage_options
         if not isinstance(data, da.Array):
@@ -629,11 +627,8 @@ def write_image(
         chunks = cast(Any, image).chunksize
         axes = ["t", "c", "z", "y", "x"]
 
-
     name = metadata.pop("name", None)
     name = str(name) if name is not None else None
-
-
 
     dask_delayed_jobs = []
 
