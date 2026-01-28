@@ -614,7 +614,7 @@ def write_image(
     if method is None:
         method = Methods.RESIZE
     fmt = check_format(group, fmt)
-    dask_delayed_jobs = []
+
     if not isinstance(image, da.Array):
         if not chunks:
             chunks = "auto"
@@ -632,44 +632,26 @@ def write_image(
 
     name = metadata.pop("name", None)
     name = str(name) if name is not None else None
-    if isinstance(image, da.Array):
-        dask_delayed_jobs = _write_dask_image(
-            image,
-            group,
-            scale_factors,
-            method,
-            scaler,
-            chunks=chunks,
-            fmt=fmt,
-            axes=axes,
-            coordinate_transformations=coordinate_transformations,
-            storage_options=storage_options,
-            name=name,
-            compute=compute,
-            **metadata,
-        )
-    else:
-        from .scale import build_pyramid
 
-        dims = _extract_dims_from_axes(_get_valid_axes(len(image.shape), axes, fmt))
-        pyramid = build_pyramid(
-            image=image,
-            scale_factors=list(scale_factors),
-            dims=dims,
-            method=method,
-        )
-        dask_delayed_jobs = write_multiscale(
-            pyramid,
-            group,
-            chunks=chunks,
-            fmt=fmt,
-            axes=axes,
-            coordinate_transformations=coordinate_transformations,
-            storage_options=storage_options,
-            name=name,
-            compute=compute,
-            **metadata,
-        )
+
+
+    dask_delayed_jobs = []
+
+    dask_delayed_jobs = _write_dask_image(
+        cast(da.Array, image),
+        group,
+        scale_factors,
+        method,
+        scaler,
+        chunks=chunks,
+        fmt=fmt,
+        axes=axes,
+        coordinate_transformations=coordinate_transformations,
+        storage_options=storage_options,
+        name=name,
+        compute=compute,
+        **metadata,
+    )
 
     return dask_delayed_jobs
 
