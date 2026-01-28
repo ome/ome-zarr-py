@@ -3,7 +3,7 @@
 import logging
 import warnings
 from pathlib import Path
-from typing import Any, TypeAlias, cast
+from typing import Any, TypeAlias, cast, Sequence
 
 import dask
 import dask.array as da
@@ -13,7 +13,7 @@ from dask.graph_manipulation import bind
 from numcodecs import Blosc
 
 from .axes import Axes
-from .format import CurrentFormat, Format, FormatV04
+from .format import CurrentFormat, Format, FormatV04, FormatV01, FormatV02
 from .scale import Methods, Scaler
 from .types import JSONDict
 
@@ -67,7 +67,7 @@ def _get_valid_axes(
 
 def _extract_dims_from_axes(
     axes: list[str] | list[dict[str, str]] | None,
-) -> tuple[str, ...]:
+) -> Sequence[str]:
     """Extract dimension names from axes, with proper type narrowing.
 
     Parameters
@@ -77,7 +77,7 @@ def _extract_dims_from_axes(
 
     Returns
     -------
-    tuple[str, ...]
+    Sequence[str]
         Dimension names as tuple.
 
     Raises
@@ -615,6 +615,20 @@ def write_image(
         method = Methods.RESIZE
     fmt = check_format(group, fmt)
     dask_delayed_jobs = []
+    if not isinstance(image, da.Array):
+        if not chunks:
+            chunks = "auto"
+        image = da.from_array(image, chunks=chunks)
+
+    # for 0.1 and 0.2 we need to ensure 5D shape
+    if type(fmt) in (FormatV01, FormatV02):
+        while len(image.shape) < 5:
+            image = image[None, :]
+
+        # TODO: Better way to get chunksize in type-safe manner?
+        chunks = cast(Any, image).chunksize
+        axes = ["t", "c", "z", "y", "x"]
+
 
     name = metadata.pop("name", None)
     name = str(name) if name is not None else None
@@ -704,8 +718,8 @@ def _write_dask_image(
             "Please use the `scale_factors` argument instead."
         )
 
-    axes = _get_valid_axes(len(image.shape), axes, fmt)
     dims = _extract_dims_from_axes(axes)
+    axes = _get_valid_axes(len(image.shape), axes, fmt)
 
     if chunks is not None:
         msg = """The 'chunks' argument is deprecated and will be removed in version 0.5.
