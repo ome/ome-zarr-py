@@ -1081,7 +1081,7 @@ def write_labels(
 
     if method is None:
         method = Methods.NEAREST
-    
+
     if not isinstance(labels, da.Array):
         if not chunks:
             chunks = "auto"
@@ -1116,7 +1116,6 @@ def write_labels(
         **metadata,
     )
 
-
     write_label_metadata(
         group=group["labels"],
         name=name,
@@ -1125,6 +1124,7 @@ def write_labels(
     )
 
     return dask_delayed_jobs
+
 
 def _retuple(chunks: tuple[Any, ...] | int, shape: tuple[Any, ...]) -> tuple[Any, ...]:
     """

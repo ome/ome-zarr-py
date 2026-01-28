@@ -202,7 +202,9 @@ class TestWriter:
         assert "multiscales" in attrs_json
 
         image_node = next(iter(reader()))
-        for level, transfs in enumerate(image_node.metadata["coordinateTransformations"]):
+        for level, transfs in enumerate(
+            image_node.metadata["coordinateTransformations"]
+        ):
             assert len(transfs) == 1
             assert transfs[0]["type"] == "scale"
             assert len(transfs[0]["scale"]) == len(shape)
@@ -1579,17 +1581,14 @@ class TestLabelWriter:
         # TODO: remove test or cleaner passage of dims
         dims = ()
         if len(shape) == 5:
-            dims = ('t', 'c', 'z', 'y', 'x')
+            dims = ("t", "c", "z", "y", "x")
         elif len(shape) == 3:
-            dims = ('z', 'y', 'x')
+            dims = ("z", "y", "x")
         elif len(shape) == 2:
-            dims = ('y', 'x')
+            dims = ("y", "x")
 
         pyramid = build_pyramid(
-            label_data,
-            method="nearest",
-            scale_factors=[2, 4, 8, 16],
-            dims=dims
+            label_data, method="nearest", scale_factors=[2, 4, 8, 16], dims=dims
         )
 
         write_multiscale_labels(
@@ -1640,7 +1639,7 @@ class TestLabelWriter:
                 label_data,
                 method="nearest",
                 scale_factors=[2, 4, 8, 16],
-                dims=('t', 'c', 'z', 'y', 'x')
+                dims=("t", "c", "z", "y", "x"),
             )
 
             write_multiscale_labels(
