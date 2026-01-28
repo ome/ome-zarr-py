@@ -322,38 +322,26 @@ Please use the 'storage_options' argument instead."""
                     axis["name"] for axis in axes if isinstance(axis, dict)
                 ]
 
-        if isinstance(data, da.Array):
-            if zarr_format == 2:
-                options["dimension_separator"] = "/"
-                del options["chunk_key_encoding"]
-            # handle any 'chunks' option from storage_options
-            if chunks_opt is not None:
-                data = da.array(data).rechunk(chunks=chunks_opt)  # noqa: PLW2901
-            da_delayed = da.to_zarr(
-                arr=data,
-                url=group.store,
-                component=str(Path(group.path, str(path))),
-                compute=compute,
-                zarr_format=zarr_format,
-                **options,
-            )
 
-            if not compute:
-                dask_delayed.append(da_delayed)
+        if zarr_format == 2:
+            #options["dimension_separator"] = "/"
+            del options["chunk_key_encoding"]
+        # handle any 'chunks' option from storage_options
+        if not isinstance(data, da.Array):
+            data = da.from_array(data)
+        if chunks_opt is not None:
+            data = da.array(data).rechunk(chunks=chunks_opt)  # noqa: PLW2901
+        da_delayed = da.to_zarr(
+            arr=data,
+            url=group.store,
+            component=str(Path(group.path, str(path))),
+            compute=compute,
+            zarr_format=zarr_format,
+            zarr_array_kwargs=options,
+        )
 
-        else:
-            if chunks_opt is not None:
-                options["chunks"] = chunks_opt
-            options["shape"] = data.shape
-            # otherwise we get 'null'
-            options["fill_value"] = 0
-
-            arr = group.create_array(
-                str(path),
-                dtype=data.dtype,
-                **options,
-            )
-            arr[slice(None)] = data
+        if not compute:
+            dask_delayed.append(da_delayed)
 
         datasets.append({"path": str(path)})
 
