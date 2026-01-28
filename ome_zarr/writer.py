@@ -634,8 +634,6 @@ def write_image(
     name = metadata.pop("name", None)
     name = str(name) if name is not None else None
 
-
-
     dask_delayed_jobs = []
 
     dask_delayed_jobs = _write_dask_image(
@@ -1083,48 +1081,45 @@ def write_labels(
 
     fmt = check_format(group, fmt)
     sub_group = group.require_group(f"labels/{name}")
+
+    if method is None:
+        method = Methods.NEAREST
+    
+    if not isinstance(labels, da.Array):
+        if not chunks:
+            chunks = "auto"
+        labels = da.from_array(labels, chunks=chunks)
+
+    # for 0.1 and 0.2 we need to ensure 5D shape
+    if type(fmt) in (FormatV01, FormatV02):
+        while len(labels.shape) < 5:
+            labels = labels[None, :]
+
+        # TODO: Better way to get chunksize in type-safe manner?
+        chunks = cast(Any, labels).chunksize
+        axes = ["t", "c", "z", "y", "x"]
+
     dask_delayed_jobs = []
 
     axes = _get_valid_axes(len(labels.shape), axes, fmt)
-    dims = _extract_dims_from_axes(axes)
 
-    if isinstance(labels, da.Array):
-        dask_delayed_jobs = _write_dask_image(
-            labels,
-            sub_group,
-            scale_factors,
-            method,
-            scaler,
-            chunks=chunks,
-            fmt=fmt,
-            axes=axes,
-            coordinate_transformations=coordinate_transformations,
-            storage_options=storage_options,
-            name=name,
-            compute=compute,
-            **metadata,
-        )
-    else:
-        from .scale import build_pyramid
+    dask_delayed_jobs = _write_dask_image(
+        cast(da.Array, labels),
+        sub_group,
+        scale_factors,
+        method,
+        scaler,
+        chunks=chunks,
+        fmt=fmt,
+        axes=axes,
+        coordinate_transformations=coordinate_transformations,
+        storage_options=storage_options,
+        name=name,
+        compute=compute,
+        **metadata,
+    )
 
-        pyramid = build_pyramid(
-            labels,
-            list(scale_factors),
-            dims=dims,
-            method=method,
-        )
-        dask_delayed_jobs = write_multiscale(
-            pyramid,
-            sub_group,
-            chunks=chunks,
-            fmt=fmt,
-            axes=axes,
-            coordinate_transformations=coordinate_transformations,
-            storage_options=storage_options,
-            name=name,
-            compute=compute,
-            **metadata,
-        )
+
     write_label_metadata(
         group=group["labels"],
         name=name,
@@ -1133,7 +1128,6 @@ def write_labels(
     )
 
     return dask_delayed_jobs
-
 
 def _retuple(chunks: tuple[Any, ...] | int, shape: tuple[Any, ...]) -> tuple[Any, ...]:
     """
