@@ -606,10 +606,11 @@ def write_image(
     `scale_factors` and `method` for all new code.
     """
     if scaler is not None:
-        raise Warning(
-            "Using the `Scaler` class for downsampling is deprecated and will be removed in version 0.13.0."
-            "Please use the `scale_factors` argument instead."
-        )
+        msg = """
+        The 'scaler' argument is deprecated and will be removed in version 0.13.0.
+        Please use the 'scale_factors' argument instead.
+        """
+        warnings.warn(msg, DeprecationWarning)
 
     if method is None:
         method = Methods.RESIZE
@@ -695,10 +696,11 @@ def _write_dask_image(
         axes = None
 
     if scaler is not None:
-        raise Warning(
-            "Using the `Scaler` class for downsampling is deprecated and will be removed in version 0.13.0."
-            "Please use the `scale_factors` argument instead."
-        )
+        msg = """
+        The 'scaler' argument is deprecated and will be removed in version 0.13.0.
+        Please use the 'scale_factors' argument instead.
+        """
+        warnings.warn(msg, DeprecationWarning)
 
     dims = _extract_dims_from_axes(axes)
     axes = _get_valid_axes(len(image.shape), axes, fmt)
@@ -1073,10 +1075,11 @@ def write_labels(
     nearest-neighbor is recommended.
     """
     if scaler is not None:
-        raise Warning(
-            "Using the `Scaler` class for downsampling is deprecated and will be removed in version 0.13.0."
-            "Please use the `scale_factors` argument instead."
-        )
+        msg = """
+        The 'scaler' argument is deprecated and will be removed in version 0.13.0.
+        Please use the 'scale_factors' argument instead.
+        """
+        warnings.warn(msg, DeprecationWarning)
 
     fmt = check_format(group, fmt)
     sub_group = group.require_group(f"labels/{name}")
