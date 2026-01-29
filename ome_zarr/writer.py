@@ -672,12 +672,6 @@ def _write_dask_image(
     from .scale import build_pyramid
 
     fmt = check_format(group, fmt)
-    if fmt.version in ("0.1", "0.2"):
-        # v0.1 and v0.2 are strictly 5D
-        shape_5d: tuple[Any, ...] = (*(1,) * (5 - image.ndim), *image.shape)
-        image = image.reshape(shape_5d)
-        # and we don't need axes
-        axes = None
 
     if scaler is not None:
         msg = """
