@@ -1488,8 +1488,8 @@ class TestLabelWriter:
             transformations.append(
                 [{"type": "scale", "scale": transf["scale"][-len(shape) :]}]
             )
-            if scale_type == "noop":
-                break
+            # if scale_type == "noop":
+            #     break
 
         # create the actual label data: zeros with blobs
         label_data = np.zeros(shape, dtype=np.uint8)
@@ -1580,11 +1580,11 @@ class TestLabelWriter:
 
         # TODO: remove test or cleaner passage of dims
         dims = ()
-        if len(shape) == 5:
+        if len(label_data.shape) == 5:
             dims = ("t", "c", "z", "y", "x")
-        elif len(shape) == 3:
+        elif len(label_data.shape) == 3:
             dims = ("z", "y", "x")
-        elif len(shape) == 2:
+        elif len(label_data.shape) == 2:
             dims = ("y", "x")
 
         pyramid = build_pyramid(
