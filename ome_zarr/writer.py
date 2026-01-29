@@ -1098,8 +1098,6 @@ def write_labels(
 
     dask_delayed_jobs = []
 
-    axes = _get_valid_axes(len(labels.shape), axes, fmt)
-
     dask_delayed_jobs = _write_dask_image(
         cast(da.Array, labels),
         sub_group,
