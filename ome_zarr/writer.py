@@ -658,7 +658,7 @@ def _resolve_storage_options(
 def _write_dask_image(
     image: da.Array,
     group: zarr.Group,
-    scale_factors: tuple[int, ...] = (2, 4, 8),
+    scale_factors: tuple[int, ...] = (2, 4, 8, 16),
     method: Methods | None = Methods.RESIZE,
     scaler: Scaler | None = None,
     fmt: Format | None = None,
