@@ -685,7 +685,7 @@ def _write_dask_image(
 
     # for path, data in enumerate(pyramid):
     if scaler is not None:
-        scale_factors = tuple(2**i for i in range(scaler.max_layer))
+        scale_factors = tuple(2**i for i in range(1, scaler.max_layer + 1))
 
     if method is None:
         method = Methods.RESIZE
