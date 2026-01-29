@@ -694,6 +694,7 @@ def _write_dask_image(
     zarr_array_kwargs: dict[str, Any] = {}
     zarr_format = fmt.zarr_format
     options = _resolve_storage_options(storage_options, 0)
+
     # zarr_array_kwargs needs dask 2025.12.0 or later
     zarr_array_kwargs: dict[str, Any] = {}
     if zarr_format == 2:
@@ -734,12 +735,19 @@ def _write_dask_image(
         # ensure that the chunk dimensions match the image dimensions
         # (which might have been changed for versions 0.1 or 0.2)
         # if chunks are explicitly set in the storage options
-        chunks_opt = options.pop("chunks", chunks)
-        # switch to this code in 0.5
-        # chunks_opt = options.pop("chunks", None)
+        chunks_opt = None
+        if isinstance(storage_options, list) and isinstance(storage_options[idx], dict):
+            if 'chunks' in storage_options[idx]:
+                chunks_opt = options.pop("chunks", None)
+
+        elif isinstance(storage_options, dict):
+            if 'chunks' in storage_options:
+                chunks_opt = options.pop("chunks", None)
+
         if chunks_opt is not None:
             chunks_opt = _retuple(chunks_opt, image.shape)
             # image.chunks will be used by da.to_zarr
+            zarr_array_kwargs['chunks'] = chunks_opt
             level_image = da.array(image).rechunk(chunks=chunks_opt)
         else: 
             level_image = image
