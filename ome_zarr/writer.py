@@ -724,16 +724,8 @@ def _write_dask_image(
 
     shapes = []
     datasets: list[dict] = []
-    delayed = [
-        da.to_zarr(
-            arr=image,
-            url=group.store,
-            component=str(Path(group.path, str(0))),
-            compute=False,
-            zarr_array_kwargs=zarr_array_kwargs,
-            **kwargs,
-        )
-    ]
+    delayed = []
+
     for idx, image in enumerate(pyramid):
 
         # LOGGER.debug(f"write_image path: {path}")
@@ -749,9 +741,9 @@ def _write_dask_image(
             chunks_opt = _retuple(chunks_opt, image.shape)
             # image.chunks will be used by da.to_zarr
             level_image = da.array(image).rechunk(chunks=chunks_opt)
-        else:
+        else: 
             level_image = image
-        LOGGER.debug("chunks_opt: %s", chunks_opt)
+         
         shapes.append(level_image.shape)
 
         LOGGER.debug(
@@ -764,12 +756,12 @@ def _write_dask_image(
             da.to_zarr(
                 arr=level_image,
                 url=group.store,
-                component=str(Path(group.path, str(idx + 1))),
+                component=str(Path(group.path, str(idx))),
                 compute=False,
                 zarr_array_kwargs=zarr_array_kwargs,
             )
         )
-        datasets.append({"path": str(idx + 1)})
+        datasets.append({"path": str(idx)})
 
     # Computing delayed jobs if necessary
     if compute:
