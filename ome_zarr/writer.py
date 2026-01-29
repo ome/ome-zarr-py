@@ -697,16 +697,15 @@ def _write_dask_image(
         method = Methods.RESIZE
 
     # Set up common kwargs for da.to_zarr
-    kwargs: dict[str, Any] = {}
+    zarr_array_kwargs: dict[str, Any] = {}
     zarr_format = fmt.zarr_format
     options = _resolve_storage_options(storage_options, 0)
     # zarr_array_kwargs needs dask 2025.12.0 or later
     zarr_array_kwargs: dict[str, Any] = {}
     if zarr_format == 2:
         zarr_array_kwargs["chunk_key_encoding"] = {"name": "v2", "separator": "/"}
-        kwargs["compressor"] = options.pop("compressor", _blosc_compressor())
+        zarr_array_kwargs["compressor"] = options.pop("compressor", _blosc_compressor())
     else:
-        # zarr_array_kwargs["chunk_key_encoding"] = fmt.chunk_key_encoding
         if axes is not None:
             zarr_array_kwargs["dimension_names"] = [
                 a["name"] for a in axes if isinstance(a, dict)
@@ -719,7 +718,7 @@ def _write_dask_image(
 
             # ValueError: compressor cannot be used for arrays with zarr_format 3.
             # Use bytes-to-bytes codecs instead.
-            kwargs["compressor"] = options.pop("compressor")
+            zarr_array_kwargs["compressor"] = options.pop("compressor")
 
     # Create the pyramid
     pyramid = build_pyramid(
@@ -774,7 +773,6 @@ def _write_dask_image(
                 component=str(Path(group.path, str(idx + 1))),
                 compute=False,
                 zarr_array_kwargs=zarr_array_kwargs,
-                **kwargs,
             )
         )
         datasets.append({"path": str(idx + 1)})
