@@ -123,6 +123,7 @@ def create_zarr(
     label_name: str = "coins",
     fmt: Format = CurrentFormat(),
     chunks: tuple | list | None = None,
+    zarr_array_kwargs: dict | None = None,
 ) -> zarr.Group:
     """Generate a synthetic image pyramid with labels."""
     pyramid, labels = method()

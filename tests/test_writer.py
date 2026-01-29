@@ -451,13 +451,12 @@ class TestWriter:
                 }
             else:
                 assert (path / ".zattrs").exists()
-                default_cname = "lz4" if isinstance(arr, da.Array) else "zstd"
                 json_text = (path / ds / ".zarray").read_text(encoding="utf-8")
                 arr_json = json.loads(json_text)
                 assert arr_json["compressor"] == {
                     "blocksize": 0,
                     "clevel": 5,
-                    "cname": default_cname,
+                    "cname": "lz4",
                     "id": "blosc",
                     "shuffle": 1,
                 }

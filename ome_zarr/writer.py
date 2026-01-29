@@ -2,6 +2,7 @@
 
 import logging
 import warnings
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Any, TypeAlias
 
@@ -200,8 +201,8 @@ def check_format(
 def write_multiscale(
     pyramid: ListOfArrayLike,
     group: zarr.Group,
-    chunks: tuple[Any, ...] | int | None = None,
     fmt: Format | None = None,
+    zarr_array_kwargs=None,
     axes: AxesType = None,
     coordinate_transformations: list[list[dict[str, Any]]] | None = None,
     storage_options: JSONDict | list[JSONDict] | None = None,
@@ -218,13 +219,6 @@ def write_multiscale(
         5-dimensional with dimensions ordered (t, c, z, y, x)
     :type group: :class:`zarr.Group`
     :param group: The group within the zarr store to store the data in
-    :type chunks: int or tuple of ints, optional
-    :param chunks:
-        The size of the saved chunks to store the image.
-
-        .. deprecated:: 0.4.0
-            This argument is deprecated and will be removed in a future version.
-            Use :attr:`storage_options` instead.
     :type fmt: :class:`ome_zarr.format.Format`, optional
     :param fmt:
         The format of the ome_zarr data which should be used.
@@ -232,7 +226,12 @@ def write_multiscale(
     :type axes: str list of str or list of dict, optional
     :param axes:
         List of axes dicts, or names. Not needed for v0.1 or v0.2 or if 2D. Otherwise
-        this must be provided
+        this must be provided.
+
+        .. deprecated:: 0.12.0
+            This argument is deprecated and will be removed in a future version.
+            Pass `dimension_names` to :attr:`zarr_array_kwargs` instead.
+
     :type coordinate_transformations: 2Dlist of dict, optional
     :param coordinate_transformations:
         List of transformations for each path.
@@ -240,7 +239,7 @@ def write_multiscale(
         'scale' transform.
     :type storage_options: dict or list of dict, optional
     :param storage_options:
-        Options to be passed on to the storage backend.
+        Options to be passed on to the storage backend, e.g. `chunks`.
         A list would need to match the number of datasets in a multiresolution pyramid.
         One can provide different chunk size for each level of a pyramid using this
         option.
@@ -252,75 +251,95 @@ def write_multiscale(
         :class:`dask.delayed.Delayed` representing the value to be computed by
         dask.
     """
+    if zarr_array_kwargs is None:
+        zarr_array_kwargs = dict()
+    if "chunk_key_encoding" in zarr_array_kwargs:
+        warnings.warn(
+            "The `chunk_key_encoding` is provided by `ome_zarr.format.Format` and should not be "
+            "defined here. Provided value will be ignored.",
+            UserWarning,
+        )
+
+    zarr_array_kwargs["chunk_key_encoding"] = fmt.chunk_key_encoding
     fmt = check_format(group, fmt)
+    zarr_format = fmt.zarr_format
+
     dims = len(pyramid[0].shape)
-    axes = _get_valid_axes(dims, axes, fmt)
+    axes = (
+        _get_valid_axes(dims, axes, fmt)
+        if not zarr_array_kwargs.get("dimension_names")
+        else _get_valid_axes(dims, zarr_array_kwargs["dimension_names"], fmt)
+    )
+    if fmt.zarr_format != 2 and not zarr_array_kwargs.get("dimension_names"):
+        zarr_array_kwargs["dimension_names"] = [ax["name"] for ax in axes]
     dask_delayed = []
 
-    if chunks is not None:
-        msg = """The 'chunks' argument is deprecated and will be removed in version 0.5.
-Please use the 'storage_options' argument instead."""
-        warnings.warn(msg, DeprecationWarning)
     datasets: list[dict] = []
     for path, data in enumerate(pyramid):
-        options = _resolve_storage_options(storage_options, path)
+        # Since applied in a loop we make a copy
+        zarr_array_kwargs_copy = zarr_array_kwargs.copy()
+        # otherwise we get 'null'
+        zarr_array_kwargs_copy.setdefault("fill_value", 0)
+
+        options = (
+            None
+            if not storage_options
+            else _resolve_storage_options(storage_options, path)
+        )
 
         # ensure that the chunk dimensions match the image dimensions
         # (which might have been changed for versions 0.1 or 0.2)
-        # if chunks are explicitly set in the storage options
-        chunks_opt = options.pop("chunks", chunks)
-        if chunks_opt is not None:
-            chunks_opt = _retuple(chunks_opt, data.shape)
-
-        options["chunk_key_encoding"] = fmt.chunk_key_encoding
-        zarr_format = fmt.zarr_format
-        compressor = options.pop("compressor", None)
-        if zarr_format == 2:
-            # by default we use Blosc with zstd compression
-            # Don't need this for zarr v3 as it has a default compressor
-            if compressor is None:
-                compressor = _blosc_compressor()
-            options["compressor"] = compressor
+        # if chunks are explicitly set in the storage options.
+        # from zarr v3 onward, chunks cannot be None anymore, default to "auto".
+        if not options:
+            zarr_array_kwargs_copy.setdefault("chunks", "auto")
         else:
-            if compressor is not None:
-                options["compressors"] = [compressor]
-            if axes is not None:
-                # the array zarr.json also contains axes names
-                # TODO: check if this is written by da.to_zarr
-                options["dimension_names"] = [
-                    axis["name"] for axis in axes if isinstance(axis, dict)
+            zarr_array_kwargs_copy["chunks"] = options.pop("chunks", "auto")
+        if zarr_array_kwargs_copy["chunks"] != "auto":
+            zarr_array_kwargs_copy["chunks"] = _retuple(
+                zarr_array_kwargs_copy["chunks"], data.shape
+            )
+
+        if options and not zarr_array_kwargs_copy.get("compressors"):
+            zarr_array_kwargs_copy["compressors"] = options.pop("compressor", "auto")
+        zarr_array_kwargs_copy.setdefault("compressors", "auto")
+
+        if zarr_array_kwargs_copy["compressors"] != "auto":
+            if not isinstance(zarr_array_kwargs_copy["compressors"], Iterable):
+                zarr_array_kwargs_copy["compressors"] = [
+                    zarr_array_kwargs_copy["compressors"]
                 ]
 
+        if axes is not None and zarr_format != 2:
+            # the array zarr.json also contains axes names
+            # TODO: check if this is written by da.to_zarr
+            zarr_array_kwargs_copy["dimension_names"] = [
+                axis["name"] if isinstance(axis, dict) else axis for axis in axes
+            ]
+
         if isinstance(data, da.Array):
-            if zarr_format == 2:
-                options["dimension_separator"] = "/"
-                del options["chunk_key_encoding"]
             # handle any 'chunks' option from storage_options
-            if chunks_opt is not None:
-                data = da.array(data).rechunk(chunks=chunks_opt)  # noqa: PLW2901
+            if zarr_array_kwargs_copy["chunks"] != "auto":
+                data = da.array(data).rechunk(chunks=zarr_array_kwargs_copy["chunks"])
             da_delayed = da.to_zarr(
                 arr=data,
                 url=group.store,
                 component=str(Path(group.path, str(path))),
                 compute=compute,
                 zarr_format=zarr_format,
-                **options,
+                zarr_array_kwargs=zarr_array_kwargs_copy,
             )
 
             if not compute:
                 dask_delayed.append(da_delayed)
 
         else:
-            if chunks_opt is not None:
-                options["chunks"] = chunks_opt
-            options["shape"] = data.shape
-            # otherwise we get 'null'
-            options["fill_value"] = 0
+            zarr_array_kwargs_copy["shape"] = data.shape
 
             arr = group.create_array(
                 str(path),
                 dtype=data.dtype,
-                **options,
+                **zarr_array_kwargs_copy,
             )
             arr[slice(None)] = data
 
@@ -525,12 +544,12 @@ def write_image(
     image: ArrayLike,
     group: zarr.Group,
     scaler: Scaler = Scaler(),
-    chunks: tuple[Any, ...] | int | None = None,
     fmt: Format | None = None,
     axes: AxesType = None,
     coordinate_transformations: list[list[dict[str, Any]]] | None = None,
     storage_options: JSONDict | list[JSONDict] | None = None,
     compute: bool | None = True,
+    zarr_array_kwargs=None,
     **metadata: str | JSONDict | list[JSONDict],
 ) -> list:
     """Writes an image to the zarr store according to ome-zarr specification
@@ -547,13 +566,6 @@ def write_image(
     :param scaler:
       Scaler implementation for downsampling the image argument. If None,
       no downsampling will be performed.
-    :type chunks: int or tuple of ints, optional
-    :param chunks:
-        The size of the saved chunks to store the image.
-
-        .. deprecated:: 0.4.0
-            This argument is deprecated and will be removed in a future version.
-            Use :attr:`storage_options` instead.
     :type fmt: :class:`ome_zarr.format.Format`, optional
     :param fmt:
       The format of the ome_zarr data which should be used.
@@ -581,7 +593,6 @@ def write_image(
         dask.
     """
     fmt = check_format(group, fmt)
-    dask_delayed_jobs = []
 
     name = metadata.pop("name", None)
     name = str(name) if name is not None else None
@@ -590,7 +601,6 @@ def write_image(
             image,
             group,
             scaler,
-            chunks=chunks,
             fmt=fmt,
             axes=axes,
             coordinate_transformations=coordinate_transformations,
@@ -604,7 +614,7 @@ def write_image(
         dask_delayed_jobs = write_multiscale(
             mip,
             group,
-            chunks=chunks,
+            zarr_array_kwargs=zarr_array_kwargs,
             fmt=fmt,
             axes=axes,
             coordinate_transformations=coordinate_transformations,
