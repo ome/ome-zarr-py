@@ -544,7 +544,6 @@ def write_image(
     scale_factors: tuple[int, ...] = (2, 4, 8, 16),
     method: Methods | None = Methods.RESIZE,
     scaler: Scaler | None = None,
-    chunks: tuple[Any, ...] | int | None = None,
     fmt: Format | None = None,
     axes: AxesType = None,
     coordinate_transformations: list[list[dict[str, Any]]] | None = None,
@@ -571,11 +570,6 @@ def write_image(
         [DEPRECATED] Scaler implementation for downsampling the image. Passing this
         argument will raise a warning and is no longer supported. Use `scale_factors` and
         `method` instead.
-    chunks : int or tuple of ints, optional
-        The size of the saved chunks to store the image.
-        .. deprecated:: 0.4.0
-           This argument is deprecated and will be removed in a future version.
-           Use `storage_options` instead.
     fmt : ome_zarr.format.Format, optional
         The format of the ome_zarr data which should be used. Defaults to the most current.
     axes : list of str or list of dicts, optional
@@ -615,9 +609,7 @@ def write_image(
     fmt = check_format(group, fmt)
 
     if not isinstance(image, da.Array):
-        if not chunks:
-            chunks = "auto"
-        image = da.from_array(image, chunks=chunks)
+        image = da.from_array(image)
 
     # for 0.1 and 0.2 we need to ensure 5D shape
     if type(fmt) in (FormatV01, FormatV02):
@@ -625,7 +617,6 @@ def write_image(
             image = image[None, :]
 
         # TODO: Better way to get chunksize in type-safe manner?
-        chunks = cast(Any, image).chunksize
         axes = ["t", "c", "z", "y", "x"]
 
     name = metadata.pop("name", None)
@@ -639,7 +630,6 @@ def write_image(
         scale_factors,
         method,
         scaler,
-        chunks=chunks,
         fmt=fmt,
         axes=axes,
         coordinate_transformations=coordinate_transformations,
@@ -671,7 +661,6 @@ def _write_dask_image(
     scale_factors: tuple[int, ...] = (2, 4, 8),
     method: Methods | None = Methods.RESIZE,
     scaler: Scaler | None = None,
-    chunks: tuple[Any, ...] | int | None = None,
     fmt: Format | None = None,
     axes: AxesType = None,
     coordinate_transformations: list[list[dict[str, Any]]] | None = None,
@@ -699,11 +688,6 @@ def _write_dask_image(
 
     dims = _extract_dims_from_axes(axes)
     axes = _get_valid_axes(len(image.shape), axes, fmt)
-
-    if chunks is not None:
-        msg = """The 'chunks' argument is deprecated and will be removed in version 0.5.
-Please use the 'storage_options' argument instead."""
-        warnings.warn(msg, DeprecationWarning)
 
     # for path, data in enumerate(pyramid):
     if scaler is not None:
@@ -912,7 +896,6 @@ def write_multiscale_labels(
     pyramid: list,
     group: zarr.Group,
     name: str,
-    chunks: tuple[Any, ...] | int | None = None,
     fmt: Format | None = None,
     axes: AxesType = None,
     coordinate_transformations: list[list[dict[str, Any]]] | None = None,
@@ -937,12 +920,6 @@ def write_multiscale_labels(
     :type name: str, optional
     :param name: The name of this labels data.
     :type chunks: int or tuple of ints, optional
-    :param chunks:
-        The size of the saved chunks to store the image.
-
-        .. deprecated:: 0.4.0
-            This argument is deprecated and will be removed in a future version.
-            Use :attr:`storage_options` instead.
     :type fmt: :class:`ome_zarr.format.Format`, optional
     :param fmt:
       The format of the ome_zarr data which should be used.
@@ -977,7 +954,6 @@ def write_multiscale_labels(
     dask_delayed_jobs = write_multiscale(
         pyramid,
         sub_group,
-        chunks=chunks,
         fmt=fmt,
         axes=axes,
         coordinate_transformations=coordinate_transformations,
@@ -1003,7 +979,6 @@ def write_labels(
     scaler: Scaler | None = Scaler(order=0),
     scale_factors: tuple[int, ...] = (2, 4, 8, 16),
     method: Methods = Methods.NEAREST,
-    chunks: tuple[Any, ...] | int | None = None,
     fmt: Format | None = None,
     axes: AxesType = None,
     coordinate_transformations: list[list[dict[str, Any]]] | None = None,
@@ -1034,11 +1009,6 @@ def write_labels(
         The downsampling factors for each pyramid level. Default: (2, 4, 8).
     method : ome_zarr.scale.Methods, optional
         Downsampling method to use. Default: Methods.NEAREST (recommended for labels).
-    chunks : int or tuple of ints, optional
-        The size of the saved chunks to store the image.
-        .. deprecated:: 0.4.0
-           This argument is deprecated and will be removed in a future version.
-           Use `storage_options` instead.
     fmt : ome_zarr.format.Format, optional
         The format of the ome_zarr data which should be used. Defaults to the most current.
     axes : list of str or list of dicts, optional
@@ -1083,9 +1053,7 @@ def write_labels(
         method = Methods.NEAREST
 
     if not isinstance(labels, da.Array):
-        if not chunks:
-            chunks = "auto"
-        labels = da.from_array(labels, chunks=chunks)
+        labels = da.from_array(labels)
 
     # for 0.1 and 0.2 we need to ensure 5D shape
     if type(fmt) in (FormatV01, FormatV02):
@@ -1093,7 +1061,6 @@ def write_labels(
             labels = labels[None, :]
 
         # TODO: Better way to get chunksize in type-safe manner?
-        chunks = cast(Any, labels).chunksize
         axes = ["t", "c", "z", "y", "x"]
 
     dask_delayed_jobs = []
@@ -1104,7 +1071,6 @@ def write_labels(
         scale_factors,
         method,
         scaler,
-        chunks=chunks,
         fmt=fmt,
         axes=axes,
         coordinate_transformations=coordinate_transformations,
