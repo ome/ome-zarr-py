@@ -156,16 +156,17 @@ class TestScaler:
     @pytest.mark.parametrize("n_levels", [1, 2, 3, 4])
     def test_build_pyramid(self, shape, method, n_levels):
         from ome_zarr.scale import build_pyramid
+
         data = self.create_data(shape)
 
         if len(data.shape) == 5:
-            dims = ('t', 'c', 'z', 'y', 'x')
+            dims = ("t", "c", "z", "y", "x")
         elif len(data.shape) == 3:
-            dims = ('z', 'y', 'x')
+            dims = ("z", "y", "x")
         elif len(data.shape) == 2:
-            dims = ('y', 'x')
+            dims = ("y", "x")
 
-        scale_factors = [2 ** i for i in range(1, n_levels)]
+        scale_factors = [2**i for i in range(1, n_levels)]
         pyramid = build_pyramid(
             image=data,
             scale_factors=scale_factors,
@@ -179,7 +180,7 @@ class TestScaler:
         # Make sure channel and time dimensions are preserved
         for level in pyramid:
             for idx, d in enumerate(dims):
-                if d in ('t', 'c'):
+                if d in ("t", "c"):
                     assert level.shape[idx] == data.shape[idx]
 
         for idx, level in enumerate(pyramid[1:], start=1):
