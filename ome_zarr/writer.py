@@ -594,7 +594,7 @@ def write_image(
         in a multiresolution pyramid. Allows different chunk sizes for each level.
     compute : bool, optional
         If True, compute immediately; otherwise, return a list of dask.delayed.Delayed objects.
-    **metadata : dict
+    `**metadata` : dict
         Additional metadata to store.
 
     Returns
@@ -1025,7 +1025,7 @@ def write_labels(
         Image label metadata. See :meth:`write_label_metadata` for details.
     compute : bool, optional
         If True, compute immediately; otherwise, return a list of dask.delayed.Delayed objects.
-    **metadata : dict
+    `**metadata` : dict
         Additional metadata to store.
 
     Returns
