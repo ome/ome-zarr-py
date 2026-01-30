@@ -86,17 +86,24 @@ def _extract_dims_from_axes(
     ValueError
         If axes is None.
     """
-    if isinstance(axes, str):
-        return tuple(str(s) for s in axes)
-    elif isinstance(axes, list) and all(isinstance(s, str) for s in axes):
-        return tuple(str(s) for s in axes)
-    elif isinstance(axes, list) and all(isinstance(s, dict) for s in axes):
-        return tuple(str(s["name"]) for s in axes)
-    elif isinstance(axes, dict):
-        return tuple(str(s["name"]) for s in axes)
-    elif axes is None:
+    if axes is None:
         # only the case for v0.1 and v0.2, which are always 5D
         return ("t", "c", "z", "y", "x")
+
+    # axes is expected to be a list of strings or a list of dicts with 'name'
+    if all(isinstance(s, str) for s in axes):
+        return tuple(str(s) for s in axes)
+
+    if all(isinstance(s, dict) and "name" in s for s in axes):
+        names: list[str] = []
+        for s in axes:
+            # narrow type for mypy
+            if not isinstance(s, dict) or "name" not in s:
+                raise TypeError("`axes` must be a list of dicts containing 'name'")
+            names.append(str(s["name"]))
+        return tuple(names)
+
+    raise TypeError("`axes` must be a list of strings or a list of dicts containing 'name'")
 
 
 def _validate_well_images(
