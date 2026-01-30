@@ -103,7 +103,9 @@ def _extract_dims_from_axes(
             names.append(str(s["name"]))
         return tuple(names)
 
-    raise TypeError("`axes` must be a list of strings or a list of dicts containing 'name'")
+    raise TypeError(
+        "`axes` must be a list of strings or a list of dicts containing 'name'"
+    )
 
 
 def _validate_well_images(
