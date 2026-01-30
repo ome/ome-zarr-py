@@ -86,7 +86,7 @@ def _extract_dims_from_axes(
     ValueError
         If axes is None.
     """
-    if isinstance(axes, str) or isinstance(axes, list):
+    if isinstance(axes, (str, list)):
         return tuple(str(s) for s in axes)
     elif isinstance(axes, dict):
         return tuple(str(s["name"]) for s in axes)
@@ -320,17 +320,19 @@ Please use the 'storage_options' argument instead."""
                 options["dimension_names"] = [
                     axis["name"] for axis in axes if isinstance(axis, dict)
                 ]
-
         if zarr_format == 2:
             # options["dimension_separator"] = "/"
             del options["chunk_key_encoding"]
+        
+        level_image = data
+        
         # handle any 'chunks' option from storage_options
         if not isinstance(data, da.Array):
-            data = da.from_array(data)
+            level_image = da.from_array(data)
         if chunks_opt is not None:
-            data = da.array(data).rechunk(chunks=chunks_opt)  # noqa: PLW2901
+            level_image = level_image.rechunk(chunks=chunks_opt)  # noqa: PLW2901
         da_delayed = da.to_zarr(
-            arr=data,
+            arr=level_image,
             url=group.store,
             component=str(Path(group.path, str(path))),
             compute=compute,
@@ -727,7 +729,7 @@ def _write_dask_image(
     datasets: list[dict] = []
     delayed = []
 
-    for idx, image in enumerate(pyramid):
+    for idx, level in enumerate(pyramid):
 
         # LOGGER.debug(f"write_image path: {path}")
         options = _resolve_storage_options(storage_options, idx)
@@ -740,17 +742,16 @@ def _write_dask_image(
             if "chunks" in storage_options[idx]:
                 chunks_opt = options.pop("chunks", None)
 
-        elif isinstance(storage_options, dict):
-            if "chunks" in storage_options:
-                chunks_opt = options.pop("chunks", None)
+        elif isinstance(storage_options, dict) and "chunks" in storage_options:
+            chunks_opt = options.pop("chunks", None)
 
         if chunks_opt is not None:
-            chunks_opt = _retuple(chunks_opt, image.shape)
+            chunks_opt = _retuple(chunks_opt, level.shape)
             # image.chunks will be used by da.to_zarr
             zarr_array_kwargs["chunks"] = chunks_opt
-            level_image = da.array(image).rechunk(chunks=chunks_opt)
+            level_image = da.array(level).rechunk(chunks=chunks_opt)
         else:
-            level_image = image
+            level_image = level
 
         shapes.append(level_image.shape)
 
