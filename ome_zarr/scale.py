@@ -10,7 +10,7 @@ import warnings
 from collections.abc import Callable, Iterator, MutableMapping
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Union
+from typing import Any, Union, Sequence
 
 import dask.array as da
 import numpy as np
@@ -315,7 +315,7 @@ class Methods(Enum):
 def build_pyramid(
     image: da.Array | np.ndarray,
     scale_factors: list[int],
-    dims: tuple[str, ...],
+    dims: Sequence[str],
     method: str | Methods = "nearest",
     chunks: tuple[int, ...] | None | str = None,
 ) -> list[da.Array]:

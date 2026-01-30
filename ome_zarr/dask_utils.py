@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Sequence
 
 import numpy as np
 import skimage.transform
@@ -9,14 +9,14 @@ from dask import array as da
 
 
 def resize(
-    image: da.Array, output_shape: tuple[int, ...], *args: Any, **kwargs: Any
+    image: da.Array, output_shape: Sequence[int], *args: Any, **kwargs: Any
 ) -> da.Array:
     r"""
     Wrapped copy of "skimage.transform.resize"
     Resize image to match a certain size.
     :type image: :class:`dask.array`
     :param image: The dask array to resize
-    :type output_shape: tuple
+    :type output_shape: Sequence[int]
     :param output_shape: The shape of the resize array
     :type \*args: list
     :param \*args: Arguments of skimage.transform.resize
