@@ -86,13 +86,13 @@ def _extract_dims_from_axes(
     ValueError
         If axes is None.
     """
-    if isinstance(axes, str):
+    if isinstance(axes, str) or (
+        isinstance(axes, list) and all(isinstance(s, str) for s in axes)
+    ):
         return tuple(str(s) for s in axes)
-    elif isinstance(axes, list) and all(isinstance(s, str) for s in axes):
-        return tuple(str(s) for s in axes)
-    elif isinstance(axes, list) and all(isinstance(s, dict) for s in axes):
-        return tuple(str(s["name"]) for s in axes)
-    elif isinstance(axes, dict):
+    elif (
+        isinstance(axes, list) and all(isinstance(s, dict) for s in axes)
+    ) or isinstance(axes, dict):
         return tuple(str(s["name"]) for s in axes)
     elif axes is None:
         # only the case for v0.1 and v0.2, which are always 5D
