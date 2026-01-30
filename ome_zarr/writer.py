@@ -319,14 +319,14 @@ def write_multiscale(
         if zarr_format == 2:
             # options["dimension_separator"] = "/"
             del options["chunk_key_encoding"]
-        
+
         level_image = data
-        
+
         # handle any 'chunks' option from storage_options
         if not isinstance(data, da.Array):
             level_image = da.from_array(data)
         if chunks_opt is not None:
-            level_image = level_image.rechunk(chunks=chunks_opt)  # noqa: PLW2901
+            level_image = level_image.rechunk(chunks=chunks_opt)
         da_delayed = da.to_zarr(
             arr=level_image,
             url=group.store,

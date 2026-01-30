@@ -7,10 +7,10 @@ import inspect
 import logging
 import os
 import warnings
-from collections.abc import Callable, Iterator, MutableMapping
+from collections.abc import Callable, Iterator, MutableMapping, Sequence
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Union, Sequence
+from typing import Any, Union
 
 import dask.array as da
 import numpy as np
