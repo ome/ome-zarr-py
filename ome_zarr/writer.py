@@ -678,8 +678,8 @@ def _write_dask_image(
         """
         warnings.warn(msg, DeprecationWarning)
 
-    dims = _extract_dims_from_axes(axes)
     axes = _get_valid_axes(len(image.shape), axes, fmt)
+    dims = _extract_dims_from_axes(axes)
 
     # for path, data in enumerate(pyramid):
     if scaler is not None:
@@ -689,12 +689,11 @@ def _write_dask_image(
         method = Methods.RESIZE
 
     # Set up common kwargs for da.to_zarr
+    # zarr_array_kwargs needs dask 2025.12.0 or later
     zarr_array_kwargs: dict[str, Any] = {}
     zarr_format = fmt.zarr_format
     options = _resolve_storage_options(storage_options, 0)
 
-    # zarr_array_kwargs needs dask 2025.12.0 or later
-    zarr_array_kwargs: dict[str, Any] = {}
     if zarr_format == 2:
         zarr_array_kwargs["chunk_key_encoding"] = {"name": "v2", "separator": "/"}
         zarr_array_kwargs["compressor"] = options.pop("compressor", _blosc_compressor())
