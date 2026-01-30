@@ -230,7 +230,6 @@ def check_format(
 def write_multiscale(
     pyramid: ListOfArrayLike,
     group: zarr.Group,
-    chunks: tuple[Any, ...] | int | None = None,
     fmt: Format | None = None,
     axes: AxesType = None,
     coordinate_transformations: list[list[dict[str, Any]]] | None = None,
@@ -287,10 +286,6 @@ def write_multiscale(
     axes = _get_valid_axes(dims, axes, fmt)
     dask_delayed = []
 
-    if chunks is not None:
-        msg = """The 'chunks' argument is deprecated and will be removed in version 0.5.
-Please use the 'storage_options' argument instead."""
-        warnings.warn(msg, DeprecationWarning)
     datasets: list[dict] = []
     for path, data in enumerate(pyramid):
         options = _resolve_storage_options(storage_options, path)
@@ -298,9 +293,10 @@ Please use the 'storage_options' argument instead."""
         # ensure that the chunk dimensions match the image dimensions
         # (which might have been changed for versions 0.1 or 0.2)
         # if chunks are explicitly set in the storage options
-        chunks_opt = options.pop("chunks", chunks)
+        chunks_opt = options.pop("chunks", None)
         if chunks_opt is not None:
             chunks_opt = _retuple(chunks_opt, data.shape)
+            options["chunks"] = chunks_opt
 
         options["chunk_key_encoding"] = fmt.chunk_key_encoding
         zarr_format = fmt.zarr_format
