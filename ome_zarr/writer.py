@@ -635,7 +635,7 @@ def write_image(
 
     if method is None:
         method = Methods.RESIZE
-    
+
     group, fmt = check_group_fmt(group, fmt)
 
     if not isinstance(image, da.Array):

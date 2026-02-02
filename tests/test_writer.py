@@ -1700,15 +1700,15 @@ class TestLabelWriter:
         assert len(attrs["labels"]) == len(label_names)
         assert all(label_name in attrs["labels"] for label_name in label_names)
 
+
 if __name__ == "__main__":
     import tempfile
-    import os
+
     tmp = tempfile.TemporaryDirectory()
-    
-    
+
     tw = TestWriter()
     # manual equivalent of the `initdir` fixture
-    
+
     tw.path = pathlib.Path(tmp.name)
     tw.store = parse_url(tw.path, mode="w", fmt=FormatV04()).store
     tw.root = zarr.group(store=tw.store)
@@ -1743,7 +1743,6 @@ if __name__ == "__main__":
         zarr_format=3,
     )
 
-
     # tw = TestLabelWriter()
 
     # path = pathlib.Path(tmp.name)
@@ -1769,7 +1768,6 @@ if __name__ == "__main__":
     #     format_version=FormatV01,
     #     array_constructor=np.array,
     # )
-
 
     # cleanup
     tmp.cleanup()
