@@ -5,7 +5,6 @@ import numpy as np
 import pytest
 import zarr
 
-from ome_zarr.io import parse_url
 from ome_zarr.scale import Scaler
 from ome_zarr.writer import write_image
 
@@ -196,8 +195,8 @@ class TestScaler:
     @pytest.mark.parametrize("method", ["gaussian", "laplacian"])
     def test_pyramid_args(self, shape, tmpdir, method):
         path = pathlib.Path(tmpdir.mkdir("data"))
-        store = parse_url(path, mode="w").store
-        group = zarr.group(store=store, overwrite=True)
+        group = zarr.open_group(path, mode="w")
+
         data = self.create_data(shape)
 
         scaler = Scaler(

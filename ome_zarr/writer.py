@@ -220,6 +220,24 @@ def _blosc_compressor() -> Blosc:
     return Blosc(cname="zstd", clevel=5, shuffle=Blosc.SHUFFLE)
 
 
+def check_group_fmt(
+    group: zarr.Group | str,
+    fmt: Format | None = None,
+    mode: str = "a",
+) -> tuple[zarr.Group, Format]:
+    """
+    Create group if string, according to fmt
+    OR check fmt is compatible with group
+    """
+    if isinstance(group, str):
+        if fmt is None:
+            fmt = CurrentFormat()
+        group = zarr.open_group(group, mode=mode, zarr_format=fmt.zarr_format)
+    else:
+        fmt = check_format(group, fmt)
+    return group, fmt
+
+
 def check_format(
     group: zarr.Group,
     fmt: Format | None = None,
@@ -294,7 +312,7 @@ def write_multiscale(
         :class:`dask.delayed.Delayed` representing the value to be computed by
         dask.
     """
-    fmt = check_format(group, fmt)
+    group, fmt = check_group_fmt(group, fmt)
     dims = len(pyramid[0].shape)
     axes = _get_valid_axes(dims, axes, fmt)
     dask_delayed = []
@@ -380,7 +398,7 @@ def write_multiscale(
 
 
 def write_multiscales_metadata(
-    group: zarr.Group,
+    group: zarr.Group | str,
     datasets: list[dict],
     fmt: Format | None = None,
     axes: AxesType = None,
@@ -391,7 +409,7 @@ def write_multiscales_metadata(
     Write the multiscales metadata in the group.
 
     :type group: :class:`zarr.Group`
-    :param group: The group within the zarr store to write the metadata in.
+    :param group: The zarr group or path.
     :type datasets: list of dicts
     :param datasets:
       The list of datasets (dicts) for this multiscale image.
@@ -407,7 +425,7 @@ def write_multiscales_metadata(
       Ignored for versions 0.1 and 0.2. Required for version 0.3 or greater.
     """
 
-    fmt = check_format(group, fmt)
+    group, fmt = check_group_fmt(group, fmt)
     ndim = -1
     if axes is not None:
         if fmt.version in ("0.1", "0.2"):
@@ -462,7 +480,7 @@ def write_multiscales_metadata(
 
 
 def write_plate_metadata(
-    group: zarr.Group,
+    group: zarr.Group | str,
     rows: list[str],
     columns: list[str],
     wells: list[str | dict],
@@ -475,7 +493,7 @@ def write_plate_metadata(
     Write the plate metadata in the group.
 
     :type group: :class:`zarr.Group`
-    :param group: The group within the zarr store to write the metadata in.
+    :param group: The group or path to write the metadata in.
     :type rows: list of str
     :param rows: The list of names for the plate rows.
     :type columns: list of str
@@ -494,7 +512,7 @@ def write_plate_metadata(
     :param field_count: The maximum number of fields per view across wells.
     """
 
-    fmt = check_format(group, fmt)
+    group, fmt = check_group_fmt(group, fmt)
     plate: dict[str, str | int | list[dict]] = {
         "columns": _validate_plate_rows_columns(columns),
         "rows": _validate_plate_rows_columns(rows),
@@ -519,7 +537,7 @@ def write_plate_metadata(
 
 
 def write_well_metadata(
-    group: zarr.Group,
+    group: zarr.Group | str,
     images: list[str | dict],
     fmt: Format | None = None,
 ) -> None:
@@ -527,7 +545,7 @@ def write_well_metadata(
     Write the well metadata in the group.
 
     :type group: :class:`zarr.Group`
-    :param group: The group within the zarr store to write the metadata in.
+    :param group: The zarr group or path to write the metadata in.
     :type images: list of dict
     :param images: The list of dictionaries for all fields of views.
     :type fmt: :class:`ome_zarr.format.Format`, optional
@@ -536,7 +554,7 @@ def write_well_metadata(
       Defaults to the most current.
     """
 
-    fmt = check_format(group, fmt)
+    group, fmt = check_group_fmt(group, fmt)
     well: dict[str, Any] = {
         "images": _validate_well_images(images),
     }
@@ -809,7 +827,7 @@ def _write_dask_image(
 
 
 def write_label_metadata(
-    group: zarr.Group,
+    group: zarr.Group | str,
     name: str,
     colors: list[JSONDict] | None = None,
     properties: list[JSONDict] | None = None,
@@ -823,7 +841,7 @@ def write_label_metadata(
     with the same name as the second argument.
 
     :type group: :class:`zarr.Group`
-    :param group: The group within the zarr store to write the metadata in.
+    :param group: The zarr group or path to write the metadata in.
     :type name: str
     :param name: The name of the label sub-group.
     :type colors: list of JSONDict, optional
@@ -842,7 +860,7 @@ def write_label_metadata(
       The format of the ome_zarr data which should be used.
       Defaults to the most current.
     """
-    fmt = check_format(group, fmt)
+    group, fmt = check_group_fmt(group, fmt)
     label_group = group[name]
     image_label_metadata = {**metadata}
     if colors is not None:
@@ -858,10 +876,12 @@ def write_label_metadata(
     add_metadata(label_group, {"image-label": image_label_metadata}, fmt=fmt)
 
 
-def get_metadata(group: zarr.Group, fmt: Format | None = None) -> dict:
-    fmt = check_format(group, fmt)
+def get_metadata(group: zarr.Group | str) -> dict:
+    if isinstance(group, str):
+        group = zarr.open_group(group, mode="r")
     attrs = group.attrs
-    if fmt.version not in ("0.1", "0.2", "0.3", "0.4"):
+
+    if group.info._zarr_format == 3:
         attrs = attrs.get("ome", {})
     else:
         attrs = dict(attrs)
@@ -869,10 +889,10 @@ def get_metadata(group: zarr.Group, fmt: Format | None = None) -> dict:
 
 
 def add_metadata(
-    group: zarr.Group, metadata: JSONDict, fmt: Format | None = None
+    group: zarr.Group | str, metadata: JSONDict, fmt: Format | None = None
 ) -> None:
 
-    fmt = check_format(group, fmt)
+    group, fmt = check_group_fmt(group, fmt)
 
     attrs = group.attrs
     if fmt.version not in ("0.1", "0.2", "0.3", "0.4"):
@@ -895,7 +915,7 @@ def add_metadata(
 
 def write_multiscale_labels(
     pyramid: list,
-    group: zarr.Group,
+    group: zarr.Group | str,
     name: str,
     fmt: Format | None = None,
     axes: AxesType = None,
@@ -917,7 +937,7 @@ def write_multiscale_labels(
       All image arrays MUST be up to 5-dimensional with dimensions
       ordered (t, c, z, y, x)
     :type group: :class:`zarr.Group`
-    :param group: The group within the zarr store to write the metadata in.
+    :param group: The zarr group or path to write the metadata in.
     :type name: str, optional
     :param name: The name of this labels data.
     :type chunks: int or tuple of ints, optional
@@ -950,7 +970,7 @@ def write_multiscale_labels(
         :class:`dask.delayed.Delayed` representing the value to be computed by
         dask.
     """
-    fmt = check_format(group, fmt)
+    group, fmt = check_group_fmt(group, fmt)
     sub_group = group.require_group(f"labels/{name}")
     dask_delayed_jobs = write_multiscale(
         pyramid,
@@ -975,7 +995,7 @@ def write_multiscale_labels(
 
 def write_labels(
     labels: np.ndarray | da.Array,
-    group: zarr.Group,
+    group: zarr.Group | str,
     name: str,
     scaler: Scaler | None = Scaler(order=0),
     scale_factors: tuple[int, ...] = (2, 4, 8, 16),
