@@ -7,7 +7,6 @@ import zarr
 
 from ome_zarr.cli import main
 from ome_zarr.format import CurrentFormat, FormatV04, FormatV05
-from ome_zarr.io import parse_url
 from ome_zarr.utils import find_multiscales, finder, strip_common_prefix, view
 from ome_zarr.writer import write_plate_metadata
 
@@ -209,8 +208,7 @@ class TestCli:
 
         # create a plate
         plate_path = Path(img_dir2.mkdir("plate"))
-        store = parse_url(plate_path, mode="w", fmt=fmt).store
-        root = zarr.group(store=store)
+        root = zarr.open_group(plate_path, mode="w", zarr_format=fmt.zarr_format)
         write_plate_metadata(root, ["A"], ["1"], ["A/1"])
 
         finder(img_dir, 8000, True)
