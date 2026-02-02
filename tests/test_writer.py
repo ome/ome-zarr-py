@@ -30,8 +30,6 @@ from ome_zarr.format import (
     FormatV05,
     format_from_version,
 )
-from ome_zarr.io import ZarrLocation, parse_url
-from ome_zarr.reader import Multiscales, Reader
 from ome_zarr.scale import build_pyramid
 from ome_zarr.writer import (
     _get_valid_axes,
