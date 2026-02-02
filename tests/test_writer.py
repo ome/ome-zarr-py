@@ -1591,8 +1591,6 @@ class TestLabelWriter:
                 for d in node_metadata["multiscales"][0]["datasets"]
             ]
             for transf, expected in zip(cts, transformations):
-                print("transf:", transf)
-                print("expected:", expected)
                 assert transf == expected
         assert np.allclose(label_data, node_data[0][...].compute())
 
