@@ -87,14 +87,15 @@ class TestCli:
             assert directory_items(Path(out) / basename) == [
                 Path(".zattrs"),
                 Path(".zgroup"),
-                Path("0"),
-                Path("1"),
-                Path("2"),
-                Path("3"),
-                Path("4"),
                 Path("labels"),
+                Path("s0"),
+                Path("s1"),
+                Path("s2"),
+                Path("s3"),
+                Path("s4"),
             ]
-            assert directory_items(Path(out) / basename / "1") == [
+
+            assert directory_items(Path(out) / basename / "s1") == [
                 Path(".zarray"),
                 Path(".zattrs"),  # empty '{}'
                 Path("0"),
@@ -103,15 +104,15 @@ class TestCli:
             ]
         else:
             assert directory_items(Path(out) / basename) == [
-                Path("0"),
-                Path("1"),
-                Path("2"),
-                Path("3"),
-                Path("4"),
                 Path("labels"),
+                Path("s0"),
+                Path("s1"),
+                Path("s2"),
+                Path("s3"),
+                Path("s4"),
                 Path("zarr.json"),
             ]
-            assert directory_items(Path(out) / basename / "1") == [
+            assert directory_items(Path(out) / basename / "s1") == [
                 Path("c"),
                 Path("zarr.json"),
             ]

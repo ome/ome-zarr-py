@@ -2,9 +2,10 @@
 
 from typing import Any
 
-from .format import CurrentFormat, Format
+from .format import CurrentFormat, Format, format_from_version
 
 KNOWN_AXES = {"x": "space", "y": "space", "z": "space", "c": "channel", "t": "time"}
+DISCRETE_AXES = ["c", "t"]
 
 
 class Axes:
@@ -18,12 +19,12 @@ class Axes:
 
         Raises ValueError if not valid
         """
+        self.fmt = fmt
         if axes is not None:
             self.axes = self._axes_to_dicts(axes)
         elif fmt.version in ("0.1", "0.2"):
             # strictly 5D
             self.axes = self._axes_to_dicts(["t", "c", "z", "y", "x"])
-        self.fmt = fmt
         self.validate()
 
     def validate(self) -> None:
@@ -45,15 +46,18 @@ class Axes:
             return self._get_names()
         return self.axes
 
-    @staticmethod
-    def _axes_to_dicts(axes: list[str] | list[dict[str, str]]) -> list[dict[str, str]]:
+    def _axes_to_dicts(
+        self, axes: list[str] | list[dict[str, str]]
+    ) -> list[dict[str, str]]:
         """Returns a list of axis dicts with name and type"""
         axes_dicts = []
         for axis in axes:
             if isinstance(axis, str):
-                axis_dict = {"name": axis}
+                axis_dict: dict[str, Any] = {"name": axis}
                 if axis in KNOWN_AXES:
                     axis_dict["type"] = KNOWN_AXES[axis]
+                    if self.fmt.version.startswith("0.6"):
+                        axis_dict["discrete"] = axis in DISCRETE_AXES
                 axes_dicts.append(axis_dict)
             else:
                 axes_dicts.append(axis)
@@ -114,3 +118,18 @@ class Axes:
                 raise ValueError("4D data must have axes tzyx or czyx or tcyx")
         elif val_axes != ("t", "c", "z", "y", "x"):
             raise ValueError("5D data must have axes ('t', 'c', 'z', 'y', 'x')")
+
+    @staticmethod
+    def from_multiscales(
+        multiscales: dict[str, Any],
+    ) -> list[str] | list[dict[str, str]]:
+        """Create Axes from the multiscales object"""
+        if "version" in multiscales:
+            fmt = format_from_version(multiscales["version"])
+            axesObj = Axes(multiscales.get("axes", []), fmt=fmt)
+            return axesObj.to_list(fmt=fmt)
+        else:
+            # v0.5 or later - no version on multiscales, so we guess!
+            if "coordinateSystems" in multiscales:
+                return multiscales["coordinateSystems"][0].get("axes", [])
+            return multiscales.get("axes", [])

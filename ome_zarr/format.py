@@ -3,11 +3,13 @@
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import Iterator, Mapping
-from typing import Any
+from typing import Any, ClassVar
 
 from zarr.storage import FsspecStore, LocalStore
 
 LOGGER = logging.getLogger("ome_zarr.format")
+
+COORDINATE_SYSTEM_NAME = "physical"
 
 
 def format_from_version(version: str) -> "Format":
@@ -25,6 +27,7 @@ def format_implementations() -> Iterator["Format"]:
     """
     Return an instance of each format implementation, newest to oldest.
     """
+    yield FormatV06()
     yield FormatV05()
     yield FormatV04()
     yield FormatV03()
@@ -115,7 +118,10 @@ class Format(ABC):
 
     @abstractmethod
     def generate_coordinate_transformations(
-        self, shapes: list[tuple]
+        self,
+        shapes: list[tuple],
+        scale: list[float] | None = None,
+        paths: list[str] | None = None,
     ) -> list[list[dict[str, Any]]] | None:  # pragma: no cover
         raise NotImplementedError()
 
@@ -125,7 +131,15 @@ class Format(ABC):
         ndim: int,
         nlevels: int,
         coordinate_transformations: list[list[dict[str, Any]]] | None = None,
-    ) -> list[list[dict[str, Any]]] | None:  # pragma: no cover
+    ) -> None:  # pragma: no cover
+        raise NotImplementedError()
+
+    @abstractmethod
+    def write_axes(
+        self,
+        multiscales: dict[str, Any],
+        axes: list,
+    ) -> None:  # pragma: no cover
         raise NotImplementedError()
 
 
@@ -191,7 +205,10 @@ class FormatV01(Format):
                 raise ValueError("%s path must be of %s type", well, key_type)
 
     def generate_coordinate_transformations(
-        self, shapes: list[tuple]
+        self,
+        shapes: list[tuple],
+        scale: list[float] | None = None,
+        paths: list[str] | None = None,
     ) -> list[list[dict[str, Any]]] | None:
         return None
 
@@ -200,6 +217,13 @@ class FormatV01(Format):
         ndim: int,
         nlevels: int,
         coordinate_transformations: list[list[dict[str, Any]]] | None = None,
+    ) -> None:
+        return None
+
+    def write_axes(
+        self,
+        multiscales: dict[str, Any],
+        axes: list,
     ) -> None:
         return None
 
@@ -227,6 +251,13 @@ class FormatV03(FormatV02):  # inherits from V02 to avoid code duplication
     @property
     def version(self) -> str:
         return "0.3"
+
+    def write_axes(
+        self,
+        multiscales: dict[str, Any],
+        axes: list,
+    ) -> None:
+        multiscales["axes"] = axes
 
 
 class FormatV04(FormatV03):
@@ -274,15 +305,34 @@ class FormatV04(FormatV03):
             raise ValueError("Mismatching column index for %s", well)
 
     def generate_coordinate_transformations(
-        self, shapes: list[tuple]
+        self,
+        shapes: list[tuple],
+        scale: list[float] | None = None,
+        paths: list[str] | None = None,
     ) -> list[list[dict[str, Any]]] | None:
         data_shape = shapes[0]
+        scale_0 = scale or [1.0] * len(data_shape)
+        if len(scale_0) != len(data_shape):
+            raise ValueError(
+                f"scale length {len(scale_0)} must match ndim: {len(data_shape)}"
+            )
         coordinate_transformations: list[list[dict[str, Any]]] = []
         # calculate minimal 'scale' transform based on pyramid dims
         for shape in shapes:
             assert len(shape) == len(data_shape)
-            scale = [full / level for full, level in zip(data_shape, shape)]
-            coordinate_transformations.append([{"type": "scale", "scale": scale}])
+            # ratio of full res to current level
+            ds_scale = [full / level for full, level in zip(data_shape, shape)]
+            ds_scale = [s * scale_0[i] for i, s in enumerate(ds_scale)]
+            # scaling is centered on center of 0,0 pixel/voxel - see #403
+            # Any expansion into negative coordinates needs to be offset
+            # by subsequent translation (half of the difference in scale)
+            trans = [((sc - scale_0[i]) / 2) for i, sc in enumerate(ds_scale)]
+            coordinate_transformations.append(
+                [
+                    {"type": "scale", "scale": ds_scale},
+                    {"type": "translation", "translation": trans},
+                ]
+            )
 
         return coordinate_transformations
 
@@ -309,53 +359,55 @@ class FormatV04(FormatV03):
                 f"datasets {nlevels}"
             )
         for transformations in coordinate_transformations:
-            assert isinstance(transformations, list)
-            types = [t.get("type", None) for t in transformations]
-            if any(t is None for t in types):
-                raise ValueError(f"Missing type in: {transformations}")
-            # validate scales...
-            if sum(t == "scale" for t in types) != 1:
-                raise ValueError(
-                    "Must supply 1 'scale' item in coordinate_transformations"
-                )
-            # first transformation must be scale
-            if types[0] != "scale":
-                raise ValueError("First coordinate_transformations must be 'scale'")
-            first = transformations[0]
-            if "scale" not in transformations[0]:
-                raise ValueError(f"Missing scale argument in: {first}")
-            scale = first["scale"]
-            if len(scale) != ndim:
-                raise ValueError(
-                    f"'scale' list {scale} must match "
-                    f"number of image dimensions: {ndim}"
-                )
-            for value in scale:
-                if not isinstance(value, (float, int)):
-                    raise ValueError(f"'scale' values must all be numbers: {scale}")
+            self.validate_transformation_per_level(ndim, transformations)
 
-            # validate translations...
-            translation_types = [t == "translation" for t in types]
-            if sum(translation_types) > 1:
+    def validate_transformation_per_level(
+        self, ndim: int, transformations: list[dict[str, Any]]
+    ) -> None:
+        assert isinstance(transformations, list)
+        types = [t.get("type", None) for t in transformations]
+        if any(t is None for t in types):
+            raise ValueError(f"Missing type in: {transformations}")
+        # validate scales...
+        if sum(t == "scale" for t in types) != 1:
+            raise ValueError("Must supply 1 'scale' item in coordinate_transformations")
+        # first transformation must be scale
+        if types[0] != "scale":
+            raise ValueError("First coordinate_transformations must be 'scale'")
+        first = transformations[0]
+        if "scale" not in transformations[0]:
+            raise ValueError(f"Missing scale argument in: {first}")
+        scale = first["scale"]
+        if len(scale) != ndim:
+            raise ValueError(
+                f"'scale' list {scale} must match "
+                f"number of image dimensions: {ndim}"
+            )
+        for value in scale:
+            if not isinstance(value, (float, int)):
+                raise ValueError(f"'scale' values must all be numbers: {scale}")
+
+        # validate translations...
+        translation_types = [t == "translation" for t in types]
+        if sum(translation_types) > 1:
+            raise ValueError(
+                "Must supply 0 or 1 'translation' item incoordinate_transformations"
+            )
+        elif sum(translation_types) == 1:
+            transformation = transformations[types.index("translation")]
+            if "translation" not in transformation:
+                raise ValueError(f"Missing scale argument in: {first}")
+            translation = transformation["translation"]
+            if len(translation) != ndim:
                 raise ValueError(
-                    "Must supply 0 or 1 'translation' item in"
-                    "coordinate_transformations"
+                    f"'translation' list {translation} must match "
+                    f"image dimensions count: {ndim}"
                 )
-            elif sum(translation_types) == 1:
-                transformation = transformations[types.index("translation")]
-                if "translation" not in transformation:
-                    raise ValueError(f"Missing scale argument in: {first}")
-                translation = transformation["translation"]
-                if len(translation) != ndim:
+            for value in translation:
+                if not isinstance(value, (float, int)):
                     raise ValueError(
-                        f"'translation' list {translation} must match "
-                        f"image dimensions count: {ndim}"
+                        f"'translation' values must all be numbers: {translation}"
                     )
-                for value in translation:
-                    if not isinstance(value, (float, int)):
-                        raise ValueError(
-                            f"'translation' values must all be numbers: {translation}"
-                        )
 
 
 class FormatV05(FormatV04):
@@ -377,4 +429,158 @@ class FormatV05(FormatV04):
         return {"name": "default", "separator": "/"}
 
 
-CurrentFormat = FormatV05
+class FormatV06(FormatV05):
+    """
+    Changelog: added FormatV06 (June 2024): writing not supported yet
+    """
+
+    TRANSF_TYPES: ClassVar = [
+        "identity",
+        "mapAxis",
+        "scale",
+        "translation",
+        "affine",
+        "rotation",
+        "sequence",
+        "displacements",
+        "coordinates",
+        "inverseOf",
+        "bijection",
+        "byDimension",
+    ]
+
+    @property
+    def version(self) -> str:
+        return "0.6dev2"
+
+    def validate_coordinate_transformations(
+        self,
+        ndim: int,
+        nlevels: int,
+        coordinate_transformations: list[list[dict[str, Any]]] | None = None,
+    ) -> None:
+        """
+        This is used for coordinateTransformations on datasets, where we only
+        allow scale and translation transforms.
+
+        Raises ValueError if no 'scale' found or doesn't match ndim.
+
+        :param ndim: Number of image dimensions.
+        """
+        if coordinate_transformations is None:
+            raise ValueError("coordinate_transformations must be provided")
+        assert len(coordinate_transformations) == nlevels
+        for transformations in coordinate_transformations:
+            for transformation in transformations:
+                # Only transformations nested within a sequenceTransformation can omit input/output
+                for att in ["input", "output", "type"]:
+                    if att not in transformation:
+                        raise ValueError(
+                            f"Missing '{att}' argument in: {transformation}"
+                        )
+                if transformation["type"] == "sequence":
+                    # for the transforms in a sequence, we can validate as in previous versions
+                    assert "transformations" in transformation
+                    self.validate_transformation_per_level(
+                        ndim, transformation["transformations"]
+                    )
+
+    # def validate_multiscales_transformations(
+    #     self,
+    #     coordinate_transformations: list[list[dict[str, Any]]] | None = None,
+    # ) -> list[list[dict[str, Any]]] | None:
+    #     """
+    #     FIXME: not used yet, since we don't write multiscales.coordinateTransformations
+
+    #     This is used for coordinateTransformations on multiscales.
+    #     """
+    #     for transformations in coordinate_transformations:
+    #         for transformation in transformations:
+    #             # Only transformations nested within a sequenceTransformation can omit input/output
+    #             if "input" not in transformation:
+    #                 raise ValueError(f"Missing input argument in: {transformation}")
+    #             if "output" not in transformation:
+    #                 raise ValueError(f"Missing output argument in: {transformation}")
+    #             if transformation["type"] not in self.TRANSF_TYPES:
+    #                 raise ValueError(
+    #                     f"Unknown transformation type: {transformation['type']}. "
+    #                     f"Must be one of {self.TRANSF_TYPES}"
+    #                 )
+
+    def generate_coordinate_transformations(
+        self,
+        shapes: list[tuple],
+        scale: list[float] | None = None,
+        paths: list[str] | None = None,
+    ) -> list[list[dict[str, Any]]] | None:
+        """
+        Returns coordinate_transformations for each dataset
+
+        shapes is a 2D list - (list for each level of pyramid)
+        scale is an optional list of floats to use for scaling instead of
+        """
+        cts_for_datasets = super().generate_coordinate_transformations(
+            shapes, scale, paths
+        )
+        if cts_for_datasets is None:
+            raise ValueError("coordinate_transformations must be provided")
+        # wrap each list in sequenceTransformation
+        coordinate_transformations = [
+            [
+                {
+                    "type": "sequence",
+                    "transformations": ct,
+                    "input": paths[i] if paths else str(i),
+                    "output": COORDINATE_SYSTEM_NAME,
+                }
+            ]
+            for i, ct in enumerate(cts_for_datasets)
+        ]
+        return coordinate_transformations
+
+    def write_axes(
+        self,
+        multiscales: dict[str, Any],
+        axes: list,
+    ) -> None:
+        multiscales["coordinateSystems"] = [
+            {"name": COORDINATE_SYSTEM_NAME, "axes": axes}
+        ]
+
+    def add_coordinate_system(
+        self,
+        multiscales: dict[str, Any],
+        name: str,
+        axes: list | None = None,
+    ) -> None:
+        if "coordinateSystems" not in multiscales:
+            multiscales["coordinateSystems"] = []
+        if axes is None:
+            if len(multiscales["coordinateSystems"]) == 0:
+                raise ValueError(
+                    "axes must be provided for the first coordinate system"
+                )
+            axes = multiscales["coordinateSystems"][0]["axes"]
+
+        multiscales["coordinateSystems"].append({"name": name, "axes": axes})
+
+    def add_coordinate_transform(
+        self,
+        multiscales: dict[str, Any],
+        transformation: dict[str, Any],
+    ) -> None:
+        print("add_coordinate_transform: transformation=", transformation)
+        if "coordinateTransformations" not in multiscales:
+            multiscales["coordinateTransformations"] = []
+        multiscales["coordinateTransformations"].append(transformation)
+
+        output = transformation.get("output")
+        if output is None or not isinstance(output, str):
+            raise ValueError("Each coordinate transformation must have an 'output' key")
+        if transformation.get("input") is None:
+            transformation["input"] = COORDINATE_SYSTEM_NAME
+        print("add_coordinate_transform: multiscales=", multiscales)
+        self.add_coordinate_system(multiscales, output)
+
+
+CurrentFormat = FormatV06

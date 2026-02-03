@@ -10,7 +10,6 @@ import dask.array as da
 import numpy as np
 
 from .axes import Axes
-from .format import format_from_version
 from .io import ZarrLocation
 from .types import JSONDict
 
@@ -39,6 +38,7 @@ class Node:
 
         # Likely to be updated by specs
         self.metadata: JSONDict = dict()
+        self.dataset_paths: list[str] = []
         self.data: list[da.core.Array] = list()
         self.specs: list[Spec] = []
         self.pre_nodes: list[Node] = []
@@ -275,18 +275,18 @@ class Multiscales(Spec):
         super().__init__(node)
 
         multiscales = self.lookup("multiscales", [])
-        version = multiscales[0].get(
-            "version", "0.1"
-        )  # should this be matched with Format.version?
+        print("Multiscales(Spec):", multiscales)
+        # FIXME: version isn't on multiscales for zarr v3
+        # version = multiscales[0].get(
+        #     "version", "0.1"
+        # )  # should this be matched with Format.version?
         datasets = multiscales[0]["datasets"]
-        axes = multiscales[0].get("axes")
-        fmt = format_from_version(version)
-        # Raises ValueError if not valid
-        axes_obj = Axes(axes, fmt)
-        node.metadata["axes"] = axes_obj.to_list()
+        axes = Axes.from_multiscales(multiscales[0])
+        node.metadata["axes"] = axes
         # This will get overwritten by 'omero' metadata if present
         node.metadata["name"] = multiscales[0].get("name")
         paths = [d["path"] for d in datasets]
+        node.dataset_paths = paths
         self.datasets: list[str] = paths
         transformations = [d.get("coordinateTransformations") for d in datasets]
         if any(trans is not None for trans in transformations):
@@ -415,6 +415,7 @@ class Well(Spec):
         self.numpy_type = image_node.data[0].dtype
         self.img_shape = image_node.data[0].shape
         self.img_metadata = image_node.metadata
+        self.dataset_paths = image_node.dataset_paths
         self.img_pyramid_shapes = [d.shape for d in image_node.data]
 
         def get_field(row: int, col: int, level: int) -> da.core.Array:
@@ -495,6 +496,8 @@ class Plate(Spec):
         if well_spec is None:
             raise Exception("Could not find first well")
         self.first_field_path = well_spec.well_data["images"][0]["path"]
+        # need the dataset paths...
+        self.dataset_paths = well_spec.dataset_paths
         self.numpy_type = well_spec.numpy_type
 
         LOGGER.debug("img_pyramid_shapes: %s", well_spec.img_pyramid_shapes)
@@ -519,9 +522,10 @@ class Plate(Spec):
         return image_node.data[0].dtype
 
     def get_tile_path(self, level: int, row: int, col: int) -> str:
+        ds_path = self.dataset_paths[level]
         return (
             f"{self.row_names[row]}/"
-            f"{self.col_names[col]}/{self.first_field_path}/{level}"
+            f"{self.col_names[col]}/{self.first_field_path}/{ds_path}"
         )
 
     def get_stitched_grid(self, level: int, tile_shape: tuple) -> da.core.Array:
