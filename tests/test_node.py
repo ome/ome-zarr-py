@@ -3,7 +3,7 @@ import zarr
 from numpy import zeros
 
 from ome_zarr.data import create_zarr
-from ome_zarr.format import FormatV01, FormatV02, FormatV03
+from ome_zarr.format import FormatV01, FormatV02, FormatV03, FormatV04
 from ome_zarr.io import parse_url
 from ome_zarr.reader import Label, Labels, Multiscales, Node, Plate, Well
 from ome_zarr.writer import write_image, write_plate_metadata, write_well_metadata
@@ -44,16 +44,17 @@ class TestHCSNode:
     @pytest.fixture(autouse=True)
     def initdir(self, tmpdir):
         self.path = tmpdir.mkdir("data")
-        self.store = parse_url(str(self.path), mode="w").store
-        self.root = zarr.group(store=self.store)
+        self.root = zarr.open_group(
+            str(self.path), mode="w", zarr_format=FormatV04().zarr_format
+        )
 
     def test_minimal_plate(self):
-        write_plate_metadata(self.root, ["A"], ["1"], ["A/1"])
+        write_plate_metadata(self.root, ["A"], ["1"], ["A/1"], fmt=FormatV01())
         row_group = self.root.require_group("A")
         well = row_group.require_group("1")
-        write_well_metadata(well, ["0"])
+        write_well_metadata(well, ["0"], fmt=FormatV04())
         image = well.require_group("0")
-        write_image(zeros((1, 1, 1, 256, 256)), image)
+        write_image(zeros((1, 1, 1, 256, 256)), image, fmt=FormatV01())
 
         node = Node(parse_url(str(self.path)), list())
         assert node.data
@@ -85,7 +86,7 @@ class TestHCSNode:
             write_well_metadata(well, ["0", "1", "2"], fmt=fmt)
             for field in range(3):
                 image = well.require_group(str(field))
-                write_image(zeros((1, 1, 1, 256, 256)), image)
+                write_image(zeros((1, 1, 1, 256, 256)), image, fmt=fmt)
 
         node = Node(parse_url(str(self.path)), list())
         assert node.data

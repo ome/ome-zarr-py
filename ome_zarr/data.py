@@ -1,7 +1,7 @@
 """Functions for generating synthetic data."""
 
+from collections.abc import Callable
 from random import randrange
-from typing import Callable, List, Optional, Tuple, Union
 
 import numpy as np
 import zarr
@@ -15,13 +15,22 @@ from skimage.segmentation import clear_border
 from .format import CurrentFormat, Format
 from .io import parse_url
 from .scale import Scaler
-from .writer import write_multiscale
+from .writer import add_metadata, write_multiscale
 
 CHANNEL_DIMENSION = 1
 
 
-def coins() -> Tuple[List, List]:
-    """Sample data from skimage."""
+def coins() -> tuple[list, list]:
+    """
+    Sample data from skimage.
+
+    Returns
+    -------
+    pyramids :
+        List of pyramid arrays.
+    labels :
+        List of labels.
+    """
     # Thanks to Juan
     # https://gist.github.com/jni/62e07ddd135dbb107278bc04c0f9a8e7
     image = data.coins()[50:-50, 50:-50]
@@ -36,8 +45,17 @@ def coins() -> Tuple[List, List]:
     return pyramid, labels
 
 
-def astronaut() -> Tuple[List, List]:
-    """Sample data from skimage."""
+def astronaut() -> tuple[list, list]:
+    """
+    Sample data from skimage.
+
+    Returns
+    -------
+    pyramids :
+        List of pyramid arrays.
+    labels :
+        List of labels.
+    """
     scaler = Scaler()
 
     astro = data.astronaut()
@@ -49,7 +67,7 @@ def astronaut() -> Tuple[List, List]:
     pyramid = scaler.nearest(pixels)
 
     shape = list(pyramid[0].shape)
-    c, y, x = shape
+    _c, y, x = shape
     label = np.zeros((y, x), dtype=np.int8)
     make_circle(100, 100, 1, label[200:300, 200:300])
     make_circle(150, 150, 2, label[250:400, 250:400])
@@ -85,7 +103,7 @@ def make_circle(h: int, w: int, value: int, target: np.ndarray) -> None:
     target[mask] = value
 
 
-def rgb_to_5d(pixels: np.ndarray) -> List:
+def rgb_to_5d(pixels: np.ndarray) -> list:
     """Convert an RGB image into 5D image (t, c, z, y, x)."""
     if len(pixels.shape) == 2:
         stack = np.array([pixels])
@@ -101,15 +119,15 @@ def rgb_to_5d(pixels: np.ndarray) -> List:
 
 def create_zarr(
     zarr_directory: str,
-    method: Callable[..., Tuple[List, List]] = coins,
+    method: Callable[..., tuple[list, list]] = coins,
     label_name: str = "coins",
     fmt: Format = CurrentFormat(),
-    chunks: Optional[Union[Tuple, List]] = None,
+    chunks: tuple | list | None = None,
 ) -> zarr.Group:
     """Generate a synthetic image pyramid with labels."""
     pyramid, labels = method()
 
-    loc = parse_url(zarr_directory, mode="w")
+    loc = parse_url(zarr_directory, mode="w", fmt=fmt)
     assert loc
     grp = zarr.group(loc.store)
     axes = None
@@ -144,6 +162,7 @@ def create_zarr(
                 {
                     "window": {"start": 0, "end": 255, "min": 0, "max": 255},
                     "color": "FF0000",
+                    "active": True,
                 }
             ],
             "rdefs": {"model": "greyscale"},
@@ -178,17 +197,18 @@ def create_zarr(
         axes=axes,
         storage_options=storage_options,
         metadata={"omero": image_data},
+        fmt=fmt,
     )
 
     if labels:
         labels_grp = grp.create_group("labels")
-        labels_grp.attrs["labels"] = [label_name]
+        add_metadata(labels_grp, {"labels": [label_name]})
 
         label_grp = labels_grp.create_group(label_name)
         if axes is not None:
             # remove channel axis for masks
             axes = axes.replace("c", "")
-        write_multiscale(labels, label_grp, axes=axes)
+        write_multiscale(labels, label_grp, axes=axes, fmt=fmt)
 
         colors = []
         properties = []
@@ -196,11 +216,16 @@ def create_zarr(
             rgba = [randrange(0, 256) for i in range(4)]
             colors.append({"label-value": x, "rgba": rgba})
             properties.append({"label-value": x, "class": f"class {x}"})
-        label_grp.attrs["image-label"] = {
-            "version": fmt.version,
-            "colors": colors,
-            "properties": properties,
-            "source": {"image": "../../"},
-        }
+        add_metadata(
+            label_grp,
+            {
+                "image-label": {
+                    "version": fmt.version,
+                    "colors": colors,
+                    "properties": properties,
+                    "source": {"image": "../../"},
+                }
+            },
+        )
 
     return grp

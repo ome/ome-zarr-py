@@ -1,5 +1,3 @@
-from typing import List, Type
-
 import pytest
 
 from ome_zarr.data import create_zarr
@@ -16,16 +14,14 @@ class TestStartingPoints:
         self.path = tmpdir.mkdir("data")
         create_zarr(str(self.path))
 
-    def matches(self, node: Node, expected: List[Type[Spec]]):
-        found: List[Type[Spec]] = list()
-        for spec in node.specs:
-            found.append(type(spec))
+    def matches(self, node: Node, expected: list[type[Spec]]):
+        found: list[type[Spec]] = [type(spec) for spec in node.specs]
 
         expected_names = sorted(x.__name__ for x in expected)
         found_names = sorted(x.__name__ for x in found)
         assert expected_names == found_names
 
-    def get_spec(self, node: Node, spec_type: Type[Spec]):
+    def get_spec(self, node: Node, spec_type: type[Spec]):
         for spec in node.specs:
             if isinstance(spec, spec_type):
                 return spec

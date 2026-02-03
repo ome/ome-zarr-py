@@ -34,20 +34,14 @@ To enable pre-commit code validation::
 Release process
 ---------------
 
-This repository uses `bump2version <https://pypi.org/project/bump2version/>`_ to manage version numbers.
-To tag a release run::
+This repository uses `setuptools_scm` to manage version numbers.
 
-    $ bumpversion release
+Go to https://github.com/ome/ome-zarr-py/releases and click on `Draft a new release`.
 
-This will remove the ``.dev0`` suffix from the current version, commit, and tag the release.
+Under `Choose a tag`, type the new version number (e.g. `0.1.0`) and choose
+`Create a new tag on publish` from the dropdown.
 
-To switch back to a development version run::
-
-    $ bumpversion --no-tag [major|minor|patch]
-
-specifying ``major``, ``minor`` or ``patch`` depending on whether the development branch will be a `major, minor or patch release <https://semver.org/>`_. This will also add the ``.dev0`` suffix.
-
-Remember to ``git push`` all commits and tags.
+Click on `Generate release notes` to create a changelog and `Publish release` to publish the release.
 
 License
 -------
@@ -56,13 +50,7 @@ Distributed under the terms of the `BSD`_ license,
 "ome-zarr-py" is free and open source software
 
 .. _`OME NGFF spec`: https://github.com/ome/ngff
-.. _`@napari`: https://github.com/napari
 .. _`BSD`: https://opensource.org/licenses/BSD-2-Clause
-.. _`Apache Software License 2.0`: http://www.apache.org/licenses/LICENSE-2.0
-.. _`Mozilla Public License 2.0`: https://www.mozilla.org/media/MPL/2.0/index.txt
-.. _`napari`: https://github.com/napari/napari
-.. _`napari-ome-zarr`: https://github.com/ome/napari-ome-zarr
-.. _`ome-zarr`: https://pypi.org/project/ome-zarr/
 
 .. |pypi| image:: https://badge.fury.io/py/ome-zarr.svg
     :alt: PyPI project
@@ -70,10 +58,8 @@ Distributed under the terms of the `BSD`_ license,
 
 .. |docs| image:: https://readthedocs.org/projects/ome-zarr/badge/?version=stable
     :alt: Documentation Status
-    :scale: 100%
     :target: https://ome-zarr.readthedocs.io/en/stable/?badge=stable
 
 .. |coverage| image:: https://codecov.io/gh/ome/ome-zarr-py/branch/master/graph/badge.svg
     :alt: Test coverage
-    :scale: 100%
     :target: https://codecov.io/gh/ome/ome-zarr-py

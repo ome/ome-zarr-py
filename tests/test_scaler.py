@@ -1,8 +1,12 @@
+import pathlib
+
 import dask.array as da
 import numpy as np
 import pytest
+import zarr
 
 from ome_zarr.scale import Scaler
+from ome_zarr.writer import write_image
 
 
 class TestScaler:
@@ -21,20 +25,21 @@ class TestScaler:
         rng = np.random.default_rng(0)
         return rng.poisson(mean_val, size=shape).astype(dtype)
 
-    def check_downscaled(self, downscaled, shape, scale_factor=2):
-        expected_shape = shape
-        for data in downscaled:
-            assert data.shape == expected_shape
-            assert data.dtype == downscaled[0].dtype
-            expected_shape = expected_shape[:-2] + tuple(
-                sh // scale_factor for sh in expected_shape[-2:]
-            )
+    def check_downscaled(self, downscaled, data, scale_factor=2):
+        expected_shape = data.shape
+        for level in downscaled:
+            assert level.dtype == data.dtype
+            if scale_factor is not None:
+                assert level.shape == expected_shape
+                expected_shape = expected_shape[:-2] + tuple(
+                    sh // scale_factor for sh in expected_shape[-2:]
+                )
 
     def test_nearest(self, shape):
         data = self.create_data(shape)
         scaler = Scaler()
         downscaled = scaler.nearest(data)
-        self.check_downscaled(downscaled, shape)
+        self.check_downscaled(downscaled, data)
 
     def test_nearest_via_method(self, shape):
         data = self.create_data(shape)
@@ -44,7 +49,7 @@ class TestScaler:
 
         scaler.method = "nearest"
         downscaled = scaler.func(data)
-        self.check_downscaled(downscaled, shape)
+        self.check_downscaled(downscaled, data)
 
         assert (
             np.sum(
@@ -56,27 +61,27 @@ class TestScaler:
             == 0
         )
 
-    # this fails because of wrong channel dimension; need to fix in follow-up PR
-    @pytest.mark.xfail
+    # NB: gaussian downscales ALL dimensions, not just YX
+    # so we SKIP the check on shape
     def test_gaussian(self, shape):
         data = self.create_data(shape)
         scaler = Scaler()
         downscaled = scaler.gaussian(data)
-        self.check_downscaled(downscaled, shape)
+        self.check_downscaled(downscaled, data, scale_factor=None)
 
-    # this fails because of wrong channel dimension; need to fix in follow-up PR
-    @pytest.mark.xfail
+    # NB: laplacian downscales ALL dimensions, not just YX
+    # so we SKIP the check on shape
     def test_laplacian(self, shape):
         data = self.create_data(shape)
         scaler = Scaler()
         downscaled = scaler.laplacian(data)
-        self.check_downscaled(downscaled, shape)
+        self.check_downscaled(downscaled, data, scale_factor=None)
 
     def test_local_mean(self, shape):
         data = self.create_data(shape)
         scaler = Scaler()
         downscaled = scaler.local_mean(data)
-        self.check_downscaled(downscaled, shape)
+        self.check_downscaled(downscaled, data)
 
     def test_local_mean_via_method(self, shape):
         data = self.create_data(shape)
@@ -86,7 +91,7 @@ class TestScaler:
 
         scaler.method = "local_mean"
         downscaled = scaler.func(data)
-        self.check_downscaled(downscaled, shape)
+        self.check_downscaled(downscaled, data)
 
         assert (
             np.sum(
@@ -103,7 +108,7 @@ class TestScaler:
         data = self.create_data(shape)
         scaler = Scaler()
         downscaled = scaler.zoom(data)
-        self.check_downscaled(downscaled, shape)
+        self.check_downscaled(downscaled, data)
 
     def test_scale_dask(self, shape):
         data = self.create_data(shape)
@@ -145,4 +150,25 @@ class TestScaler:
         print("level_1", level_1)
         # to zarr invokes compute
         data_dir = tmpdir.mkdir("test_big_dask_pyramid")
-        da.to_zarr(level_1, data_dir)
+        da.to_zarr(level_1, str(data_dir))
+
+    @pytest.mark.parametrize("method", ["gaussian", "laplacian"])
+    def test_pyramid_args(self, shape, tmpdir, method):
+        path = pathlib.Path(tmpdir.mkdir("data"))
+        group = zarr.open_group(path, mode="w")
+
+        data = self.create_data(shape)
+
+        scaler = Scaler(
+            downscale=2,
+            method=method,
+            max_layer=2,
+        )
+
+        axes = "tczyx"[-len(shape) :]
+        write_image(
+            image=data,
+            group=group,
+            scaler=scaler,
+            axes=axes,
+        )

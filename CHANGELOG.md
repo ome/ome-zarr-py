@@ -1,6 +1,32 @@
-# Unreleased
+
+# 0.11.1 (April 2025)
+
+- Use release/v1 PyPA action branch for publishing to PyPI ([#449](https://github.com/ome/ome-zarr-py/pull/449))
+
+# 0.11.0 (April 2025)
+
+- Browse collection of local OME-Zarr in BioFile Finder ([#436](https://github.com/ome/ome-zarr-py/pull/436))
+- Remove unused `distributed` from dependencies. Thanks to [Marvin Albert](https://github.com/m-albert) ([#441](https://github.com/ome/ome-zarr-py/pull/441))
+- Simplify `_create_mip()`. Thanks to [David Stansby](https://github.com/dstansby) ([#438](https://github.com/ome/ome-zarr-py/pull/438))
+- Add parameters to `info` documentation. Thanks to [David Stansby](https://github.com/dstansby) ([#437](https://github.com/ome/ome-zarr-py/pull/437))
+- Apply `ruff flake8` rules and other fixes. Thanks to [Dimitri Papadopoulos Orfanos](https://github.com/DimitriPapadopoulos) ([#423](https://github.com/ome/ome-zarr-py/pull/423) - [#434](https://github.com/ome/ome-zarr-py/pull/434))
+
+
+# 0.10.3 (January 2025)
+
+- Document Scaler attributes ([#418](https://github.com/ome/ome-zarr-py/pull/418))
+- Fix dimension separator when downloading files ([#419](https://github.com/ome/ome-zarr-py/pull/419))
+- Exclude bad version of fsspec in deps ([#420](https://github.com/ome/ome-zarr-py/pull/420))
+
+# 0.10.2 (November 2024)
 
 - Drop support for Python 3.8.
+- Document parameters and return value of `parse_url`.
+* Write metadata using delayed that depends on writing array(s)
+* Document return values of sample data
+* Simplify Python tutorial
+* pin zarr at < 3
+* Update version of pyupgrade
 
 # 0.9.0 (May 2024)
 
