@@ -72,6 +72,10 @@ class Scaler:
     max_layer: int = 4
     method: str = "nearest"
 
+    # 0: Nearest-neighbor
+    # 1: Bi-linear (default)
+    order: int = 1  # only used for resize
+
     @staticmethod
     def methods() -> Iterator[str]:
         """Return the name of all methods which define a downsampling.
@@ -163,7 +167,11 @@ class Scaler:
 
         dtype = image.dtype
         image = _resize(
-            image.astype(float), out_shape, order=1, mode="reflect", anti_aliasing=False
+            image.astype(float),
+            out_shape,
+            order=self.order,
+            mode="reflect",
+            anti_aliasing=False,
         )
         return image.astype(dtype)
 
@@ -195,25 +203,25 @@ class Scaler:
 
     def gaussian(self, base: np.ndarray) -> list[np.ndarray]:
         """Downsample using :func:`skimage.transform.pyramid_gaussian`."""
-        return list(
-            pyramid_gaussian(
-                base,
-                downscale=self.downscale,
-                max_layer=self.max_layer,
-                channel_axis=None,
-            )
+        dtype = base.dtype
+        pyramid = pyramid_gaussian(
+            base,
+            downscale=self.downscale,
+            max_layer=self.max_layer,
+            channel_axis=None,
         )
+        return [level.astype(dtype) for level in pyramid]
 
     def laplacian(self, base: np.ndarray) -> list[np.ndarray]:
         """Downsample using :func:`skimage.transform.pyramid_laplacian`."""
-        return list(
-            pyramid_laplacian(
-                base,
-                downscale=self.downscale,
-                max_layer=self.max_layer,
-                channel_axis=None,
-            )
+        dtype = base.dtype
+        pyramid = pyramid_laplacian(
+            base,
+            downscale=self.downscale,
+            max_layer=self.max_layer,
+            channel_axis=None,
         )
+        return [level.astype(dtype) for level in pyramid]
 
     def local_mean(self, base: np.ndarray) -> list[np.ndarray]:
         """Downsample using :func:`skimage.transform.downscale_local_mean`."""

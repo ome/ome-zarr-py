@@ -205,6 +205,8 @@ class ZarrLocation:
         Return whether the current underlying implementation
         points to a URL
         """
+        if isinstance(self.__store.fs.protocol, tuple):
+            return any(proto in ["http", "https"] for proto in self.__store.fs.protocol)
         return self.__store.fs.protocol in ["http", "https"]
 
 

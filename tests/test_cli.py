@@ -53,7 +53,7 @@ class TestCli:
             args += ["--format", fmt.version]
         main(args)
         main(["info", filename])
-        out, err = capsys.readouterr()
+        out, _err = capsys.readouterr()
         print("Captured output:", out)
         assert os.path.join("labels", "coins") in out
         version = fmt.version if fmt else CurrentFormat().version
@@ -84,7 +84,7 @@ class TestCli:
         main(["info", f"{out}/{basename}"])
 
         if fmt is not None and fmt.zarr_format == 2:
-            assert directory_items(Path(out) / "data-3") == [
+            assert directory_items(Path(out) / basename) == [
                 Path(".zattrs"),
                 Path(".zgroup"),
                 Path("0"),
@@ -94,7 +94,7 @@ class TestCli:
                 Path("4"),
                 Path("labels"),
             ]
-            assert directory_items(Path(out) / "data-3" / "1") == [
+            assert directory_items(Path(out) / basename / "1") == [
                 Path(".zarray"),
                 Path(".zattrs"),  # empty '{}'
                 Path("0"),
@@ -102,7 +102,7 @@ class TestCli:
                 Path("2"),
             ]
         else:
-            assert directory_items(Path(out) / "data-3") == [
+            assert directory_items(Path(out) / basename) == [
                 Path("0"),
                 Path("1"),
                 Path("2"),
@@ -111,7 +111,7 @@ class TestCli:
                 Path("labels"),
                 Path("zarr.json"),
             ]
-            assert directory_items(Path(out) / "data-3" / "1") == [
+            assert directory_items(Path(out) / basename / "1") == [
                 Path("c"),
                 Path("zarr.json"),
             ]
@@ -152,6 +152,10 @@ class TestCli:
             self._rotate_and_test(*list(secondpass), reverse=False)
 
     def test_view(self):
+        # view empty dir for code coverage
+        view(str(self.path), 8000, True)
+        view(str(self.path), 8000, True, force=True)
+
         filename = f"{self.path}-4"
         main(["create", "--method=astronaut", filename])
         # CLI doesn't support the dry_run option yet
@@ -196,11 +200,9 @@ class TestCli:
         with open(bf2raw_dir / ".zattrs", "w") as f:
             f.write("""{"bioformats2raw.layout" : 3}""")
         with open(bf2raw_dir / "OME" / "METADATA.ome.xml", "w") as f:
-            f.write(
-                """<?xml version="1.0" encoding="UTF-8"?>
+            f.write("""<?xml version="1.0" encoding="UTF-8"?>
                 <OME><Image ID="Image:1" Name="test.fake"></Image></OME>
-                """
-            )
+                """)
 
         # create a plate
         plate_path = Path(img_dir2.mkdir("plate"))
