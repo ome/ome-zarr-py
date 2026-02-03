@@ -569,7 +569,7 @@ def write_well_metadata(
 
 def write_image(
     image: ArrayLike,
-    group: zarr.Group,
+    group: zarr.Group | str,
     scale_factors: tuple[int, ...] = (2, 4, 8, 16),
     method: Methods | None = Methods.RESIZE,
     scaler: Scaler | None = None,
@@ -589,8 +589,8 @@ def write_image(
         The image data to save. A downsampling pyramid will be computed if
         `scale_factors` is provided. Image array MUST be up to 5-dimensional with
         dimensions ordered (t, c, z, y, x). Can be a NumPy or Dask array.
-    group : zarr.Group
-        The group within the zarr store to write the metadata in.
+    group : zarr.Group or str
+         The zarr group to write the metadata, or a path to create
     scale_factors : tuple of int, optional
         The downsampling factors for each pyramid level. Default: (2, 4, 8).
     method : ome_zarr.scale.Methods, optional
@@ -687,7 +687,7 @@ def _resolve_storage_options(
 
 def _write_dask_image(
     image: da.Array,
-    group: zarr.Group,
+    group: zarr.Group | str,
     scale_factors: tuple[int, ...] = (2, 4, 8, 16),
     method: Methods | None = Methods.RESIZE,
     scaler: Scaler | None = None,
@@ -701,7 +701,7 @@ def _write_dask_image(
 ) -> list:
     from .scale import build_pyramid
 
-    fmt = check_format(group, fmt)
+    group, fmt = check_group_fmt(group, fmt)
 
     if scaler is not None:
         msg = """
@@ -1068,7 +1068,7 @@ def write_labels(
         """
         warnings.warn(msg, DeprecationWarning)
 
-    fmt = check_format(group, fmt)
+    group, fmt = check_group_fmt(group, fmt)
     sub_group = group.require_group(f"labels/{name}")
 
     if method is None:
