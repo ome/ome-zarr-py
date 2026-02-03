@@ -19,7 +19,7 @@ repos:
           - --autofix
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.14.14
+    rev: v0.14.2
     hooks:
     - id: ruff-check
       args: ["--fix", "--show-fixes"]

@@ -5,8 +5,7 @@ See the :class:`~ome_zarr.scale.Scaler` class for details.
 
 import inspect
 import logging
-import os
-from collections.abc import Callable, Iterator, MutableMapping
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from typing import Any, Union
 
@@ -22,7 +21,6 @@ from skimage.transform import (
 )
 
 from .dask_utils import resize as dask_resize
-from .io import parse_url
 
 LOGGER = logging.getLogger("ome_zarr.scale")
 
@@ -98,14 +96,14 @@ class Scaler:
         """Perform downsampling to disk."""
         func = self.func
 
-        store = self.__check_store(output_directory)
+        # store = self.__check_store(output_directory)
         base = zarr.open_array(input_array)
         pyramid = func(base)
 
         if self.labeled:
             self.__assert_values(pyramid)
 
-        grp = self.__create_group(store, base, pyramid)
+        grp = self.__create_group(output_directory, base, pyramid)
 
         if self.copy_metadata:
             print(f"copying attribute keys: {list(base.attrs.keys())}")
@@ -118,13 +116,6 @@ class Scaler:
         if not func:
             raise Exception
         return func
-
-    def __check_store(self, output_directory: str) -> MutableMapping:
-        """Return a Zarr store if it doesn't already exist."""
-        assert not os.path.exists(output_directory)
-        loc = parse_url(output_directory, mode="w")
-        assert loc
-        return loc.store
 
     def __assert_values(self, pyramid: list[np.ndarray]) -> None:
         """Check for a single unique set of values for all pyramid levels."""
@@ -141,10 +132,10 @@ class Scaler:
                 )
 
     def __create_group(
-        self, store: MutableMapping, base: np.ndarray, pyramid: list[np.ndarray]
+        self, dir_path: str, base: np.ndarray, pyramid: list[np.ndarray]
     ) -> zarr.Group:
         """Create group and datasets."""
-        grp = zarr.group(store)
+        grp = zarr.open_group(dir_path, mode="w")
         grp.create_dataset("base", data=base)
         series = []
         for i in range(len(pyramid)):
@@ -212,25 +203,25 @@ class Scaler:
 
     def gaussian(self, base: np.ndarray) -> list[np.ndarray]:
         """Downsample using :func:`skimage.transform.pyramid_gaussian`."""
-        return list(
-            pyramid_gaussian(
-                base,
-                downscale=self.downscale,
-                max_layer=self.max_layer,
-                channel_axis=None,
-            )
+        dtype = base.dtype
+        pyramid = pyramid_gaussian(
+            base,
+            downscale=self.downscale,
+            max_layer=self.max_layer,
+            channel_axis=None,
         )
+        return [level.astype(dtype) for level in pyramid]
 
     def laplacian(self, base: np.ndarray) -> list[np.ndarray]:
         """Downsample using :func:`skimage.transform.pyramid_laplacian`."""
-        return list(
-            pyramid_laplacian(
-                base,
-                downscale=self.downscale,
-                max_layer=self.max_layer,
-                channel_axis=None,
-            )
+        dtype = base.dtype
+        pyramid = pyramid_laplacian(
+            base,
+            downscale=self.downscale,
+            max_layer=self.max_layer,
+            channel_axis=None,
         )
+        return [level.astype(dtype) for level in pyramid]
 
     def local_mean(self, base: np.ndarray) -> list[np.ndarray]:
         """Downsample using :func:`skimage.transform.downscale_local_mean`."""
