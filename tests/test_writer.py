@@ -275,11 +275,10 @@ class TestWriter:
                 assert group[0].chunks == (1, 50, 50)
             else:
                 assert group[0].chunks == storage_options["chunks"]
+        elif storage_options is None:
+            pass
         else:
-            if storage_options is None:
-                pass
-            else:
-                assert group[0].chunks == storage_options["chunks"]
+            assert group[0].chunks == storage_options["chunks"]
 
     @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])
     @pytest.mark.parametrize("storage_options", [None, {"chunks": (1, 100, 100)}])
@@ -309,11 +308,10 @@ class TestWriter:
                     assert group[i].chunks == (1, 50, 50)
                 else:
                     assert group[i].chunks == storage_options["chunks"]
+            elif storage_options is None:
+                pass
             else:
-                if storage_options is None:
-                    pass
-                else:
-                    assert group[i].chunks == storage_options["chunks"]
+                assert group[i].chunks == storage_options["chunks"]
 
     @pytest.mark.parametrize("read_from_zarr", [True, False])
     @pytest.mark.parametrize("compute", [True, False])
