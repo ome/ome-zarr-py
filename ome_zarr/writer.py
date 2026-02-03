@@ -699,7 +699,7 @@ def _write_dask_image(
     compute: bool | None = True,
     **metadata: str | JSONDict | list[JSONDict],
 ) -> list:
-    from .scale import build_pyramid
+    from .scale import _build_pyramid
 
     group, fmt = check_group_fmt(group, fmt)
 
@@ -745,7 +745,7 @@ def _write_dask_image(
             zarr_array_kwargs["compressor"] = options.pop("compressor")
 
     # Create the pyramid
-    pyramid = build_pyramid(
+    pyramid = _build_pyramid(
         image,
         list(scale_factors),
         dims=dims,

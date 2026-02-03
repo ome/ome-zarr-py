@@ -154,7 +154,7 @@ class TestScaler:
     @pytest.mark.parametrize("method", ["nearest", "resize"])
     @pytest.mark.parametrize("n_levels", [1, 2, 3, 4])
     def test_build_pyramid(self, shape, method, n_levels):
-        from ome_zarr.scale import build_pyramid
+        from ome_zarr.scale import _build_pyramid
 
         data = self.create_data(shape)
 
@@ -166,7 +166,7 @@ class TestScaler:
             dims = ("y", "x")
 
         scale_factors = [2**i for i in range(1, n_levels)]
-        pyramid = build_pyramid(
+        pyramid = _build_pyramid(
             image=data,
             scale_factors=scale_factors,
             method=method,

@@ -303,16 +303,31 @@ class Methods(Enum):
     NEAREST = "nearest"
 
 
-def build_pyramid(
+def _build_pyramid(
     image: da.Array | np.ndarray,
     scale_factors: list[int],
     dims: Sequence[str],
     method: str | Methods = "nearest",
     chunks: tuple[int, ...] | None | str = None,
 ) -> list[da.Array]:
-    """Build a pyramid of downscaled images.
+    """
+    Build a pyramid of downscaled images.
 
-    :type image: :class:`dask.array` or :class:`numpy.ndarray`
+    Parameters
+    ----------
+    image : dask.array.Array or numpy.ndarray
+        The input image to downscale.
+    scale_factors : list of int
+        The downscaling factors for each pyramid level.
+    dims : sequence of str
+        The dimension names corresponding to the image axes.
+    method : str or Methods, optional
+        The downsampling method to use. Options are "resize" or "nearest".
+        Default is "nearest".
+    chunks : tuple of int, str, or None, optional
+        The chunk size to use for dask arrays. If None, the array's existing
+        chunking is used. If a string, it should be a valid dask chunking
+        specification. Default is None.
     """
 
     if isinstance(image, np.ndarray):
