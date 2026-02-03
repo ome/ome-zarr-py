@@ -200,11 +200,9 @@ class TestCli:
         with open(bf2raw_dir / ".zattrs", "w") as f:
             f.write("""{"bioformats2raw.layout" : 3}""")
         with open(bf2raw_dir / "OME" / "METADATA.ome.xml", "w") as f:
-            f.write(
-                """<?xml version="1.0" encoding="UTF-8"?>
+            f.write("""<?xml version="1.0" encoding="UTF-8"?>
                 <OME><Image ID="Image:1" Name="test.fake"></Image></OME>
-                """
-            )
+                """)
 
         # create a plate
         plate_path = Path(img_dir2.mkdir("plate"))
