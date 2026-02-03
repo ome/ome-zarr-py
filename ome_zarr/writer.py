@@ -607,6 +607,7 @@ def write_image(
             storage_options=storage_options,
             name=name,
             compute=compute,
+            zarr_array_kwargs=zarr_array_kwargs,
             **metadata,
         )
     else:
@@ -865,6 +866,7 @@ def write_multiscale_labels(
     storage_options: JSONDict | list[JSONDict] | None = None,
     label_metadata: JSONDict | None = None,
     compute: bool | None = True,
+    zarr_array_kwargs: dict[str, Any] | None = None,
     **metadata: JSONDict,
 ) -> list:
     """
@@ -930,6 +932,7 @@ def write_multiscale_labels(
         storage_options=storage_options,
         name=name,
         compute=compute,
+        zarr_array_kwargs=zarr_array_kwargs,
         **metadata,
     )
     write_label_metadata(
@@ -954,6 +957,7 @@ def write_labels(
     storage_options: JSONDict | list[JSONDict] | None = None,
     label_metadata: JSONDict | None = None,
     compute: bool | None = True,
+    zarr_array_kwargs: dict[str, Any] | None = None,
     **metadata: JSONDict,
 ) -> list:
     """
@@ -1031,6 +1035,7 @@ def write_labels(
             storage_options=storage_options,
             name=name,
             compute=compute,
+            zarr_array_kwargs=zarr_array_kwargs,
             **metadata,
         )
     else:
@@ -1045,6 +1050,7 @@ def write_labels(
             storage_options=storage_options,
             name=name,
             compute=compute,
+            zarr_array_kwargs=zarr_array_kwargs,
             **metadata,
         )
     write_label_metadata(
