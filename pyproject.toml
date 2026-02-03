@@ -18,7 +18,7 @@ requires-python = ">3.10"
 
 dependencies = [
     "numpy",
-    "dask>=2026.1.1",
+    "dask==2026.1.1",
     "zarr>=3.0.0",
     "fsspec[s3]>=0.8,!=2021.07.0,!=2023.9.0",
     "aiohttp",
