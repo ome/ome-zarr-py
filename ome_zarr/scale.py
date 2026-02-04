@@ -352,7 +352,7 @@ def _build_pyramid(
         if idx == 0:
             relative_factor = scale_factors[0]
         else:
-            relative_factor = factor / scale_factors[idx - 1]
+            relative_factor: float | int = factor / scale_factors[idx - 1]
 
         # Build per-dimension factor (only spatial dims are downsampled)
         per_dim_factor = tuple(
