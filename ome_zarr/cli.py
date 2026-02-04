@@ -72,16 +72,31 @@ def create(args: argparse.Namespace) -> None:
 
 
 def scale(args: argparse.Namespace) -> None:
-    """Wrap the :func:`~ome_zarr.scale.Scaler.scale` method."""
-    scaler = Scaler(
-        copy_metadata=args.copy_metadata,
-        downscale=args.downscale,
-        in_place=args.in_place,
-        labeled=args.labeled,
-        max_layer=args.max_layer,
+    from .writer import write_image
+    import dask.array as da
+    import zarr
+    """Wrap the :func:`~ome_zarr.scale._build_pyramid` method."""
+    base = zarr.open_array(args.input_array, mode="r")
+    scale_factors = tuple(args.downscale**i for i in range(1, args.max_layer + 1))
+
+    data = da.from_zarr(args.input_array)
+    print(data.shape, data.dtype)  # type: ignore
+    print(scale_factors)
+    print(args.dims)
+
+    write_image(
+        data,
+        args.output_directory,
+        axes=str(args.dims),
         method=args.method,
+        scale_factors=scale_factors
     )
-    scaler.scale(args.input_array, args.output_directory)
+
+    grp = zarr.open_group(args.output_directory, mode="a")
+
+    if args.copy_metadata:
+        print(f"copying attribute keys: {list(base.attrs.keys())}")
+        grp.attrs.update(base.attrs)
 
 
 def csv_to_labels(args: argparse.Namespace) -> None:
@@ -166,24 +181,21 @@ def main(args: list[str] | None = None) -> None:
     parser_scale = subparsers.add_parser("scale")
     parser_scale.add_argument("input_array")
     parser_scale.add_argument("output_directory")
-    parser_scale.add_argument(
-        "--labeled",
-        action="store_true",
-        help="assert that the list of unique pixel values doesn't change",
-    )
+    parser_scale.add_argument("dims", type=str, help="Dimensions of input data, i.e. 'zyx' or 'tczyx'.")
     parser_scale.add_argument(
         "--copy-metadata",
         action="store_true",
         help="copies the array metadata to the new group",
     )
     parser_scale.add_argument(
-        "--method", choices=list(Scaler.methods()), default="nearest"
+        "--method", choices=list(['nearest', 'resize', 'laplacian', 'local_mean', 'zoom']), default="resize"
     )
     parser_scale.add_argument(
         "--in-place", action="store_true", help="if true, don't write the base array"
     )
     parser_scale.add_argument("--downscale", type=int, default=2)
     parser_scale.add_argument("--max_layer", type=int, default=4)
+    
     parser_scale.set_defaults(func=scale)
 
     # csv to label properties
