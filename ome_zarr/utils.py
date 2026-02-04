@@ -389,7 +389,7 @@ def download(input_path: str, output_dir: str = ".") -> None:
                                 arr=data,
                                 url=root.store,
                                 component=dataset,
-                                zarr_array_kwargs=zarr_array_kwargs,
+                                **zarr_array_kwargs,
                             )
             else:
                 # Assume a group that needs metadata, like labels

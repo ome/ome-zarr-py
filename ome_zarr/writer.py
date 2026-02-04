@@ -12,6 +12,7 @@ import numpy as np
 import zarr
 from dask.graph_manipulation import bind
 from numcodecs import Blosc
+from packaging.version import Version
 
 from .axes import Axes
 from .format import CurrentFormat, Format, FormatV01, FormatV02, FormatV04
@@ -310,6 +311,21 @@ def write_multiscale(
     axes = _get_valid_axes(dims, axes, fmt)
     dask_delayed = []
 
+    storage_options = storage_options if storage_options is not None else {}
+
+    storage_options.setdefault("name", None)
+    if name and not storage_options["name"]:
+        storage_options["name"] = name
+        warnings.warn(
+            "The use of the name argument is being deprecated and will be removed in future version. Please"
+            "provide `name` in `storage_options` instead.",
+            DeprecationWarning,
+        )
+    elif name and storage_options["name"]:
+        warnings.warn(
+            "Name is defined twice. The `name` as defined in `storage_options` will be used."
+        )
+
     datasets: list[dict] = []
     for path, data in enumerate(pyramid):
         options = _resolve_storage_options(storage_options, path)
@@ -317,8 +333,8 @@ def write_multiscale(
         # ensure that the chunk dimensions match the image dimensions
         # (which might have been changed for versions 0.1 or 0.2)
         # if chunks are explicitly set in the storage options
-        chunks_opt = options.pop("chunks", None)
-        if chunks_opt is not None:
+        chunks_opt = options.pop("chunks", "auto")
+        if chunks_opt != "auto":
             chunks_opt = _retuple(chunks_opt, data.shape)
             options["chunks"] = chunks_opt
 
@@ -351,15 +367,22 @@ def write_multiscale(
             level_image = da.from_array(data)
         if chunks_opt is not None:
             level_image = level_image.rechunk(chunks=chunks_opt)
-        da_delayed = da.to_zarr(
-            arr=level_image,
-            url=group.store,
-            component=str(Path(group.path, str(path))),
-            compute=compute,
-            zarr_format=zarr_format,
-            zarr_array_kwargs=options,
-        )
 
+        options["name"] = str(Path(group.path, str(path)))
+        if Version(zarr.__version__) >= Version("3.0.0"):
+            da_delayed = da.to_zarr(
+                arr=level_image,
+                url=group.store,
+                compute=compute,
+                **options,
+            )
+        else:
+            da_delayed = da.to_zarr(
+                arr=level_image,
+                url=group.store,
+                compute=compute,
+                **options,
+            )
         if not compute:
             dask_delayed.append(da_delayed)
 
@@ -381,11 +404,13 @@ def write_multiscale(
         write_multiscales_metadata_delayed = dask.delayed(write_multiscales_metadata)
         return dask_delayed + [
             bind(write_multiscales_metadata_delayed, dask_delayed)(
-                group, datasets, fmt, axes, name, **metadata
+                group, datasets, fmt, axes, storage_options["name"], **metadata
             )
         ]
     else:
-        write_multiscales_metadata(group, datasets, fmt, axes, name, **metadata)
+        write_multiscales_metadata(
+            group, datasets, fmt, axes, storage_options["name"], **metadata
+        )
 
     return dask_delayed
 
@@ -787,7 +812,7 @@ def _write_dask_image(
                 url=group.store,
                 component=str(Path(group.path, str(idx))),
                 compute=False,
-                zarr_array_kwargs=zarr_array_kwargs,
+                **zarr_array_kwargs,
             )
         )
         datasets.append({"path": str(idx)})
