@@ -30,7 +30,7 @@ from ome_zarr.format import (
     FormatV05,
     format_from_version,
 )
-from ome_zarr.scale import Scaler
+from ome_zarr.scale import _build_pyramid
 from ome_zarr.writer import (
     _get_valid_axes,
     _retuple,
@@ -46,10 +46,10 @@ from ome_zarr.writer import (
 
 TRANSFORMATIONS = [
     [{"scale": [1, 1, 0.5, 0.18, 0.18], "type": "scale"}],
-    [{"scale": [1, 1, 0.5, 0.36, 0.36], "type": "scale"}],
-    [{"scale": [1, 1, 0.5, 0.72, 0.72], "type": "scale"}],
-    [{"scale": [1, 1, 0.5, 1.44, 1.44], "type": "scale"}],
-    [{"scale": [1, 1, 0.5, 2.88, 2.88], "type": "scale"}],
+    [{"scale": [1, 1, 1.0, 0.36, 0.36], "type": "scale"}],
+    [{"scale": [1, 1, 2.0, 0.72, 0.72], "type": "scale"}],
+    [{"scale": [1, 1, 4.0, 1.44, 1.44], "type": "scale"}],
+    [{"scale": [1, 1, 8.0, 2.88, 2.88], "type": "scale"}],
 ]
 
 
@@ -81,13 +81,6 @@ class TestWriter:
     def shape(self, request):
         return request.param
 
-    @pytest.fixture(params=[True, False], ids=["scale", "noop"])
-    def scaler(self, request):
-        if request.param:
-            return Scaler()
-        else:
-            return None
-
     @pytest.mark.parametrize(
         "format_version",
         (
@@ -101,7 +94,7 @@ class TestWriter:
     @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])
     @pytest.mark.parametrize("storage_options_list", [True, False])
     def test_writer(
-        self, shape, scaler, format_version, array_constructor, storage_options_list
+        self, shape, format_version, array_constructor, storage_options_list
     ):
         version = format_version()
 
@@ -120,8 +113,7 @@ class TestWriter:
             transformations.append(
                 [{"type": "scale", "scale": transf["scale"][-len(shape) :]}]
             )
-        if scaler is None:
-            transformations = [transformations[0]]
+
         chunks = [(128, 128), (50, 50), (25, 25), (25, 25), (25, 25), (25, 25)]
         storage_options = {"chunks": chunks[0]}
         if storage_options_list:
@@ -129,7 +121,6 @@ class TestWriter:
         write_image(
             image=data,
             group=str(grp_path),
-            scaler=scaler,
             fmt=version,
             axes=axes,
             coordinate_transformations=transformations,
@@ -239,14 +230,14 @@ class TestWriter:
             d["coordinateTransformations"]
             for d in node_metadata["multiscales"][0]["datasets"]
         ]
-        for transfs in cts:
+        for level, transfs in enumerate(cts):
             assert len(transfs) == 1
             assert transfs[0]["type"] == "scale"
             assert len(transfs[0]["scale"]) == len(shape)
-            # Scaler only downsamples x and y. z scale will be 1
-            assert transfs[0]["scale"][0] == 1
-            for value in transfs[0]["scale"]:
-                assert value >= 1
+
+            # default downsamples by factor 2 each level
+            for idx, value in enumerate(transfs[0]["scale"]):
+                assert value == shape[idx] / (shape[idx] // (2**level))
 
     @pytest.mark.parametrize("read_from_zarr", [True, False])
     @pytest.mark.parametrize("compute", [True, False])
@@ -333,10 +324,9 @@ class TestWriter:
             assert len(transfs) == 1
             assert transfs[0]["type"] == "scale"
             assert len(transfs[0]["scale"]) == len(shape)
-            # Scaler only downsamples x and y. z scale will be 1
-            assert transfs[0]["scale"][0] == 1
-            for value in transfs[0]["scale"]:
-                assert value >= 1
+
+            for idx, value in enumerate(transfs[0]["scale"]):
+                assert value == shape[idx] / (shape[idx] // (2**level))
             if read_from_zarr and level < 3:
                 # if shape smaller than chunk, dask writer uses chunk == shape
                 # so we only compare larger resolutions
@@ -489,7 +479,7 @@ class TestWriter:
                 }
             else:
                 assert (path / ".zattrs").exists()
-                default_cname = "lz4" if isinstance(arr, da.Array) else "zstd"
+                default_cname = "zstd"
                 json_text = (path / ds / ".zarray").read_text(encoding="utf-8")
                 arr_json = json.loads(json_text)
                 assert arr_json["compressor"] == {
@@ -1429,13 +1419,12 @@ class TestLabelWriter:
         self.path_v3 = self.path / "v3"
         self.root_v3 = zarr.open_group(self.path_v3, mode="w", zarr_format=3)
 
-    def create_image_data(self, group, shape, scaler, fmt, axes, transformations):
+    def create_image_data(self, group, shape, fmt, axes, transformations):
         rng = np.random.default_rng(0)
         data = rng.poisson(10, size=shape).astype(np.uint8)
         write_image(
             image=data,
             group=group,
-            scaler=scaler,
             fmt=fmt,
             axes=axes,
             coordinate_transformations=transformations,
@@ -1452,13 +1441,6 @@ class TestLabelWriter:
     )
     def shape(self, request):
         return request.param
-
-    @pytest.fixture(params=[True, False], ids=["scale", "noop"])
-    def scaler(self, request):
-        if request.param:
-            return Scaler()
-        else:
-            return None
 
     def verify_label_data(
         self, img_path, label_name, label_data, fmt, shape, transformations
@@ -1543,8 +1525,8 @@ class TestLabelWriter:
             transformations.append(
                 [{"type": "scale", "scale": transf["scale"][-len(shape) :]}]
             )
-            if scale_type == "noop":
-                break
+            # if scale_type == "noop":
+            #     break
 
         # create the actual label data: zeros with blobs
         label_data = np.zeros(shape, dtype=np.uint8)
@@ -1568,15 +1550,8 @@ class TestLabelWriter:
         label_name = "my-labels"
         label_data = array_constructor(label_data)
 
-        scaler = Scaler()
-        if scale_type == "noop":
-            scaler = None
-        kwargs = {"scaler": scaler}
-        if scale_type == "default":
-            del kwargs["scaler"]
-
         # create the root level image data
-        self.create_image_data(group, shape, scaler, fmt, axes, transformations)
+        self.create_image_data(group, shape, fmt, axes, transformations)
 
         write_labels(
             label_data,
@@ -1585,7 +1560,6 @@ class TestLabelWriter:
             fmt=fmt,
             axes=axes,
             coordinate_transformations=transformations,
-            **kwargs,
         )
         label_data = self.verify_label_data(
             img_path, label_name, label_data, fmt, shape, transformations
@@ -1610,9 +1584,7 @@ class TestLabelWriter:
         ),
     )
     @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])
-    def test_write_multiscale_labels(
-        self, shape, scaler, format_version, array_constructor
-    ):
+    def test_write_multiscale_labels(self, shape, format_version, array_constructor):
         fmt = format_version()
         if fmt.version == "0.5":
             img_path = self.path_v3
@@ -1639,17 +1611,25 @@ class TestLabelWriter:
         label_data = array_constructor(label_data)
 
         label_name = "my-labels"
-        if scaler is None:
-            transformations = [transformations[0]]
-            labels_mip = [label_data]
-        else:
-            labels_mip = scaler.nearest(label_data)
 
         # create the root level image data
-        self.create_image_data(group, shape, scaler, fmt, axes, transformations)
+        self.create_image_data(group, shape, fmt, axes, transformations)
+
+        # TODO: remove test or cleaner passage of dims
+        dims = ()
+        if len(label_data.shape) == 5:
+            dims = ("t", "c", "z", "y", "x")
+        elif len(label_data.shape) == 3:
+            dims = ("z", "y", "x")
+        elif len(label_data.shape) == 2:
+            dims = ("y", "x")
+
+        pyramid = _build_pyramid(
+            label_data, method="nearest", scale_factors=[2, 4, 8, 16], dims=dims
+        )
 
         write_multiscale_labels(
-            labels_mip,
+            pyramid,
             group,
             name=label_name,
             fmt=fmt,
@@ -1680,11 +1660,9 @@ class TestLabelWriter:
 
         # create the root level image data
         shape = (1, 2, 1, 256, 256)
-        scaler = Scaler()
         self.create_image_data(
             group,
             shape,
-            scaler,
             axes=axes,
             fmt=fmt,
             transformations=transformations,
@@ -1694,7 +1672,12 @@ class TestLabelWriter:
         for label_name in label_names:
             label_data = np.random.randint(0, 1000, size=shape)
             label_data = array_constructor(label_data)
-            labels_mip = scaler.nearest(label_data)
+            labels_mip = _build_pyramid(
+                label_data,
+                method="nearest",
+                scale_factors=[2, 4, 8, 16],
+                dims=("t", "c", "z", "y", "x"),
+            )
 
             write_multiscale_labels(
                 labels_mip,
