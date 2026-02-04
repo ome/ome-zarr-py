@@ -80,9 +80,6 @@ def scale(args: argparse.Namespace) -> None:
     scale_factors = tuple(args.downscale**i for i in range(1, args.max_layer + 1))
 
     data = da.from_zarr(args.input_array)
-    print(data.shape, data.dtype)  # type: ignore
-    print(scale_factors)
-    print(args.dims)
 
     write_image(
         data,
@@ -181,14 +178,14 @@ def main(args: list[str] | None = None) -> None:
     parser_scale = subparsers.add_parser("scale")
     parser_scale.add_argument("input_array")
     parser_scale.add_argument("output_directory")
-    parser_scale.add_argument("dims", type=str, help="Dimensions of input data, i.e. 'zyx' or 'tczyx'.")
+    parser_scale.add_argument("axes", type=str, help="Dimensions of input data, i.e. 'zyx' or 'tczyx'.")
     parser_scale.add_argument(
         "--copy-metadata",
         action="store_true",
         help="copies the array metadata to the new group",
     )
     parser_scale.add_argument(
-        "--method", choices=list(['nearest', 'resize', 'laplacian', 'local_mean', 'zoom']), default="resize"
+        "--method", choices=['nearest', 'resize', 'laplacian', 'local_mean', 'zoom'], default="resize"
     )
     parser_scale.add_argument(
         "--in-place", action="store_true", help="if true, don't write the base array"
