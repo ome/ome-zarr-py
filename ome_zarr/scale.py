@@ -350,7 +350,7 @@ def _build_pyramid(
     for idx, factor in enumerate(scale_factors):
         # Compute relative factor for this level
         if idx == 0:
-            relative_factor = scale_factors[0]
+            relative_factor: float | int = scale_factors[0]
         else:
             relative_factor: float | int = factor / scale_factors[idx - 1]
 
