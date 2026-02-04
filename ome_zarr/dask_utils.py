@@ -9,7 +9,9 @@ from dask import array as da
 # See https://github.com/toloudis/ome-zarr-py/pull/1
 
 
-def _better_chunksize(image: da.Array, factors: np.ndarray) -> tuple[Sequence[int], Sequence[int]]:
+def _better_chunksize(
+    image: da.Array, factors: np.ndarray
+) -> tuple[Sequence[int], Sequence[int]]:
     better_chunksize = tuple(
         np.maximum(1, np.round(np.array(image.chunksize) * factors) / factors).astype(
             int
