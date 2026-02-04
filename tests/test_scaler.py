@@ -151,7 +151,7 @@ class TestScaler:
         data_dir = tmpdir.mkdir("test_big_dask_pyramid")
         da.to_zarr(level_1, str(data_dir))
 
-    @pytest.mark.parametrize("method", ["nearest", "resize"])
+    @pytest.mark.parametrize("method", ["nearest", "resize", "laplacian", "local_mean", "zoom"])
     @pytest.mark.parametrize("n_levels", [1, 2, 3, 4])
     def test_build_pyramid(self, shape, method, n_levels):
         from ome_zarr.scale import _build_pyramid
