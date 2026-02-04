@@ -24,6 +24,9 @@ from skimage.transform import (
 )
 
 from .dask_utils import resize as dask_resize
+from .dask_utils import laplacian as dask_laplacian
+from .dask_utils import local_mean as dask_local_mean
+from .dask_utils import zoom as dask_zoom
 
 LOGGER = logging.getLogger("ome_zarr.scale")
 
@@ -301,6 +304,9 @@ SPATIAL_DIMS = ("z", "y", "x")
 class Methods(Enum):
     RESIZE = "resize"
     NEAREST = "nearest"
+    LAPLACIAN = "laplacian"
+    LOCAL_MEAN = "local_mean"
+    ZOOM = "zoom"
 
 
 def _build_pyramid(
@@ -378,6 +384,21 @@ def _build_pyramid(
                 order=0,
                 preserve_range=True,
                 anti_aliasing=False,
+            )
+        elif method == Methods.LAPLACIAN:
+            new_image = dask_laplacian(
+                images[-1],
+                output_shape=tuple(target_shape),
+            )
+        elif method == Methods.LOCAL_MEAN:
+            new_image = dask_local_mean(
+                images[-1],
+                output_shape=target_shape,
+            )
+        elif method == Methods.ZOOM:
+            new_image = dask_zoom(
+                images[-1],
+                output_shape=target_shape,
             )
         else:
             raise ValueError(f"Unknown downsampling method: {method}")

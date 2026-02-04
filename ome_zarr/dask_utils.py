@@ -9,6 +9,26 @@ from dask import array as da
 # See https://github.com/toloudis/ome-zarr-py/pull/1
 
 
+def _better_chunksize(image: da.Array, factors: np.ndarray) -> tuple[int, ...]:
+    better_chunksize = tuple(
+        np.maximum(1, np.round(np.array(image.chunksize) * factors) / factors).astype(
+            int
+        )
+    )
+
+    # If E.g. we resize image from 6675 by 0.5 to 3337, factor is 0.49992509 so each
+    # chunk of size e.g. 1000 will resize to 499. When assumbled into a new array, the
+    # array will now be of size 3331 instead of 3337 because each of 6 chunks was
+    # smaller by 1. When we compute() this, dask will read 6 chunks of 1000 and expect
+    # last chunk to be 337 but instead it will only be 331.
+    # So we use ceil() here (and in resize_block) to round 499.925 up to chunk of 500
+    block_output_shape = tuple(
+        np.ceil(np.array(better_chunksize) * factors).astype(int)
+    )
+
+    return better_chunksize, block_output_shape
+
+
 def resize(
     image: da.Array, output_shape: Sequence[int], *args: Any, **kwargs: Any
 ) -> da.Array:
@@ -28,22 +48,8 @@ def resize(
     factors = np.array(output_shape) / np.array(image.shape).astype(float)
     # Rechunk the input blocks so that the factors achieve an output
     # blocks size of full numbers.
-    better_chunksize = tuple(
-        np.maximum(1, np.round(np.array(image.chunksize) * factors) / factors).astype(
-            int
-        )
-    )
+    better_chunksize, block_output_shape = _better_chunksize(image, factors)
     image_prepared = image.rechunk(better_chunksize)
-
-    # If E.g. we resize image from 6675 by 0.5 to 3337, factor is 0.49992509 so each
-    # chunk of size e.g. 1000 will resize to 499. When assumbled into a new array, the
-    # array will now be of size 3331 instead of 3337 because each of 6 chunks was
-    # smaller by 1. When we compute() this, dask will read 6 chunks of 1000 and expect
-    # last chunk to be 337 but instead it will only be 331.
-    # So we use ceil() here (and in resize_block) to round 499.925 up to chunk of 500
-    block_output_shape = tuple(
-        np.ceil(np.array(better_chunksize) * factors).astype(int)
-    )
 
     # Map overlap
     def resize_block(image_block: da.Array, block_info: dict) -> da.Array:
@@ -59,6 +65,102 @@ def resize(
     output_slices = tuple(slice(0, d) for d in output_shape)
     output = da.map_blocks(
         resize_block, image_prepared, dtype=image.dtype, chunks=block_output_shape
+    )[output_slices]
+    return output.rechunk(image.chunksize).astype(image.dtype)
+
+
+def laplacian(image: da.Array, output_shape: Sequence[int], *args, **kwargs) -> da.Array:
+    r"""
+    Laplacian pyramid downscaling.
+    :type image: :class:`dask.array`
+    :param image: The dask array to resize
+    :type output_shape: Sequence[int]
+    :param output_shape: The shape of the resize array
+    :return: Resized image.
+    """
+    from skimage.transform import pyramid_laplacian
+    factors = np.array(output_shape) / np.array(image.shape).astype(float)
+    better_chunksize, block_output_shape = _better_chunksize(image, factors)
+    image_prepared = image.rechunk(better_chunksize)
+
+    def laplacian_block(image_block: da.Array) -> da.Array:
+        laplacian = pyramid_laplacian(
+            image_block,
+            *args,
+            **kwargs
+        )
+        return next(laplacian).astype(image_block.dtype)
+
+    output_slices = tuple(slice(0, d) for d in output_shape)
+    output = da.map_blocks(
+        laplacian_block,
+        image_prepared,
+        dtype=image.dtype,
+        chunks=block_output_shape
+    )[output_slices]
+    return output.rechunk(image.chunksize).astype(image.dtype)
+
+
+def local_mean(image: da.Array, output_shape: Sequence[int], *args, **kwargs) -> da.Array:
+    """
+    Local mean downscaling.
+
+    :type image: :class:`dask.array.Array`
+    :param image: The dask array to resize
+    :type output_shape: Sequence[int]
+    :param output_shape: The shape of the resize array
+    :return: Resized image.
+    """
+    from skimage.transform import downscale_local_mean
+    factors = np.array(output_shape) / np.array(image.shape).astype(float)
+    better_chunksize, block_output_shape = _better_chunksize(image, factors)
+    image_prepared = image.rechunk(better_chunksize)
+
+    def local_mean_block(image_block: da.Array) -> da.Array:
+        local_mean = downscale_local_mean(
+            image_block,
+            factors,
+            *args,
+            **kwargs
+        )
+        return local_mean.astype(image_block.dtype)
+
+    output_slices = tuple(slice(0, d) for d in output_shape)
+    output = da.map_blocks(
+        local_mean_block,
+        image_prepared,
+        dtype=image.dtype,
+        chunks=block_output_shape
+    )[output_slices]
+    return output.rechunk(image.chunksize).astype(image.dtype)
+
+
+def zoom(image: da.Array, output_shape: Sequence[int], *args, **kwargs) -> da.Array:
+    """
+    Scipy zoom downscaling by integer factors.
+
+    :type image: :class:`dask.array.Array`
+    :param image: The dask array to resize
+    :type output_shape: Sequence[int]
+    :param output_shape: The shape of the resize array
+    :return: Resized image.
+    """
+    from scipy.ndimage import zoom
+    factors = np.array(output_shape) / np.array(image.shape).astype(float)
+    better_chunksize, block_output_shape = _better_chunksize(image, factors)
+    image_prepared = image.rechunk(better_chunksize)
+
+    def zoom_block(image_block: da.Array) -> da.Array:
+        zoomed = zoom(image_block, 1 / factors, order=1)
+        return zoomed.astype(image_block.dtype)
+
+    output_shape = tuple(d // f for d, f in zip(image.shape, factors))
+    output_slices = tuple(slice(0, d) for d in output_shape)
+    output = da.map_blocks(
+        zoom_block,
+        image_prepared,
+        dtype=image.dtype,
+        chunks=block_output_shape
     )[output_slices]
     return output.rechunk(image.chunksize).astype(image.dtype)
 
