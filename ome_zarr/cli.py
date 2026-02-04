@@ -179,7 +179,9 @@ def main(args: list[str] | None = None) -> None:
     parser_scale = subparsers.add_parser("scale")
     parser_scale.add_argument("input_array")
     parser_scale.add_argument("output_directory")
-    parser_scale.add_argument("axes", type=str, help="Dimensions of input data, i.e. 'zyx' or 'tczyx'.")
+    parser_scale.add_argument(
+        "axes", type=str, help="Dimensions of input data, i.e. 'zyx' or 'tczyx'."
+    )
     parser_scale.add_argument(
         "--copy-metadata",
         action="store_true",
