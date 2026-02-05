@@ -259,6 +259,17 @@ def check_format(
     return fmt
 
 
+def _prepare_zarr_array_kwargs(zarr_array_kwargs):
+    # this should be a string but is assigned just before to_zarr is called to allow for passing multiscale name.
+    zarr_array_kwargs.setdefault("name", None)
+
+    zarr_array_kwargs.setdefault("chunks", "auto")
+    zarr_array_kwargs.setdefault("filters", "auto")
+    zarr_array_kwargs.setdefault("shards", None)
+    zarr_array_kwargs.setdefault("compressors", "auto")
+    zarr_array_kwargs.setdefault("serializer", "auto")
+
+
 def write_multiscale(
     pyramid: ListOfArrayLike,
     group: zarr.Group,
@@ -312,8 +323,8 @@ def write_multiscale(
     dask_delayed = []
 
     storage_options = storage_options if storage_options is not None else {}
+    _prepare_zarr_array_kwargs(storage_options)
 
-    storage_options.setdefault("name", None)
     if name and not storage_options["name"]:
         storage_options["name"] = name
         warnings.warn(
@@ -340,7 +351,7 @@ def write_multiscale(
 
         options["chunk_key_encoding"] = fmt.chunk_key_encoding
         zarr_format = fmt.zarr_format
-        compressor = options.pop("compressor", None)
+        compressor = options.pop("compressor", "auto")
         if zarr_format == 2:
             # by default we use Blosc with zstd compression
             # Don't need this for zarr v3 as it has a default compressor
