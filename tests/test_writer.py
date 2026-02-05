@@ -20,6 +20,7 @@ from ome_zarr_models.v05.well import Well as Models05Well
 from skimage.data import binary_blobs
 from zarr.abc.codec import BytesBytesCodec
 from zarr.codecs import BloscCodec
+import numcodecs
 
 from ome_zarr.format import (
     CurrentFormat,
@@ -1572,6 +1573,145 @@ class TestLabelWriter:
         if fmt.version == "0.4":
             test_root = zarr.open(self.path)
             Models04Labels.from_zarr(test_root["labels"])
+
+    @pytest.mark.parametrize(
+        "format_version",
+        (
+                # pytest.param(FormatV01, id="V01"),
+                # pytest.param(FormatV02, id="V02"),
+                # pytest.param(FormatV03, id="V03"),
+                # pytest.param(FormatV04, id="V04"),
+                pytest.param(FormatV05, id="V05"),
+        ),
+    )
+    @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])
+    def test_write_labels_with_storage_options(self,shape, format_version, array_constructor):
+        """Test that storage_options are properly passed to zarr array creation."""
+
+        fmt = format_version()
+        if fmt.version == "0.5":
+            img_path = self.path_v3
+            group = self.root_v3
+        else:
+            img_path = self.path
+            group = self.root
+
+        axes = "tczyx"[-len(shape):]
+        transformations = []
+        for dataset_transfs in TRANSFORMATIONS:
+            transf = dataset_transfs[0]
+            # e.g. slice [1, 1, z, x, y] -> [z, x, y] for 3D
+            transformations.append(
+                [{"type": "scale", "scale": transf["scale"][-len(shape):]}]
+            )
+            # if scale_type == "noop":
+            #     break
+
+        # create the actual label data: zeros with blobs
+        label_data = np.zeros(shape, dtype=np.uint8)
+        # add some blobs, corresponding to shape
+        blobs = binary_blobs(length=256, volume_fraction=0.1, n_dim=2).astype("int8")
+        # we only apply blobs to the last two dimensions of label_data
+        slices = [slice(None)] * (len(shape) - blobs.ndim)
+        slices += [slice(0, 256), slice(0, 256)]
+        label_data[tuple(slices)] = 2 * blobs
+
+        print("label_data.shape:", label_data.shape, shape)
+        assert label_data.max() == 2
+        assert label_data.min() == 0
+        assert np.unique(label_data).tolist() == [0, 2]
+
+        if fmt.version in ("0.1", "0.2"):
+            # v0.1 and v0.2 require 5d
+            expand_dims = (np.s_[None],) * (5 - len(shape))
+            label_data = label_data[expand_dims]
+            assert label_data.ndim == 5
+        label_name = "my-labels"
+        label_data = array_constructor(label_data)
+
+        # create the root level image data
+        self.create_image_data(group, shape, fmt, axes, transformations)
+
+        from zarr.codecs import BytesCodec, BloscCodec, ShardingCodec, TransposeCodec, Delta
+        # Define comprehensive storage options
+
+        # TODO having shards corresponding to chunks will prevent permission errors, otherwise you get permission errors.
+        storage_options = {
+            "chunks": tuple([min(128, s) for s in shape]),  # Adaptive chunk size
+            "shards": tuple([min(128, s) for s in shape]) if fmt.version == "0.5" else None,  # Zarr v3 only
+            # "filters": [Delta(dtype='int32')],
+            "compressors": [BloscCodec(cname='lz4', clevel=5, shuffle="shuffle")],
+            "serializer": BytesCodec(endian="little") if fmt.version == "0.5" else None,
+            # Zarr v3 only
+            "fill_value": 0,
+            "dimension_names": list(axes) if fmt.version == "0.5" else None,
+            "order": "C",
+        }
+
+        # Remove None values
+        storage_options = {k: v for k, v in storage_options.items() if v is not None}
+
+        # Write labels with storage options
+        write_labels(
+            label_data,
+            group,
+            name=label_name,
+            fmt=fmt,
+            axes=axes,
+            coordinate_transformations=transformations,
+            storage_options=storage_options,
+        )
+
+        # Verify the data was written correctly
+        label_group = group[f"labels/{label_name}"]
+        level0 = label_group["0"]
+
+        # Check shape and data
+        assert level0.shape == shape
+
+        # Get the actual data for comparison
+        if hasattr(label_data, 'compute'):
+            expected_data = label_data.compute()
+        else:
+            expected_data = label_data
+
+        assert np.array_equal(level0[:], expected_data)
+
+        # Verify chunks
+        expected_chunks = tuple([min(128, s) for s in shape])
+        assert level0.chunks == expected_chunks, \
+            f"Expected chunks {expected_chunks}, got {level0.chunks}"
+
+        # Verify shards (zarr v3 / format v0.5 only)
+        if fmt.version == "0.5" and hasattr(level0, 'shards'):
+            expected_shards = tuple([min(256, s) for s in shape])
+            assert level0.shards == expected_shards, \
+                f"Expected shards {expected_shards}, got {level0.shards}"
+
+        # Verify fill_value
+        assert level0.fill_value == 0
+
+        # Verify compressor (zarr v2 uses 'compressor', v3 uses 'compressors')
+        if hasattr(level0, 'compressor') and level0.compressor is not None:
+            assert level0.compressor.cname == 'zstd'
+            assert level0.compressor.clevel == 5
+
+        # Verify filters (if supported)
+        if hasattr(level0, 'filters') and level0.filters is not None:
+            assert len(level0.filters) > 0
+
+        # Verify serializer (zarr v3 / format v0.5 only)
+        if fmt.version == "0.5" and hasattr(level0, 'serializer'):
+            # The serializer should be set (exact comparison depends on zarr's internal representation)
+            assert level0.serializer is not None
+
+        # Verify dimension_names (zarr v3 feature, format v0.5)
+        if fmt.version == "0.5" and hasattr(level0, 'dimension_names'):
+            assert level0.dimension_names == tuple(axes)
+
+        # Verify metadata is valid
+        if fmt.version == "0.4":
+            Models04Labels.from_zarr(group["labels"])
 
     @pytest.mark.parametrize(
         "format_version",

@@ -757,21 +757,21 @@ def _write_dask_image(
 
     if zarr_format == 2:
         zarr_array_kwargs["chunk_key_encoding"] = {"name": "v2", "separator": "/"}
-        zarr_array_kwargs["compressor"] = options.pop("compressor", _blosc_compressor())
+        zarr_array_kwargs["compressors"] = options.pop("compressor", "auto")
     else:
         if axes is not None:
             zarr_array_kwargs["dimension_names"] = [
                 a["name"] for a in axes if isinstance(a, dict)
             ]
-        if "compressor" in options:
+        if "compressor" in options or "compressors" in options:
             # We use 'compressors' for group.create_array() but da.to_zarr() below uses
-            # zarr.create() which doesn't support 'compressors'
+            # zarr.create() in dask < 2025.12.0 which doesn't support 'compressors'
             # TypeError: AsyncArray._create() got an unexpected keyword argument 'compressors'
             # kwargs["compressors"] = [options.pop("compressor", _blosc_compressor())]
 
             # ValueError: compressor cannot be used for arrays with zarr_format 3.
             # Use bytes-to-bytes codecs instead.
-            zarr_array_kwargs["compressor"] = options.pop("compressor")
+            zarr_array_kwargs["compressors"] = options.pop("compressor", None) or options.pop("compressors", "auto")
 
     # Create the pyramid
     pyramid = _build_pyramid(
@@ -786,8 +786,7 @@ def _write_dask_image(
     delayed = []
 
     for idx, level in enumerate(pyramid):
-
-        # LOGGER.debug(f"write_image path: {path}")
+        zarr_array_kwargs_copy = zarr_array_kwargs.copy()
         options = _resolve_storage_options(storage_options, idx)
 
         # ensure that the chunk dimensions match the image dimensions
@@ -796,19 +795,19 @@ def _write_dask_image(
         chunks_opt = None
         if isinstance(storage_options, list) and isinstance(storage_options[idx], dict):
             if "chunks" in storage_options[idx]:
-                chunks_opt = options.pop("chunks", None)
+                chunks_opt = options.pop("chunks", "auto")
 
         elif isinstance(storage_options, dict) and "chunks" in storage_options:
-            chunks_opt = options.pop("chunks", None)
+            chunks_opt = options.pop("chunks", "auto")
 
-        if chunks_opt is not None:
+        if chunks_opt is not "auto":
             chunks_opt = _retuple(chunks_opt, level.shape)
             # image.chunks will be used by da.to_zarr
-            zarr_array_kwargs["chunks"] = chunks_opt
             level_image = da.array(level).rechunk(chunks=chunks_opt)
         else:
             level_image = level
-
+        # Chunks would always be at least `auto` which is the default so it can be always safely assigned.
+        zarr_array_kwargs_copy["chunks"] = chunks_opt
         shapes.append(level_image.shape)
 
         LOGGER.debug(
@@ -817,13 +816,16 @@ def _write_dask_image(
             level_image.dtype,
         )
 
+        for k, v in options.items():
+            if k not in zarr_array_kwargs_copy:
+                zarr_array_kwargs_copy[k] = v
         delayed.append(
             da.to_zarr(
                 arr=level_image,
                 url=group.store,
                 component=str(Path(group.path, str(idx))),
                 compute=False,
-                **zarr_array_kwargs,
+                **zarr_array_kwargs_copy,
             )
         )
         datasets.append({"path": str(idx)})
