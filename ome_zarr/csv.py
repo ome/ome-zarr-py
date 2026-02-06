@@ -1,9 +1,7 @@
 import csv
 import os
 
-from zarr.convenience import open as zarr_open
-
-from .io import parse_url
+import zarr
 
 # d: DoubleColumn, for floating point numbers
 # l: LongColumn, for integer numbers
@@ -104,12 +102,10 @@ def dict_to_zarr(
     :param zarr_id:         Key of label property, where value is key of props_to_add
     """
 
-    zarr = parse_url(zarr_path)
-    if not zarr:
-        raise Exception(f"No zarr found at {zarr_path}")
-
-    plate_attrs = zarr.root_attrs.get("plate", None)
-    multiscales = "multiscales" in zarr.root_attrs
+    root = zarr.open_group(zarr_path)
+    root_attrs = root.attrs.asdict()
+    plate_attrs = root_attrs.get("plate", None)
+    multiscales = "multiscales" in root_attrs
     if plate_attrs is None and not multiscales:
         raise Exception("zarr_path must be to plate.zarr or image.zarr")
 
@@ -124,7 +120,7 @@ def dict_to_zarr(
         labels_paths = [os.path.join(zarr_path, "labels", "0")]
 
     for path_to_labels in labels_paths:
-        label_group = zarr_open(path_to_labels)
+        label_group = zarr.open_group(path_to_labels)
         attrs = label_group.attrs.asdict()
         properties = attrs.get("image-label", {}).get("properties")
         if properties is None:
