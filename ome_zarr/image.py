@@ -133,6 +133,18 @@ class Image:
         group: zarr.Group | str,
         version: str = "0.5",
     ):
+        """
+        Serialize the Image and its multiscales to an OME-Zarr group.
+
+        Parameters
+        ----------
+        group : zarr.Group or str
+            The target Zarr group or path where the OME-Zarr data will be written.
+        storage_options : dict, optional
+            Additional storage options to pass to the Zarr, such as:
+            - `compressor`: A Zarr compressor instance to use for compressing the data.
+            - `chunks`: A tuple specifying the chunk shape to use when writing the data.
+        """
         import os
         import shutil
 
