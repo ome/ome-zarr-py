@@ -32,6 +32,7 @@ class Image:
     _build_multiscales: bool = field(default=True, repr=False)
 
     def __post_init__(self):
+        from .scale import _build_pyramid
 
         # set default scale if unset
         if not self.scale:
@@ -52,7 +53,7 @@ class Image:
             v05.Dataset(
                 path="scale0",
                 coordinateTransformations=[
-                    v05.ScaleTransformation(scale=list(self.scale))
+                    v05.ScaleTransformation(scale=list(self.scale.values()))
                 ],
             )
         ]
@@ -75,50 +76,38 @@ class Image:
         if not self._build_multiscales:
             return
 
-        # Create multiscales
-        images = [
-            Image(
-                data=self.data,
-                dims=self.dims,
-                scale_factors=[],
-                scale=self.scale,
-                scale_method=self.scale_method,
-                axes_units=self.axes_units,
-                labels=self.labels,
-                name=self.name,
-                _build_multiscales=False,
-            )
+        pyramid = _build_pyramid(
+            image=self.data,
+            dims=self.dims,
+            scale_factors=self.scale_factors,
+            method=self.scale_method,
+        )
+
+        scales = [
+            {
+                d: self.scale[d] 
+                if d in SPATIAL_DIMS
+                else 1 for d in self.dims
+            }
         ]
+        for scale_factor in self.scale_factors:
+            level_scale = {
+                d: self.scale[d] * scale_factor
+                if d in SPATIAL_DIMS
+                else 1 for d in self.dims
+            }
+            scales.append(level_scale)
 
-        for idx, factor in enumerate(self.scale_factors):
-
-            # for scale factors except the root resolution, we use relative scale factors
-            if idx == 0:
-                relative_factor = int(self.scale_factors[0])
-            else:
-                relative_factor = self.scale_factors[idx] // self.scale_factors[idx - 1]
-
-            relative_factor = tuple(
-                relative_factor if d in SPATIAL_DIMS else 1 for d in self.dims
-            )
-
-            # Calculate target shape, leave non-spatial dims unchanged
-            target_shape = [
-                s // f if d in SPATIAL_DIMS else s
-                for s, d, f in zip(images[-1].data.shape, self.dims, relative_factor)
-            ]
-
-            if self.scale_method == Methods.RESIZE:
-                from .dask_utils import resize
-
-                new_image = resize(images[-1].data, output_shape=tuple(target_shape))
+        images = []
+        datasets = []
+        for idx, (level, scale) in enumerate(zip(pyramid, scales)):
 
             images.append(
                 Image(
-                    data=new_image,
+                    data=level,
                     dims=self.dims,
                     scale_factors=[],
-                    scale=tuple(s * factor for s in self.scale),
+                    scale=scale,
                     scale_method=self.scale_method,
                     axes_units=self.axes_units,
                     labels=self.labels,
@@ -127,9 +116,11 @@ class Image:
                 )
             )
             ds = v05.Dataset(
-                path=f"s{idx+1}",
+                path=f"scale{idx+1}",
                 coordinateTransformations=[
-                    v05.ScaleTransformation(scale=list(np.asarray(self.scale) * factor))
+                    v05.ScaleTransformation(
+                        scale=list(scale.values())
+                    )
                 ],
             )
             datasets.append(ds)
@@ -143,22 +134,22 @@ class Image:
 
     def to_ome_zarr(
         self,
-        group: zarr.Group,
+        group: zarr.Group | str,
         version: str = "0.5",
-        chunks: tuple[Any, ...] | int | None = None,
     ):
         import os
         import shutil
-
+        import zarr
         from .writer import write_multiscale
 
         if os.path.exists(str(group)):
             shutil.rmtree(str(group))
 
         write_multiscale(
-            self.multiscales,
+            pyramid=[img.data for img in self.multiscales],
             group=group,
-            chunks=chunks,
         )
 
-        group.attrs["ome"] = self.metadata.model_dump(exclude_none=True)
+        if isinstance(group, str):
+            group = zarr.open(group, mode="r+")
+            group.attrs["ome"] = self.metadata.model_dump(exclude_none=True)
