@@ -44,7 +44,7 @@ class Image:
 
         # coerce scale to dict if it's a sequence
         if isinstance(self.scale, Sequence):
-            self.scale = {d: s for d, s in zip(self.dims, self.scale)} 
+            self.scale = {d: s for d, s in zip(self.dims, self.scale)}
 
         if isinstance(self.scale_method, Methods):
             self.scale_method = str(self.scale_method.value)
@@ -83,18 +83,11 @@ class Image:
             method=self.scale_method,
         )
 
-        scales = [
-            {
-                d: self.scale[d] 
-                if d in SPATIAL_DIMS
-                else 1 for d in self.dims
-            }
-        ]
+        scales = [{d: self.scale[d] if d in SPATIAL_DIMS else 1 for d in self.dims}]
         for scale_factor in self.scale_factors:
             level_scale = {
-                d: self.scale[d] * scale_factor
-                if d in SPATIAL_DIMS
-                else 1 for d in self.dims
+                d: self.scale[d] * scale_factor if d in SPATIAL_DIMS else 1
+                for d in self.dims
             }
             scales.append(level_scale)
 
@@ -118,9 +111,7 @@ class Image:
             ds = v05.Dataset(
                 path=f"scale{idx+1}",
                 coordinateTransformations=[
-                    v05.ScaleTransformation(
-                        scale=list(scale.values())
-                    )
+                    v05.ScaleTransformation(scale=list(scale.values()))
                 ],
             )
             datasets.append(ds)
@@ -139,7 +130,9 @@ class Image:
     ):
         import os
         import shutil
+
         import zarr
+
         from .writer import write_multiscale
 
         if os.path.exists(str(group)):
