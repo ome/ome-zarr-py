@@ -361,7 +361,7 @@ def write_multiscale(
         da_delayed = da.to_zarr(
             arr=level_image,
             url=group.store,
-            component=str(Path(group.path, str(path))),
+            component=str(Path(group.path, f"scale{path}")),
             compute=compute,
             zarr_format=zarr_format,
             zarr_array_kwargs=options,

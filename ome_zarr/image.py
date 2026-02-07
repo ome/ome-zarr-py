@@ -50,7 +50,7 @@ class Image:
 
         datasets = [
             v05.Dataset(
-                path="s0",
+                path="scale0",
                 coordinateTransformations=[
                     v05.ScaleTransformation(scale=list(self.scale))
                 ],
