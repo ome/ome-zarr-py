@@ -164,5 +164,5 @@ class Image:
             group=group,
             storage_options=storage_options,
         )
-        
+
         group.attrs["ome"] = self.metadata.model_dump(exclude_none=True)
