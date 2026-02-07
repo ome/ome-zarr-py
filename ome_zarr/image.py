@@ -156,13 +156,14 @@ class Image:
         if os.path.exists(str(group)):
             shutil.rmtree(str(group))
 
-        if isinstance(group, str):
-            group = zarr.open(group, mode="r+")
-
         write_multiscale(
             pyramid=[img.data for img in self.multiscales],
             group=group,
             storage_options=storage_options,
+            axes=self.dims,
         )
-        
+
+        if isinstance(group, str):
+            group = zarr.open(group, mode="r+")
+
         group.attrs["ome"] = self.metadata.model_dump(exclude_none=True)
