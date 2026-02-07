@@ -131,6 +131,7 @@ class Image:
     def to_ome_zarr(
         self,
         group: zarr.Group | str,
+        storage_options: dict[str, Any] | None = None,
         version: str = "0.5",
     ):
         """
@@ -155,11 +156,13 @@ class Image:
         if os.path.exists(str(group)):
             shutil.rmtree(str(group))
 
+        if isinstance(group, str):
+            group = zarr.open(group, mode="r+")
+
         write_multiscale(
             pyramid=[img.data for img in self.multiscales],
             group=group,
+            storage_options=storage_options,
         )
-
-        if isinstance(group, str):
-            group = zarr.open(group, mode="r+")
-            group.attrs["ome"] = self.metadata.model_dump(exclude_none=True)
+        
+        group.attrs["ome"] = self.metadata.model_dump(exclude_none=True)
