@@ -21,7 +21,7 @@ class Image:
     data: da.Array | np.ndarray
     dims: Sequence[str] | str
     scale_factors: list[int] = field(default_factory=lambda: [2, 4, 8])
-    scale: Sequence[float] | None = None
+    scale: Sequence[float] | dict[str, float] | None = None
     scale_method: str | Methods = Methods.RESIZE
     axes_units: dict[str, str] | None = field(default_factory=dict)
     labels: dict[str, Any] | None = field(default_factory=dict)
@@ -40,6 +40,13 @@ class Image:
         # coerce dims to list of dims
         if isinstance(self.dims, str):
             self.dims = [d for d in self.dims]
+
+        # coerce scale to dict if it's a sequence
+        if isinstance(self.scale, Sequence):
+            self.scale = {d: s for d, s in zip(self.dims, self.scale)} 
+
+        if isinstance(self.scale_method, Methods):
+            self.scale_method = str(self.scale_method.value)
 
         datasets = [
             v05.Dataset(
