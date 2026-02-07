@@ -49,6 +49,11 @@ class Image:
         if isinstance(self.scale_method, Methods):
             self.scale_method = str(self.scale_method.value)
 
+        if len(self.dims) != len(self.data.shape):
+            raise ValueError(
+                f"Number of dimensions in data ({len(self.data.shape)}) does not match number of dims ({len(self.dims)})"
+            )
+
         datasets = [
             v05.Dataset(
                 path="scale0",
