@@ -8,8 +8,7 @@ import numpy as np
 import zarr
 from yaozarrs import v05
 
-from ome_zarr.writer import _get_valid_axes
-from .format import CurrentFormat, Format, FormatV01, FormatV02, FormatV04
+from .format import Format
 
 
 class Methods(Enum):
@@ -74,21 +73,13 @@ class Image:
         axes = []
         for d in self.dims:
             if d in SPATIAL_DIMS:
-                axes.append(
-                    v05.SpaceAxis(name=d, unit=self.axes_units.get(d, None))
-                    )
+                axes.append(v05.SpaceAxis(name=d, unit=self.axes_units.get(d, None)))
             elif d == "t":
-                axes.append(
-                    v05.TimeAxis(name=d, unit=self.axes_units.get(d, None))
-                    )
+                axes.append(v05.TimeAxis(name=d, unit=self.axes_units.get(d, None)))
             elif d == "c":
-                axes.append(
-                    v05.ChannelAxis(name=d, unit=self.axes_units.get(d, None))
-                    )
+                axes.append(v05.ChannelAxis(name=d, unit=self.axes_units.get(d, None)))
             else:
-                axes.append(
-                    v05.CustomAxis(name=d, unit=self.axes_units.get(d, None))
-                )
+                axes.append(v05.CustomAxis(name=d, unit=self.axes_units.get(d, None)))
 
         self.metadata = v05.Multiscale(
             axes=axes,
@@ -167,7 +158,9 @@ class Image:
         """
         import os
         import shutil
+
         import zarr
+
         from .writer import (
             _write_pyramid_to_zarr,
             check_group_fmt,
@@ -179,16 +172,16 @@ class Image:
         group, fmt = check_group_fmt(group, fmt)
 
         if not self.multiscales:
-            raise ValueError("No multiscale data to write. Ensure that the Image has multiscales built.")
+            raise ValueError(
+                "No multiscale data to write. Ensure that the Image has multiscales built."
+            )
 
         # coerce data to dask arrays for writing
         pyramid = [
-            img.data 
-            if isinstance(img.data, da.Array)
-            else da.from_array(img.data)
+            img.data if isinstance(img.data, da.Array) else da.from_array(img.data)
             for img in self.multiscales
             if self.multiscales is not None
-            ]
+        ]
 
         _write_pyramid_to_zarr(
             pyramid=pyramid,
