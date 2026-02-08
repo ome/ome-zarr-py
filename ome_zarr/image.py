@@ -254,3 +254,56 @@ class NgffMultiscales:
             group = zarr.open(group, mode="r+")
 
         group.attrs["ome"] = self.metadata.model_dump(exclude_none=True)
+
+
+    @classmethod
+    def from_ome_zarr(
+        cls,
+        group: zarr.Group | str,
+    ) -> "NgffMultiscales":
+        """
+        Load a multiscale pyramid from an OME-Zarr group.
+
+        Parameters
+        ----------
+        group : zarr.Group or str
+            The Zarr group or path containing the OME-Zarr data.
+
+        Returns
+        -------
+        Multiscales
+            A Multiscales container with the loaded images and metadata.
+        """
+        import json
+
+        if isinstance(group, str):
+            group = zarr.open(group, mode="r")
+
+        metadata_json = group.attrs.get("ome", None)
+        if metadata_json is None:
+            raise ValueError("OME metadata not found in Zarr group attributes")
+
+        metadata = v05.Multiscale.model_validate(metadata_json)
+
+        images = []
+        for dataset in metadata.datasets:
+            path = dataset.path
+            data = da.from_zarr(group[path])
+            scale = dataset.coordinateTransformations[0].scale
+            axes_units = {ax.name: ax.unit for ax in metadata.axes}
+            if all(s is None for s in axes_units.values()):
+                axes_units = None
+            images.append(
+                NgffImage(
+                    data=data,
+                    dims=[ax.name for ax in metadata.axes],
+                    scale={d.name: s for d, s in zip(metadata.axes, scale)},
+                    axes_units=axes_units,
+                    name=metadata.name,
+                )
+            )
+
+        instance = cls.__new__(cls)
+        instance.images = images
+        instance.metadata = metadata
+        return instance
