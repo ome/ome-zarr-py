@@ -12,7 +12,6 @@ import numpy as np
 import zarr
 from dask.graph_manipulation import bind
 from numcodecs import Blosc
-from packaging.version import Version
 
 from .axes import Axes
 from .format import CurrentFormat, Format, FormatV01, FormatV02, FormatV04
@@ -325,17 +324,26 @@ def write_multiscale(
     storage_options = storage_options if storage_options is not None else {}
     _prepare_zarr_array_kwargs(storage_options)
 
-    if name and not storage_options["name"]:
-        storage_options["name"] = name
-        warnings.warn(
-            "The use of the name argument is being deprecated and will be removed in future version. Please"
-            "provide `name` in `storage_options` instead.",
-            DeprecationWarning,
-        )
-    elif name and storage_options["name"]:
-        warnings.warn(
-            "Name is defined twice. The `name` as defined in `storage_options` will be used."
-        )
+    if isinstance(storage_options, dict):
+        if name is not None and not storage_options.get("name"):
+            storage_options["name"] = name
+            warnings.warn(
+                "The use of the name argument is being deprecated and will be removed in future version. Please"
+                "provide `name` in `storage_options` instead.",
+                DeprecationWarning,
+            )
+        elif name is not None and storage_options["name"]:
+            warnings.warn(
+                "Name is defined twice. The `name` as defined in `storage_options` will be used."
+            )
+    elif isinstance(storage_options, list):
+        if name is not None and not all(x.get("name") for x in storage_options):
+            for store_dict in storage_options:
+                store_dict["name"] = name
+        elif name is not None and any(x.get("name") for x in storage_options):
+            warnings.warn(
+                "Name is defined twice. The `name` as defined in `storage_options` will be used."
+            )
 
     datasets: list[dict] = []
     for path, data in enumerate(pyramid):
@@ -355,12 +363,12 @@ def write_multiscale(
         if zarr_format == 2:
             # by default we use Blosc with zstd compression
             # Don't need this for zarr v3 as it has a default compressor
-            if compressor is None:
-                compressor = _blosc_compressor()
-            options["compressor"] = compressor
+            options["compressors"] = compressor
         else:
+            if "compressor" in options:
+                del options["compressor"]
             if compressor is not None:
-                options["compressors"] = [compressor]
+                options["compressors"] = compressor
             if axes is not None:
                 # the array zarr.json also contains axes names
                 # TODO: check if this is written by da.to_zarr
@@ -380,20 +388,13 @@ def write_multiscale(
             level_image = level_image.rechunk(chunks=chunks_opt)
 
         options["name"] = str(Path(group.path, str(path)))
-        if Version(zarr.__version__) >= Version("3.0.0"):
-            da_delayed = da.to_zarr(
-                arr=level_image,
-                url=group.store,
-                compute=compute,
-                **options,
-            )
-        else:
-            da_delayed = da.to_zarr(
-                arr=level_image,
-                url=group.store,
-                compute=compute,
-                **options,
-            )
+
+        da_delayed = da.to_zarr(
+            arr=level_image,
+            url=group.store,
+            compute=compute,
+            **options,
+        )
         if not compute:
             dask_delayed.append(da_delayed)
 
@@ -411,17 +412,20 @@ def write_multiscale(
         for dataset, transform in zip(datasets, coordinate_transformations):
             dataset["coordinateTransformations"] = transform
 
+    name = (
+        storage_options["name"]
+        if isinstance(storage_options, dict)
+        else storage_options[0]["name"]
+    )
     if len(dask_delayed) > 0 and not compute:
         write_multiscales_metadata_delayed = dask.delayed(write_multiscales_metadata)
         return dask_delayed + [
             bind(write_multiscales_metadata_delayed, dask_delayed)(
-                group, datasets, fmt, axes, storage_options["name"], **metadata
+                group, datasets, fmt, axes, name, **metadata
             )
         ]
     else:
-        write_multiscales_metadata(
-            group, datasets, fmt, axes, storage_options["name"], **metadata
-        )
+        write_multiscales_metadata(group, datasets, fmt, axes, name, **metadata)
 
     return dask_delayed
 
@@ -771,7 +775,9 @@ def _write_dask_image(
 
             # ValueError: compressor cannot be used for arrays with zarr_format 3.
             # Use bytes-to-bytes codecs instead.
-            zarr_array_kwargs["compressors"] = options.pop("compressor", None) or options.pop("compressors", "auto")
+            zarr_array_kwargs["compressors"] = options.pop(
+                "compressor", None
+            ) or options.pop("compressors", "auto")
 
     # Create the pyramid
     pyramid = _build_pyramid(
@@ -792,7 +798,8 @@ def _write_dask_image(
         # ensure that the chunk dimensions match the image dimensions
         # (which might have been changed for versions 0.1 or 0.2)
         # if chunks are explicitly set in the storage options
-        chunks_opt = None
+        chunks_opt = "auto"
+        shards_opt = None
         if isinstance(storage_options, list) and isinstance(storage_options[idx], dict):
             if "chunks" in storage_options[idx]:
                 chunks_opt = options.pop("chunks", "auto")
@@ -800,14 +807,32 @@ def _write_dask_image(
         elif isinstance(storage_options, dict) and "chunks" in storage_options:
             chunks_opt = options.pop("chunks", "auto")
 
-        if chunks_opt is not "auto":
+        if isinstance(storage_options, list) and isinstance(storage_options[idx], dict):
+            if "shards" in storage_options[idx]:
+                shards_opt = options.pop("shards", None)
+
+        elif isinstance(storage_options, dict) and "shards" in storage_options:
+            shards_opt = options.pop("shards", None)
+
+        if storage_options is None:
+            zarr_array_kwargs_copy["chunks"] = chunks_opt = "auto"
+            zarr_array_kwargs_copy["shards"] = shards_opt = None
+
+        # If shards are defined, one dask chunk should correspond to 1 shard to prevent concurrent writes to 1 shard.
+        # In this case user defined chunks will correspond to zarr chunks and not dask chunks.
+        # Check against string is purely because of mypy
+        if not isinstance(chunks_opt, str) and not shards_opt:
             chunks_opt = _retuple(chunks_opt, level.shape)
             # image.chunks will be used by da.to_zarr
             level_image = da.array(level).rechunk(chunks=chunks_opt)
+        elif shards_opt is not None:
+            shards_opt = _retuple(shards_opt, level.shape)
+            level_image = da.array(level).rechunk(shards_opt)
         else:
             level_image = level
         # Chunks would always be at least `auto` which is the default so it can be always safely assigned.
         zarr_array_kwargs_copy["chunks"] = chunks_opt
+        zarr_array_kwargs_copy["shards"] = shards_opt
         shapes.append(level_image.shape)
 
         LOGGER.debug(
@@ -819,6 +844,10 @@ def _write_dask_image(
         for k, v in options.items():
             if k not in zarr_array_kwargs_copy:
                 zarr_array_kwargs_copy[k] = v
+
+        zarr_array_kwargs_copy["chunks"] = chunks_opt
+        zarr_array_kwargs_copy.pop("compressor", None)
+
         delayed.append(
             da.to_zarr(
                 arr=level_image,
@@ -1115,8 +1144,6 @@ def write_labels(
 
         # TODO: Better way to get chunksize in type-safe manner?
         axes = ["t", "c", "z", "y", "x"]
-
-    dask_delayed_jobs = []
 
     dask_delayed_jobs = _write_dask_image(
         cast(da.Array, labels),
