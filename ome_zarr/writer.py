@@ -4,7 +4,7 @@ import logging
 import warnings
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, List, TypeAlias, cast
+from typing import Any, TypeAlias
 
 import dask
 import dask.array as da
@@ -317,11 +317,9 @@ def write_multiscale(
     axes = _get_valid_axes(dims, axes, fmt)
 
     pyramid = [
-        da.from_array(level)
-        if not isinstance(level, da.Array)
-        else level
+        da.from_array(level) if not isinstance(level, da.Array) else level
         for level in pyramid
-        ]
+    ]
     dask_delayed = _write_pyramid_to_zarr(
         pyramid,
         group,
@@ -573,9 +571,7 @@ def write_image(
         The 'scaler' argument is deprecated and will be removed in version 0.13.0.
         Please use the 'scale_factors' argument instead.
         """
-        scale_factors = tuple(
-            2**i for i in range(1, scaler.max_layer + 1)
-            )
+        scale_factors = tuple(2**i for i in range(1, scaler.max_layer + 1))
         warnings.warn(msg, DeprecationWarning)
 
     if method is None:
@@ -599,7 +595,6 @@ def write_image(
 
     if method is None:
         method = Methods.RESIZE
-
 
     # Create the pyramid
     pyramid = _build_pyramid(
@@ -643,7 +638,7 @@ def _resolve_storage_options(
 
 
 def _write_pyramid_to_zarr(
-    pyramid: List[da.Array],
+    pyramid: list[da.Array],
     group: zarr.Group | str,
     fmt: Format | None = None,
     axes: AxesType = None,
@@ -902,12 +897,10 @@ def write_multiscale_labels(
 
     # Ensure pyramid is all dask arrays
     pyramid = [
-        da.from_array(level)
-        if not isinstance(level, da.Array)
-        else level
+        da.from_array(level) if not isinstance(level, da.Array) else level
         for level in pyramid
     ]
-    
+
     dask_delayed_jobs = _write_pyramid_to_zarr(
         pyramid,
         sub_group,
@@ -1003,9 +996,7 @@ def write_labels(
         The 'scaler' argument is deprecated and will be removed in version 0.13.0.
         Please use the 'scale_factors' argument instead.
         """
-        scale_factors = tuple(
-            2**i for i in range(1, scaler.max_layer + 1)
-            )
+        scale_factors = tuple(2**i for i in range(1, scaler.max_layer + 1))
         warnings.warn(msg, DeprecationWarning)
 
     group, fmt = check_group_fmt(group, fmt)
