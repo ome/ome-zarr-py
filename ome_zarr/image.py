@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from dataclasses import dataclass, field, InitVar
+from dataclasses import InitVar, dataclass, field
 from enum import Enum
 from typing import Any
 
@@ -31,13 +31,13 @@ def _build_axes(
     axes = []
     for d in dims:
         if d in SPATIAL_DIMS:
-            axes.append(v05.SpaceAxis(name=d, unit=axes_units.get(d, None)))
+            axes.append(v05.SpaceAxis(name=d, unit=axes_units.get(d)))
         elif d == "t":
-            axes.append(v05.TimeAxis(name=d, unit=axes_units.get(d, None)))
+            axes.append(v05.TimeAxis(name=d, unit=axes_units.get(d)))
         elif d == "c":
-            axes.append(v05.ChannelAxis(name=d, unit=axes_units.get(d, None)))
+            axes.append(v05.ChannelAxis(name=d, unit=axes_units.get(d)))
         else:
-            axes.append(v05.CustomAxis(name=d, unit=axes_units.get(d, None)))
+            axes.append(v05.CustomAxis(name=d, unit=axes_units.get(d)))
     return axes
 
 
@@ -114,10 +114,10 @@ class NgffMultiscales:
     metadata: v05.Multiscale = field(init=False)
 
     def __post_init__(
-            self,
-            image: NgffImage,
-            scale_factors: list[int] = [2, 4, 8, 16],
-            ):
+        self,
+        image: NgffImage,
+        scale_factors: list[int] = [2, 4, 8, 16],
+    ):
         from .scale import _build_pyramid
 
         method = self.method
@@ -136,7 +136,11 @@ class NgffMultiscales:
         scales = [{d: image.scale[d] for d in image.dims}]
         for scale_factor in scale_factors:
             level_scale = {
-                d: image.scale[d] * scale_factor if d in SPATIAL_DIMS else image.scale[d]
+                d: (
+                    image.scale[d] * scale_factor
+                    if d in SPATIAL_DIMS
+                    else image.scale[d]
+                )
                 for d in image.dims
             }
             scales.append(level_scale)
@@ -228,6 +232,7 @@ class NgffMultiscales:
         """
         import os
         import shutil
+
         from .writer import _write_pyramid_to_zarr, check_group_fmt
 
         if os.path.exists(str(group)):
@@ -237,9 +242,7 @@ class NgffMultiscales:
 
         # Coerce data to dask arrays for writing
         pyramid = [
-            img.data
-            if isinstance(img.data, da.Array)
-            else da.from_array(img.data)
+            img.data if isinstance(img.data, da.Array) else da.from_array(img.data)
             for img in self.images
         ]
 
@@ -257,12 +260,11 @@ class NgffMultiscales:
 
         group.attrs["ome"] = self.metadata.model_dump(exclude_none=True)
 
-
     @classmethod
     def from_ome_zarr(
         cls,
         group: zarr.Group | str,
-    ) -> "NgffMultiscales":
+    ) -> NgffMultiscales:
         """
         Load a multiscale pyramid from an OME-Zarr group.
 
@@ -276,7 +278,6 @@ class NgffMultiscales:
         Multiscales
             A Multiscales container with the loaded images and metadata.
         """
-        import json
 
         if isinstance(group, str):
             group = zarr.open(group, mode="r")
