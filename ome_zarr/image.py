@@ -237,7 +237,9 @@ class NgffMultiscales:
 
         # Coerce data to dask arrays for writing
         pyramid = [
-            img.data if isinstance(img.data, da.Array) else da.from_array(img.data)
+            img.data
+            if isinstance(img.data, da.Array)
+            else da.from_array(img.data)
             for img in self.images
         ]
 
