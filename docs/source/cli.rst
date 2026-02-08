@@ -28,7 +28,7 @@ Local data::
 view
 ====
 
-Use the `ome_zarr` command to serve local Zarr data and view in the https://ome.github.io/ome-ngff-validator::
+Use the `ome_zarr` command to serve local Zarr data and view it in the https://ome.github.io/ome-ngff-validator::
 
     ome_zarr view 6001240.zarr/
 
@@ -59,16 +59,16 @@ Specify a different output directory::
 create
 ======
 
-To create sample OME-Zarr image from the `skimage <https://scikit-image.org/docs/stable/api/skimage.data.html>`_
+To create a sample OME-Zarr image from the `skimage <https://scikit-image.org/docs/stable/api/skimage.data.html>`_
 data.
 
-Create an OME-Zarr image in coinsdata/ dir using 'coins' method in OME-Zarr latest version or v0.4::
+Create an OME-Zarr image in coinsdata.zarr using the 'coins' method in OME-Zarr latest version or v0.4::
 
     ome_zarr create coinsdata.zarr
 
     ome_zarr create coinsdata.zarr --format 0.4
 
-Create an rgb image from skimage astronaut in testimage dir::
+Create an RGB image from the skimage astronaut dataset in testimage.zarr::
 
     ome_zarr create testimage.zarr --method=astronaut
 
