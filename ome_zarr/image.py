@@ -8,6 +8,9 @@ import numpy as np
 import zarr
 from yaozarrs import v05
 
+from ome_zarr.writer import _get_valid_axes
+from .format import CurrentFormat, Format, FormatV01, FormatV02, FormatV04
+
 
 class Methods(Enum):
     RESIZE = "resize"
@@ -26,6 +29,7 @@ class Image:
     axes_units: dict[str, str] | None = field(default_factory=dict)
     labels: dict[str, Any] | None = field(default_factory=dict)
     name: str | None = "image"
+    coordinate_transformations: list[dict] | None = None
 
     multiscales: list["Image"] | None = None
     metadata: v05.Multiscale = field(init=False)
@@ -49,6 +53,10 @@ class Image:
         if isinstance(self.scale_method, Methods):
             self.scale_method = str(self.scale_method.value)
 
+        if not isinstance(self.data, da.Array):
+            self.data = da.from_array(self.data)
+
+        # parse dims, units and scale into axes
         if len(self.dims) != len(self.data.shape):
             raise ValueError(
                 f"Number of dimensions in data ({len(self.data.shape)}) does not match number of dims ({len(self.dims)})"
@@ -66,11 +74,21 @@ class Image:
         axes = []
         for d in self.dims:
             if d in SPATIAL_DIMS:
-                axes.append(v05.SpaceAxis(name=d))
+                axes.append(
+                    v05.SpaceAxis(name=d, unit=self.axes_units.get(d, None))
+                    )
             elif d == "t":
-                axes.append(v05.TimeAxis(name=d))
+                axes.append(
+                    v05.TimeAxis(name=d, unit=self.axes_units.get(d, None))
+                    )
             elif d == "c":
-                axes.append(v05.ChannelAxis(name=d))
+                axes.append(
+                    v05.ChannelAxis(name=d, unit=self.axes_units.get(d, None))
+                    )
+            else:
+                axes.append(
+                    v05.CustomAxis(name=d, unit=self.axes_units.get(d, None))
+                )
 
         self.metadata = v05.Multiscale(
             axes=axes,
@@ -132,7 +150,8 @@ class Image:
         self,
         group: zarr.Group | str,
         storage_options: dict[str, Any] | None = None,
-        version: str = "0.5",
+        fmt: Format | None = None,
+        compute: bool = False,
     ):
         """
         Serialize the Image and its multiscales to an OME-Zarr group.
@@ -148,19 +167,36 @@ class Image:
         """
         import os
         import shutil
-
         import zarr
-
-        from .writer import write_multiscale
+        from .writer import (
+            _write_pyramid_to_zarr,
+            check_group_fmt,
+        )
 
         if os.path.exists(str(group)):
             shutil.rmtree(str(group))
 
-        write_multiscale(
-            pyramid=[img.data for img in self.multiscales],
+        group, fmt = check_group_fmt(group, fmt)
+
+        if not self.multiscales:
+            raise ValueError("No multiscale data to write. Ensure that the Image has multiscales built.")
+
+        # coerce data to dask arrays for writing
+        pyramid = [
+            img.data 
+            if isinstance(img.data, da.Array)
+            else da.from_array(img.data)
+            for img in self.multiscales
+            if self.multiscales is not None
+            ]
+
+        _write_pyramid_to_zarr(
+            pyramid=pyramid,
             group=group,
             storage_options=storage_options,
-            axes=self.dims,
+            fmt=fmt,
+            axes=[dict(ax) for ax in self.metadata.axes],
+            compute=compute,
         )
 
         if isinstance(group, str):
