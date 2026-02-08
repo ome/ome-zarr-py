@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, InitVar
 from enum import Enum
 from typing import Any
 
@@ -8,8 +10,7 @@ import numpy as np
 import zarr
 from yaozarrs import v05
 
-from ome_zarr.writer import _get_valid_axes
-from .format import CurrentFormat, Format, FormatV01, FormatV02, FormatV04
+from .format import Format
 
 
 class Methods(Enum):
@@ -19,176 +20,226 @@ class Methods(Enum):
 SPATIAL_DIMS = ["z", "y", "x"]
 
 
+def _build_axes(
+    dims: Sequence[str],
+    axes_units: dict[str, str] | None = None,
+) -> list[v05.SpaceAxis | v05.TimeAxis | v05.ChannelAxis | v05.CustomAxis]:
+    """Build OME-Zarr axes metadata from dimension names and units."""
+    if axes_units is None:
+        axes_units = {}
+
+    axes = []
+    for d in dims:
+        if d in SPATIAL_DIMS:
+            axes.append(v05.SpaceAxis(name=d, unit=axes_units.get(d, None)))
+        elif d == "t":
+            axes.append(v05.TimeAxis(name=d, unit=axes_units.get(d, None)))
+        elif d == "c":
+            axes.append(v05.ChannelAxis(name=d, unit=axes_units.get(d, None)))
+        else:
+            axes.append(v05.CustomAxis(name=d, unit=axes_units.get(d, None)))
+    return axes
+
+
 @dataclass
-class Image:
+class NgffImage:
+    """Single-scale image representation with metadata."""
+
     data: da.Array | np.ndarray
     dims: Sequence[str] | str
-    scale_factors: list[int] = field(default_factory=lambda: [2, 4, 8])
     scale: Sequence[float] | dict[str, float] | None = None
-    scale_method: str | Methods = Methods.RESIZE
     axes_units: dict[str, str] | None = field(default_factory=dict)
-    labels: dict[str, Any] | None = field(default_factory=dict)
     name: str | None = "image"
-    coordinate_transformations: list[dict] | None = None
-
-    multiscales: list["Image"] | None = None
-    metadata: v05.Multiscale = field(init=False)
-    _build_multiscales: bool = field(default=True, repr=False)
 
     def __post_init__(self):
-        from .scale import _build_pyramid
-
         # set default scale if unset
         if not self.scale:
-            self.scale = tuple(1.0 for s in range(len(self.dims)))
+            self.scale = tuple(1.0 for _ in range(len(self.dims)))
 
-        # coerce dims to list of dims
+        # coerce dims to list
         if isinstance(self.dims, str):
-            self.dims = [d for d in self.dims]
+            self.dims = list(self.dims)
 
         # coerce scale to dict if it's a sequence
         if isinstance(self.scale, Sequence):
             self.scale = {d: s for d, s in zip(self.dims, self.scale)}
 
-        if isinstance(self.scale_method, Methods):
-            self.scale_method = str(self.scale_method.value)
-
+        # coerce data to dask array
         if not isinstance(self.data, da.Array):
             self.data = da.from_array(self.data)
 
-        # parse dims, units and scale into axes
+        # validate dimensions match data shape
         if len(self.dims) != len(self.data.shape):
             raise ValueError(
-                f"Number of dimensions in data ({len(self.data.shape)}) does not match number of dims ({len(self.dims)})"
+                f"Number of dimensions in data ({len(self.data.shape)}) "
+                f"does not match number of dims ({len(self.dims)})"
             )
 
-        datasets = [
-            v05.Dataset(
-                path="scale0",
-                coordinateTransformations=[
-                    v05.ScaleTransformation(scale=list(self.scale.values()))
-                ],
-            )
-        ]
+    def to_multiscales(
+        self,
+        scale_factors: list[int] | None = None,
+        method: str | Methods = Methods.RESIZE,
+    ) -> NgffMultiscales:
+        """
+        Build a multiscale pyramid from this image.
 
-        axes = []
-        for d in self.dims:
-            if d in SPATIAL_DIMS:
-                axes.append(
-                    v05.SpaceAxis(name=d, unit=self.axes_units.get(d, None))
-                    )
-            elif d == "t":
-                axes.append(
-                    v05.TimeAxis(name=d, unit=self.axes_units.get(d, None))
-                    )
-            elif d == "c":
-                axes.append(
-                    v05.ChannelAxis(name=d, unit=self.axes_units.get(d, None))
-                    )
-            else:
-                axes.append(
-                    v05.CustomAxis(name=d, unit=self.axes_units.get(d, None))
-                )
+        Parameters
+        ----------
+        scale_factors : list of int, optional
+            Downsampling factors for each pyramid level. Default: [2, 4, 8].
+        method : str or Methods, optional
+            Downsampling method to use. Default: Methods.RESIZE.
 
-        self.metadata = v05.Multiscale(
-            axes=axes,
-            datasets=datasets,
-            name=self.name,
+        Returns
+        -------
+        Multiscales
+            A Multiscales container with this image and its downsampled versions.
+        """
+        return NgffMultiscales.from_image(
+            image=self,
+            scale_factors=scale_factors,
+            method=method,
         )
 
-        if not self._build_multiscales:
-            return
 
+@dataclass
+class NgffMultiscales:
+    """Container for multiscale image pyramid with OME-Zarr metadata."""
+
+    image: InitVar[NgffImage]
+    scale_factors: InitVar[list[int]]
+    method: str | Methods = Methods.RESIZE
+
+    images: list[NgffImage] = field(init=False)
+    metadata: v05.Multiscale = field(init=False)
+
+    def __post_init__(
+            self,
+            image: NgffImage,
+            scale_factors: list[int] = [2, 4, 8, 16],
+            ):
+        from .scale import _build_pyramid
+
+        method = self.method
+        if isinstance(method, Methods):
+            method = str(method.value)
+
+        # Build the pyramid data
         pyramid = _build_pyramid(
-            image=self.data,
-            dims=self.dims,
-            scale_factors=self.scale_factors,
-            method=self.scale_method,
+            image=image.data,
+            dims=image.dims,
+            scale_factors=scale_factors,
+            method=method,
         )
 
-        scales = [{d: self.scale[d] if d in SPATIAL_DIMS else 1 for d in self.dims}]
-        for scale_factor in self.scale_factors:
+        # Build scale dictionaries for each level
+        scales = [{d: image.scale[d] for d in image.dims}]
+        for scale_factor in scale_factors:
             level_scale = {
-                d: self.scale[d] * scale_factor if d in SPATIAL_DIMS else 1
-                for d in self.dims
+                d: image.scale[d] * scale_factor if d in SPATIAL_DIMS else image.scale[d]
+                for d in image.dims
             }
             scales.append(level_scale)
 
+        # Create Image instances for each pyramid level
         images = []
         datasets = []
-        for idx, (level, scale) in enumerate(zip(pyramid, scales)):
-
+        for idx, (level_data, level_scale) in enumerate(zip(pyramid, scales)):
             images.append(
-                Image(
-                    data=level,
-                    dims=self.dims,
-                    scale_factors=[],
-                    scale=scale,
-                    scale_method=self.scale_method,
-                    axes_units=self.axes_units,
-                    labels=self.labels,
-                    name=self.name,
-                    _build_multiscales=False,
+                NgffImage(
+                    data=level_data,
+                    dims=image.dims,
+                    scale=level_scale,
+                    axes_units=image.axes_units,
+                    name=image.name,
                 )
             )
-            ds = v05.Dataset(
-                path=f"scale{idx+1}",
-                coordinateTransformations=[
-                    v05.ScaleTransformation(scale=list(scale.values()))
-                ],
+            datasets.append(
+                v05.Dataset(
+                    path=f"scale{idx}",
+                    coordinateTransformations=[
+                        v05.ScaleTransformation(scale=list(level_scale.values()))
+                    ],
+                )
             )
-            datasets.append(ds)
 
-        self.multiscales = images
+        self.images = images
+
+        # Build axes metadata
+        axes = _build_axes(image.dims, image.axes_units)
+
         self.metadata = v05.Multiscale(
             axes=axes,
             datasets=datasets,
-            name=self.name,
+            name=image.name,
         )
+
+    @classmethod
+    def from_image(
+        cls,
+        image: NgffImage,
+        scale_factors: list[int] | None = None,
+        method: str | Methods = Methods.RESIZE,
+    ) -> NgffMultiscales:
+        """
+        Build a multiscale pyramid from a base image.
+
+        Parameters
+        ----------
+        image : Image
+            The base (highest resolution) image.
+        scale_factors : list of int, optional
+            Downsampling factors for each pyramid level. Default: [2, 4, 8].
+        method : str or Methods, optional
+            Downsampling method to use. Default: Methods.RESIZE.
+
+        Returns
+        -------
+        Multiscales
+            A Multiscales container with the pyramid images and metadata.
+        """
+        if scale_factors is None:
+            scale_factors = [2, 4, 8]
+
+        return cls(image=image, scale_factors=scale_factors, method=method)
 
     def to_ome_zarr(
         self,
         group: zarr.Group | str,
         storage_options: dict[str, Any] | None = None,
         fmt: Format | None = None,
-        compute: bool = False,
+        compute: bool = True,
     ):
         """
-        Serialize the Image and its multiscales to an OME-Zarr group.
+        Serialize the multiscale pyramid to an OME-Zarr group.
 
         Parameters
         ----------
         group : zarr.Group or str
             The target Zarr group or path where the OME-Zarr data will be written.
         storage_options : dict, optional
-            Additional storage options to pass to the Zarr, such as:
-            - `compressor`: A Zarr compressor instance to use for compressing the data.
-            - `chunks`: A tuple specifying the chunk shape to use when writing the data.
+            Additional storage options to pass to Zarr, such as:
+            - `compressor`: A Zarr compressor instance for compressing the data.
+            - `chunks`: A tuple specifying the chunk shape for writing data.
+        fmt : Format, optional
+            The OME-Zarr format version to use. Defaults to the current format.
+        compute : bool, optional
+            If True, compute immediately; otherwise return delayed objects.
         """
         import os
         import shutil
-        import zarr
-        from .writer import (
-            _write_pyramid_to_zarr,
-            check_group_fmt,
-        )
+        from .writer import _write_pyramid_to_zarr, check_group_fmt
 
         if os.path.exists(str(group)):
             shutil.rmtree(str(group))
 
         group, fmt = check_group_fmt(group, fmt)
 
-        if not self.multiscales:
-            raise ValueError("No multiscale data to write. Ensure that the Image has multiscales built.")
-
-        # coerce data to dask arrays for writing
+        # Coerce data to dask arrays for writing
         pyramid = [
-            img.data 
-            if isinstance(img.data, da.Array)
-            else da.from_array(img.data)
-            for img in self.multiscales
-            if self.multiscales is not None
-            ]
+            img.data if isinstance(img.data, da.Array) else da.from_array(img.data)
+            for img in self.images
+        ]
 
         _write_pyramid_to_zarr(
             pyramid=pyramid,
