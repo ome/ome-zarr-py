@@ -119,6 +119,7 @@ class NgffMultiscales:
             scale_factors: list[int] = [2, 4, 8, 16],
             ):
         from .scale import _build_pyramid
+        from .format import Format
 
         method = self.method
         if isinstance(method, Methods):
@@ -132,19 +133,21 @@ class NgffMultiscales:
             method=method,
         )
 
-        # Build scale dictionaries for each level
-        scales = [{d: image.scale[d] for d in image.dims}]
-        for scale_factor in scale_factors:
-            level_scale = {
-                d: image.scale[d] * scale_factor if d in SPATIAL_DIMS else image.scale[d]
-                for d in image.dims
-            }
-            scales.append(level_scale)
+        # build scales for each level based on the original image shape
+        # and the pyramid level shapes
+        scales = []
+        for shape in [d.shape for d in pyramid]:
+            scale = [
+                full / level
+                for full, level in zip(image.data.shape, shape)
+                ]
+            scales.append({d: s for d, s in zip(image.dims, scale)})
 
         # Create Image instances for each pyramid level
         images = []
         datasets = []
         for idx, (level_data, level_scale) in enumerate(zip(pyramid, scales)):
+
             images.append(
                 NgffImage(
                     data=level_data,
