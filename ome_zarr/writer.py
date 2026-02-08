@@ -181,6 +181,7 @@ def check_group_fmt(
     group: zarr.Group | str,
     fmt: Format | None = None,
     mode: str = "a",
+    group_attrs: dict[str, Any] | None = None,
 ) -> tuple[zarr.Group, Format]:
     """
     Create group if string, according to fmt
@@ -189,18 +190,35 @@ def check_group_fmt(
     if isinstance(group, str):
         if fmt is None:
             fmt = CurrentFormat()
-        group = zarr.open_group(group, mode=mode, zarr_format=fmt.zarr_format)
+        group_attrs = group_attrs or {}
+        if isinstance(group, str) and group.endswith(".zip"):
+            store = zarr.storage.ZipStore(group, mode=mode)
+            group = zarr.group(
+                store=store,
+                path="/",
+                zarr_format=fmt.zarr_format,
+                attributes={"ome": group_attrs},
+            )
+        else:
+            group = zarr.open_group(
+                group,
+                mode=mode,
+                zarr_format=fmt.zarr_format,
+                attributes={"ome": group_attrs},
+            )
     else:
         fmt = check_format(group, fmt)
     return group, fmt
 
 
 def check_format(
-    group: zarr.Group,
+    group: zarr.Group | str,
     fmt: Format | None = None,
 ) -> Format:
     """Check if the format is valid for the given group"""
 
+    if isinstance(group, str):
+        return fmt or CurrentFormat()
     zarr_format = group.info._zarr_format
     if fmt is not None:
         if fmt.zarr_format != zarr_format:
@@ -270,16 +288,32 @@ def write_multiscale(
         :class:`dask.delayed.Delayed` representing the value to be computed by
         dask.
     """
-    group, fmt = check_group_fmt(group, fmt)
+
     dims = len(pyramid[0].shape)
+    fmt = check_format(group, fmt)
     axes = _get_valid_axes(dims, axes, fmt)
+    datasets: list[dict] = [{"path": str(path)} for path in range(len(pyramid))]
+
+    if coordinate_transformations is None:
+        shapes = [data.shape for data in pyramid]
+        coordinate_transformations = fmt.generate_coordinate_transformations(shapes)
+    # we validate again later, but this catches length mismatch before zip(datasets...)
+    fmt.validate_coordinate_transformations(
+        dims, len(pyramid), coordinate_transformations
+    )
+    if coordinate_transformations is not None:
+        for dataset, transform in zip(datasets, coordinate_transformations):
+            dataset["coordinateTransformations"] = transform
+
+    group_attrs = get_multiscales_metadata(datasets, fmt, axes, name, **metadata)
+    group, fmt = check_group_fmt(group, fmt, group_attrs=group_attrs)
+
     dask_delayed = []
 
     if chunks is not None:
         msg = """The 'chunks' argument is deprecated and will be removed in version 0.5.
 Please use the 'storage_options' argument instead."""
         warnings.warn(msg, DeprecationWarning)
-    datasets: list[dict] = []
     for path, data in enumerate(pyramid):
         options = _resolve_storage_options(storage_options, path)
 
@@ -344,29 +378,113 @@ Please use the 'storage_options' argument instead."""
 
         datasets.append({"path": str(path)})
 
-    if coordinate_transformations is None:
-        shapes = [data.shape for data in pyramid]
-        coordinate_transformations = fmt.generate_coordinate_transformations(shapes)
+    # if coordinate_transformations is None:
+    #     shapes = [data.shape for data in pyramid]
+    #     coordinate_transformations = fmt.generate_coordinate_transformations(shapes)
 
-    # we validate again later, but this catches length mismatch before zip(datasets...)
-    fmt.validate_coordinate_transformations(
-        dims, len(pyramid), coordinate_transformations
-    )
-    if coordinate_transformations is not None:
-        for dataset, transform in zip(datasets, coordinate_transformations):
-            dataset["coordinateTransformations"] = transform
+    # # we validate again later, but this catches length mismatch before zip(datasets...)
+    # fmt.validate_coordinate_transformations(
+    #     dims, len(pyramid), coordinate_transformations
+    # )
+    # if coordinate_transformations is not None:
+    #     for dataset, transform in zip(datasets, coordinate_transformations):
+    #         dataset["coordinateTransformations"] = transform
 
-    if len(dask_delayed) > 0 and not compute:
-        write_multiscales_metadata_delayed = dask.delayed(write_multiscales_metadata)
-        return dask_delayed + [
-            bind(write_multiscales_metadata_delayed, dask_delayed)(
-                group, datasets, fmt, axes, name, **metadata
-            )
-        ]
-    else:
-        write_multiscales_metadata(group, datasets, fmt, axes, name, **metadata)
+    # if len(dask_delayed) > 0 and not compute:
+    #     write_multiscales_metadata_delayed = dask.delayed(write_multiscales_metadata)
+    #     return dask_delayed + [
+    #         bind(write_multiscales_metadata_delayed, dask_delayed)(
+    #             group, datasets, fmt, axes, name, **metadata
+    #         )
+    #     ]
+    # else:
+    #     write_multiscales_metadata(group, datasets, fmt, axes, name, **metadata)
 
     return dask_delayed
+
+
+def get_multiscales_metadata(
+    datasets: list[dict],
+    fmt: Format | None = None,
+    axes: AxesType = None,
+    name: str | None = None,
+    **metadata: str | JSONDict | list[JSONDict],
+) -> dict[str, Any]:
+    """
+    Write the multiscales metadata in the group.
+
+    :type group: :class:`zarr.Group`
+    :param group: The zarr group or path.
+    :type datasets: list of dicts
+    :param datasets:
+      The list of datasets (dicts) for this multiscale image.
+      Each dict must include 'path' and a 'coordinateTransformations'
+      list for version 0.4 or later that must include a 'scale' transform.
+    :type fmt: :class:`ome_zarr.format.Format`, optional
+    :param fmt:
+      The format of the ome_zarr data which should be used.
+      Defaults to the most current.
+    :type axes: list of str or list of dicts, optional
+    :param axes:
+      The names of the axes. e.g. ["t", "c", "z", "y", "x"].
+      Ignored for versions 0.1 and 0.2. Required for version 0.3 or greater.
+    """
+
+    if fmt is None:
+        fmt = CurrentFormat()
+    rsp_dict = {}
+    ndim = -1
+    if axes is not None:
+        if fmt.version in ("0.1", "0.2"):
+            LOGGER.info("axes ignored for version 0.1 or 0.2")
+            axes = None
+        else:
+            axes = _get_valid_axes(axes=axes, fmt=fmt)
+            if axes is not None:
+                ndim = len(axes)
+    if (
+        isinstance(metadata, dict)
+        and metadata.get("metadata")
+        and isinstance(metadata["metadata"], dict)
+        and "omero" in metadata["metadata"]
+    ):
+        omero_metadata = metadata["metadata"].pop("omero")
+        if omero_metadata is None:
+            raise KeyError("If `'omero'` is present, value cannot be `None`.")
+        for c in omero_metadata["channels"]:
+            if "color" in c:  # noqa: SIM102
+                if not isinstance(c["color"], str) or len(c["color"]) != 6:
+                    raise TypeError("`'color'` must be a hex code string.")
+            if "window" in c:
+                if not isinstance(c["window"], dict):
+                    raise TypeError("`'window'` must be a dict.")
+                for p in ["min", "max", "start", "end"]:
+                    if p not in c["window"]:
+                        raise KeyError(f"`'{p}'` not found in `'window'`.")
+                    if not isinstance(c["window"][p], (int, float)):
+                        raise TypeError(f"`'{p}'` must be an int or float.")
+
+        rsp_dict["omero"] = omero_metadata
+
+    # note: we construct the multiscale metadata via dict(), rather than {}
+    # to avoid duplication of protected keys like 'version' in **metadata
+    # (for {} this would silently over-write it, with dict() it explicitly fails)
+    multiscales = [
+        dict(datasets=_validate_datasets(datasets, ndim, fmt), name=name or "/")
+    ]
+    # if len(metadata.get("metadata", {})) > 0:
+    #     multiscales[0]["metadata"] = metadata["metadata"]
+    if axes is not None:
+        multiscales[0]["axes"] = axes
+
+    if fmt.version in ("0.1", "0.2", "0.3", "0.4"):
+        multiscales[0]["version"] = fmt.version
+    else:
+        # Zarr v3 top-level version
+        rsp_dict["version"] = fmt.version
+
+    rsp_dict["multiscales"] = multiscales
+    return rsp_dict
 
 
 def write_multiscales_metadata(
@@ -599,9 +717,9 @@ def write_image(
         dask.
     """
 
-    # if a path is given create the group according to the format (default current)
-    # otherwise check the group and fmt are compatible zarr versions
-    group, fmt = check_group_fmt(group, fmt)
+    # get format based on group
+    fmt = check_format(group, fmt)
+
     dask_delayed_jobs = []
 
     name = metadata.pop("name", None)
