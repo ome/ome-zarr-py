@@ -235,7 +235,7 @@ class NgffMultiscales:
         self,
         group: zarr.Group | str,
         storage_options: dict[str, Any] | None = None,
-        fmt: Format | None = None,
+        version: str | None = '0.6',
         compute: bool = True,
     ):
         """
@@ -261,6 +261,19 @@ class NgffMultiscales:
 
         if os.path.exists(str(group)):
             shutil.rmtree(str(group))
+
+        fmt = None
+        if version == '0.6':
+            from .format import FormatV05
+            fmt = FormatV05()
+        elif version == '0.5':
+            from .format import FormatV05
+            fmt = FormatV05()
+        elif version == '0.4':
+            from .format import FormatV04
+            fmt = FormatV04()
+        else:
+            raise ValueError(f"Unsupported OME-Zarr version: {version}")
 
         group, fmt = check_group_fmt(group, fmt)
 
