@@ -8,14 +8,12 @@ from typing import Any
 import dask.array as da
 import numpy as np
 import zarr
+from ome_zarr_models._v06.coordinate_transforms import Scale
 from ome_zarr_models._v06.multiscales import (
+    Axis,
+    CoordinateSystem,
     Dataset,
     Multiscale,
-    CoordinateSystem,
-    Axis,
-)
-from ome_zarr_models._v06.coordinate_transforms import (
-    Scale
 )
 
 from .format import Format
@@ -39,21 +37,13 @@ def _build_axes(
     axes = []
     for d in dims:
         if d in SPATIAL_DIMS:
-            axes.append(
-                Axis(name=d, type='space', unit=axes_units.get(d))
-                )
+            axes.append(Axis(name=d, type="space", unit=axes_units.get(d)))
         elif d == "t":
-            axes.append(
-                Axis(name=d, type='time', unit=axes_units.get(d))
-                )
+            axes.append(Axis(name=d, type="time", unit=axes_units.get(d)))
         elif d == "c":
-            axes.append(
-                Axis(name=d, type='channel', unit=axes_units.get(d))
-                )
+            axes.append(Axis(name=d, type="channel", unit=axes_units.get(d)))
         else:
-            axes.append(
-                Axis(name=d, type='custom', unit=axes_units.get(d))
-                )
+            axes.append(Axis(name=d, type="custom", unit=axes_units.get(d)))
     return axes
 
 
@@ -125,7 +115,7 @@ class NgffMultiscales:
     image: InitVar[NgffImage]
     scale_factors: InitVar[list[int]]
     method: str | Methods = Methods.RESIZE
-    coordinate_system_name: InitVar[str | None] = 'physical'
+    coordinate_system_name: InitVar[str | None] = "physical"
 
     images: list[NgffImage] = field(init=False)
     metadata: Multiscale = field(init=False)
@@ -181,8 +171,8 @@ class NgffMultiscales:
                         Scale(
                             input=f"scale{idx}",
                             output="physical",
-                            scale=list(level_scale.values())
-                            )
+                            scale=list(level_scale.values()),
+                        )
                     ],
                 )
             )
@@ -196,27 +186,18 @@ class NgffMultiscales:
         axes = []
         for d in image.dims:
             if d in SPATIAL_DIMS:
-                axes.append(
-                    Axis(name=d, type='space', unit=image.axes_units.get(d))
-                    )
+                axes.append(Axis(name=d, type="space", unit=image.axes_units.get(d)))
             elif d == "t":
-                axes.append(
-                    Axis(name=d, type='time', unit=image.axes_units.get(d))
-                    )
+                axes.append(Axis(name=d, type="time", unit=image.axes_units.get(d)))
             elif d == "c":
-                axes.append(
-                    Axis(name=d, type='channel', unit=image.axes_units.get(d))
-                    )
+                axes.append(Axis(name=d, type="channel", unit=image.axes_units.get(d)))
             else:
-                axes.append(
-                    Axis(name=d, type='custom', unit=image.axes_units.get(d))
-                    )
+                axes.append(Axis(name=d, type="custom", unit=image.axes_units.get(d)))
 
         self.metadata = Multiscale(
-            coordinateSystems=[CoordinateSystem(
-                name=coordinate_system_name,
-                axes=axes
-            )],
+            coordinateSystems=[
+                CoordinateSystem(name=coordinate_system_name, axes=axes)
+            ],
             datasets=datasets,
             name=image.name,
         )
@@ -343,7 +324,10 @@ class NgffMultiscales:
                 NgffImage(
                     data=data,
                     dims=[ax.name for ax in metadata.coordinateSystems[0].axes],
-                    scale={d.name: s for d, s in zip(metadata.coordinateSystems[0].axes, scale)},
+                    scale={
+                        d.name: s
+                        for d, s in zip(metadata.coordinateSystems[0].axes, scale)
+                    },
                     axes_units=axes_units,
                     name=metadata.name,
                 )
