@@ -16,33 +16,9 @@ from ome_zarr_models._v06.multiscales import (
     Multiscale,
 )
 
-class Methods(Enum):
-    RESIZE = "resize"
-
+from .scale import Methods
 
 SPATIAL_DIMS = ["z", "y", "x"]
-
-
-def _build_axes(
-    dims: Sequence[str],
-    axes_units: dict[str, str] | None = None,
-) -> list[Axis]:
-    """Build OME-Zarr axes metadata from dimension names and units."""
-    if axes_units is None:
-        axes_units = {}
-
-    axes = []
-    for d in dims:
-        if d in SPATIAL_DIMS:
-            axes.append(Axis(name=d, type="space", unit=axes_units.get(d)))
-        elif d == "t":
-            axes.append(Axis(name=d, type="time", unit=axes_units.get(d)))
-        elif d == "c":
-            axes.append(Axis(name=d, type="channel", unit=axes_units.get(d)))
-        else:
-            axes.append(Axis(name=d, type="custom", unit=axes_units.get(d)))
-    return axes
-
 
 @dataclass
 class NgffImage:
@@ -320,6 +296,11 @@ class NgffMultiscales:
         metadata_json = group.attrs.get("ome", None)
         if metadata_json is None:
             raise ValueError("OME metadata not found in Zarr group attributes")
+        
+        # get version from metadata and validate against supported versions
+        if hasattr(metadata_json, "version"):
+            v = metadata_json["version"]
+
 
         metadata = Multiscale.model_validate(metadata_json)
 
