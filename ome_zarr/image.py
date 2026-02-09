@@ -8,7 +8,15 @@ from typing import Any
 import dask.array as da
 import numpy as np
 import zarr
-from yaozarrs import v05
+from ome_zarr_models._v06.multiscales import (
+    Dataset,
+    Multiscale,
+    CoordinateSystem,
+    Axis,
+)
+from ome_zarr_models._v06.coordinate_transforms import (
+    Scale
+)
 
 from .format import Format
 
@@ -23,7 +31,7 @@ SPATIAL_DIMS = ["z", "y", "x"]
 def _build_axes(
     dims: Sequence[str],
     axes_units: dict[str, str] | None = None,
-) -> list[v05.SpaceAxis | v05.TimeAxis | v05.ChannelAxis | v05.CustomAxis]:
+) -> list[Axis]:
     """Build OME-Zarr axes metadata from dimension names and units."""
     if axes_units is None:
         axes_units = {}
@@ -31,13 +39,21 @@ def _build_axes(
     axes = []
     for d in dims:
         if d in SPATIAL_DIMS:
-            axes.append(v05.SpaceAxis(name=d, unit=axes_units.get(d)))
+            axes.append(
+                Axis(name=d, type='space', unit=axes_units.get(d))
+                )
         elif d == "t":
-            axes.append(v05.TimeAxis(name=d, unit=axes_units.get(d)))
+            axes.append(
+                Axis(name=d, type='time', unit=axes_units.get(d))
+                )
         elif d == "c":
-            axes.append(v05.ChannelAxis(name=d, unit=axes_units.get(d)))
+            axes.append(
+                Axis(name=d, type='channel', unit=axes_units.get(d))
+                )
         else:
-            axes.append(v05.CustomAxis(name=d, unit=axes_units.get(d)))
+            axes.append(
+                Axis(name=d, type='custom', unit=axes_units.get(d))
+                )
     return axes
 
 
@@ -109,20 +125,25 @@ class NgffMultiscales:
     image: InitVar[NgffImage]
     scale_factors: InitVar[list[int]]
     method: str | Methods = Methods.RESIZE
+    coordinate_system_name: InitVar[str | None] = 'physical'
 
     images: list[NgffImage] = field(init=False)
-    metadata: v05.Multiscale = field(init=False)
+    metadata: Multiscale = field(init=False)
 
     def __post_init__(
         self,
         image: NgffImage,
         scale_factors: list[int] = [2, 4, 8, 16],
+        coordinate_system_name: str | None = "physical",
     ):
         from .scale import _build_pyramid
 
         method = self.method
         if isinstance(method, Methods):
             method = str(method.value)
+
+        if not coordinate_system_name:
+            coordinate_system_name = "physical"
 
         # Build the pyramid data
         pyramid = _build_pyramid(
@@ -154,10 +175,14 @@ class NgffMultiscales:
                 )
             )
             datasets.append(
-                v05.Dataset(
+                Dataset(
                     path=f"scale{idx}",
                     coordinateTransformations=[
-                        v05.ScaleTransformation(scale=list(level_scale.values()))
+                        Scale(
+                            input=f"scale{idx}",
+                            output="physical",
+                            scale=list(level_scale.values())
+                            )
                     ],
                 )
             )
@@ -165,10 +190,33 @@ class NgffMultiscales:
         self.images = images
 
         # Build axes metadata
-        axes = _build_axes(image.dims, image.axes_units)
+        if image.axes_units is None:
+            image.axes_units = {}
 
-        self.metadata = v05.Multiscale(
-            axes=axes,
+        axes = []
+        for d in image.dims:
+            if d in SPATIAL_DIMS:
+                axes.append(
+                    Axis(name=d, type='space', unit=image.axes_units.get(d))
+                    )
+            elif d == "t":
+                axes.append(
+                    Axis(name=d, type='time', unit=image.axes_units.get(d))
+                    )
+            elif d == "c":
+                axes.append(
+                    Axis(name=d, type='channel', unit=image.axes_units.get(d))
+                    )
+            else:
+                axes.append(
+                    Axis(name=d, type='custom', unit=image.axes_units.get(d))
+                    )
+
+        self.metadata = Multiscale(
+            coordinateSystems=[CoordinateSystem(
+                name=coordinate_system_name,
+                axes=axes
+            )],
             datasets=datasets,
             name=image.name,
         )
@@ -246,14 +294,14 @@ class NgffMultiscales:
             group=group,
             storage_options=storage_options,
             fmt=fmt,
-            axes=[dict(ax) for ax in self.metadata.axes],
+            axes=[dict(ax) for ax in self.metadata.coordinateSystems[0].axes],
             compute=compute,
         )
 
         if isinstance(group, str):
             group = zarr.open(group, mode="r+")
 
-        group.attrs["ome"] = self.metadata.model_dump(exclude_none=True)
+        group.attrs["ome"] = self.metadata.dict()
 
     @classmethod
     def from_ome_zarr(
@@ -281,21 +329,21 @@ class NgffMultiscales:
         if metadata_json is None:
             raise ValueError("OME metadata not found in Zarr group attributes")
 
-        metadata = v05.Multiscale.model_validate(metadata_json)
+        metadata = Multiscale.validate(metadata_json)
 
         images = []
         for dataset in metadata.datasets:
             path = dataset.path
             data = da.from_zarr(group[path])
             scale = dataset.coordinateTransformations[0].scale
-            axes_units = {ax.name: ax.unit for ax in metadata.axes}
+            axes_units = {ax.name: ax.unit for ax in metadata.coordinateSystems[0].axes}
             if all(s is None for s in axes_units.values()):
                 axes_units = None
             images.append(
                 NgffImage(
                     data=data,
-                    dims=[ax.name for ax in metadata.axes],
-                    scale={d.name: s for d, s in zip(metadata.axes, scale)},
+                    dims=[ax.name for ax in metadata.coordinateSystems[0].axes],
+                    scale={d.name: s for d, s in zip(metadata.coordinateSystems[0].axes, scale)},
                     axes_units=axes_units,
                     name=metadata.name,
                 )
