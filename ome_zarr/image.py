@@ -24,7 +24,7 @@ SPATIAL_DIMS = ["z", "y", "x"]
 class NgffImage:
     """
     Single-scale image representation with metadata.
-    
+
     Parameters
     ----------
     data : dask.array.Array or numpy.ndarray
@@ -33,7 +33,7 @@ class NgffImage:
         The dimension names corresponding to the data array axes, i.e. ('c', 'z', 'y', 'x').
     scale : sequence of float or dict of str to float, optional
         The physical scale for each dimension. If a sequence is provided, it should
-        match the order of `dims`. If a dict is provided, keys should be dimension names, 
+        match the order of `dims`. If a dict is provided, keys should be dimension names,
         e.g. {'x': 0.1, 'y': 0.1, 'z': 0.5}. Default is None, which sets all scales to 1.0.
     axes_units : dict of str to str, optional
         Units for each dimension, e.g. {'x': 'micrometer', 'y': 'micrometer'}. Default is empty dict.
@@ -120,7 +120,7 @@ class NgffImage:
 class NgffMultiscales:
     """
     Container for multiscale image pyramid with OME-Zarr metadata.
-    
+
     Parameters
     ----------
     image : NgffImage
@@ -138,7 +138,7 @@ class NgffMultiscales:
         List of images at each pyramid level.
     metadata : Multiscale
         OME-Zarr multiscale metadata.
-    
+
     Methods
     -------
     from_image(image, scale_factors=None, method=Methods.RESIZE) -> NgffMultiscales
