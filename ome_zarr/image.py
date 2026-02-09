@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import InitVar, dataclass, field
-from enum import Enum
 from typing import Any
 
 import dask.array as da
@@ -19,6 +18,7 @@ from ome_zarr_models._v06.multiscales import (
 from .scale import Methods
 
 SPATIAL_DIMS = ["z", "y", "x"]
+
 
 @dataclass
 class NgffImage:
@@ -360,11 +360,10 @@ class NgffMultiscales:
         metadata_json = group.attrs.get("ome", None)
         if metadata_json is None:
             raise ValueError("OME metadata not found in Zarr group attributes")
-        
+
         # get version from metadata and validate against supported versions
         if hasattr(metadata_json, "version"):
             v = metadata_json["version"]
-
 
         metadata = Multiscale.model_validate(metadata_json)
 
