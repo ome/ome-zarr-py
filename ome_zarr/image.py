@@ -22,7 +22,42 @@ SPATIAL_DIMS = ["z", "y", "x"]
 
 @dataclass
 class NgffImage:
-    """Single-scale image representation with metadata."""
+    """
+    Single-scale image representation with metadata.
+    
+    Parameters
+    ----------
+    data : dask.array.Array or numpy.ndarray
+        The image data array.
+    dims : sequence of str or str
+        The dimension names corresponding to the data array axes, i.e. ('c', 'z', 'y', 'x').
+    scale : sequence of float or dict of str to float, optional
+        The physical scale for each dimension. If a sequence is provided, it should
+        match the order of `dims`. If a dict is provided, keys should be dimension names, 
+        e.g. {'x': 0.1, 'y': 0.1, 'z': 0.5}. Default is None, which sets all scales to 1.0.
+    axes_units : dict of str to str, optional
+        Units for each dimension, e.g. {'x': 'micrometer', 'y': 'micrometer'}. Default is empty dict.
+    name : str, optional
+        Name of the image. Default is "image".
+
+    Attributes
+    ----------
+    data : dask.array.Array
+        The image data array.
+    dims : sequence of str
+        The dimension names.
+    scale : dict of str to float
+        The physical scale for each dimension.
+    axes_units : dict of str to str
+        Units for each dimension.
+    name : str
+        Name of the image.
+
+    Methods
+    -------
+    to_multiscales(scale_factors=None, method=Methods.RESIZE) -> NgffMultiscales
+        Build a multiscale pyramid from this image.
+    """
 
     data: da.Array | np.ndarray
     dims: Sequence[str] | str
@@ -83,7 +118,37 @@ class NgffImage:
 
 @dataclass
 class NgffMultiscales:
-    """Container for multiscale image pyramid with OME-Zarr metadata."""
+    """
+    Container for multiscale image pyramid with OME-Zarr metadata.
+    
+    Parameters
+    ----------
+    image : NgffImage
+        The base (highest resolution) image.
+    scale_factors : list of int, optional
+        Downsampling factors for each pyramid level. Default: [2, 4, 8, 16].
+    method : str or Methods, optional
+        Downsampling method to use. Default: Methods.RESIZE.
+    coordinate_system_name : str, optional
+        Name of the coordinate system. Default: "physical".
+
+    Attributes
+    ----------
+    images : list of NgffImage
+        List of images at each pyramid level.
+    metadata : Multiscale
+        OME-Zarr multiscale metadata.
+    
+    Methods
+    -------
+    from_image(image, scale_factors=None, method=Methods.RESIZE) -> NgffMultiscales
+        Build a multiscale pyramid from a base image.
+    to_ome_zarr(group, storage_options=None, version="0.6", compute=True)
+        Serialize the multiscale pyramid to an OME-Zarr group.
+    from_ome_zarr(group) -> NgffMultiscales
+        Load a multiscale pyramid from an OME-Zarr group.
+
+    """
 
     image: InitVar[NgffImage]
     scale_factors: InitVar[list[int]]
