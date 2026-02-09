@@ -5,13 +5,16 @@ See the :class:`~ome_zarr.scale.Scaler` class for details.
 
 import inspect
 import logging
-from collections.abc import Callable, Iterator
+import warnings
+from collections.abc import Callable, Iterator, Sequence
 from dataclasses import dataclass
+from enum import Enum
 from typing import Any, Union
 
 import dask.array as da
 import numpy as np
 import zarr
+from deprecated import deprecated
 from scipy.ndimage import zoom
 from skimage.transform import (
     downscale_local_mean,
@@ -20,7 +23,10 @@ from skimage.transform import (
     resize,
 )
 
+from .dask_utils import laplacian as dask_laplacian
+from .dask_utils import local_mean as dask_local_mean
 from .dask_utils import resize as dask_resize
+from .dask_utils import zoom as dask_zoom
 
 LOGGER = logging.getLogger("ome_zarr.scale")
 
@@ -28,6 +34,10 @@ ListOfArrayLike = Union[list[da.Array], list[np.ndarray]]  # noqa: UP007  # FIXM
 ArrayLike = Union[da.Array, np.ndarray]  # noqa: UP007  # FIXME
 
 
+@deprecated(
+    reason="Downsampling via the `Scaler` class has been deprecated. Please use the `scale_Factors` argument instead.",
+    version="0.13.0",
+)
 @dataclass
 class Scaler:
     """Helper class for performing various types of downsampling.
@@ -286,3 +296,115 @@ class Scaler:
                         new_stack[(dims_to_slice)] = out
             rv.append(new_stack)
         return rv
+
+
+SPATIAL_DIMS = ("z", "y", "x")
+
+
+class Methods(Enum):
+    RESIZE = "resize"
+    NEAREST = "nearest"
+    LAPLACIAN = "laplacian"
+    LOCAL_MEAN = "local_mean"
+    ZOOM = "zoom"
+
+
+def _build_pyramid(
+    image: da.Array | np.ndarray,
+    scale_factors: list[int],
+    dims: Sequence[str],
+    method: str | Methods = "nearest",
+    chunks: tuple[int, ...] | None | str = None,
+) -> list[da.Array]:
+    """
+    Build a pyramid of downscaled images.
+
+    Parameters
+    ----------
+    image : dask.array.Array or numpy.ndarray
+        The input image to downscale.
+    scale_factors : list of int
+        The downscaling factors for each pyramid level.
+    dims : sequence of str
+        The dimension names corresponding to the image axes.
+    method : str or Methods, optional
+        The downsampling method to use. Options are "resize" or "nearest".
+        Default is "nearest".
+    chunks : tuple of int, str, or None, optional
+        The chunk size to use for dask arrays. If None, the array's existing
+        chunking is used. If a string, it should be a valid dask chunking
+        specification. Default is None.
+    """
+
+    if isinstance(image, np.ndarray):
+        if chunks is not None:
+            image = da.from_array(image, chunks=chunks)
+        else:
+            image = da.from_array(image)
+
+    if isinstance(method, str):
+        method = Methods(method)
+
+    images: list[da.Array] = [image]
+
+    for idx, factor in enumerate(scale_factors):
+        # Compute relative factor for this level
+        # May or may not be an integer depending on passed scale factors
+        relative_factor: float | int
+        if idx == 0:
+            relative_factor = scale_factors[0]
+        else:
+            relative_factor = factor / scale_factors[idx - 1]
+
+        # Build per-dimension factor (only spatial dims are downsampled)
+        per_dim_factor = tuple(
+            relative_factor if d in SPATIAL_DIMS else 1 for d in dims
+        )
+
+        # Calculate target shape, leave non-spatial dims unchanged
+        target_shape = []
+        for s, d, f in zip(images[-1].shape, dims, per_dim_factor):
+            if d in SPATIAL_DIMS:
+                if s // f == 0:
+                    target_shape.append(1)
+                    warnings.warn(
+                        f"Dimension {d} is too small to downsample further.",
+                        UserWarning,
+                        stacklevel=3,
+                    )
+                else:
+                    target_shape.append(int(s // f))
+            else:
+                target_shape.append(int(s))
+
+        if method == Methods.RESIZE:
+            new_image = dask_resize(images[-1], output_shape=target_shape)
+        elif method == Methods.NEAREST:
+            new_image = dask_resize(
+                images[-1],
+                output_shape=target_shape,
+                order=0,
+                preserve_range=True,
+                anti_aliasing=False,
+            )
+        elif method == Methods.LAPLACIAN:
+            new_image = dask_laplacian(
+                images[-1],
+                output_shape=tuple(target_shape),
+            )
+        elif method == Methods.LOCAL_MEAN:
+            new_image = dask_local_mean(
+                images[-1],
+                output_shape=target_shape,
+            )
+        elif method == Methods.ZOOM:
+            new_image = dask_zoom(
+                images[-1],
+                output_shape=target_shape,
+            )
+        else:
+            raise ValueError(f"Unknown downsampling method: {method}")
+
+        images.append(new_image)
+
+    return images
