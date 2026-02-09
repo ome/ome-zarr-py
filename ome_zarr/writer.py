@@ -639,7 +639,7 @@ def _resolve_storage_options(
 
 def _write_pyramid_to_zarr(
     pyramid: list[da.Array],
-    group: zarr.Group | str,
+    group: zarr.Group,
     fmt: Format,
     axes: AxesType = None,
     coordinate_transformations: list[list[dict[str, Any]]] | None = None,
