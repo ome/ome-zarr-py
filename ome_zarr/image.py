@@ -16,9 +16,6 @@ from ome_zarr_models._v06.multiscales import (
     Multiscale,
 )
 
-from .format import Format
-
-
 class Methods(Enum):
     RESIZE = "resize"
 
@@ -167,13 +164,14 @@ class NgffMultiscales:
             datasets.append(
                 Dataset(
                     path=f"scale{idx}",
-                    coordinateTransformations=[
+                    coordinateTransformations=(
                         Scale(
                             input=f"scale{idx}",
                             output="physical",
                             scale=list(level_scale.values()),
-                        )
-                    ],
+                            path=None
+                        ),
+                    ),
                 )
             )
 
@@ -195,9 +193,9 @@ class NgffMultiscales:
                 axes.append(Axis(name=d, type="custom", unit=image.axes_units.get(d)))
 
         self.metadata = Multiscale(
-            coordinateSystems=[
-                CoordinateSystem(name=coordinate_system_name, axes=axes)
-            ],
+            coordinateSystems=(
+                CoordinateSystem(name=coordinate_system_name, axes=axes),
+                ),
             datasets=datasets,
             name=image.name,
         )
@@ -323,7 +321,7 @@ class NgffMultiscales:
         if metadata_json is None:
             raise ValueError("OME metadata not found in Zarr group attributes")
 
-        metadata = Multiscale.validate(metadata_json)
+        metadata = Multiscale.model_validate(metadata_json)
 
         images = []
         for dataset in metadata.datasets:
