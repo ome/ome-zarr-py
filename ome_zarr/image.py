@@ -145,7 +145,7 @@ class NgffMultiscales:
                             input=f"scale{idx}",
                             output="physical",
                             scale=list(level_scale.values()),
-                            path=None
+                            path=None,
                         ),
                     ),
                 )
@@ -171,7 +171,7 @@ class NgffMultiscales:
         self.metadata = Multiscale(
             coordinateSystems=(
                 CoordinateSystem(name=coordinate_system_name, axes=axes),
-                ),
+            ),
             datasets=datasets,
             name=image.name,
         )
@@ -209,7 +209,7 @@ class NgffMultiscales:
         self,
         group: zarr.Group | str,
         storage_options: dict[str, Any] | None = None,
-        version: str | None = '0.6',
+        version: str | None = "0.6",
         compute: bool = True,
     ):
         """
@@ -237,14 +237,13 @@ class NgffMultiscales:
             shutil.rmtree(str(group))
 
         fmt = None
-        if version == '0.6':
+        if version == "0.6" or version == "0.5":
             from .format import FormatV05
+
             fmt = FormatV05()
-        elif version == '0.5':
-            from .format import FormatV05
-            fmt = FormatV05()
-        elif version == '0.4':
+        elif version == "0.4":
             from .format import FormatV04
+
             fmt = FormatV04()
         else:
             raise ValueError(f"Unsupported OME-Zarr version: {version}")
