@@ -312,8 +312,8 @@ class NgffMultiscales:
 
         Returns
         -------
-        Multiscales
-            A Multiscales container with the loaded images and metadata.
+        NgffMultiscales
+            A NgffMultiscales container with the loaded images and metadata.
         """
 
         if isinstance(group, str):
