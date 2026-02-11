@@ -382,7 +382,8 @@ def _build_pyramid(
                 images[-1],
                 output_shape=target_shape,
                 preserve_range=True,
-                anti_aliasing=True,)
+                anti_aliasing=True,
+            )
         elif method == Methods.NEAREST:
             new_image = dask_resize(
                 images[-1],
