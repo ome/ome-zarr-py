@@ -715,7 +715,7 @@ def _write_pyramid_to_zarr(
                 url=group.store,
                 component=str(Path(group.path, str(idx))),
                 compute=False,
-                zarr_array_kwargs=zarr_array_kwargs,
+                **zarr_array_kwargs,
             )
         )
         datasets.append({"path": str(idx)})
