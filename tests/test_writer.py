@@ -1770,6 +1770,95 @@ class TestLabelWriter:
         )
 
     @pytest.mark.parametrize(
+        "format_version",
+        (
+            # pytest.param(FormatV01, id="V01"),
+            # pytest.param(FormatV02, id="V02"),
+            # pytest.param(FormatV03, id="V03"),
+            # pytest.param(FormatV04, id="V04"),
+            pytest.param(FormatV05, id="V05"),
+        ),
+    )
+    @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])
+    def test_write_multiscale_labels_storage_options(
+        self, shape, format_version, array_constructor
+    ):
+        fmt = format_version()
+        if fmt.version == "0.5":
+            img_path = self.path_v3
+            group = self.root_v3
+        else:
+            img_path = self.path
+            group = self.root
+        axes = "tczyx"[-len(shape) :]
+        transformations = []
+        for dataset_transfs in TRANSFORMATIONS:
+            transf = dataset_transfs[0]
+            # e.g. slice [1, 1, z, x, y] -> [z, x, y] for 3D
+            transformations.append(
+                [{"type": "scale", "scale": transf["scale"][-len(shape) :]}]
+            )
+
+        # create the actual label data
+        label_data = np.random.randint(0, 1000, size=shape)
+        if fmt.version in ("0.1", "0.2"):
+            # v0.1 and v0.2 require 5d
+            expand_dims = (np.s_[None],) * (5 - len(shape))
+            label_data = label_data[expand_dims]
+            assert label_data.ndim == 5
+        label_data = array_constructor(label_data)
+
+        label_name = "my-labels"
+
+        # create the root level image data
+        self.create_image_data(group, shape, fmt, axes, transformations)
+
+        # TODO: remove test or cleaner passage of dims
+        dims = ()
+        if len(label_data.shape) == 5:
+            dims = ("t", "c", "z", "y", "x")
+        elif len(label_data.shape) == 3:
+            dims = ("z", "y", "x")
+        elif len(label_data.shape) == 2:
+            dims = ("y", "x")
+
+        pyramid = _build_pyramid(
+            label_data, method="nearest", scale_factors=[2, 4, 8, 16], dims=dims
+        )
+
+        from zarr.codecs import (
+            BloscCodec,
+            BytesCodec,
+        )
+
+        storage_options = {
+            "chunks": tuple([min(8, s) for s in shape]),
+            "shards": (
+                tuple([min(16, s) for s in shape]) if fmt.version == "0.5" else None
+            ),
+            "compressors": [BloscCodec(cname="lz4", clevel=5, shuffle="shuffle")],
+            "serializer": BytesCodec(endian="little") if fmt.version == "0.5" else None,
+            "fill_value": 0,
+            "dimension_names": list(axes) if fmt.version == "0.5" else None,
+            "order": "C",
+        }
+
+        storage_options = {k: v for k, v in storage_options.items() if v is not None}
+
+        write_multiscale_labels(
+            pyramid,
+            group,
+            name=label_name,
+            fmt=fmt,
+            axes=axes,
+            coordinate_transformations=transformations,
+            storage_options=storage_options,
+        )
+        self.verify_label_data(
+            img_path, label_name, label_data, fmt, shape, transformations
+        )
+
+    @pytest.mark.parametrize(
         "fmt",
         (pytest.param(FormatV04(), id="V04"), pytest.param(FormatV05(), id="V05")),
     )
