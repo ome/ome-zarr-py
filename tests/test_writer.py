@@ -1567,19 +1567,10 @@ class TestLabelWriter:
             test_root = zarr.open(self.path)
             Models04Labels.from_zarr(test_root["labels"])
 
-    @pytest.mark.parametrize(
-        "format_version",
-        (
-            pytest.param(FormatV01, id="V01"),
-            pytest.param(FormatV02, id="V02"),
-            pytest.param(FormatV03, id="V03"),
-            pytest.param(FormatV04, id="V04"),
-            pytest.param(FormatV05, id="V05"),
-        ),
-    )
-    @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])
-    def test_write_multiscale_labels(self, shape, format_version, array_constructor):
-        fmt = format_version()
+    def test_write_multiscale_labels(
+        self, shape, format_version_all, array_constructor
+    ):
+        fmt = format_version_all()
         if fmt.version == "0.5":
             img_path = self.path_v3
             group = self.root_v3
