@@ -1567,6 +1567,121 @@ class TestLabelWriter:
             test_root = zarr.open(self.path)
             Models04Labels.from_zarr(test_root["labels"])
 
+    def test_write_labels_with_storage_options(
+        self, shape, format_version_all, array_constructor
+    ):
+        fmt = format_version_all()
+        if fmt.version == "0.5":
+            group = self.root_v3
+        else:
+            group = self.root
+
+        axes = "tczyx"[-len(shape) :]
+        transformations = []
+        for dataset_transfs in TRANSFORMATIONS:
+            transf = dataset_transfs[0]
+            # e.g. slice [1, 1, z, x, y] -> [z, x, y] for 3D
+            transformations.append(
+                [{"type": "scale", "scale": transf["scale"][-len(shape) :]}]
+            )
+
+        label_data = np.zeros(shape, dtype=np.uint8)
+        blobs = binary_blobs(length=256, volume_fraction=0.1, n_dim=2).astype("int8")
+        slices = [slice(None)] * (len(shape) - blobs.ndim)
+        slices += [slice(0, 256), slice(0, 256)]
+        label_data[tuple(slices)] = 2 * blobs
+
+        print("label_data.shape:", label_data.shape, shape)
+        assert label_data.max() == 2
+        assert label_data.min() == 0
+        assert np.unique(label_data).tolist() == [0, 2]
+
+        if fmt.version in ("0.1", "0.2"):
+            # v0.1 and v0.2 require 5d
+            expand_dims = (np.s_[None],) * (5 - len(shape))
+            label_data = label_data[expand_dims]
+            assert label_data.ndim == 5
+        label_name = "my-labels"
+        label_data = array_constructor(label_data)
+
+        self.create_image_data(group, shape, fmt, axes, transformations)
+
+        from zarr.codecs import (
+            BloscCodec,
+            BytesCodec,
+        )
+
+        storage_options = {
+            "chunks": tuple([min(128, s) for s in shape]),
+            "shards": (
+                tuple([min(256, s) for s in shape]) if fmt.version == "0.5" else None
+            ),
+            "compressors": [BloscCodec(cname="lz4", clevel=5, shuffle="shuffle")],
+            "serializer": BytesCodec(endian="little") if fmt.version == "0.5" else None,
+            "fill_value": 0,
+            "dimension_names": list(axes) if fmt.version == "0.5" else None,
+            "order": "C",
+        }
+
+        storage_options = {k: v for k, v in storage_options.items() if v is not None}
+
+        write_labels(
+            label_data,
+            group,
+            name=label_name,
+            fmt=fmt,
+            axes=axes,
+            coordinate_transformations=transformations,
+            storage_options=storage_options,
+        )
+
+        label_group = group[f"labels/{label_name}"]
+        level0 = label_group["0"]
+
+        # Check shape and data
+        if fmt.version in ("0.1", "0.2"):
+            while len(shape) < 5:
+                shape = (1,) + shape
+        assert level0.shape == shape
+
+        # Get the actual data for comparison
+        if hasattr(label_data, "compute"):
+            expected_data = label_data.compute()
+        else:
+            expected_data = label_data
+
+        assert np.array_equal(level0[:], expected_data)
+
+        expected_chunks = tuple([min(128, s) for s in shape])
+        assert (
+            level0.chunks == expected_chunks
+        ), f"Expected chunks {expected_chunks}, got {level0.chunks}"
+
+        if fmt.version == "0.5" and hasattr(level0, "shards"):
+            expected_shards = tuple([min(256, s) for s in shape])
+            assert (
+                level0.shards == expected_shards
+            ), f"Expected shards {expected_shards}, got {level0.shards}"
+
+        assert level0.fill_value == 0
+
+        if level0.compressors:
+            if fmt.version == "0.5":
+                assert level0.compressors[0].cname.name == "lz4"
+            else:
+                assert level0.compressors[0].cname == "lz4"
+            assert level0.compressors[0].clevel == 5
+
+        if fmt.version == "0.5" and hasattr(level0, "serializer"):
+            assert level0.metadata.codecs[0].index_codecs[0].endian.name == "little"
+
+        if fmt.version == "0.5" and hasattr(level0, "dimension_names"):
+            assert level0.dimension_names == tuple(axes)
+
+        # Verify metadata is valid
+        if fmt.version == "0.4":
+            Models04Labels.from_zarr(group["labels"])
+
     def test_write_multiscale_labels(
         self, shape, format_version_all, array_constructor
     ):
