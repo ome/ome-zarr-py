@@ -30,6 +30,7 @@ from ome_zarr.format import (
 )
 from ome_zarr.scale import _build_pyramid
 from ome_zarr.writer import (
+    DASK_ARRAY_KWARGS,
     _get_valid_axes,
     _retuple,
     get_metadata,
@@ -49,6 +50,44 @@ TRANSFORMATIONS = [
     [{"scale": [1, 1, 4.0, 1.44, 1.44], "type": "scale"}],
     [{"scale": [1, 1, 8.0, 2.88, 2.88], "type": "scale"}],
 ]
+
+FORMAT_VERSIONS = [
+    pytest.param(FormatV04, id="V04"),
+    pytest.param(FormatV05, id="V05"),
+]
+
+ARRAY_CONSTRUCTORS = [np.array, da.from_array]
+
+
+def pytest_generate_tests(metafunc):
+    if "format_version_all" in metafunc.fixturenames:
+        metafunc.parametrize("format_version_all", FORMAT_VERSIONS)
+    if "array_constructor" in metafunc.fixturenames:
+        metafunc.parametrize("array_constructor", ARRAY_CONSTRUCTORS)
+
+
+def _make_storage_options(fmt, shape, axes):
+    from numcodecs import Blosc
+    from zarr.codecs import (
+        BloscCodec,
+        BytesCodec,
+    )
+
+    compressor = (
+        [Blosc(cname="zstd", clevel=3, shuffle=Blosc.SHUFFLE)]
+        if fmt.zarr_format == 2
+        else [BloscCodec(cname="zstd", clevel=3, shuffle="shuffle")]
+    )
+    options = {
+        "chunks": (16, 16),
+        "shards": (32, 32) if fmt.version == "0.5" else None,
+        "compressors": compressor,
+        "serializer": BytesCodec(endian="little") if fmt.version == "0.5" else None,
+        "fill_value": 0,
+        "dimension_names": list(axes) if fmt.version == "0.5" else None,
+        "order": "C",
+    }
+    return {k: v for k, v in options.items() if v is not None}
 
 
 class TestWriter:
@@ -79,21 +118,13 @@ class TestWriter:
     def shape(self, request):
         return request.param
 
-    @pytest.mark.parametrize(
-        "format_version",
-        (
-            pytest.param(FormatV04, id="V04"),
-            pytest.param(FormatV05, id="V05"),
-        ),
-    )
-    @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])
     @pytest.mark.parametrize("storage_options_list", [True, False])
     def test_writer(
-        self, shape, format_version, array_constructor, storage_options_list
+        self, shape, format_version_all, array_constructor, storage_options_list
     ):
-        version = format_version()
+        fmt = format_version_all()
 
-        if version.version == "0.5":
+        if fmt.version == "0.5":
             grp_path = self.path_v3 / "test"
         else:
             grp_path = self.path / "test"
@@ -109,14 +140,25 @@ class TestWriter:
                 [{"type": "scale", "scale": transf["scale"][-len(shape) :]}]
             )
 
-        chunks = [(128, 128), (50, 50), (25, 25), (25, 25), (25, 25), (25, 25)]
-        storage_options = {"chunks": chunks[0]}
-        if storage_options_list:
-            storage_options = [{"chunks": chunk} for chunk in chunks]
+        storage_options = _make_storage_options(fmt, shape, axes)
+        if fmt.version != "0.5":
+            chunks = [(128, 128), (50, 50), (25, 25), (25, 25), (25, 25), (25, 25)]
+
+            if storage_options_list:
+                storage_options = [{"chunks": chunk} for chunk in chunks]
+            else:
+                storage_options["chunks"] = chunks[0]
+        else:
+            chunks = [storage_options["chunks"] for _ in range(len(transformations))]
+            if storage_options_list:
+                storage_options = [
+                    storage_options for _ in range(len(transformations) + 1)
+                ]
+
         write_image(
             image=data,
             group=str(grp_path),
-            fmt=version,
+            fmt=fmt,
             axes=axes,
             coordinate_transformations=transformations,
             storage_options=storage_options,
@@ -130,13 +172,13 @@ class TestWriter:
         assert "multiscales" in node_metadata
         paths = [d["path"] for d in node_metadata["multiscales"][0]["datasets"]]
         node_data = [da.from_zarr(out[path]) for path in paths]
-        if version.version in ("0.1", "0.2"):
+        if fmt.version in ("0.1", "0.2"):
             # v0.1 and v0.2 MUST be 5D
             assert node_data[0].ndim == 5
         else:
             assert node_data[0].shape == shape
         print("node.metadata", node_metadata)
-        if version.version not in ("0.1", "0.2", "0.3"):
+        if fmt.version not in ("0.1", "0.2", "0.3"):
             cts = [
                 d["coordinateTransformations"]
                 for d in node_metadata["multiscales"][0]["datasets"]
@@ -147,14 +189,15 @@ class TestWriter:
         # check chunks for first 2 resolutions (before shape gets smaller than chunk)
         for level, nd_array in enumerate(node_data[:2]):
             expected = chunks[level] if storage_options_list else chunks[0]
-            first_chunk = [c[0] for c in nd_array.chunks]
-            assert tuple(first_chunk) == _retuple(expected, nd_array.shape)
+            chunksize = nd_array.chunksize
+            assert chunksize == _retuple(expected, nd_array.shape)
+
         assert np.allclose(data, node_data[0][...].compute())
 
-        if version.version == "0.4":
+        if fmt.version == "0.4":
             # Validate with ome-zarr-models-py: only supports v0.4
             Models04Image.from_zarr(out)
-        elif version.version == "0.5":
+        elif fmt.version == "0.5":
             Models05Image.from_zarr(out)
 
     def test_mix_zarr_formats(self):
@@ -193,7 +236,6 @@ class TestWriter:
         assert np.allclose(data, arr[...].compute())
 
     @pytest.mark.parametrize("zarr_format", [2, 3])
-    @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])
     def test_write_image_current(self, array_constructor, zarr_format):
         shape = (64, 64, 64)
         data = self.create_data(shape)
@@ -380,7 +422,8 @@ class TestWriter:
         assert len(list(test_group.array_values())) > 0
         for data in test_group.array_values():
             print(data)
-            assert data.chunks == (32, 32, 32)
+            # Older dask versions can store chunks as maximum size of the array instead of chunks.
+            assert data.chunks in ((32, 32, 32), tuple(min(32, x) for x in data.shape))
 
     @pytest.mark.parametrize(
         "format_version",
@@ -389,7 +432,6 @@ class TestWriter:
             pytest.param(FormatV05, id="V05"),
         ),
     )
-    @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])
     def test_write_image_compressed(self, array_constructor, format_version):
         shape = (64, 64, 64)
         data = self.create_data(shape)
@@ -422,7 +464,7 @@ class TestWriter:
             comp = group[ds].info._compressors[0]
             if format_version().zarr_format == 3:
                 print("comp", comp.to_dict())
-                # {'configuration': {'checksum': False, 'level': 0}, 'name': 'zstd'}
+                # Accounts for different dask versions
                 assert comp.to_dict() == {
                     "name": "blosc",
                     "configuration": {
@@ -432,6 +474,9 @@ class TestWriter:
                         "shuffle": "shuffle",
                         "blocksize": 0,
                     },
+                } or comp.to_dict() == {
+                    "configuration": {"checksum": False, "level": 0},
+                    "name": "zstd",
                 }
             else:
                 print("comp", comp.get_config())
@@ -455,7 +500,6 @@ class TestWriter:
             pytest.param(FormatV05, id="V05"),
         ),
     )
-    @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])
     def test_default_compression(self, array_constructor, format_version):
         """Test that the default compression is not None.
 
@@ -495,16 +539,19 @@ class TestWriter:
                 }
             else:
                 assert (path / ".zattrs").exists()
-                default_cname = "zstd"
                 json_text = (path / ds / ".zarray").read_text(encoding="utf-8")
                 arr_json = json.loads(json_text)
-                assert arr_json["compressor"] == {
-                    "blocksize": 0,
-                    "clevel": 5,
-                    "cname": default_cname,
-                    "id": "blosc",
-                    "shuffle": 1,
-                }
+                # With older dask versions and while writing zarr_format 2 compressor is not allowed to be passed on.
+                # Instead a codec should be passed but this is not something worthwhile testing given it is just for
+                # older versions.
+                assert (
+                    arr_json["compressor"]
+                    == {
+                        "level": 0,
+                        "id": "zstd",
+                    }
+                    or arr_json["compressor"] is None
+                )
 
         chunk_size = (path / f"s0/{c}0/0/0/0").stat().st_size
         assert chunk_size < 4e6
@@ -1416,17 +1463,12 @@ class TestLabelWriter:
         label_data = [da.from_zarr(label_group[path]) for path in labels_paths]
         return label_data
 
-    @pytest.mark.parametrize(
-        "format_version",
-        (
-            pytest.param(FormatV04, id="V04"),
-            pytest.param(FormatV05, id="V05"),
-        ),
-    )
-    @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])
-    def test_write_labels(self, shape, format_version, array_constructor):
+    @pytest.mark.parametrize("scale_type", ["custom", "noop", "default"])
+    def test_write_labels(
+        self, shape, format_version_all, array_constructor, scale_type
+    ):
 
-        fmt = format_version()
+        fmt = format_version_all()
         if fmt.version == "0.5":
             img_path = self.path_v3
             group = self.root_v3
@@ -1487,16 +1529,109 @@ class TestLabelWriter:
             test_root = zarr.open(self.path)
             Models04Labels.from_zarr(test_root["labels"])
 
-    @pytest.mark.parametrize(
-        "format_version",
-        (
-            pytest.param(FormatV04, id="V04"),
-            pytest.param(FormatV05, id="V05"),
-        ),
-    )
-    @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])
-    def test_write_multiscale_labels(self, shape, format_version, array_constructor):
-        fmt = format_version()
+    def test_write_labels_with_storage_options(
+        self,
+        shape,
+        format_version_all,
+        array_constructor,
+    ):
+        fmt = format_version_all()
+        if fmt.version == "0.5":
+            group = self.root_v3
+        else:
+            group = self.root
+
+        axes = "tczyx"[-len(shape) :]
+        transformations = []
+        for dataset_transfs in TRANSFORMATIONS:
+            transf = dataset_transfs[0]
+            # e.g. slice [1, 1, z, x, y] -> [z, x, y] for 3D
+            transformations.append(
+                [{"type": "scale", "scale": transf["scale"][-len(shape) :]}]
+            )
+
+        label_data = np.zeros(shape, dtype=np.uint8)
+        blobs = binary_blobs(length=256, volume_fraction=0.1, n_dim=2).astype("int8")
+        slices = [slice(None)] * (len(shape) - blobs.ndim)
+        slices += [slice(0, 256), slice(0, 256)]
+        label_data[tuple(slices)] = 2 * blobs
+
+        print("label_data.shape:", label_data.shape, shape)
+        assert label_data.max() == 2
+        assert label_data.min() == 0
+        assert np.unique(label_data).tolist() == [0, 2]
+
+        label_name = "my-labels"
+        label_data = array_constructor(label_data)
+
+        self.create_image_data(group, shape, fmt, axes, transformations)
+
+        storage_options = _make_storage_options(fmt, shape, axes)
+
+        write_labels(
+            label_data,
+            group,
+            name=label_name,
+            fmt=fmt,
+            axes=axes,
+            coordinate_transformations=transformations,
+            storage_options=storage_options,
+        )
+
+        label_group = group[f"labels/{label_name}"]
+        level0 = label_group["s0"]
+
+        assert level0.shape == shape
+
+        if hasattr(label_data, "compute"):
+            expected_data = label_data.compute()
+        else:
+            expected_data = label_data
+
+        assert np.array_equal(level0[:], expected_data)
+
+        chunks = storage_options["chunks"]
+        expected_chunks = _retuple(chunks, level0.shape)
+        assert (
+            level0.chunks == expected_chunks
+        ), f"Expected chunks {expected_chunks}, got {level0.chunks}"
+
+        if DASK_ARRAY_KWARGS and fmt.version == "0.5" and hasattr(level0, "shards"):
+            expected_shards = _retuple(storage_options["shards"], level0.shape)
+            assert (
+                level0.shards == expected_shards
+            ), f"Expected shards {expected_shards}, got {level0.shards}"
+
+        assert level0.fill_value == 0
+
+        if level0.compressors:
+            if fmt.version == "0.5":
+                if DASK_ARRAY_KWARGS:
+                    assert level0.compressors[0].cname.name == "zstd"
+                else:
+                    assert level0.compressors[0].to_dict()["name"] == "zstd"
+            else:
+                assert level0.compressors[0].cname == "zstd"
+            if DASK_ARRAY_KWARGS:
+                assert level0.compressors[0].clevel == 3
+                if fmt.version == "0.5" and hasattr(level0, "serializer"):
+                    assert (
+                        level0.metadata.codecs[0].index_codecs[0].endian.name
+                        == "little"
+                    )
+            else:
+                assert level0.compressors[0].to_dict()["configuration"]["level"] == 0
+
+        if fmt.version == "0.5" and hasattr(level0, "dimension_names"):
+            assert level0.dimension_names == tuple(axes)
+
+        if fmt.version == "0.4":
+            Models04Labels.from_zarr(group["labels"])
+
+    def test_write_multiscale_labels(
+        self, shape, format_version_all, array_constructor
+    ):
+        fmt = format_version_all()
         if fmt.version == "0.5":
             img_path = self.path_v3
             group = self.root_v3
@@ -1556,11 +1691,130 @@ class TestLabelWriter:
             img_path, label_name, label_data, fmt, shape, transformations
         )
 
+    def test_write_multiscale_labels_storage_options(
+        self, shape, format_version_all, array_constructor
+    ):
+        fmt = format_version_all()
+        if fmt.version == "0.5":
+            img_path = self.path_v3
+            group = self.root_v3
+        else:
+            img_path = self.path
+            group = self.root
+        axes = "tczyx"[-len(shape) :]
+        transformations = []
+        for dataset_transfs in TRANSFORMATIONS:
+            transf = dataset_transfs[0]
+            transformations.append(
+                [{"type": "scale", "scale": transf["scale"][-len(shape) :]}]
+            )
+
+        label_data = np.random.randint(0, 1000, size=shape)
+        label_data = array_constructor(label_data)
+
+        label_name = "my-labels"
+
+        self.create_image_data(group, shape, fmt, axes, transformations)
+
+        # TODO: remove test or cleaner passage of dims
+        dims = ()
+        if len(label_data.shape) == 5:
+            dims = ("t", "c", "z", "y", "x")
+        elif len(label_data.shape) == 3:
+            dims = ("z", "y", "x")
+        elif len(label_data.shape) == 2:
+            dims = ("y", "x")
+
+        pyramid = _build_pyramid(
+            label_data, method="nearest", scale_factors=[2, 4, 8], dims=dims
+        )
+
+        storage_options = _make_storage_options(fmt, shape, axes)
+
+        write_multiscale_labels(
+            pyramid,
+            group,
+            name=label_name,
+            fmt=fmt,
+            axes=axes,
+            coordinate_transformations=transformations[:-1],
+            storage_options=storage_options,
+        )
+        label_group = group[f"labels/{label_name}"]
+
+        # Verify each level of the pyramid
+        for level_idx, pyramid_level in enumerate(pyramid):
+            level = label_group[f"s{level_idx}"]
+
+            if hasattr(pyramid_level, "compute"):
+                expected_data = pyramid_level.compute()
+            else:
+                expected_data = pyramid_level
+
+            expected_shape = expected_data.shape
+            if fmt.version in ("0.1", "0.2"):
+                while len(expected_shape) < 5:
+                    expected_shape = (1,) + expected_shape
+
+            assert (
+                level.shape == expected_shape
+            ), f"Level {level_idx}: Expected shape {expected_shape}, got {level.shape}"
+
+            assert np.array_equal(
+                level[:], expected_data
+            ), f"Level {level_idx}: Data mismatch"
+
+            chunks = storage_options["chunks"]
+            expected_chunks = _retuple(chunks, level.shape)
+            assert (
+                level.chunks == expected_chunks
+            ), f"Level {level_idx}: Expected chunks {expected_chunks}, got {level.chunks}"
+
+            if DASK_ARRAY_KWARGS and fmt.version == "0.5" and hasattr(level, "shards"):
+                expected_shards = _retuple(storage_options["shards"], level.shape)
+                assert (
+                    level.shards == expected_shards
+                ), f"Level {level_idx}: Expected shards {expected_shards}, got {level.shards}"
+
+            assert (
+                level.fill_value == 0
+            ), f"Level {level_idx}: Expected fill_value 0, got {level.fill_value}"
+
+            if level.compressors:
+                if fmt.version == "0.5":
+                    if DASK_ARRAY_KWARGS:
+                        assert level.compressors[0].cname.name == "zstd"
+                    else:
+                        assert level.compressors[0].to_dict()["name"] == "zstd"
+                else:
+                    assert level.compressors[0].cname == "zstd"
+                if DASK_ARRAY_KWARGS:
+                    assert level.compressors[0].clevel == 3
+                    if fmt.version == "0.5" and hasattr(level, "serializer"):
+                        assert (
+                            level.metadata.codecs[0].index_codecs[0].endian.name
+                            == "little"
+                        )
+                else:
+                    assert level.compressors[0].to_dict()["configuration"]["level"] == 0
+
+            if fmt.version == "0.5" and hasattr(level, "dimension_names"):
+                assert level.dimension_names == tuple(
+                    axes
+                ), f"Level {level_idx}: Expected dimension names {tuple(axes)}, got {level.dimension_names}"
+
+        # Verify metadata is valid
+        if fmt.version == "0.4":
+            Models04Labels.from_zarr(group["labels"])
+
+        self.verify_label_data(
+            img_path, label_name, label_data, fmt, shape, transformations
+        )
+
     @pytest.mark.parametrize(
         "fmt",
         (pytest.param(FormatV04(), id="V04"), pytest.param(FormatV05(), id="V05")),
     )
-    @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])
     def test_two_label_images(self, array_constructor, fmt):
         if fmt.version == "0.5":
             img_path = self.path_v3
