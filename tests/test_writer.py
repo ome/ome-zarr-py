@@ -52,6 +52,23 @@ TRANSFORMATIONS = [
     [{"scale": [1, 1, 8.0, 2.88, 2.88], "type": "scale"}],
 ]
 
+FORMAT_VERSIONS = [
+    pytest.param(FormatV01, id="V01"),
+    pytest.param(FormatV02, id="V02"),
+    pytest.param(FormatV03, id="V03"),
+    pytest.param(FormatV04, id="V04"),
+    pytest.param(FormatV05, id="V05"),
+]
+
+ARRAY_CONSTRUCTORS = [np.array, da.from_array]
+
+
+def pytest_generate_tests(metafunc):
+    if "format_version_all" in metafunc.fixturenames:
+        metafunc.parametrize("format_version_all", FORMAT_VERSIONS)
+    if "array_constructor" in metafunc.fixturenames:
+        metafunc.parametrize("array_constructor", ARRAY_CONSTRUCTORS)
+
 
 class TestWriter:
     @pytest.fixture(autouse=True)
@@ -81,22 +98,11 @@ class TestWriter:
     def shape(self, request):
         return request.param
 
-    @pytest.mark.parametrize(
-        "format_version",
-        (
-            pytest.param(FormatV01, id="V01"),
-            pytest.param(FormatV02, id="V02"),
-            pytest.param(FormatV03, id="V03"),
-            pytest.param(FormatV04, id="V04"),
-            pytest.param(FormatV05, id="V05"),
-        ),
-    )
-    @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])
     @pytest.mark.parametrize("storage_options_list", [True, False])
     def test_writer(
-        self, shape, format_version, array_constructor, storage_options_list
+        self, shape, format_version_all, array_constructor, storage_options_list
     ):
-        version = format_version()
+        version = format_version_all()
 
         if version.version == "0.5":
             grp_path = self.path_v3 / "test"
@@ -198,7 +204,6 @@ class TestWriter:
         assert np.allclose(data, arr[...].compute())
 
     @pytest.mark.parametrize("zarr_format", [2, 3])
-    @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])
     def test_write_image_current(self, array_constructor, zarr_format):
         shape = (64, 64, 64)
         data = self.create_data(shape)
@@ -373,7 +378,6 @@ class TestWriter:
             pytest.param(FormatV05, id="V05"),
         ),
     )
-    @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])
     def test_write_image_compressed(self, array_constructor, format_version):
         shape = (64, 64, 64)
         data = self.create_data(shape)
@@ -439,7 +443,6 @@ class TestWriter:
             pytest.param(FormatV05, id="V05"),
         ),
     )
-    @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])
     def test_default_compression(self, array_constructor, format_version):
         """Test that the default compression is not None.
 
@@ -1495,21 +1498,12 @@ class TestLabelWriter:
         label_data = [da.from_zarr(label_group[path]) for path in labels_paths]
         return label_data
 
-    @pytest.mark.parametrize(
-        "format_version",
-        (
-            pytest.param(FormatV01, id="V01"),
-            pytest.param(FormatV02, id="V02"),
-            pytest.param(FormatV03, id="V03"),
-            pytest.param(FormatV04, id="V04"),
-            pytest.param(FormatV05, id="V05"),
-        ),
-    )
-    @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])
     @pytest.mark.parametrize("scale_type", ["custom", "noop", "default"])
-    def test_write_labels(self, shape, format_version, array_constructor, scale_type):
+    def test_write_labels(
+        self, shape, format_version_all, array_constructor, scale_type
+    ):
 
-        fmt = format_version()
+        fmt = format_version_all()
         if fmt.version == "0.5":
             img_path = self.path_v3
             group = self.root_v3
@@ -1644,7 +1638,6 @@ class TestLabelWriter:
         "fmt",
         (pytest.param(FormatV04(), id="V04"), pytest.param(FormatV05(), id="V05")),
     )
-    @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])
     def test_two_label_images(self, array_constructor, fmt):
         if fmt.version == "0.5":
             img_path = self.path_v3
