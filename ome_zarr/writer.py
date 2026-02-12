@@ -619,8 +619,6 @@ def write_image(
     name = metadata.pop("name", None)
     name = str(name) if name is not None else None
 
-    dask_delayed_jobs = []
-
     dask_delayed_jobs = _write_pyramid_to_zarr(
         pyramid,
         group,
@@ -690,26 +688,25 @@ def _write_pyramid_to_zarr(
     delayed = []
 
     for idx, level in enumerate(pyramid):
-
-        # LOGGER.debug(f"write_image path: {path}")
+        zarr_array_kwargs_copy = zarr_array_kwargs.copy()
         options = _resolve_storage_options(storage_options, idx)
 
         # ensure that the chunk dimensions match the image dimensions
         # (which might have been changed for versions 0.1 or 0.2)
         # if chunks are explicitly set in the storage options
-        chunks_opt = None
-        if isinstance(storage_options, list) and isinstance(storage_options[idx], dict):
-            if "chunks" in storage_options[idx]:
-                chunks_opt = options.pop("chunks", None)
 
-        elif isinstance(storage_options, dict) and "chunks" in storage_options:
-            chunks_opt = options.pop("chunks", None)
+        chunks_opt = options.get("chunks", "auto")
+        shards_opt = options.get("shards", None)
 
-        if chunks_opt is not None:
+        # If shards are defined, one dask chunk should correspond to 1 shard to prevent concurrent writes to 1 shard.
+        # In this case user defined chunks will correspond to zarr chunks and not dask chunks.
+        # Check against string is purely because of mypy
+        if not isinstance(chunks_opt, str) and not shards_opt:
             chunks_opt = _retuple(chunks_opt, level.shape)
-            # image.chunks will be used by da.to_zarr
-            zarr_array_kwargs["chunks"] = chunks_opt
             level_image = da.array(level).rechunk(chunks=chunks_opt)
+        elif shards_opt is not None:
+            shards_opt = _retuple(shards_opt, level.shape)
+            level_image = da.array(level).rechunk(shards_opt)
         else:
             level_image = level
 
@@ -721,13 +718,20 @@ def _write_pyramid_to_zarr(
             level_image.dtype,
         )
 
+        zarr_array_kwargs_copy["chunks"] = chunks_opt
+        zarr_array_kwargs_copy.pop("compressor", None)
+
+        for k, v in options.items():
+            if k not in zarr_array_kwargs_copy:
+                zarr_array_kwargs_copy[k] = v
+
         delayed.append(
             da.to_zarr(
                 arr=level_image,
                 url=group.store,
                 component=str(Path(group.path, str(idx))),
                 compute=False,
-                **zarr_array_kwargs,
+                **zarr_array_kwargs_copy,
             )
         )
         datasets.append({"path": str(idx)})
