@@ -482,7 +482,7 @@ class TestWriter:
                 }
             else:
                 assert (path / ".zattrs").exists()
-                default_cname = "zstd"
+                default_cname = "lz4"
                 json_text = (path / ds / ".zarray").read_text(encoding="utf-8")
                 arr_json = json.loads(json_text)
                 assert arr_json["compressor"] == {
