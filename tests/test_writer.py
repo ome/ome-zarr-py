@@ -1606,17 +1606,23 @@ class TestLabelWriter:
 
         self.create_image_data(group, shape, fmt, axes, transformations)
 
+        from numcodecs import Blosc
         from zarr.codecs import (
             BloscCodec,
             BytesCodec,
         )
 
+        compressor = (
+            [Blosc(cname="zstd", clevel=3, shuffle=Blosc.SHUFFLE)]
+            if fmt.zarr_format == 2
+            else [BloscCodec(cname="zstd", clevel=3, shuffle="shuffle")]
+        )
         storage_options = {
             "chunks": tuple([min(128, s) for s in shape]),
             "shards": (
                 tuple([min(256, s) for s in shape]) if fmt.version == "0.5" else None
             ),
-            "compressors": [BloscCodec(cname="lz4", clevel=5, shuffle="shuffle")],
+            "compressors": compressor,
             "serializer": BytesCodec(endian="little") if fmt.version == "0.5" else None,
             "fill_value": 0,
             "dimension_names": list(axes) if fmt.version == "0.5" else None,
@@ -1667,10 +1673,10 @@ class TestLabelWriter:
 
         if level0.compressors:
             if fmt.version == "0.5":
-                assert level0.compressors[0].cname.name == "lz4"
+                assert level0.compressors[0].cname.name == "zstd"
             else:
-                assert level0.compressors[0].cname == "lz4"
-            assert level0.compressors[0].clevel == 5
+                assert level0.compressors[0].cname == "zstd"
+            assert level0.compressors[0].clevel == 3
 
         if fmt.version == "0.5" and hasattr(level0, "serializer"):
             assert level0.metadata.codecs[0].index_codecs[0].endian.name == "little"
@@ -1741,9 +1747,9 @@ class TestLabelWriter:
         )
 
     def test_write_multiscale_labels_storage_options(
-        self, shape, format_version, array_constructor
+        self, shape, format_version_all, array_constructor
     ):
-        fmt = format_version()
+        fmt = format_version_all()
         if fmt.version == "0.5":
             img_path = self.path_v3
             group = self.root_v3
@@ -1786,17 +1792,23 @@ class TestLabelWriter:
             label_data, method="nearest", scale_factors=[2, 4, 8, 16], dims=dims
         )
 
+        from numcodecs import Blosc
         from zarr.codecs import (
             BloscCodec,
             BytesCodec,
         )
 
+        compressor = (
+            [Blosc(cname="zstd", clevel=3, shuffle=Blosc.SHUFFLE)]
+            if fmt.zarr_format == 2
+            else [BloscCodec(cname="zstd", clevel=3, shuffle="shuffle")]
+        )
         storage_options = {
             "chunks": tuple([min(8, s) for s in shape]),
             "shards": (
                 tuple([min(16, s) for s in shape]) if fmt.version == "0.5" else None
             ),
-            "compressors": [BloscCodec(cname="lz4", clevel=5, shuffle="shuffle")],
+            "compressors": compressor,
             "serializer": BytesCodec(endian="little") if fmt.version == "0.5" else None,
             "fill_value": 0,
             "dimension_names": list(axes) if fmt.version == "0.5" else None,

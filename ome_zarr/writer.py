@@ -667,7 +667,6 @@ def _write_pyramid_to_zarr(
 
     if zarr_format == 2:
         zarr_array_kwargs["chunk_key_encoding"] = {"name": "v2", "separator": "/"}
-        zarr_array_kwargs["compressor"] = options.pop("compressor", _blosc_compressor())
     else:
         if axes is not None:
             zarr_array_kwargs["dimension_names"] = [
@@ -681,7 +680,7 @@ def _write_pyramid_to_zarr(
 
             # ValueError: compressor cannot be used for arrays with zarr_format 3.
             # Use bytes-to-bytes codecs instead.
-            zarr_array_kwargs["compressor"] = options.pop("compressor")
+            zarr_array_kwargs["compressors"] = options.pop("compressor")
 
     shapes = []
     datasets: list[dict] = []
@@ -694,7 +693,7 @@ def _write_pyramid_to_zarr(
         # ensure that the chunk dimensions match the image dimensions
         # (which might have been changed for versions 0.1 or 0.2)
         # if chunks are explicitly set in the storage options
-
+        zarr_array_kwargs_copy["compressors"] = options.pop("compressors", "auto")
         chunks_opt = options.get("chunks", "auto")
         shards_opt = options.get("shards", None)
 
