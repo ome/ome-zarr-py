@@ -9,10 +9,12 @@ import numpy as np
 import zarr
 from ome_zarr_models._v06.coordinate_transforms import Scale
 from ome_zarr_models._v06.multiscales import (
-    Axis,
-    CoordinateSystem,
     Dataset,
     Multiscale,
+)
+from ome_zarr_models._v06.coordinate_transforms import (
+  CoordinateSystem,
+  Axis
 )
 
 from .scale import Methods
@@ -154,7 +156,6 @@ class NgffMultiscales:
     scale_factors: InitVar[list[int]]
     method: str | Methods = Methods.RESIZE
     coordinate_system_name: InitVar[str | None] = "physical"
-
     images: list[NgffImage] = field(init=False)
     metadata: Multiscale = field(init=False)
 
@@ -333,7 +334,17 @@ class NgffMultiscales:
         if isinstance(group, str):
             group = zarr.open(group, mode="r+")
 
-        group.attrs["ome"] = self.metadata.dict()
+        if version == '0.4':
+            # in v0.4, metadata is stored under "multiscales" attribute
+            metadata_dict = self.metadata.to_version("0.4").model_dump()
+            metadata_json = _recursive_pop_nones(metadata_dict)
+            group.attrs["multiscales"] = [metadata_json]
+        elif version in ("0.5", "0.6"):
+            metadata_dict = {
+                "version": version,
+                "multiscales": [_recursive_pop_nones(self.metadata.to_version(version).model_dump())],
+            }
+            group.attrs["ome"] = metadata_dict
 
     @classmethod
     def from_ome_zarr(
@@ -357,15 +368,36 @@ class NgffMultiscales:
         if isinstance(group, str):
             group = zarr.open(group, mode="r")
 
-        metadata_json = group.attrs.get("ome", None)
-        if metadata_json is None:
-            raise ValueError("OME metadata not found in Zarr group attributes")
+        def _finditem(obj, key):
+            if key in obj: return obj[key]
+            for k, v in obj.items():
+                if isinstance(v,dict):
+                    item = _finditem(v, key)
+                    if item is not None:
+                        return item
+                    
+        version = _finditem(group.attrs, "version")
+        if version is None:
+            raise ValueError("Could not find 'version' in group attributes")
 
-        # get version from metadata and validate against supported versions
-        if hasattr(metadata_json, "version"):
-            v = metadata_json["version"]
-
-        metadata = Multiscale.model_validate(metadata_json)
+        if version == '0.4':
+            from ome_zarr_models._v04.multiscales import Multiscale as Multiscalev04
+            metadata_json = group.attrs.get("multiscales", [None])[0]
+                
+            metadata = Multiscalev04.model_validate(metadata_json).to_version("0.6")
+        elif version == '0.5':
+            from ome_zarr_models._v05.multiscales import Multiscale as Multiscalev05
+            ome_attrs = group.attrs.get("ome", {})
+            metadata_json = ome_attrs.get("multiscales", [None])[0]
+            metadata = Multiscalev05.model_validate(metadata_json).to_version("0.6")
+        elif version == '0.6':
+            from ome_zarr_models._v06.multiscales import Multiscale
+            ome_attrs = group.attrs.get("ome", {})
+            metadata_json = ome_attrs.get("multiscales", [None])[0]
+            metadata_json = _recursive_pop_nones(metadata_json)
+            metadata = Multiscale.model_validate(metadata_json)
+        else:
+            raise ValueError(f"Unsupported OME-Zarr version: {version}")
 
         images = []
         for dataset in metadata.datasets:
@@ -392,3 +424,27 @@ class NgffMultiscales:
         instance.images = images
         instance.metadata = metadata
         return instance
+
+
+def _recursive_pop_nones(input: dict) -> dict:
+    """Recursively remove None values from a nested dictionary."""
+    output = {}
+    for key, value in input.items():
+        if isinstance(value, dict):
+            nested = _recursive_pop_nones(value)
+            if nested:
+                output[key] = nested
+        elif isinstance(value, list | tuple):
+            nested_list = []
+            for item in value:
+                if isinstance(item, dict):
+                    nested_item = _recursive_pop_nones(item)
+                    if nested_item:
+                        nested_list.append(nested_item)
+                elif item is not None:
+                    nested_list.append(item)
+            if nested_list:
+                output[key] = nested_list
+        elif value is not None:
+            output[key] = value
+    return output
