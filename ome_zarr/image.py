@@ -7,14 +7,10 @@ from typing import Any
 import dask.array as da
 import numpy as np
 import zarr
-from ome_zarr_models._v06.coordinate_transforms import Scale
+from ome_zarr_models._v06.coordinate_transforms import Axis, CoordinateSystem, Scale
 from ome_zarr_models._v06.multiscales import (
     Dataset,
     Multiscale,
-)
-from ome_zarr_models._v06.coordinate_transforms import (
-  CoordinateSystem,
-  Axis
 )
 
 from .scale import Methods
@@ -335,7 +331,7 @@ class NgffMultiscales:
         if isinstance(group, str):
             group = zarr.open(group, mode="r+")
 
-        if version == '0.4':
+        if version == "0.4":
             # in v0.4, metadata is stored under "multiscales" attribute
             metadata_dict = self.metadata.to_version("0.4").model_dump()
             metadata_json = _recursive_pop_nones(metadata_dict)
@@ -343,7 +339,9 @@ class NgffMultiscales:
         elif version in ("0.5", "0.6"):
             metadata_dict = {
                 "version": version,
-                "multiscales": [_recursive_pop_nones(self.metadata.to_version(version).model_dump())],
+                "multiscales": [
+                    _recursive_pop_nones(self.metadata.to_version(version).model_dump())
+                ],
             }
             group.attrs["ome"] = metadata_dict
 
@@ -370,29 +368,33 @@ class NgffMultiscales:
             group = zarr.open(group, mode="r")
 
         def _finditem(obj, key):
-            if key in obj: return obj[key]
+            if key in obj:
+                return obj[key]
             for k, v in obj.items():
-                if isinstance(v,dict):
+                if isinstance(v, dict):
                     item = _finditem(v, key)
                     if item is not None:
                         return item
-                    
+
         version = _finditem(group.attrs, "version")
         if version is None:
             raise ValueError("Could not find 'version' in group attributes")
 
-        if version == '0.4':
+        if version == "0.4":
             from ome_zarr_models._v04.multiscales import Multiscale as Multiscalev04
+
             metadata_json = group.attrs.get("multiscales", [None])[0]
-                
+
             metadata = Multiscalev04.model_validate(metadata_json).to_version("0.6")
-        elif version == '0.5':
+        elif version == "0.5":
             from ome_zarr_models._v05.multiscales import Multiscale as Multiscalev05
+
             ome_attrs = group.attrs.get("ome", {})
             metadata_json = ome_attrs.get("multiscales", [None])[0]
             metadata = Multiscalev05.model_validate(metadata_json).to_version("0.6")
-        elif version == '0.6':
+        elif version == "0.6":
             from ome_zarr_models._v06.multiscales import Multiscale
+
             ome_attrs = group.attrs.get("ome", {})
             metadata_json = ome_attrs.get("multiscales", [None])[0]
             metadata_json = _recursive_pop_nones(metadata_json)
