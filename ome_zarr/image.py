@@ -211,7 +211,7 @@ class NgffMultiscales:
                         Scale(
                             input=f"scale{idx}",
                             output="physical",
-                            scale=list(level_scale.values()),
+                            scale=tuple(level_scale.values()),
                             path=None,
                         ),
                     ),
@@ -237,9 +237,9 @@ class NgffMultiscales:
 
         self.metadata = Multiscale(
             coordinateSystems=(
-                CoordinateSystem(name=coordinate_system_name, axes=axes),
+                CoordinateSystem(name=coordinate_system_name, axes=tuple(axes)),
             ),
-            datasets=datasets,
+            datasets=tuple(datasets),
             name=image.name,
         )
 
