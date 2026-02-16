@@ -167,6 +167,7 @@ class NgffMultiscales:
     ):
         from .scale import _build_pyramid
 
+        self.name = image.name
         method = self.method
         if isinstance(method, Methods):
             method = str(method.value)
