@@ -378,7 +378,12 @@ def _build_pyramid(
                 target_shape.append(int(s))
 
         if method == Methods.RESIZE:
-            new_image = dask_resize(images[-1], output_shape=target_shape)
+            new_image = dask_resize(
+                images[-1],
+                output_shape=target_shape,
+                order=1,
+                preserve_range=True,
+                anti_aliasing=True,)
         elif method == Methods.NEAREST:
             new_image = dask_resize(
                 images[-1],
