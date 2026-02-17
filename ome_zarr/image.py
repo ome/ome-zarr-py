@@ -7,14 +7,16 @@ from typing import Any
 import dask.array as da
 import numpy as np
 import zarr
-from ome_zarr_models._v06.coordinate_transforms import Scale
+from ome_zarr_models._v06.coordinate_transforms import (
+  Scale,
+  Transform,
+  CoordinateSystem,
+  CoordinateSystemIdentifier,
+  Axis
+)
 from ome_zarr_models._v06.multiscales import (
     Dataset,
     Multiscale,
-)
-from ome_zarr_models._v06.coordinate_transforms import (
-  CoordinateSystem,
-  Axis
 )
 
 from .scale import Methods
@@ -151,19 +153,18 @@ class NgffMultiscales:
         Load a multiscale pyramid from an OME-Zarr group.
 
     """
-
     image: InitVar[NgffImage]
-    scale_factors: InitVar[list[int]]
+    scale_factors: InitVar[list[int]] = [2, 4, 8, 16]
     method: str | Methods = Methods.RESIZE
     coordinate_system_name: InitVar[str | None] = "physical"
-    images: list[NgffImage] = field(init=False)
-    metadata: Multiscale = field(init=False)
+    coordinateTransformations: InitVar[list[Transform]] = []
 
     def __post_init__(
         self,
         image: NgffImage,
-        scale_factors: list[int] = [2, 4, 8, 16],
+        scale_factors = [2, 4, 8, 16],
         coordinate_system_name: str | None = "physical",
+        coordinateTransformations: list[Transform] = []
     ):
         from .scale import _build_pyramid
 
@@ -188,7 +189,7 @@ class NgffMultiscales:
         scales = []
         for shape in [d.shape for d in pyramid]:
             scale = [full / level for full, level in zip(image.data.shape, shape)]
-            scales.append({d: s for d, s in zip(image.dims, scale)})
+            scales.append({d: s * image.scale[d] for d, s in zip(image.dims, scale)})
 
         # Create Image instances for each pyramid level
         images = []
@@ -235,12 +236,32 @@ class NgffMultiscales:
             else:
                 axes.append(Axis(name=d, type="custom", unit=image.axes_units.get(d)))
 
+        # check if any additional coordinate transforms have been passed and if so
+        # add them to metadata and create a new output coordinate system
+        coordinate_systems = []
+        if coordinateTransformations:
+            for tf in coordinateTransformations:
+                if type(tf) is CoordinateSystemIdentifier:
+                    name = tf.name
+                else:
+                    name = tf.output
+                coordinate_systems.append(
+                    CoordinateSystem(
+                        name=name,
+                        axes=tuple(
+                            Axis(name=d.name, type=d.type, unit=d.unit) for d in axes
+                        )
+                    )
+                )
+
         self.metadata = Multiscale(
             coordinateSystems=(
                 CoordinateSystem(name=coordinate_system_name, axes=tuple(axes)),
+                *coordinate_systems
             ),
             datasets=tuple(datasets),
             name=image.name,
+            coordinateTransformations=tuple(coordinateTransformations),
         )
 
     @classmethod
