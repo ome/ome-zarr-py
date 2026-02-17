@@ -532,7 +532,7 @@ def write_image(
     scale_factors : tuple of int, optional
         The downsampling factors for each pyramid level. Default: (2, 4, 8).
     method : ome_zarr.scale.Methods, optional
-        Downsampling method to use. 
+        Downsampling method to use.
         Available methods are:
         - `nearest`: Nearest neighbor downsampling.
         - `resize`: Resize-based downsampling using `skimage.transform.resize` with anti-aliasing.
@@ -540,7 +540,7 @@ def write_image(
         - `laplacian`: Laplacian pyramid downsampling using `skimage.transform.pyramid_laplacian`.
         - `local_mean`: Local mean downsampling using `skimage.transform.downscale_local_mean`.
         - `zoom`: Zoom-based downsampling using `scipy.ndimage.zoom`.
-        
+
         Default: `resize`.
     scaler : ome_zarr.scale.Scaler, optional
         [DEPRECATED] Scaler implementation for downsampling the image. Passing this
