@@ -13,6 +13,8 @@ from typing import Any, Union
 
 import dask.array as da
 import numpy as np
+from skimage import __version__ as skimage_version
+from scipy import __version__ as scipy_version
 import zarr
 from deprecated import deprecated
 from scipy.ndimage import zoom
@@ -300,13 +302,45 @@ class Scaler:
 
 SPATIAL_DIMS = ("z", "y", "x")
 
-
 class Methods(Enum):
     RESIZE = "resize"
     NEAREST = "nearest"
     LAPLACIAN = "laplacian"
     LOCAL_MEAN = "local_mean"
     ZOOM = "zoom"
+
+method_dispatch = {
+    Methods.RESIZE: {
+        "func": dask_resize,
+        "kwargs": {"order": 1, "mode": "reflect", "anti_aliasing": True, "preserve_range": True},
+        "used_function": "skimage.transform.resize",
+        "version": skimage_version,
+    },
+    Methods.NEAREST: {
+        "func": dask_resize,
+        "kwargs": {"order": 0, "mode": "reflect", "anti_aliasing": False, "preserve_range": True},
+        "used_function": "skimage.transform.resize",
+        "version": skimage_version,
+    },
+    Methods.LAPLACIAN: {
+        "func": dask_laplacian,
+        "kwargs": {},
+        "used_function": "skimage.transform.pyramid_laplacian",
+        "version": skimage_version,
+    },
+    Methods.LOCAL_MEAN: {
+        "func": dask_local_mean,
+        "kwargs": {},
+        "used_function": "skimage.transform.downscale_local_mean",
+        "version": skimage_version,
+    },
+    Methods.ZOOM: {
+        "func": dask_zoom,
+        "kwargs": {},
+        "used_function": "scipy.ndimage.zoom",
+        "version": scipy_version,
+    },
+}
 
 
 def _build_pyramid(
@@ -330,6 +364,9 @@ def _build_pyramid(
     method : str or Methods, optional
         The downsampling method to use. Options are "resize" or "nearest".
         Default is "nearest".
+    exact : bool, optional
+        Whether to use exact resizing. Only applicable for certain methods.
+        Default is False.
     chunks : tuple of int, str, or None, optional
         The chunk size to use for dask arrays. If None, the array's existing
         chunking is used. If a string, it should be a valid dask chunking
@@ -377,38 +414,15 @@ def _build_pyramid(
             else:
                 target_shape.append(int(s))
 
-        if method == Methods.RESIZE:
-            new_image = dask_resize(
-                images[-1],
-                output_shape=target_shape,
-                preserve_range=True,
-                anti_aliasing=True,
-            )
-        elif method == Methods.NEAREST:
-            new_image = dask_resize(
-                images[-1],
-                output_shape=target_shape,
-                order=0,
-                preserve_range=True,
-                anti_aliasing=False,
-            )
-        elif method == Methods.LAPLACIAN:
-            new_image = dask_laplacian(
-                images[-1],
-                output_shape=tuple(target_shape),
-            )
-        elif method == Methods.LOCAL_MEAN:
-            new_image = dask_local_mean(
-                images[-1],
-                output_shape=target_shape,
-            )
-        elif method == Methods.ZOOM:
-            new_image = dask_zoom(
-                images[-1],
-                output_shape=target_shape,
-            )
-        else:
+        if method not in method_dispatch:
             raise ValueError(f"Unknown downsampling method: {method}")
+
+        # apply the downsampling method to the last image in the list
+        new_image = method_dispatch[method]["func"](
+            images[-1],
+            output_shape=tuple(target_shape),
+            **method_dispatch[method]["kwargs"],
+        )
 
         images.append(new_image)
 
