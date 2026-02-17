@@ -70,6 +70,32 @@ def pytest_generate_tests(metafunc):
         metafunc.parametrize("array_constructor", ARRAY_CONSTRUCTORS)
 
 
+def _make_storage_options(fmt, shape, axes):
+    from numcodecs import Blosc
+    from zarr.codecs import (
+        BloscCodec,
+        BytesCodec,
+    )
+
+    compressor = (
+        [Blosc(cname="zstd", clevel=3, shuffle=Blosc.SHUFFLE)]
+        if fmt.zarr_format == 2
+        else [BloscCodec(cname="zstd", clevel=3, shuffle="shuffle")]
+    )
+    options = {
+        "chunks": tuple([min(16, s) for s in shape]),
+        "shards": (
+            tuple([min(32, s) for s in shape]) if fmt.version == "0.5" else None
+        ),
+        "compressors": compressor,
+        "serializer": BytesCodec(endian="little") if fmt.version == "0.5" else None,
+        "fill_value": 0,
+        "dimension_names": list(axes) if fmt.version == "0.5" else None,
+        "order": "C",
+    }
+    return {k: v for k, v in options.items() if v is not None}
+
+
 class TestWriter:
     @pytest.fixture(autouse=True)
     def initdir(self, tmpdir):
@@ -102,9 +128,9 @@ class TestWriter:
     def test_writer(
         self, shape, format_version_all, array_constructor, storage_options_list
     ):
-        version = format_version_all()
+        fmt = format_version_all()
 
-        if version.version == "0.5":
+        if fmt.version == "0.5":
             grp_path = self.path_v3 / "test"
         else:
             grp_path = self.path / "test"
@@ -120,6 +146,7 @@ class TestWriter:
                 [{"type": "scale", "scale": transf["scale"][-len(shape) :]}]
             )
 
+        storage_options = _make_storage_options(fmt, shape, axes)
         chunks = [(128, 128), (50, 50), (25, 25), (25, 25), (25, 25), (25, 25)]
         storage_options = {"chunks": chunks[0]}
         if storage_options_list:
@@ -127,7 +154,7 @@ class TestWriter:
         write_image(
             image=data,
             group=str(grp_path),
-            fmt=version,
+            fmt=fmt,
             axes=axes,
             coordinate_transformations=transformations,
             storage_options=storage_options,
@@ -141,13 +168,13 @@ class TestWriter:
         assert "multiscales" in node_metadata
         paths = [d["path"] for d in node_metadata["multiscales"][0]["datasets"]]
         node_data = [da.from_zarr(out[path]) for path in paths]
-        if version.version in ("0.1", "0.2"):
+        if fmt.version in ("0.1", "0.2"):
             # v0.1 and v0.2 MUST be 5D
             assert node_data[0].ndim == 5
         else:
             assert node_data[0].shape == shape
         print("node.metadata", node_metadata)
-        if version.version not in ("0.1", "0.2", "0.3"):
+        if fmt.version not in ("0.1", "0.2", "0.3"):
             cts = [
                 d["coordinateTransformations"]
                 for d in node_metadata["multiscales"][0]["datasets"]
@@ -162,10 +189,10 @@ class TestWriter:
             assert tuple(first_chunk) == _retuple(expected, nd_array.shape)
         assert np.allclose(data, node_data[0][...].compute())
 
-        if version.version == "0.4":
+        if fmt.version == "0.4":
             # Validate with ome-zarr-models-py: only supports v0.4
             Models04Image.from_zarr(out)
-        elif version.version == "0.5":
+        elif fmt.version == "0.5":
             Models05Image.from_zarr(out)
 
     def test_mix_zarr_formats(self):
@@ -1568,7 +1595,10 @@ class TestLabelWriter:
             Models04Labels.from_zarr(test_root["labels"])
 
     def test_write_labels_with_storage_options(
-        self, shape, format_version_all, array_constructor
+        self,
+        shape,
+        format_version_all,
+        array_constructor,
     ):
         fmt = format_version_all()
         if fmt.version == "0.5":
@@ -1606,30 +1636,7 @@ class TestLabelWriter:
 
         self.create_image_data(group, shape, fmt, axes, transformations)
 
-        from numcodecs import Blosc
-        from zarr.codecs import (
-            BloscCodec,
-            BytesCodec,
-        )
-
-        compressor = (
-            [Blosc(cname="zstd", clevel=3, shuffle=Blosc.SHUFFLE)]
-            if fmt.zarr_format == 2
-            else [BloscCodec(cname="zstd", clevel=3, shuffle="shuffle")]
-        )
-        storage_options = {
-            "chunks": tuple([min(128, s) for s in shape]),
-            "shards": (
-                tuple([min(256, s) for s in shape]) if fmt.version == "0.5" else None
-            ),
-            "compressors": compressor,
-            "serializer": BytesCodec(endian="little") if fmt.version == "0.5" else None,
-            "fill_value": 0,
-            "dimension_names": list(axes) if fmt.version == "0.5" else None,
-            "order": "C",
-        }
-
-        storage_options = {k: v for k, v in storage_options.items() if v is not None}
+        storage_options = _make_storage_options(fmt, shape, axes)
 
         write_labels(
             label_data,
@@ -1658,13 +1665,13 @@ class TestLabelWriter:
 
         assert np.array_equal(level0[:], expected_data)
 
-        expected_chunks = tuple([min(128, s) for s in shape])
+        expected_chunks = tuple([min(32, s) for s in shape])
         assert (
             level0.chunks == expected_chunks
         ), f"Expected chunks {expected_chunks}, got {level0.chunks}"
 
         if fmt.version == "0.5" and hasattr(level0, "shards"):
-            expected_shards = tuple([min(256, s) for s in shape])
+            expected_shards = tuple([min(64, s) for s in shape])
             assert (
                 level0.shards == expected_shards
             ), f"Expected shards {expected_shards}, got {level0.shards}"
@@ -1760,12 +1767,10 @@ class TestLabelWriter:
         transformations = []
         for dataset_transfs in TRANSFORMATIONS:
             transf = dataset_transfs[0]
-            # e.g. slice [1, 1, z, x, y] -> [z, x, y] for 3D
             transformations.append(
                 [{"type": "scale", "scale": transf["scale"][-len(shape) :]}]
             )
 
-        # create the actual label data
         label_data = np.random.randint(0, 1000, size=shape)
         if fmt.version in ("0.1", "0.2"):
             # v0.1 and v0.2 require 5d
@@ -1776,7 +1781,6 @@ class TestLabelWriter:
 
         label_name = "my-labels"
 
-        # create the root level image data
         self.create_image_data(group, shape, fmt, axes, transformations)
 
         # TODO: remove test or cleaner passage of dims
@@ -1789,33 +1793,10 @@ class TestLabelWriter:
             dims = ("y", "x")
 
         pyramid = _build_pyramid(
-            label_data, method="nearest", scale_factors=[2, 4, 8, 16], dims=dims
+            label_data, method="nearest", scale_factors=[2, 4, 8], dims=dims
         )
 
-        from numcodecs import Blosc
-        from zarr.codecs import (
-            BloscCodec,
-            BytesCodec,
-        )
-
-        compressor = (
-            [Blosc(cname="zstd", clevel=3, shuffle=Blosc.SHUFFLE)]
-            if fmt.zarr_format == 2
-            else [BloscCodec(cname="zstd", clevel=3, shuffle="shuffle")]
-        )
-        storage_options = {
-            "chunks": tuple([min(8, s) for s in shape]),
-            "shards": (
-                tuple([min(16, s) for s in shape]) if fmt.version == "0.5" else None
-            ),
-            "compressors": compressor,
-            "serializer": BytesCodec(endian="little") if fmt.version == "0.5" else None,
-            "fill_value": 0,
-            "dimension_names": list(axes) if fmt.version == "0.5" else None,
-            "order": "C",
-        }
-
-        storage_options = {k: v for k, v in storage_options.items() if v is not None}
+        storage_options = _make_storage_options(fmt, shape, axes)
 
         write_multiscale_labels(
             pyramid,
@@ -1823,9 +1804,80 @@ class TestLabelWriter:
             name=label_name,
             fmt=fmt,
             axes=axes,
-            coordinate_transformations=transformations,
+            coordinate_transformations=transformations[:-1],
             storage_options=storage_options,
         )
+        label_group = group[f"labels/{label_name}"]
+
+        # Verify each level of the pyramid
+        for level_idx, pyramid_level in enumerate(pyramid):
+            level = label_group[str(level_idx)]
+
+            if hasattr(pyramid_level, "compute"):
+                expected_data = pyramid_level.compute()
+            else:
+                expected_data = pyramid_level
+
+            expected_shape = expected_data.shape
+            if fmt.version in ("0.1", "0.2"):
+                while len(expected_shape) < 5:
+                    expected_shape = (1,) + expected_shape
+
+            assert (
+                level.shape == expected_shape
+            ), f"Level {level_idx}: Expected shape {expected_shape}, got {level.shape}"
+
+            assert np.array_equal(
+                level[:], expected_data
+            ), f"Level {level_idx}: Data mismatch"
+
+            chunks = storage_options["chunks"]
+            expected_chunks = (
+                chunks
+                if len(chunks) == len(label_data.shape)
+                else (1,) * len(expand_dims) + chunks
+            )
+            assert (
+                level.chunks == expected_chunks
+            ), f"Level {level_idx}: Expected chunks {expected_chunks}, got {level.chunks}"
+
+            if fmt.version == "0.5" and hasattr(level, "shards"):
+                expected_shards = storage_options["shards"]
+                assert (
+                    level.shards == expected_shards
+                ), f"Level {level_idx}: Expected shards {expected_shards}, got {level.shards}"
+
+            assert (
+                level.fill_value == 0
+            ), f"Level {level_idx}: Expected fill_value 0, got {level.fill_value}"
+
+            if level.compressors:
+                if fmt.version == "0.5":
+                    assert (
+                        level.compressors[0].cname.name == "zstd"
+                    ), f"Level {level_idx}: Expected zstd compression"
+                else:
+                    assert (
+                        level.compressors[0].cname == "zstd"
+                    ), f"Level {level_idx}: Expected zstd compression"
+                assert (
+                    level.compressors[0].clevel == 3
+                ), f"Level {level_idx}: Expected compression level 3, got {level.compressors[0].clevel}"
+
+            if fmt.version == "0.5" and hasattr(level, "serializer"):
+                assert (
+                    level.metadata.codecs[0].index_codecs[0].endian.name == "little"
+                ), f"Level {level_idx}: Expected little endian serialization"
+
+            if fmt.version == "0.5" and hasattr(level, "dimension_names"):
+                assert level.dimension_names == tuple(
+                    axes
+                ), f"Level {level_idx}: Expected dimension names {tuple(axes)}, got {level.dimension_names}"
+
+        # Verify metadata is valid
+        if fmt.version == "0.4":
+            Models04Labels.from_zarr(group["labels"])
+
         self.verify_label_data(
             img_path, label_name, label_data, fmt, shape, transformations
         )
