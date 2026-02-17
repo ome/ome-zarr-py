@@ -572,7 +572,7 @@ def write_well_metadata(
 def write_image(
     image: ArrayLike,
     group: zarr.Group | str,
-    scale_factors: list[int] | list[dict[str, int]] = [2, 4, 8, 16],
+    scale_factors: list[int]| tuple[int, ...] | list[dict[str, int]] = (2, 4, 8, 16),
     method: Methods | None = Methods.RESIZE,
     scaler: Scaler | None = None,
     fmt: Format | None = None,
@@ -700,7 +700,7 @@ def _resolve_storage_options(
 def _write_dask_image(
     image: da.Array,
     group: zarr.Group | str,
-    scale_factors: list[int] | list[dict[str, int]] = [2, 4, 8, 16],
+    scale_factors: list[int] | tuple[int, ...] | list[dict[str, int]] = (2, 4, 8, 16),
     method: Methods | None = Methods.RESIZE,
     scaler: Scaler | None = None,
     fmt: Format | None = None,
@@ -1026,7 +1026,7 @@ def write_labels(
     group: zarr.Group | str,
     name: str,
     scaler: Scaler | None = Scaler(order=0),
-    scale_factors: list[int] | list[dict[str, int]] = [2, 4, 8, 16],
+    scale_factors: list[int] | tuple[int, ...] | list[dict[str, int]] = (2, 4, 8, 16),
     method: Methods = Methods.NEAREST,
     fmt: Format | None = None,
     axes: AxesType = None,
