@@ -13,11 +13,11 @@ from typing import Any, Union
 
 import dask.array as da
 import numpy as np
-from skimage import __version__ as skimage_version
-from scipy import __version__ as scipy_version
 import zarr
 from deprecated import deprecated
+from scipy import __version__ as scipy_version
 from scipy.ndimage import zoom
+from skimage import __version__ as skimage_version
 from skimage.transform import (
     downscale_local_mean,
     pyramid_gaussian,
@@ -302,6 +302,7 @@ class Scaler:
 
 SPATIAL_DIMS = ("z", "y", "x")
 
+
 class Methods(Enum):
     RESIZE = "resize"
     NEAREST = "nearest"
@@ -309,16 +310,27 @@ class Methods(Enum):
     LOCAL_MEAN = "local_mean"
     ZOOM = "zoom"
 
+
 method_dispatch = {
     Methods.RESIZE: {
         "func": dask_resize,
-        "kwargs": {"order": 1, "mode": "reflect", "anti_aliasing": True, "preserve_range": True},
+        "kwargs": {
+            "order": 1,
+            "mode": "reflect",
+            "anti_aliasing": True,
+            "preserve_range": True,
+        },
         "used_function": "skimage.transform.resize",
         "version": skimage_version,
     },
     Methods.NEAREST: {
         "func": dask_resize,
-        "kwargs": {"order": 0, "mode": "reflect", "anti_aliasing": False, "preserve_range": True},
+        "kwargs": {
+            "order": 0,
+            "mode": "reflect",
+            "anti_aliasing": False,
+            "preserve_range": True,
+        },
         "used_function": "skimage.transform.resize",
         "version": skimage_version,
     },
