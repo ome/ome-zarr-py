@@ -1665,13 +1665,18 @@ class TestLabelWriter:
 
         assert np.array_equal(level0[:], expected_data)
 
-        expected_chunks = tuple([min(32, s) for s in shape])
+        chunks = storage_options["chunks"]
+        expected_chunks = (
+            chunks
+            if len(chunks) == len(label_data.shape)
+            else (1,) * len(expand_dims) + chunks
+        )
         assert (
             level0.chunks == expected_chunks
         ), f"Expected chunks {expected_chunks}, got {level0.chunks}"
 
         if fmt.version == "0.5" and hasattr(level0, "shards"):
-            expected_shards = tuple([min(64, s) for s in shape])
+            expected_shards = storage_options["shards"]
             assert (
                 level0.shards == expected_shards
             ), f"Expected shards {expected_shards}, got {level0.shards}"
