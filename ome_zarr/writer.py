@@ -726,7 +726,7 @@ def _write_dask_image(
     dims = _extract_dims_from_axes(axes)
 
     # scale_factors are passed as [2, 4, 8, 16, ...]
-    if isinstance(scale_factors, list) and all(
+    if isinstance(scale_factors, list | tuple) and all(
         isinstance(s, int) for s in scale_factors
     ):
         scales = []
