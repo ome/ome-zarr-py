@@ -2,6 +2,8 @@
 from dataclasses import field, dataclass
 import os
 
+import networkx as nx
+import zarr
 from ome_zarr_models._v06.coordinate_transforms import (
   Transform,
   Translation,
@@ -15,9 +17,10 @@ import networkx as nx
 
 @dataclass
 class SceneMetadata:
-  coordinateTransformations: list[Transform]
-  coordinateSystems: tuple[CoordinateSystemIdentifier] | list[CoordinateSystemIdentifier] = field(default_factory=list)
-  
+    coordinateTransformations: list[Transform]
+    coordinateSystems: (
+        tuple[CoordinateSystemIdentifier] | list[CoordinateSystemIdentifier]
+    ) = field(default_factory=list)
 
 # the class exposed to the user
 @dataclass(kw_only=True)
@@ -30,10 +33,10 @@ class NgffScene:
     def __post_init__(self):
 
         self.metadata = SceneMetadata(
-          coordinateTransformations=self.transformations,
-          coordinateSystems=self.coordinate_systems
-          )
-        
+            coordinateTransformations=self.transformations,
+            coordinateSystems=self.coordinate_systems,
+        )
+
         self._graph = nx.DiGraph()
 
         for cs in self.coordinate_systems:
@@ -71,7 +74,8 @@ class NgffScene:
             self._graph.add_edge(
                 (tf.input.path, tf.input.name),
                 (tf.output.path, tf.output.name),
-                transform=tf)
+                transform=tf,
+            )
 
     def to_ome_zarr(
             self,
@@ -115,8 +119,14 @@ class NgffScene:
 
         # Always update scene metadata
         metadata_dict = {
-            "coordinateTransformations": [t.model_dump() for t in self.metadata.coordinateTransformations],
-            "coordinateSystems": [cs.model_dump() for cs in self.metadata.coordinateSystems] if self.metadata.coordinateSystems else None
+            "coordinateTransformations": [
+                t.model_dump() for t in self.metadata.coordinateTransformations
+            ],
+            "coordinateSystems": (
+                [cs.model_dump() for cs in self.metadata.coordinateSystems]
+                if self.metadata.coordinateSystems
+                else None
+            ),
         }
         metadata_dict = _recursive_pop_nones(metadata_dict)
 
