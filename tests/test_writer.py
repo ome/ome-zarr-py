@@ -83,10 +83,8 @@ def _make_storage_options(fmt, shape, axes):
         else [BloscCodec(cname="zstd", clevel=3, shuffle="shuffle")]
     )
     options = {
-        "chunks": tuple([min(16, s) for s in shape]),
-        "shards": (
-            tuple([min(32, s) for s in shape]) if fmt.version == "0.5" else None
-        ),
+        "chunks": (16, 16),
+        "shards": (32, 32) if fmt.version == "0.5" else None,
         "compressors": compressor,
         "serializer": BytesCodec(endian="little") if fmt.version == "0.5" else None,
         "fill_value": 0,
@@ -147,10 +145,20 @@ class TestWriter:
             )
 
         storage_options = _make_storage_options(fmt, shape, axes)
-        chunks = [(128, 128), (50, 50), (25, 25), (25, 25), (25, 25), (25, 25)]
-        storage_options = {"chunks": chunks[0]}
-        if storage_options_list:
-            storage_options = [{"chunks": chunk} for chunk in chunks]
+        if fmt.version != "0.5":
+            chunks = [(128, 128), (50, 50), (25, 25), (25, 25), (25, 25), (25, 25)]
+
+            if storage_options_list:
+                storage_options = [{"chunks": chunk} for chunk in chunks]
+            else:
+                storage_options["chunks"] = chunks[0]
+        else:
+            chunks = [storage_options["chunks"] for _ in range(len(transformations))]
+            if storage_options_list:
+                storage_options = [
+                    storage_options for _ in range(len(transformations) + 1)
+                ]
+
         write_image(
             image=data,
             group=str(grp_path),
@@ -185,8 +193,9 @@ class TestWriter:
         # check chunks for first 2 resolutions (before shape gets smaller than chunk)
         for level, nd_array in enumerate(node_data[:2]):
             expected = chunks[level] if storage_options_list else chunks[0]
-            first_chunk = [c[0] for c in nd_array.chunks]
-            assert tuple(first_chunk) == _retuple(expected, nd_array.shape)
+            chunksize = nd_array.chunksize
+            assert chunksize == _retuple(expected, nd_array.shape)
+
         assert np.allclose(data, node_data[0][...].compute())
 
         if fmt.version == "0.4":
@@ -1666,17 +1675,13 @@ class TestLabelWriter:
         assert np.array_equal(level0[:], expected_data)
 
         chunks = storage_options["chunks"]
-        expected_chunks = (
-            chunks
-            if len(chunks) == len(label_data.shape)
-            else (1,) * len(expand_dims) + chunks
-        )
+        expected_chunks = _retuple(chunks, level0.shape)
         assert (
             level0.chunks == expected_chunks
         ), f"Expected chunks {expected_chunks}, got {level0.chunks}"
 
         if fmt.version == "0.5" and hasattr(level0, "shards"):
-            expected_shards = storage_options["shards"]
+            expected_shards = _retuple(storage_options["shards"], level0.shape)
             assert (
                 level0.shards == expected_shards
             ), f"Expected shards {expected_shards}, got {level0.shards}"
@@ -1837,17 +1842,13 @@ class TestLabelWriter:
             ), f"Level {level_idx}: Data mismatch"
 
             chunks = storage_options["chunks"]
-            expected_chunks = (
-                chunks
-                if len(chunks) == len(label_data.shape)
-                else (1,) * len(expand_dims) + chunks
-            )
+            expected_chunks = _retuple(chunks, level.shape)
             assert (
                 level.chunks == expected_chunks
             ), f"Level {level_idx}: Expected chunks {expected_chunks}, got {level.chunks}"
 
             if fmt.version == "0.5" and hasattr(level, "shards"):
-                expected_shards = storage_options["shards"]
+                expected_shards = _retuple(storage_options["shards"], level.shape)
                 assert (
                     level.shards == expected_shards
                 ), f"Level {level_idx}: Expected shards {expected_shards}, got {level.shards}"

@@ -704,6 +704,8 @@ def _write_pyramid_to_zarr(
             chunks_opt = _retuple(chunks_opt, level.shape)
             level_image = da.array(level).rechunk(chunks=chunks_opt)
         elif shards_opt is not None:
+            # This ensures that shards are always divisible by chunks, which is a requirement.
+            chunks_opt = _retuple(chunks_opt, level.shape)
             shards_opt = _retuple(shards_opt, level.shape)
             level_image = da.array(level).rechunk(shards_opt)
         else:
@@ -718,6 +720,7 @@ def _write_pyramid_to_zarr(
         )
 
         zarr_array_kwargs_copy["chunks"] = chunks_opt
+        zarr_array_kwargs_copy["shards"] = shards_opt
         zarr_array_kwargs_copy.pop("compressor", None)
 
         for k, v in options.items():
