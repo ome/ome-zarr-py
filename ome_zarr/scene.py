@@ -1,19 +1,18 @@
 # the class for storage representation, not exposed to the user
-from dataclasses import field, dataclass
 import os
+from dataclasses import dataclass, field
 
 import networkx as nx
 import zarr
 from ome_zarr_models._v06.coordinate_transforms import (
-  Transform,
-  Translation,
-  CoordinateSystemIdentifier
+    CoordinateSystemIdentifier,
+    Transform,
+    Translation,
 )
+from zarr.storage import StoreLike
 
 from .image import NgffMultiscales
-import zarr
-from zarr.storage import StoreLike
-import networkx as nx
+
 
 @dataclass
 class SceneMetadata:
@@ -22,12 +21,15 @@ class SceneMetadata:
         tuple[CoordinateSystemIdentifier] | list[CoordinateSystemIdentifier]
     ) = field(default_factory=list)
 
+
 # the class exposed to the user
 @dataclass(kw_only=True)
 class NgffScene:
     images: list[NgffMultiscales]
     transformations: list[Transform]
-    coordinate_systems: tuple[CoordinateSystemIdentifier] | list[CoordinateSystemIdentifier] = field(default_factory=list)
+    coordinate_systems: (
+        tuple[CoordinateSystemIdentifier] | list[CoordinateSystemIdentifier]
+    ) = field(default_factory=list)
     _written_image_names: set[str] = field(default_factory=set, init=False)
 
     def __post_init__(self):
@@ -40,7 +42,7 @@ class NgffScene:
         self._graph = nx.DiGraph()
 
         for cs in self.coordinate_systems:
-            if hasattr(cs, 'path') and cs.path is None:
+            if hasattr(cs, "path") and cs.path is None:
                 self._graph.add_node((None, cs.name))
 
         for img in self.images:
@@ -59,16 +61,18 @@ class NgffScene:
                 self._graph.add_edge(
                     (img.metadata.name, ds.path),
                     (img.metadata.name, ds.coordinateTransformations[0].output),
-                    transform=transform)
-                
+                    transform=transform,
+                )
+
             # add additional transformations from image metadata as edges
             if img.metadata.coordinateTransformations:
                 for tf in img.metadata.coordinateTransformations:
                     self._graph.add_edge(
                         (img.metadata.name, tf.input),
                         (img.metadata.name, tf.output),
-                        transform=tf)
-        
+                        transform=tf,
+                    )
+
         # add scene-level transformations as edges between coordinate systems of different images
         for tf in self.transformations:
             self._graph.add_edge(
@@ -77,13 +81,10 @@ class NgffScene:
                 transform=tf,
             )
 
-    def to_ome_zarr(
-            self,
-            store: StoreLike,
-            incremental: bool = False):
+    def to_ome_zarr(self, store: StoreLike, incremental: bool = False):
         """
         Write scene to OME-Zarr format.
-        
+
         Parameters
         ----------
         store: StoreLike
@@ -93,25 +94,26 @@ class NgffScene:
             If False, overwrite all images in the store with the current state of the scene.
 
         """
-        from .image import _recursive_pop_nones
         import shutil
-    
+
+        from .image import _recursive_pop_nones
+
         if not incremental and os.path.exists(str(store)):
             # Clear the store if it already exists and we're not doing incremental writes
             shutil.rmtree(str(store))
 
         # Open or create zarr group
-        mode = 'a' if incremental else 'w'
+        mode = "a" if incremental else "w"
         zarr_group = zarr.open(store, mode=mode)
-        
+
         # Create a subgroup for each image using its name
         for img in self.images:
             img_name = str(img.metadata.name)
-            
+
             # Skip if already written (incremental mode)
             if incremental and img_name in self._written_image_names:
                 continue
-            
+
             # Write the image
             subgroup = zarr_group.create_group(img_name, overwrite=not incremental)
             img.to_ome_zarr(subgroup)
@@ -130,24 +132,21 @@ class NgffScene:
         }
         metadata_dict = _recursive_pop_nones(metadata_dict)
 
-        zarr_group.attrs['ome'] = {
-            "scene": metadata_dict,
-            "version": "0.6"
-        }
-    
+        zarr_group.attrs["ome"] = {"scene": metadata_dict, "version": "0.6"}
+
     @classmethod
     def from_ome_zarr(cls, store: StoreLike):
         """
         Load an existing scene from OME-Zarr format.
-        
+
         Args:
             path: Path to the OME-Zarr scene
-            
+
         Returns:
             NgffScene instance with images and metadata loaded from disk
         """
-        zarr_group = zarr.open(store, mode='r')
-        
+        zarr_group = zarr.open(store, mode="r")
+
         # Load all image subgroups
         images = []
         for img_name in zarr_group.group_keys():
@@ -156,39 +155,37 @@ class NgffScene:
             # You may need to adapt based on your NgffMultiscales.from_ome_zarr implementation
             img = NgffMultiscales.from_ome_zarr(img_group)
             images.append(img)
-        
+
         # Load scene metadata
-        ome_metadata = zarr_group.attrs.get('ome', {})
-        scene_metadata = ome_metadata.get('scene', {})
-        
+        ome_metadata = zarr_group.attrs.get("ome", {})
+        scene_metadata = ome_metadata.get("scene", {})
+
         # Note: Reconstructing Transform and CoordinateSystemIdentifier objects from dicts
         # may require additional deserialization logic depending on your models
-        
+
         transformations = []
-        for tf in scene_metadata.get('coordinateTransformations', []):
+        for tf in scene_metadata.get("coordinateTransformations", []):
             if tf["type"] == "translation":
-                transformations.append(
-                    Translation.model_validate(tf)
-                )
+                transformations.append(Translation.model_validate(tf))
         coordinate_systems = [
             CoordinateSystemIdentifier.model_validate(cs)
-            for cs in scene_metadata.get('coordinateSystems', [])
+            for cs in scene_metadata.get("coordinateSystems", [])
             if cs
         ]
-        
+
         scene = cls(
             images=images,
             transformations=transformations,
-            coordinate_systems=coordinate_systems
+            coordinate_systems=coordinate_systems,
         )
         # Mark all existing images as already written
         scene._written_image_names = {img.metadata.name for img in images}
-        
+
         return scene
-    
+
     def add_transform(self, transform: Transform):
         self.transformations.append(transform)
         self.metadata = SceneMetadata(
             coordinateTransformations=self.transformations,
-            coordinateSystems=self.metadata.coordinateSystems
+            coordinateSystems=self.metadata.coordinateSystems,
         )

@@ -8,11 +8,11 @@ import dask.array as da
 import numpy as np
 import zarr
 from ome_zarr_models._v06.coordinate_transforms import (
-  Scale,
-  Transform,
-  CoordinateSystem,
-  CoordinateSystemIdentifier,
-  Axis
+    Axis,
+    CoordinateSystem,
+    CoordinateSystemIdentifier,
+    Scale,
+    Transform,
 )
 from ome_zarr_models._v06.multiscales import (
     Dataset,
@@ -153,6 +153,7 @@ class NgffMultiscales:
         Load a multiscale pyramid from an OME-Zarr group.
 
     """
+
     image: InitVar[NgffImage]
     scale_factors: InitVar[list[int]] = [2, 4, 8, 16]
     method: str | Methods = Methods.RESIZE
@@ -162,9 +163,9 @@ class NgffMultiscales:
     def __post_init__(
         self,
         image: NgffImage,
-        scale_factors = [2, 4, 8, 16],
+        scale_factors=[2, 4, 8, 16],
         coordinate_system_name: str | None = "physical",
-        coordinateTransformations: list[Transform] = []
+        coordinateTransformations: list[Transform] = [],
     ):
         from .scale import _build_pyramid
 
@@ -250,14 +251,14 @@ class NgffMultiscales:
                         name=name,
                         axes=tuple(
                             Axis(name=d.name, type=d.type, unit=d.unit) for d in axes
-                        )
+                        ),
                     )
                 )
 
         self.metadata = Multiscale(
             coordinateSystems=(
                 CoordinateSystem(name=coordinate_system_name, axes=tuple(axes)),
-                *coordinate_systems
+                *coordinate_systems,
             ),
             datasets=tuple(datasets),
             name=image.name,
