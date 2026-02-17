@@ -590,20 +590,17 @@ def write_image(
         `scale_factors` is provided. Image array MUST be up to 5-dimensional with
         dimensions ordered (t, c, z, y, x). Can be a NumPy or Dask array.
     group : zarr.Group or str
-         The zarr group to write the metadata, or a path to create
+        The zarr group to write the metadata, or a path to create
     scale_factors : tuple of int, optional
         The downsampling factors for each pyramid level. Default: (2, 4, 8).
     method : ome_zarr.scale.Methods, optional
         Downsampling method to use.
         Available methods are:
         - `nearest`: Nearest neighbor downsampling.
-        - `resize`: Resize-based downsampling using `skimage.transform.resize` with anti-aliasing.
-          This is the default method and is recommended for most use cases.
+        - `resize`: Resize-based downsampling using `skimage.transform.resize` with anti-aliasing (default).
         - `laplacian`: Laplacian pyramid downsampling using `skimage.transform.pyramid_laplacian`.
         - `local_mean`: Local mean downsampling using `skimage.transform.downscale_local_mean`.
         - `zoom`: Zoom-based downsampling using `scipy.ndimage.zoom`.
-
-        Default: `resize`.
     scaler : ome_zarr.scale.Scaler, optional
         [DEPRECATED] Scaler implementation for downsampling the image. Passing this
         argument will raise a warning and is no longer supported. Use `scale_factors` and
