@@ -65,8 +65,8 @@ To apply equal or custom downsampling factors along all spatial dimensions, pass
 
     scale_factors = [
         {"z": 2, "y": 2, "x": 2},
-        {"z": 2, "y": 4, "x": 4},
-        {"z": 4, "y": 8, "x": 8}
+        {"z": 4, "y": 4, "x": 4},
+        {"z": 8, "y": 8, "x": 8}
         ]
     write_image(
         your_data
