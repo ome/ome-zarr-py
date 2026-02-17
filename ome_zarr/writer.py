@@ -27,6 +27,7 @@ AxesType = str | list[str] | list[dict[str, str]] | None
 
 SPATIAL_DIMS = ("x", "y", "z")
 
+
 def _get_valid_axes(
     ndim: int | None = None,
     axes: AxesType = None,
@@ -725,14 +726,16 @@ def _write_dask_image(
     dims = _extract_dims_from_axes(axes)
 
     # scale_factors are passed as [2, 4, 8, 16, ...]
-    if isinstance(scale_factors, list) and all(isinstance(s, int) for s in scale_factors):
+    if isinstance(scale_factors, list) and all(
+        isinstance(s, int) for s in scale_factors
+    ):
         scales = []
         for i in range(1, len(scale_factors) + 1):
             scale = {d: 2**i if d in SPATIAL_DIMS else 1 for d in dims}
             if "z" in dims:
                 scale["z"] = 1
             scales.append(scale)
-        scale_factors = scales            
+        scale_factors = scales
 
     # for path, data in enumerate(pyramid):
     if scaler is not None:

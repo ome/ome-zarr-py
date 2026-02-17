@@ -49,7 +49,7 @@ build these pyramids under the hood as delayed dask arrays based on the settings
 The scale factors can be passed as a list of integers or a list of dicts::
 
     from ome_zarr.writer import write_image
-    
+
     scale_factors = [2, 4, 8]
     write_image(
         your_data
@@ -62,7 +62,7 @@ In this example, the downsampling will be applied in all spatial dimensions *exc
 To apply equal or custom downsampling factors along all spatial dimensions, pass the scale factors as a list of dicts, e.g.::
 
     from ome_zarr.writer import write_image
-    
+
     scale_factors = [
         {"z": 2, "y": 2, "x": 2},
         {"z": 2, "y": 4, "x": 4},

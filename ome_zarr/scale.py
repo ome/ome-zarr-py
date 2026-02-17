@@ -404,7 +404,9 @@ def _build_pyramid(
         if idx == 0:
             relative_factors = np.asarray(list(scale_factors[0].values()))
         else:
-            relative_factors = np.asarray(list(factor.values())) / np.asarray(list(scale_factors[idx - 1].values()))
+            relative_factors = np.asarray(list(factor.values())) / np.asarray(
+                list(scale_factors[idx - 1].values())
+            )
 
         # Build per-dimension factor (only spatial dims are downsampled)
         per_dim_factor = tuple(

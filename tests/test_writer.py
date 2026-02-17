@@ -1646,14 +1646,12 @@ class TestLabelWriter:
             dims = ("y", "x")
 
         scale_factors = [
-            {dim: 2**i if dim in ("z", "y", "x") else 1 for dim in dims }
+            {dim: 2 ** i if dim in ("z", "y", "x") else 1 for dim in dims}
             for i in range(1, 5)
         ]
 
         pyramid = _build_pyramid(
-            label_data,
-            method="nearest",
-            scale_factors=scale_factors, dims=dims
+            label_data, method="nearest", scale_factors=scale_factors, dims=dims
         )
 
         write_multiscale_labels(
@@ -1701,7 +1699,7 @@ class TestLabelWriter:
             label_data = np.random.randint(0, 1000, size=shape)
             label_data = array_constructor(label_data)
             scale_factors = [
-                {dim: 2**i if dim in ("z", "y", "x") else 1 for dim in axes }
+                {dim: 2 ** i if dim in ("z", "y", "x") else 1 for dim in axes}
                 for i in range(1, 5)
             ]
             labels_mip = _build_pyramid(
