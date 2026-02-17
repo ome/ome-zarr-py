@@ -37,8 +37,8 @@ ArrayLike = Union[da.Array, np.ndarray]  # noqa: UP007  # FIXME
 
 
 @deprecated(
-    reason="Downsampling via the `Scaler` class has been deprecated. Please use the `scale_Factors` argument instead.",
-    version="0.13.0",
+    reason="Downsampling via the `Scaler` class has been deprecated. Please use the `scale_factors` argument instead.",
+    version="0.14.0",
 )
 @dataclass
 class Scaler:
