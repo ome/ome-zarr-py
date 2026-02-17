@@ -362,8 +362,8 @@ def download(input_path: str, output_dir: str = ".") -> None:
             target_path, mode="w", zarr_format=fmt.zarr_format, attributes=metadata
         )
 
-        resolutions: list[da.core.Array] = []
-        datasets: list[str] = []
+        resolutions: list[da.core.Array]
+        datasets: list[str]
 
         for spec in node.specs:
             if isinstance(spec, Multiscales):
@@ -389,7 +389,7 @@ def download(input_path: str, output_dir: str = ".") -> None:
                                 arr=data,
                                 url=root.store,
                                 component=dataset,
-                                zarr_array_kwargs=zarr_array_kwargs,
+                                **zarr_array_kwargs,
                             )
             else:
                 # Assume a group that needs metadata, like labels
