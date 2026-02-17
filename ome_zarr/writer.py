@@ -26,18 +26,6 @@ ArrayLike: TypeAlias = da.Array | np.ndarray
 AxesType = str | list[str] | list[dict[str, str]] | None
 
 
-def _prepare_zarr_array_kwargs(zarr_array_kwargs: dict[str, Any]) -> None:
-    """Set defaults for zarr array kwargs."""
-    # this should be a string but is assigned just before to_zarr is called to allow for passing multiscale name.
-    zarr_array_kwargs.setdefault("name", None)
-
-    zarr_array_kwargs.setdefault("chunks", "auto")
-    zarr_array_kwargs.setdefault("filters", "auto")
-    zarr_array_kwargs.setdefault("shards", None)
-    zarr_array_kwargs.setdefault("compressors", "auto")
-    zarr_array_kwargs.setdefault("serializer", "auto")
-
-
 def _get_valid_axes(
     ndim: int | None = None,
     axes: AxesType = None,
