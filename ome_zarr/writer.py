@@ -2,6 +2,7 @@
 
 import logging
 import warnings
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, TypeAlias
 
@@ -13,8 +14,8 @@ from dask.graph_manipulation import bind
 from numcodecs import Blosc
 
 from .axes import Axes
-from .format import CurrentFormat, Format, FormatV04
-from .scale import Scaler
+from .format import CurrentFormat, Format, FormatV01, FormatV02, FormatV04
+from .scale import Methods, Scaler
 from .types import JSONDict
 
 LOGGER = logging.getLogger("ome_zarr.writer")
@@ -23,6 +24,8 @@ ListOfArrayLike = list[da.Array] | list[np.ndarray]
 ArrayLike: TypeAlias = da.Array | np.ndarray
 
 AxesType = str | list[str] | list[dict[str, str]] | None
+
+SPATIAL_DIMS = ("x", "y", "z")
 
 
 def _get_valid_axes(
@@ -63,6 +66,48 @@ def _get_valid_axes(
     axes_obj = Axes(axes, fmt)
 
     return axes_obj.to_list(fmt)
+
+
+def _extract_dims_from_axes(
+    axes: list[str] | list[dict[str, str]] | None,
+) -> Sequence[str]:
+    """Extract dimension names from axes, with proper type narrowing.
+
+    Parameters
+    ----------
+    axes : list[str] | list[dict[str, str]] | None
+        Axes returned from _get_valid_axes (must not be None).
+
+    Returns
+    -------
+    Sequence[str]
+        Dimension names as tuple.
+
+    Raises
+    ------
+    ValueError
+        If axes is None.
+    """
+    if axes is None:
+        # only the case for v0.1 and v0.2, which are always 5D
+        return ("t", "c", "z", "y", "x")
+
+    # axes is expected to be a list of strings or a list of dicts with 'name'
+    if all(isinstance(s, str) for s in axes):
+        return tuple(str(s) for s in axes)
+
+    if all(isinstance(s, dict) and "name" in s for s in axes):
+        names: list[str] = []
+        for s in axes:
+            # narrow type for mypy
+            if not isinstance(s, dict) or "name" not in s:
+                raise TypeError("`axes` must be a list of dicts containing 'name'")
+            names.append(str(s["name"]))
+        return tuple(names)
+
+    raise TypeError(
+        "`axes` must be a list of strings or a list of dicts containing 'name'"
+    )
 
 
 def _validate_well_images(
@@ -217,8 +262,7 @@ def check_format(
 
 def write_multiscale(
     pyramid: ListOfArrayLike,
-    group: zarr.Group | str,
-    chunks: tuple[Any, ...] | int | None = None,
+    group: zarr.Group,
     fmt: Format | None = None,
     axes: AxesType = None,
     coordinate_transformations: list[list[dict[str, Any]]] | None = None,
@@ -273,98 +317,22 @@ def write_multiscale(
     group, fmt = check_group_fmt(group, fmt)
     dims = len(pyramid[0].shape)
     axes = _get_valid_axes(dims, axes, fmt)
-    dask_delayed = []
 
-    if chunks is not None:
-        msg = """The 'chunks' argument is deprecated and will be removed in version 0.5.
-Please use the 'storage_options' argument instead."""
-        warnings.warn(msg, DeprecationWarning)
-    datasets: list[dict] = []
-    for path, data in enumerate(pyramid):
-        options = _resolve_storage_options(storage_options, path)
-
-        # ensure that the chunk dimensions match the image dimensions
-        # (which might have been changed for versions 0.1 or 0.2)
-        # if chunks are explicitly set in the storage options
-        chunks_opt = options.pop("chunks", chunks)
-        if chunks_opt is not None:
-            chunks_opt = _retuple(chunks_opt, data.shape)
-
-        options["chunk_key_encoding"] = fmt.chunk_key_encoding
-        zarr_format = fmt.zarr_format
-        compressor = options.pop("compressor", None)
-        if zarr_format == 2:
-            # by default we use Blosc with zstd compression
-            # Don't need this for zarr v3 as it has a default compressor
-            if compressor is None:
-                compressor = _blosc_compressor()
-            options["compressor"] = compressor
-        else:
-            if compressor is not None:
-                options["compressors"] = [compressor]
-            if axes is not None:
-                # the array zarr.json also contains axes names
-                # TODO: check if this is written by da.to_zarr
-                options["dimension_names"] = [
-                    axis["name"] for axis in axes if isinstance(axis, dict)
-                ]
-
-        if isinstance(data, da.Array):
-            if zarr_format == 2:
-                options["dimension_separator"] = "/"
-                del options["chunk_key_encoding"]
-            # handle any 'chunks' option from storage_options
-            if chunks_opt is not None:
-                data = da.array(data).rechunk(chunks=chunks_opt)  # noqa: PLW2901
-            da_delayed = da.to_zarr(
-                arr=data,
-                url=group.store,
-                component=str(Path(group.path, str(path))),
-                compute=compute,
-                zarr_format=zarr_format,
-                **options,
-            )
-
-            if not compute:
-                dask_delayed.append(da_delayed)
-
-        else:
-            if chunks_opt is not None:
-                options["chunks"] = chunks_opt
-            options["shape"] = data.shape
-            # otherwise we get 'null'
-            options["fill_value"] = 0
-
-            arr = group.create_array(
-                str(path),
-                dtype=data.dtype,
-                **options,
-            )
-            arr[slice(None)] = data
-
-        datasets.append({"path": str(path)})
-
-    if coordinate_transformations is None:
-        shapes = [data.shape for data in pyramid]
-        coordinate_transformations = fmt.generate_coordinate_transformations(shapes)
-
-    # we validate again later, but this catches length mismatch before zip(datasets...)
-    fmt.validate_coordinate_transformations(
-        dims, len(pyramid), coordinate_transformations
+    pyramid = [
+        da.from_array(level) if not isinstance(level, da.Array) else level
+        for level in pyramid
+    ]
+    dask_delayed = _write_pyramid_to_zarr(
+        pyramid,
+        group,
+        fmt=fmt,
+        axes=axes,
+        coordinate_transformations=coordinate_transformations,
+        storage_options=storage_options,
+        name=name,
+        compute=compute,
+        **metadata,
     )
-    if coordinate_transformations is not None:
-        for dataset, transform in zip(datasets, coordinate_transformations):
-            dataset["coordinateTransformations"] = transform
-
-    if len(dask_delayed) > 0 and not compute:
-        write_multiscales_metadata_delayed = dask.delayed(write_multiscales_metadata)
-        return dask_delayed + [
-            bind(write_multiscales_metadata_delayed, dask_delayed)(
-                group, datasets, fmt, axes, name, **metadata
-            )
-        ]
-    else:
-        write_multiscales_metadata(group, datasets, fmt, axes, name, **metadata)
 
     return dask_delayed
 
@@ -542,8 +510,9 @@ def write_well_metadata(
 def write_image(
     image: ArrayLike,
     group: zarr.Group | str,
-    scaler: Scaler = Scaler(),
-    chunks: tuple[Any, ...] | int | None = None,
+    scale_factors: list[int] | tuple[int, ...] | list[dict[str, int]] = (2, 4, 8, 16),
+    method: Methods | None = Methods.RESIZE,
+    scaler: Scaler | None = None,
     fmt: Format | None = None,
     axes: AxesType = None,
     coordinate_transformations: list[list[dict[str, Any]]] | None = None,
@@ -551,89 +520,124 @@ def write_image(
     compute: bool | None = True,
     **metadata: str | JSONDict | list[JSONDict],
 ) -> list:
-    """Writes an image to the zarr store according to ome-zarr specification
-
-    :type image: :class:`numpy.ndarray` or `dask.array.Array`
-    :param image:
-      The image data to save. A downsampling of the data will be computed
-      if the scaler argument is non-None.
-      Image array MUST be up to 5-dimensional with dimensions
-      ordered (t, c, z, y, x).  Image can be a numpy or dask Array.
-    :type group: :class:`zarr.Group` or str
-    :param group: The zarr group to write the metadata, or a path to create
-    :type scaler: :class:`ome_zarr.scale.Scaler`
-    :param scaler:
-      Scaler implementation for downsampling the image argument. If None,
-      no downsampling will be performed.
-    :type chunks: int or tuple of ints, optional
-    :param chunks:
-        The size of the saved chunks to store the image.
-
-        .. deprecated:: 0.4.0
-            This argument is deprecated and will be removed in a future version.
-            Use :attr:`storage_options` instead.
-    :type fmt: :class:`ome_zarr.format.Format`, optional
-    :param fmt:
-      The format of the ome_zarr data which should be used.
-      Defaults to the most current.
-    :type axes: list of str or list of dicts, optional
-    :param axes:
-      The names of the axes. e.g. ["t", "c", "z", "y", "x"].
-      Ignored for versions 0.1 and 0.2. Required for version 0.3 or greater.
-    :type coordinate_transformations: list of list of dict
-    :param coordinate_transformations:
-      For each resolution, we have a List of transformation Dicts (not validated).
-      Each list of dicts are added to each datasets in order.
-    :type storage_options: dict or list of dict, optional
-    :param storage_options:
-        Options to be passed on to the storage backend.
-        A list would need to match the number of datasets in a multiresolution pyramid.
-        One can provide different chunk size for each level of a pyramid using this
-        option.
-    :param compute:
-        If true compute immediately otherwise a list of :class:`dask.delayed.Delayed`
-        is returned.
-    :return:
-        Empty list if the compute flag is True, otherwise it returns a list of
-        :class:`dask.delayed.Delayed` representing the value to be computed by
-        dask.
     """
+    Write an image to the zarr store according to the OME-Zarr specification, supporting multiscale pyramids.
 
-    # if a path is given create the group according to the format (default current)
-    # otherwise check the group and fmt are compatible zarr versions
+    Parameters
+    ----------
+    image : numpy.ndarray or dask.array.Array
+        The image data to save. A downsampling pyramid will be computed if
+        `scale_factors` is provided. Image array MUST be up to 5-dimensional with
+        dimensions ordered (t, c, z, y, x). Can be a NumPy or Dask array.
+    group : zarr.Group or str
+        The zarr group to write the metadata, or a path to create
+    scale_factors : list of int or list of dict, optional
+        The downsampling factors for each pyramid level. Default: [2, 4, 8, 16].
+        Passing a list of integers (i.e., [2, 4, 8]) will apply the downsampling in all
+        spatial dimensions *except the z dimension*, which will be left at a scale factor of 1.
+        To apply downsampling to the z-dimension, pass the scale factors as a list of dicts, e.g.
+        `[{"z": 1, "y": 2, "x": 2}, {"z": 1, "y": 4, "x": 4}, {"z": 1, "y": 8, "x": 8}]`.
+    method : ome_zarr.scale.Methods, optional
+        Downsampling method to use.
+        Available methods are:
+        - `nearest`: Nearest neighbor downsampling.
+        - `resize`: Resize-based downsampling using `skimage.transform.resize` with anti-aliasing (default).
+        - `laplacian`: Laplacian pyramid downsampling using `skimage.transform.pyramid_laplacian`.
+        - `local_mean`: Local mean downsampling using `skimage.transform.downscale_local_mean`.
+        - `zoom`: Zoom-based downsampling using `scipy.ndimage.zoom`.
+    scaler : ome_zarr.scale.Scaler, optional
+        [DEPRECATED] Scaler implementation for downsampling the image. Passing this
+        argument will raise a warning and is no longer supported. Use `scale_factors` and
+        `method` instead.
+    fmt : ome_zarr.format.Format, optional
+        The format of the ome_zarr data which should be used. Defaults to the most current.
+    axes : list of str or list of dicts, optional
+        The names of the axes, e.g. ["t", "c", "z", "y", "x"]. Ignored for versions 0.1 and 0.2.
+        Required for version 0.3 or greater.
+    coordinate_transformations : list of list of dict, optional
+        For each resolution, a list of transformation dicts (not validated). Each list of dicts
+        is added to each dataset in order.
+    storage_options : dict or list of dict, optional
+        Options to be passed on to the storage backend. A list must match the number of datasets
+        in a multiresolution pyramid. Allows different chunk sizes for each level.
+    compute : bool, optional
+        If True, compute immediately; otherwise, return a list of dask.delayed.Delayed objects.
+    `**metadata` : dict
+        Additional metadata to store.
+
+    Returns
+    -------
+    list
+        Empty list if `compute` is True, otherwise a list of dask.delayed.Delayed objects
+        representing the value to be computed by dask.
+
+    Notes
+    -----
+    The `scaler` argument is deprecated and will be removed in a future version. Use
+    `scale_factors` and `method` for all new code.
+    """
+    from .scale import _build_pyramid
+
+    if method is None:
+        method = Methods.RESIZE
+
     group, fmt = check_group_fmt(group, fmt)
-    dask_delayed_jobs = []
+
+    if not isinstance(image, da.Array):
+        image = da.from_array(image)
+
+    # for 0.1 and 0.2 we need to ensure 5D shape
+    if type(fmt) in (FormatV01, FormatV02):
+        while len(image.shape) < 5:
+            image = image[None, :]
+
+        # TODO: Better way to get chunksize in type-safe manner?
+        axes = ["t", "c", "z", "y", "x"]
+
+    axes = _get_valid_axes(len(image.shape), axes, fmt)
+    dims = _extract_dims_from_axes(axes)
+
+    # parse scale_factors
+    # if scaler is provided, we ignore scale_factors and infer the scale_factors
+    # from the Scaler attributes instead.
+    if scaler is not None:
+        msg = """
+        The 'scaler' argument is deprecated and will be removed in version 0.13.0.
+        Please use the 'scale_factors' argument instead.
+        """
+        scale_factors = [
+            {d: 2**i if d in SPATIAL_DIMS else 1 for d in dims}
+            for i in range(1, scaler.max_layer + 1)
+        ]
+        warnings.warn(msg, DeprecationWarning)
+
+    if method is None:
+        method = Methods.RESIZE
+
+    # Create the pyramid
+    pyramid = _build_pyramid(
+        image,
+        scale_factors,
+        dims=dims,
+        method=method,
+    )
 
     name = metadata.pop("name", None)
     name = str(name) if name is not None else None
-    if isinstance(image, da.Array):
-        dask_delayed_jobs = _write_dask_image(
-            image,
-            group,
-            scaler,
-            chunks=chunks,
-            fmt=fmt,
-            axes=axes,
-            coordinate_transformations=coordinate_transformations,
-            storage_options=storage_options,
-            name=name,
-            compute=compute,
-            **metadata,
-        )
-    else:
-        mip = _create_mip(image, fmt, scaler, axes)
-        dask_delayed_jobs = write_multiscale(
-            mip,
-            group,
-            chunks=chunks,
-            fmt=fmt,
-            axes=axes,
-            coordinate_transformations=coordinate_transformations,
-            storage_options=storage_options,
-            name=name,
-            compute=compute,
-            **metadata,
-        )
+
+    dask_delayed_jobs = []
+
+    dask_delayed_jobs = _write_pyramid_to_zarr(
+        pyramid,
+        group,
+        fmt=fmt,
+        axes=axes,
+        coordinate_transformations=coordinate_transformations,
+        storage_options=storage_options,
+        name=name,
+        compute=compute,
+        **metadata,
+    )
 
     return dask_delayed_jobs
 
@@ -651,12 +655,10 @@ def _resolve_storage_options(
     return options
 
 
-def _write_dask_image(
-    image: da.Array,
-    group: zarr.Group | str,
-    scaler: Scaler = Scaler(),
-    chunks: tuple[Any, ...] | int | None = None,
-    fmt: Format | None = None,
+def _write_pyramid_to_zarr(
+    pyramid: list[da.Array],
+    group: zarr.Group,
+    fmt: Format,
     axes: AxesType = None,
     coordinate_transformations: list[list[dict[str, Any]]] | None = None,
     storage_options: JSONDict | list[JSONDict] | None = None,
@@ -664,86 +666,79 @@ def _write_dask_image(
     compute: bool | None = True,
     **metadata: str | JSONDict | list[JSONDict],
 ) -> list:
+
     group, fmt = check_group_fmt(group, fmt)
-    if fmt.version in ("0.1", "0.2"):
-        # v0.1 and v0.2 are strictly 5D
-        shape_5d: tuple[Any, ...] = (*(1,) * (5 - image.ndim), *image.shape)
-        image = image.reshape(shape_5d)
-        # and we don't need axes
-        axes = None
 
-    dims = len(image.shape)
-    axes = _get_valid_axes(dims, axes, fmt)
+    # Set up common kwargs for da.to_zarr
+    # zarr_array_kwargs needs dask 2025.12.0 or later
+    zarr_array_kwargs: dict[str, Any] = {}
+    zarr_format = fmt.zarr_format
+    options = _resolve_storage_options(storage_options, 0)
 
-    if chunks is not None:
-        msg = """The 'chunks' argument is deprecated and will be removed in version 0.5.
-Please use the 'storage_options' argument instead."""
-        warnings.warn(msg, DeprecationWarning)
+    if zarr_format == 2:
+        zarr_array_kwargs["chunk_key_encoding"] = {"name": "v2", "separator": "/"}
+        zarr_array_kwargs["compressor"] = options.pop("compressor", _blosc_compressor())
+    else:
+        if axes is not None:
+            zarr_array_kwargs["dimension_names"] = [
+                a["name"] for a in axes if isinstance(a, dict)
+            ]
+        if "compressor" in options:
+            # We use 'compressors' for group.create_array() but da.to_zarr() below uses
+            # zarr.create() which doesn't support 'compressors'
+            # TypeError: AsyncArray._create() got an unexpected keyword argument 'compressors'
+            # kwargs["compressors"] = [options.pop("compressor", _blosc_compressor())]
 
+            # ValueError: compressor cannot be used for arrays with zarr_format 3.
+            # Use bytes-to-bytes codecs instead.
+            zarr_array_kwargs["compressor"] = options.pop("compressor")
+
+    shapes = []
     datasets: list[dict] = []
     delayed = []
 
-    # for path, data in enumerate(pyramid):
-    max_layer: int = scaler.max_layer if scaler is not None else 0
-    shapes = []
-    for path in range(max_layer + 1):
-        # LOGGER.debug(f"write_image path: {path}")
-        options = _resolve_storage_options(storage_options, path)
+    for idx, level in enumerate(pyramid):
 
-        # don't downsample top level of pyramid
-        if str(path) != "0" and scaler is not None:
-            image = scaler.resize_image(image)
+        # LOGGER.debug(f"write_image path: {path}")
+        options = _resolve_storage_options(storage_options, idx)
 
         # ensure that the chunk dimensions match the image dimensions
         # (which might have been changed for versions 0.1 or 0.2)
         # if chunks are explicitly set in the storage options
-        chunks_opt = options.pop("chunks", chunks)
-        # switch to this code in 0.5
-        # chunks_opt = options.pop("chunks", None)
+        chunks_opt = None
+        if isinstance(storage_options, list) and isinstance(storage_options[idx], dict):
+            if "chunks" in storage_options[idx]:
+                chunks_opt = options.pop("chunks", None)
+
+        elif isinstance(storage_options, dict) and "chunks" in storage_options:
+            chunks_opt = options.pop("chunks", None)
+
         if chunks_opt is not None:
-            chunks_opt = _retuple(chunks_opt, image.shape)
+            chunks_opt = _retuple(chunks_opt, level.shape)
             # image.chunks will be used by da.to_zarr
-            image = da.array(image).rechunk(chunks=chunks_opt)
-        LOGGER.debug("chunks_opt: %s", chunks_opt)
-        shapes.append(image.shape)
+            zarr_array_kwargs["chunks"] = chunks_opt
+            level_image = da.array(level).rechunk(chunks=chunks_opt)
+        else:
+            level_image = level
+
+        shapes.append(level_image.shape)
 
         LOGGER.debug(
-            "write dask.array to_zarr shape: %s, dtype: %s", image.shape, image.dtype
+            "write dask.array to_zarr shape: %s, dtype: %s",
+            level_image.shape,
+            level_image.dtype,
         )
-        kwargs: dict[str, Any] = {}
-        zarr_format = fmt.zarr_format
-        # zarr_array_kwargs needs dask 2025.12.0 or later
-        zarr_array_kwargs: dict[str, Any] = {}
-        if zarr_format == 2:
-            zarr_array_kwargs["chunk_key_encoding"] = {"name": "v2", "separator": "/"}
-            kwargs["compressor"] = options.pop("compressor", _blosc_compressor())
-        else:
-            # zarr_array_kwargs["chunk_key_encoding"] = fmt.chunk_key_encoding
-            if axes is not None:
-                zarr_array_kwargs["dimension_names"] = [
-                    a["name"] for a in axes if isinstance(a, dict)
-                ]
-            if "compressor" in options:
-                # We use 'compressors' for group.create_array() but da.to_zarr() below uses
-                # zarr.create() which doesn't support 'compressors'
-                # TypeError: AsyncArray._create() got an unexpected keyword argument 'compressors'
-                # kwargs["compressors"] = [options.pop("compressor", _blosc_compressor())]
-
-                # ValueError: compressor cannot be used for arrays with zarr_format 3.
-                # Use bytes-to-bytes codecs instead.
-                kwargs["compressor"] = options.pop("compressor")
 
         delayed.append(
             da.to_zarr(
-                arr=image,
+                arr=level_image,
                 url=group.store,
-                component=str(Path(group.path, str(path))),
+                component=str(Path(group.path, str(idx))),
                 compute=False,
                 zarr_array_kwargs=zarr_array_kwargs,
-                **kwargs,
             )
         )
-        datasets.append({"path": str(path)})
+        datasets.append({"path": str(idx)})
 
     # Computing delayed jobs if necessary
     if compute:
@@ -756,7 +751,7 @@ Please use the 'storage_options' argument instead."""
 
     # we validate again later, but this catches length mismatch before zip(datasets...)
     fmt.validate_coordinate_transformations(
-        dims, len(datasets), coordinate_transformations
+        len(pyramid[0].shape), len(datasets), coordinate_transformations
     )
     if coordinate_transformations is not None:
         for dataset, transform in zip(datasets, coordinate_transformations):
@@ -864,7 +859,6 @@ def write_multiscale_labels(
     pyramid: list,
     group: zarr.Group | str,
     name: str,
-    chunks: tuple[Any, ...] | int | None = None,
     fmt: Format | None = None,
     axes: AxesType = None,
     coordinate_transformations: list[list[dict[str, Any]]] | None = None,
@@ -889,12 +883,6 @@ def write_multiscale_labels(
     :type name: str, optional
     :param name: The name of this labels data.
     :type chunks: int or tuple of ints, optional
-    :param chunks:
-        The size of the saved chunks to store the image.
-
-        .. deprecated:: 0.4.0
-            This argument is deprecated and will be removed in a future version.
-            Use :attr:`storage_options` instead.
     :type fmt: :class:`ome_zarr.format.Format`, optional
     :param fmt:
       The format of the ome_zarr data which should be used.
@@ -926,10 +914,16 @@ def write_multiscale_labels(
     """
     group, fmt = check_group_fmt(group, fmt)
     sub_group = group.require_group(f"labels/{name}")
-    dask_delayed_jobs = write_multiscale(
+
+    # Ensure pyramid is all dask arrays
+    pyramid = [
+        da.from_array(level) if not isinstance(level, da.Array) else level
+        for level in pyramid
+    ]
+
+    dask_delayed_jobs = _write_pyramid_to_zarr(
         pyramid,
         sub_group,
-        chunks=chunks,
         fmt=fmt,
         axes=axes,
         coordinate_transformations=coordinate_transformations,
@@ -952,8 +946,9 @@ def write_labels(
     labels: np.ndarray | da.Array,
     group: zarr.Group | str,
     name: str,
-    scaler: Scaler = Scaler(order=0),
-    chunks: tuple[Any, ...] | int | None = None,
+    scaler: Scaler | None = Scaler(order=0),
+    scale_factors: list[int] | tuple[int, ...] | list[dict[str, int]] = (2, 4, 8, 16),
+    method: Methods = Methods.NEAREST,
     fmt: Format | None = None,
     axes: AxesType = None,
     coordinate_transformations: list[list[dict[str, Any]]] | None = None,
@@ -963,96 +958,116 @@ def write_labels(
     **metadata: JSONDict,
 ) -> list:
     """
-    Write image label data to disk.
+    Write image label data to disk, including multiscale and image-label metadata.
+    Creates the label data in the sub-group "labels/{name}".
 
-    Including the multiscales and image-label metadata.
-    Creates the label data in the sub-group "labels/{name}"
+    Parameters
+    ----------
+    labels : numpy.ndarray or dask.array.Array
+        The label data to save. A downsampling pyramid will be computed if
+        `scale_factors` is provided. Label array MUST be up to 5-dimensional with
+        dimensions ordered (t, c, z, y, x).
+    group : zarr.Group
+        The group within the zarr store to write the metadata in.
+    name : str
+        The name of this labels data.
+    scaler : ome_zarr.scale.Scaler, optional
+        [DEPRECATED] Scaler implementation for downsampling the label data. Passing this
+        argument will raise a warning and is no longer supported. Use `scale_factors` and
+        `method` instead.
+    scale_factors : tuple of int, optional
+        The downsampling factors for each pyramid level. Default: (2, 4, 8, 16).
+        Passing a list of integers (i.e., [2, 4, 8]) will apply the downsampling in all
+        spatial dimensions *except the z dimension*, which will be left at a scale factor of 1.
+        To apply downsampling to the z-dimension, pass the scale factors as a list of dicts, e.g.
+        `[{"z": 1, "y": 2, "x": 2}, {"z": 1, "y": 4, "x": 4}, {"z": 1, "y": 8, "x": 8}]`.
+        This default behavior may change in future versions.
+    method : ome_zarr.scale.Methods, optional
+        Downsampling method to use. Default: Methods.NEAREST (recommended for labels).
+        See also `ome_zarr.scale.Methods` for available methods.
+    fmt : ome_zarr.format.Format, optional
+        The format of the ome_zarr data which should be used. Defaults to the most current.
+    axes : list of str or list of dicts, optional
+        The names of the axes, e.g. ["t", "c", "z", "y", "x"]. Ignored for versions 0.1 and 0.2.
+        Required for version 0.3 or greater.
+    coordinate_transformations : list of list of dict, optional
+        For each resolution, a list of transformation dicts (not validated). Each list of dicts
+        is added to each dataset in order.
+    storage_options : dict or list of dict, optional
+        Options to be passed on to the storage backend. A list must match the number of datasets
+        in a multiresolution pyramid. Allows different chunk sizes for each level.
+    label_metadata : dict, optional
+        Image label metadata. See :meth:`write_label_metadata` for details.
+    compute : bool, optional
+        If True, compute immediately; otherwise, return a list of dask.delayed.Delayed objects.
+    `**metadata` : dict
+        Additional metadata to store.
 
-    :type labels: :class:`numpy.ndarray`
-    :param labels:
-      The label data to save. A downsampling of the data will be computed
-      if the scaler argument is non-None.
-      Label array MUST be up to 5-dimensional with dimensions
-      ordered (t, c, z, y, x)
-    :type group: :class:`zarr.Group` or str
-    :param group: The zarr group or path to write the metadata in.
-    :type name: str, optional
-    :param name: The name of this labels data.
-    :type scaler: :class:`ome_zarr.scale.Scaler`
-    :param scaler:
-      Scaler implementation for downsampling the image argument.
-      NB: Labels downsampling should avoid interpolation.
-      If no scaler is provided, the default scaler with nearest neighbour
-      interpolation will be used.
-      If scaler=None, no downsampling will be performed.
-    :type chunks: int or tuple of ints, optional
-    :param chunks:
-        The size of the saved chunks to store the image.
+    Returns
+    -------
+    list
+        Empty list if `compute` is True, otherwise a list of dask.delayed.Delayed objects
+        representing the value to be computed by dask.
 
-        .. deprecated:: 0.4.0
-            This argument is deprecated and will be removed in a future version.
-            Use :attr:`storage_options` instead.
-    :type fmt: :class:`ome_zarr.format.Format`, optional
-    :param fmt:
-      The format of the ome_zarr data which should be used.
-      Defaults to the most current.
-    :type axes: list of str or list of dicts, optional
-    :param axes:
-      The names of the axes. e.g. ["t", "c", "z", "y", "x"].
-      Ignored for versions 0.1 and 0.2. Required for version 0.3 or greater.
-    :type coordinate_transformations: list of dict
-    :param coordinate_transformations:
-      For each resolution, we have a List of transformation Dicts (not validated).
-      Each list of dicts are added to each datasets in order.
-    :type storage_options: dict or list of dict, optional
-    :param storage_options:
-        Options to be passed on to the storage backend.
-        A list would need to match the number of datasets in a multiresolution pyramid.
-        One can provide different chunk size for each level of a pyramid using this
-        option.
-    :type label_metadata: dict, optional
-    :param label_metadata:
-      Image label metadata. See :meth:`write_label_metadata` for details
-    :param compute:
-        If true compute immediately otherwise a list of :class:`dask.delayed.Delayed`
-        is returned.
-    :return:
-        Empty list if the compute flag is True, otherwise it returns a list of
-        :class:`dask.delayed.Delayed` representing the value to be computed by
-        dask.
+    Notes
+    -----
+    The `scaler` argument is deprecated and will be removed in a future version. Use
+    `scale_factors` and `method` for all new code. Labels downsampling should avoid interpolation;
+    nearest-neighbor is recommended.
     """
+    from .scale import _build_pyramid
+
     group, fmt = check_group_fmt(group, fmt)
     sub_group = group.require_group(f"labels/{name}")
+
+    # for 0.1 and 0.2 we need to ensure 5D shape
+    if type(fmt) in (FormatV01, FormatV02):
+        while len(labels.shape) < 5:
+            labels = labels[None, :]
+
+        axes = ["t", "c", "z", "y", "x"]
+
+    axes = _get_valid_axes(len(labels.shape), axes, fmt)
+    dims = _extract_dims_from_axes(axes)
+
+    if scaler is not None:
+        msg = """
+        The 'scaler' argument is deprecated and will be removed in version 0.13.0.
+        Please use the 'scale_factors' argument instead.
+        """
+        scale_factors = [
+            {d: 2**i if d in SPATIAL_DIMS else 1 for d in dims}
+            for i in range(1, scaler.max_layer + 1)
+        ]
+        warnings.warn(msg, DeprecationWarning)
+
+    if method is None:
+        method = Methods.NEAREST
+
+    if not isinstance(labels, da.Array):
+        labels = da.from_array(labels)
+
+    pyramid = _build_pyramid(
+        labels,
+        scale_factors,
+        dims=dims,
+        method=method,
+    )
+
     dask_delayed_jobs = []
 
-    if isinstance(labels, da.Array):
-        dask_delayed_jobs = _write_dask_image(
-            labels,
-            sub_group,
-            scaler,
-            chunks=chunks,
-            fmt=fmt,
-            axes=axes,
-            coordinate_transformations=coordinate_transformations,
-            storage_options=storage_options,
-            name=name,
-            compute=compute,
-            **metadata,
-        )
-    else:
-        mip = _create_mip(labels, fmt, scaler, axes)
-        dask_delayed_jobs = write_multiscale(
-            mip,
-            sub_group,
-            chunks=chunks,
-            fmt=fmt,
-            axes=axes,
-            coordinate_transformations=coordinate_transformations,
-            storage_options=storage_options,
-            name=name,
-            compute=compute,
-            **metadata,
-        )
+    dask_delayed_jobs = _write_pyramid_to_zarr(
+        pyramid,
+        sub_group,
+        fmt=fmt,
+        axes=axes,
+        coordinate_transformations=coordinate_transformations,
+        storage_options=storage_options,
+        name=name,
+        compute=compute,
+        **metadata,
+    )
+
     write_label_metadata(
         group=group["labels"],
         name=name,
@@ -1061,44 +1076,6 @@ def write_labels(
     )
 
     return dask_delayed_jobs
-
-
-def _create_mip(
-    image: np.ndarray,
-    fmt: Format,
-    scaler: Scaler,
-    axes: AxesType,
-) -> list[np.ndarray]:
-    """
-    Generate a downsampled pyramid of images.
-
-    Returns
-    -------
-    pyramid :
-        List of numpy arrays that are the downsampled pyramid levels.
-    """
-    if image.ndim > 5:
-        raise ValueError("Only images of 5D or less are supported")
-
-    if fmt.version in ("0.1", "0.2"):
-        # v0.1 and v0.2 are strictly 5D
-        shape_5d: tuple[Any, ...] = (*(1,) * (5 - image.ndim), *image.shape)
-        image = image.reshape(shape_5d)
-
-    # check axes before trying to scale
-    _get_valid_axes(image.ndim, axes, fmt)
-
-    if scaler is not None:
-        if image.shape[-1] == 1 or image.shape[-2] == 1:
-            raise ValueError(
-                "Can't downsample if size of x or y dimension is 1. "
-                f"Shape: {image.shape}"
-            )
-        mip = scaler.func(image)
-    else:
-        LOGGER.debug("disabling pyramid")
-        mip = [image]
-    return mip
 
 
 def _retuple(chunks: tuple[Any, ...] | int, shape: tuple[Any, ...]) -> tuple[Any, ...]:

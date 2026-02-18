@@ -152,6 +152,61 @@ class TestScaler:
         data_dir = tmpdir.mkdir("test_big_dask_pyramid")
         da.to_zarr(level_1, str(data_dir))
 
+    @pytest.mark.parametrize(
+        "method", ["nearest", "resize", "laplacian", "local_mean", "zoom"]
+    )
+    @pytest.mark.parametrize("n_levels", [1, 2, 3, 4])
+    def test_build_pyramid(self, shape, method, n_levels):
+        from ome_zarr.scale import _build_pyramid
+
+        data = self.create_data(shape)
+
+        if len(data.shape) == 5:
+            dims = ("t", "c", "z", "y", "x")
+        elif len(data.shape) == 3:
+            dims = ("z", "y", "x")
+        elif len(data.shape) == 2:
+            dims = ("y", "x")
+
+        scale_factors = [
+            {dim: 2 ** i if dim in ("y", "x") else 1 for dim in dims}
+            for i in range(1, n_levels)
+        ]
+        pyramid = _build_pyramid(
+            image=data,
+            scale_factors=scale_factors,
+            method=method,
+            dims=dims,
+        )
+
+        assert len(pyramid) == n_levels  # original + (n_levels - 1) downscaled
+        assert pyramid[0].shape == data.shape
+
+        # Make sure channel and time dimensions are preserved
+        for level in pyramid:
+            for idx, d in enumerate(dims):
+                if d in ("t", "c"):
+                    assert level.shape[idx] == data.shape[idx]
+
+        for idx, level in enumerate(pyramid[1:], start=1):
+            previous_shape = pyramid[idx - 1].shape
+            current_shape = level.shape
+
+            # Check all spatial dimensions are scaled correctly
+            for dim_idx, dim_name in enumerate(dims):
+                if dim_name in ("x", "y", "z"):
+                    if idx == 1:
+                        relative_scale = scale_factors[0][dim_name]
+                    else:
+                        relative_scale = (
+                            scale_factors[idx - 1][dim_name]
+                            // scale_factors[idx - 2][dim_name]
+                        )
+                    assert (
+                        current_shape[dim_idx]
+                        == previous_shape[dim_idx] // relative_scale
+                    )
+
     @pytest.mark.parametrize("method", ["gaussian", "laplacian"])
     def test_pyramid_args(self, shape, tmpdir, method):
         path = pathlib.Path(tmpdir.mkdir("data"))

@@ -5,14 +5,19 @@ See the :class:`~ome_zarr.scale.Scaler` class for details.
 
 import inspect
 import logging
-from collections.abc import Callable, Iterator
+import warnings
+from collections.abc import Callable, Iterator, Sequence
 from dataclasses import dataclass
-from typing import Any, Union
+from enum import Enum
+from typing import Any, Union, cast
 
 import dask.array as da
 import numpy as np
 import zarr
+from deprecated import deprecated
+from scipy import __version__ as scipy_version
 from scipy.ndimage import zoom
+from skimage import __version__ as skimage_version
 from skimage.transform import (
     downscale_local_mean,
     pyramid_gaussian,
@@ -20,7 +25,10 @@ from skimage.transform import (
     resize,
 )
 
+from .dask_utils import laplacian as dask_laplacian
+from .dask_utils import local_mean as dask_local_mean
 from .dask_utils import resize as dask_resize
+from .dask_utils import zoom as dask_zoom
 
 LOGGER = logging.getLogger("ome_zarr.scale")
 
@@ -28,6 +36,10 @@ ListOfArrayLike = Union[list[da.Array], list[np.ndarray]]  # noqa: UP007  # FIXM
 ArrayLike = Union[da.Array, np.ndarray]  # noqa: UP007  # FIXME
 
 
+@deprecated(
+    reason="Downsampling via the `Scaler` class has been deprecated. Please use the `scale_factors` argument instead.",
+    version="0.14.0",
+)
 @dataclass
 class Scaler:
     """Helper class for performing various types of downsampling.
@@ -286,3 +298,163 @@ class Scaler:
                         new_stack[(dims_to_slice)] = out
             rv.append(new_stack)
         return rv
+
+
+SPATIAL_DIMS = ("z", "y", "x")
+
+
+class Methods(Enum):
+    RESIZE = "resize"
+    NEAREST = "nearest"
+    LAPLACIAN = "laplacian"
+    LOCAL_MEAN = "local_mean"
+    ZOOM = "zoom"
+
+
+method_dispatch = {
+    Methods.RESIZE: {
+        "func": dask_resize,
+        "kwargs": {
+            "order": 1,
+            "mode": "reflect",
+            "anti_aliasing": True,
+            "preserve_range": True,
+        },
+        "used_function": "skimage.transform.resize",
+        "version": skimage_version,
+    },
+    Methods.NEAREST: {
+        "func": dask_resize,
+        "kwargs": {
+            "order": 0,
+            "mode": "reflect",
+            "anti_aliasing": False,
+            "preserve_range": True,
+        },
+        "used_function": "skimage.transform.resize",
+        "version": skimage_version,
+    },
+    Methods.LAPLACIAN: {
+        "func": dask_laplacian,
+        "kwargs": {},
+        "used_function": "skimage.transform.pyramid_laplacian",
+        "version": skimage_version,
+    },
+    Methods.LOCAL_MEAN: {
+        "func": dask_local_mean,
+        "kwargs": {},
+        "used_function": "skimage.transform.downscale_local_mean",
+        "version": skimage_version,
+    },
+    Methods.ZOOM: {
+        "func": dask_zoom,
+        "kwargs": {},
+        "used_function": "scipy.ndimage.zoom",
+        "version": scipy_version,
+    },
+}
+
+
+def _build_pyramid(
+    image: da.Array | np.ndarray,
+    scale_factors: list[dict[str, int]] | list[int] | tuple[int, ...],
+    dims: Sequence[str],
+    method: str | Methods = "nearest",
+    chunks: tuple[int, ...] | None | str = None,
+) -> list[da.Array]:
+    """
+    Build a pyramid of downscaled images.
+
+    Parameters
+    ----------
+    image : dask.array.Array or numpy.ndarray
+        The input image to downscale.
+    scale_factors : list of dict or list of int or tuple of int
+        The downscaling factors for each pyramid level. Each dictionary should
+        map dimension names to their respective downscaling factors.
+        I.e., [{"y": 2, "x": 2}, {"y": 4, "x": 4}] to create two levels with downsampling factors of 2 and 4.
+        Alternatively, a list or tuple of integers can be provided, which will be
+        converted to dictionaries with spatial dimensions only.
+    dims : sequence of str
+        The dimension names corresponding to the image axes.
+    method : str or Methods, optional
+        The downsampling method to use. Options are "resize" or "nearest".
+        Default is "nearest".
+    exact : bool, optional
+        Whether to use exact resizing. Only applicable for certain methods.
+        Default is False.
+    chunks : tuple of int, str, or None, optional
+        The chunk size to use for dask arrays. If None, the array's existing
+        chunking is used. If a string, it should be a valid dask chunking
+        specification. Default is None.
+    """
+
+    if isinstance(image, np.ndarray):
+        if chunks is not None:
+            image = da.from_array(image, chunks=chunks)
+        else:
+            image = da.from_array(image)
+
+    if isinstance(method, str):
+        method = Methods(method)
+
+    # scale_factors are passed as [2, 4, 8, 16, ...]
+    if isinstance(scale_factors, list | tuple) and all(
+        isinstance(s, int) for s in scale_factors
+    ):
+        scales: list[dict[str, int]] = []
+        for i in range(1, len(scale_factors) + 1):
+            scale = {d: 2**i if d in SPATIAL_DIMS else 1 for d in dims}
+            if "z" in dims:
+                scale["z"] = 1
+            scales.append(scale)
+        scale_factors = scales
+    else:
+        scale_factors = cast(list[dict[str, int]], scale_factors)
+
+    images: list[da.Array] = [image]
+
+    for idx, factor in enumerate(scale_factors):
+        # Compute relative factor for this level
+        # May or may not be an integer depending on passed scale factors
+        if idx == 0:
+            relative_factors = np.asarray(list(scale_factors[0].values()))
+        else:
+            relative_factors = np.asarray(list(factor.values())) / np.asarray(
+                list(scale_factors[idx - 1].values())
+            )
+
+        # Build per-dimension factor (only spatial dims are downsampled)
+        per_dim_factor = tuple(
+            relative_factors[i] if d in SPATIAL_DIMS else 1 for i, d in enumerate(dims)
+        )
+
+        # Calculate target shape, leave non-spatial dims unchanged
+        target_shape = []
+        for s, d, f in zip(images[-1].shape, dims, per_dim_factor):
+            if d in SPATIAL_DIMS:
+                if s // f == 0:
+                    target_shape.append(1)
+                    warnings.warn(
+                        f"Dimension {d} is too small to downsample further.",
+                        UserWarning,
+                        stacklevel=3,
+                    )
+                else:
+                    target_shape.append(int(s // f))
+            else:
+                target_shape.append(int(s))
+
+        if method not in method_dispatch:
+            raise ValueError(f"Unknown downsampling method: {method}")
+
+        # apply the downsampling method to the last image in the list
+        new_image = method_dispatch[method]["func"](
+            images[-1],
+            output_shape=tuple(target_shape),
+            **method_dispatch[method]["kwargs"],
+        )
+
+        images.append(new_image)
+
+    return images
