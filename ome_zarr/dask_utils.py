@@ -142,7 +142,7 @@ def zoom(image: da.Array, output_shape: Sequence[int], *args, **kwargs) -> da.Ar
     """
     from scipy.ndimage import zoom
 
-    factors = np.array(output_shape) / np.array(image.shape).astype(float)
+    factors = np.array(image.shape).astype(float) / np.array(output_shape)
     better_chunksize, block_output_shape = _better_chunksize(image, factors)
     image_prepared = image.rechunk(better_chunksize)
 
