@@ -408,14 +408,9 @@ def _build_pyramid(
                 list(scale_factors[idx - 1].values())
             )
 
-        # Build per-dimension factor (only spatial dims are downsampled)
-        per_dim_factor = tuple(
-            relative_factors[i] if d in SPATIAL_DIMS else 1 for i, d in enumerate(dims)
-        )
-
         # Calculate target shape, leave non-spatial dims unchanged
         target_shape = []
-        for s, d, f in zip(images[-1].shape, dims, per_dim_factor):
+        for s, d, f in zip(images[-1].shape, dims, relative_factors):
             if d in SPATIAL_DIMS:
                 if s // f == 0:
                     target_shape.append(1)
