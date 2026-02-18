@@ -599,6 +599,8 @@ def write_image(
         spatial dimensions *except the z dimension*, which will be left at a scale factor of 1.
         To apply downsampling to the z-dimension, pass the scale factors as a list of dicts, e.g.
         `[{"z": 2, "y": 2, "x": 2}, {"z": 4, "y": 4, "x": 4}, {"z": 8, "y": 8, "x": 8}]`.
+        If dimensions are omitted in this dictionary,
+        the downsampling factor for that dimension will default to 1.
     method : ome_zarr.scale.Methods, optional
         Downsampling method to use.
         Available methods are:
