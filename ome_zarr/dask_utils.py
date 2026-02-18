@@ -113,12 +113,14 @@ def local_mean(
     """
     from skimage.transform import downscale_local_mean
 
-    factors = np.array(output_shape) / np.array(image.shape).astype(float)
+    factors = np.array(image.shape).astype(float) / np.array(output_shape)
     better_chunksize, block_output_shape = _better_chunksize(image, factors)
     image_prepared = image.rechunk(better_chunksize)
 
     def local_mean_block(image_block: da.Array) -> da.Array:
-        local_mean = downscale_local_mean(image_block, factors, *args, **kwargs)
+        local_mean = downscale_local_mean(
+            image_block, tuple(factors.astype(int)), *args, **kwargs
+        )
         return local_mean.astype(image_block.dtype)
 
     output_slices = tuple(slice(0, d) for d in output_shape)
