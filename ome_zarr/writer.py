@@ -4,7 +4,7 @@ import logging
 import warnings
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, TypeAlias, cast
+from typing import Any, TypeAlias
 
 import dask
 import dask.array as da
@@ -1029,7 +1029,7 @@ def write_labels(
 
     axes = _get_valid_axes(len(labels.shape), axes, fmt)
     dims = _extract_dims_from_axes(axes)
-    
+
     if scaler is not None:
         msg = """
         The 'scaler' argument is deprecated and will be removed in version 0.13.0.
