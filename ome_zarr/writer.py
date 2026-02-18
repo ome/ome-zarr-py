@@ -735,7 +735,7 @@ def _write_dask_image(
             if "z" in dims:
                 scale["z"] = 1
             scales.append(scale)
-        scale_factors = scales
+        scale_factors = cast(list[dict[str, int]], scales)
 
     # for path, data in enumerate(pyramid):
     if scaler is not None:
