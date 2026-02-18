@@ -599,7 +599,7 @@ def write_image(
 
     # parse scale_factors
     # if scaler is provided, we ignore scale_factors and infer the scale_factors
-    # from the Scaler attrbutes instead.
+    # from the Scaler attributes instead.
     if scaler is not None:
         msg = """
         The 'scaler' argument is deprecated and will be removed in version 0.13.0.
