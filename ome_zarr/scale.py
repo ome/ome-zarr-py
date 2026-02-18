@@ -357,7 +357,7 @@ method_dispatch = {
 
 def _build_pyramid(
     image: da.Array | np.ndarray,
-    scale_factors: list[dict[str, int]],
+    scale_factors: list[dict[str, int]] | list[int] | tuple[int, ...],
     dims: Sequence[str],
     method: str | Methods = "nearest",
     chunks: tuple[int, ...] | None | str = None,
@@ -369,10 +369,12 @@ def _build_pyramid(
     ----------
     image : dask.array.Array or numpy.ndarray
         The input image to downscale.
-    scale_factors : list of dict
+    scale_factors : list of dict or list of int or tuple of int
         The downscaling factors for each pyramid level. Each dictionary should
         map dimension names to their respective downscaling factors.
         I.e., [{"y": 2, "x": 2}, {"y": 4, "x": 4}] to create two levels with downsampling factors of 2 and 4.
+        Alternatively, a list or tuple of integers can be provided, which will be
+        converted to dictionaries with spatial dimensions only.
     dims : sequence of str
         The dimension names corresponding to the image axes.
     method : str or Methods, optional
@@ -395,6 +397,18 @@ def _build_pyramid(
 
     if isinstance(method, str):
         method = Methods(method)
+
+    # scale_factors are passed as [2, 4, 8, 16, ...]
+    if isinstance(scale_factors, list | tuple) and all(
+        isinstance(s, int) for s in scale_factors
+    ):
+        scales = []
+        for i in range(1, len(scale_factors) + 1):
+            scale = {d: 2**i if d in SPATIAL_DIMS else 1 for d in dims}
+            if "z" in dims:
+                scale["z"] = 1
+            scales.append(scale)
+        scale_factors = scales
 
     images: list[da.Array] = [image]
 

@@ -611,25 +611,13 @@ def write_image(
         ]
         warnings.warn(msg, DeprecationWarning)
 
-    # scale_factors are passed as [2, 4, 8, 16, ...]
-    if isinstance(scale_factors, list | tuple) and all(
-        isinstance(s, int) for s in scale_factors
-    ):
-        scales = []
-        for i in range(1, len(scale_factors) + 1):
-            scale = {d: 2**i if d in SPATIAL_DIMS else 1 for d in dims}
-            if "z" in dims:
-                scale["z"] = 1
-            scales.append(scale)
-        scale_factors = scales
-
     if method is None:
         method = Methods.RESIZE
 
     # Create the pyramid
     pyramid = _build_pyramid(
         image,
-        cast(list[dict[str, int]], scale_factors),
+        scale_factors,
         dims=dims,
         method=method,
     )
@@ -1029,31 +1017,8 @@ def write_labels(
     """
     from .scale import _build_pyramid
 
-    if scaler is not None:
-        msg = """
-        The 'scaler' argument is deprecated and will be removed in version 0.13.0.
-        Please use the 'scale_factors' argument instead.
-        """
-        scale_factors = tuple(2**i for i in range(1, scaler.max_layer + 1))
-        warnings.warn(msg, DeprecationWarning)
-
     group, fmt = check_group_fmt(group, fmt)
     sub_group = group.require_group(f"labels/{name}")
-
-    if method is None:
-        method = Methods.NEAREST
-
-    if not isinstance(labels, da.Array):
-        labels = da.from_array(labels)
-
-    axes = _get_valid_axes(len(labels.shape), axes, fmt)
-    dims = _extract_dims_from_axes(axes)
-    pyramid = _build_pyramid(
-        labels,
-        list(scale_factors),
-        dims=dims,
-        method=method,
-    )
 
     # for 0.1 and 0.2 we need to ensure 5D shape
     if type(fmt) in (FormatV01, FormatV02):
@@ -1061,6 +1026,33 @@ def write_labels(
             labels = labels[None, :]
 
         axes = ["t", "c", "z", "y", "x"]
+
+    axes = _get_valid_axes(len(labels.shape), axes, fmt)
+    dims = _extract_dims_from_axes(axes)
+    
+    if scaler is not None:
+        msg = """
+        The 'scaler' argument is deprecated and will be removed in version 0.13.0.
+        Please use the 'scale_factors' argument instead.
+        """
+        scale_factors = [
+            {d: 2**i if d in SPATIAL_DIMS else 1 for d in dims}
+            for i in range(1, scaler.max_layer + 1)
+        ]
+        warnings.warn(msg, DeprecationWarning)
+
+    if method is None:
+        method = Methods.NEAREST
+
+    if not isinstance(labels, da.Array):
+        labels = da.from_array(labels)
+
+    pyramid = _build_pyramid(
+        labels,
+        scale_factors,
+        dims=dims,
+        method=method,
+    )
 
     dask_delayed_jobs = []
 
