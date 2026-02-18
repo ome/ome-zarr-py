@@ -7,7 +7,7 @@ import pytest
 import zarr
 
 from ome_zarr.scale import Scaler
-from ome_zarr.writer import write_image, write_multiscale
+from ome_zarr.writer import write_image
 
 
 class TestScaler:
