@@ -4,9 +4,9 @@ import dask.array as da
 import numpy as np
 import pytest
 import zarr
-
+import tempfile
 from ome_zarr.scale import Scaler
-from ome_zarr.writer import write_image
+from ome_zarr.writer import write_image, write_multiscale
 
 
 class TestScaler:
@@ -206,6 +206,15 @@ class TestScaler:
                         current_shape[dim_idx]
                         == previous_shape[dim_idx] // relative_scale
                     )
+        
+        # now write the pyramid to zarr to make sure it works with dask arrays
+        with tempfile.TemporaryDirectory() as tmpdir:
+            write_multiscale(
+                pyramid=pyramid,
+                group=zarr.open_group(tmpdir, mode="w"),
+                axes=dims,
+                method=method,
+            )
 
     @pytest.mark.parametrize("method", ["gaussian", "laplacian"])
     def test_pyramid_args(self, shape, tmpdir, method):
