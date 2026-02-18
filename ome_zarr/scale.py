@@ -336,7 +336,7 @@ method_dispatch = {
     },
     Methods.LAPLACIAN: {
         "func": dask_laplacian,
-        "kwargs": {},
+        "kwargs": {"preserve_range": True},
         "used_function": "skimage.transform.pyramid_laplacian",
         "version": skimage_version,
     },
