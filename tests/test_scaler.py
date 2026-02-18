@@ -210,9 +210,10 @@ class TestScaler:
 
         # now write the pyramid to zarr to make sure it works with dask arrays
         with tempfile.TemporaryDirectory() as tmpdir:
-            write_multiscale(
-                pyramid=pyramid,
+            write_image(
+                data,
                 group=zarr.open_group(tmpdir, mode="w"),
+                scale_factors=scale_factors,
                 axes=dims,
                 method=method,
             )
