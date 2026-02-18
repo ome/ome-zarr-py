@@ -38,6 +38,47 @@ This image can be viewed in `napari` using the
 
     $ napari test_ngff_image.zarr
 
+Building a pyramid
+------------------
+
+Multi-resolution pyramids are an integral part of ome-zarr image data
+and enable fast rendering of large images.
+The entrypoints to writing ome-zarr images in ome-zarr-py (`write_image` and `write_labels`)
+build these pyramids under the hood as delayed dask arrays based on the settings for the scaling functions and scale factors.
+
+The scale factors can be passed as a list of integers or a list of dicts::
+
+    from ome_zarr.writer import write_image
+
+    scale_factors = [2, 4, 8]
+    write_image(
+        your_data
+        path,
+        axes="zyx",
+        scale_factors=scale_factors,
+        )
+
+In this example, the downsampling will be applied in all spatial dimensions *except the z dimension*, which will be left at a scale factor of 1.
+To apply equal or custom downsampling factors along all spatial dimensions, pass the scale factors as a list of dicts, e.g.::
+
+    from ome_zarr.writer import write_image
+
+    scale_factors = [
+        {"z": 2, "y": 2, "x": 2},
+        {"z": 4, "y": 4, "x": 4},
+        {"z": 8, "y": 8, "x": 8}
+        ]
+    write_image(
+        your_data
+        path,
+        axes="zyx",
+        scale_factors=scale_factors,
+        )
+
+If you have already built a pyramid representation by other means,
+you can pass it directly to the :py:func:`ome_zarr.writer.write_multiscale` or use :py:func:`ome_zarr.writer.write_multiscale_labels`,
+which do not perform any down-sampling but just write the passed pyramid to disk with the correct metadata.
+
 Rendering settings
 ------------------
 Rendering settings can be added to an existing zarr group::

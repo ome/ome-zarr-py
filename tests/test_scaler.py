@@ -168,7 +168,10 @@ class TestScaler:
         elif len(data.shape) == 2:
             dims = ("y", "x")
 
-        scale_factors = [2**i for i in range(1, n_levels)]
+        scale_factors = [
+            {dim: 2 ** i if dim in ("y", "x") else 1 for dim in dims}
+            for i in range(1, n_levels)
+        ]
         pyramid = _build_pyramid(
             image=data,
             scale_factors=scale_factors,
@@ -189,11 +192,20 @@ class TestScaler:
             previous_shape = pyramid[idx - 1].shape
             current_shape = level.shape
 
-            if idx == 1:
-                relative_scale = scale_factors[0]
-            else:
-                relative_scale = scale_factors[idx - 1] // scale_factors[idx - 2]
-            assert current_shape[-2] == previous_shape[-2] // relative_scale
+            # Check all spatial dimensions are scaled correctly
+            for dim_idx, dim_name in enumerate(dims):
+                if dim_name in ("x", "y", "z"):
+                    if idx == 1:
+                        relative_scale = scale_factors[0][dim_name]
+                    else:
+                        relative_scale = (
+                            scale_factors[idx - 1][dim_name]
+                            // scale_factors[idx - 2][dim_name]
+                        )
+                    assert (
+                        current_shape[dim_idx]
+                        == previous_shape[dim_idx] // relative_scale
+                    )
 
     @pytest.mark.parametrize("method", ["gaussian", "laplacian"])
     def test_pyramid_args(self, shape, tmpdir, method):

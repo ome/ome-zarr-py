@@ -37,8 +37,8 @@ ArrayLike = Union[da.Array, np.ndarray]  # noqa: UP007  # FIXME
 
 
 @deprecated(
-    reason="Downsampling via the `Scaler` class has been deprecated. Please use the `scale_Factors` argument instead.",
-    version="0.13.0",
+    reason="Downsampling via the `Scaler` class has been deprecated. Please use the `scale_factors` argument instead.",
+    version="0.14.0",
 )
 @dataclass
 class Scaler:
@@ -357,7 +357,7 @@ method_dispatch = {
 
 def _build_pyramid(
     image: da.Array | np.ndarray,
-    scale_factors: list[int],
+    scale_factors: list[dict[str, int]],
     dims: Sequence[str],
     method: str | Methods = "nearest",
     chunks: tuple[int, ...] | None | str = None,
@@ -369,8 +369,10 @@ def _build_pyramid(
     ----------
     image : dask.array.Array or numpy.ndarray
         The input image to downscale.
-    scale_factors : list of int
-        The downscaling factors for each pyramid level.
+    scale_factors : list of dict
+        The downscaling factors for each pyramid level. Each dictionary should
+        map dimension names to their respective downscaling factors.
+        I.e., [{"y": 2, "x": 2}, {"y": 4, "x": 4}] to create two levels with downsampling factors of 2 and 4.
     dims : sequence of str
         The dimension names corresponding to the image axes.
     method : str or Methods, optional
@@ -399,15 +401,16 @@ def _build_pyramid(
     for idx, factor in enumerate(scale_factors):
         # Compute relative factor for this level
         # May or may not be an integer depending on passed scale factors
-        relative_factor: float | int
         if idx == 0:
-            relative_factor = scale_factors[0]
+            relative_factors = np.asarray(list(scale_factors[0].values()))
         else:
-            relative_factor = factor / scale_factors[idx - 1]
+            relative_factors = np.asarray(list(factor.values())) / np.asarray(
+                list(scale_factors[idx - 1].values())
+            )
 
         # Build per-dimension factor (only spatial dims are downsampled)
         per_dim_factor = tuple(
-            relative_factor if d in SPATIAL_DIMS else 1 for d in dims
+            relative_factors[i] if d in SPATIAL_DIMS else 1 for i, d in enumerate(dims)
         )
 
         # Calculate target shape, leave non-spatial dims unchanged

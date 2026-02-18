@@ -211,7 +211,8 @@ class TestWriter:
             group = self.group_v3
             grp_path = self.path_v3 / "test"
 
-        write_image(data, group, axes="zyx")
+        axes = "zyx"
+        write_image(data, group, axes=axes)
 
         # manually check this is zarr v2 or v3
         if zarr_format == 2:
@@ -235,9 +236,18 @@ class TestWriter:
             assert transfs[0]["type"] == "scale"
             assert len(transfs[0]["scale"]) == len(shape)
 
-            # default downsamples by factor 2 each level
+            # default downsamples by factor 2 each level, except z-axis
             for idx, value in enumerate(transfs[0]["scale"]):
-                assert value == shape[idx] / (shape[idx] // (2**level))
+                axis_name = axes[idx]
+                if axis_name == "z":
+                    # z-axis is not downsampled by default
+                    assert value == 1.0
+                elif axis_name in ("x", "y"):
+                    # spatial dimensions are downsampled
+                    assert value == shape[idx] / (shape[idx] // (2**level))
+                else:
+                    # non-spatial dimensions (t, c) are not downsampled
+                    assert value == 1.0
 
     @pytest.mark.parametrize("read_from_zarr", [True, False])
     @pytest.mark.parametrize("compute", [True, False])
@@ -261,6 +271,7 @@ class TestWriter:
         data = self.create_data(shape)
         data_delayed = da.from_array(data)
         chunks = (32, 32)
+        axes = "zyx"
         # same NAME needed for exact zarr_attrs match below
         # (otherwise group.name is used)
         NAME = "test_write_image_dask"
@@ -275,7 +286,7 @@ class TestWriter:
             write_image(
                 data_delayed,
                 temp_group,
-                axes="zyx",
+                axes=axes,
                 storage_options=opts,
                 name=NAME,
             )
@@ -293,7 +304,7 @@ class TestWriter:
         dask_delayed_jobs = write_image(
             data_delayed,
             group,
-            axes="zyx",
+            axes=axes,
             storage_options={"chunks": chunks},
             compute=compute,
             name=NAME,
@@ -325,8 +336,18 @@ class TestWriter:
             assert transfs[0]["type"] == "scale"
             assert len(transfs[0]["scale"]) == len(shape)
 
+            # default downsamples by factor 2 each level, except z-axis
             for idx, value in enumerate(transfs[0]["scale"]):
-                assert value == shape[idx] / (shape[idx] // (2**level))
+                axis_name = axes[idx]
+                if axis_name == "z":
+                    # z-axis is not downsampled by default
+                    assert value == 1.0
+                elif axis_name in ("x", "y"):
+                    # spatial dimensions are downsampled
+                    assert value == shape[idx] / (shape[idx] // (2**level))
+                else:
+                    # non-spatial dimensions (t, c) are not downsampled
+                    assert value == 1.0
             if read_from_zarr and level < 3:
                 # if shape smaller than chunk, dask writer uses chunk == shape
                 # so we only compare larger resolutions
@@ -1624,8 +1645,13 @@ class TestLabelWriter:
         elif len(label_data.shape) == 2:
             dims = ("y", "x")
 
+        scale_factors = [
+            {dim: 2 ** i if dim in ("z", "y", "x") else 1 for dim in dims}
+            for i in range(1, 5)
+        ]
+
         pyramid = _build_pyramid(
-            label_data, method="nearest", scale_factors=[2, 4, 8, 16], dims=dims
+            label_data, method="nearest", scale_factors=scale_factors, dims=dims
         )
 
         write_multiscale_labels(
@@ -1672,10 +1698,14 @@ class TestLabelWriter:
         for label_name in label_names:
             label_data = np.random.randint(0, 1000, size=shape)
             label_data = array_constructor(label_data)
+            scale_factors = [
+                {dim: 2 ** i if dim in ("z", "y", "x") else 1 for dim in axes}
+                for i in range(1, 5)
+            ]
             labels_mip = _build_pyramid(
                 label_data,
                 method="nearest",
-                scale_factors=[2, 4, 8, 16],
+                scale_factors=scale_factors,
                 dims=("t", "c", "z", "y", "x"),
             )
 

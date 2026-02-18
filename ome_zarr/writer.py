@@ -4,7 +4,7 @@ import logging
 import warnings
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, TypeAlias
+from typing import Any, TypeAlias, cast
 
 import dask
 import dask.array as da
@@ -24,6 +24,8 @@ ListOfArrayLike = list[da.Array] | list[np.ndarray]
 ArrayLike: TypeAlias = da.Array | np.ndarray
 
 AxesType = str | list[str] | list[dict[str, str]] | None
+
+SPATIAL_DIMS = ("x", "y", "z")
 
 
 def _get_valid_axes(
@@ -508,7 +510,7 @@ def write_well_metadata(
 def write_image(
     image: ArrayLike,
     group: zarr.Group | str,
-    scale_factors: tuple[int, ...] = (2, 4, 8, 16),
+    scale_factors: list[int] | tuple[int, ...] | list[dict[str, int]] = (2, 4, 8, 16),
     method: Methods | None = Methods.RESIZE,
     scaler: Scaler | None = None,
     fmt: Format | None = None,
@@ -528,20 +530,21 @@ def write_image(
         `scale_factors` is provided. Image array MUST be up to 5-dimensional with
         dimensions ordered (t, c, z, y, x). Can be a NumPy or Dask array.
     group : zarr.Group or str
-         The zarr group to write the metadata, or a path to create
-    scale_factors : tuple of int, optional
-        The downsampling factors for each pyramid level. Default: (2, 4, 8).
+        The zarr group to write the metadata, or a path to create
+    scale_factors : list of int or list of dict, optional
+        The downsampling factors for each pyramid level. Default: [2, 4, 8, 16].
+        Passing a list of integers (i.e., [2, 4, 8]) will apply the downsampling in all
+        spatial dimensions *except the z dimension*, which will be left at a scale factor of 1.
+        To apply downsampling to the z-dimension, pass the scale factors as a list of dicts, e.g.
+        `[{"z": 1, "y": 2, "x": 2}, {"z": 1, "y": 4, "x": 4}, {"z": 1, "y": 8, "x": 8}]`.
     method : ome_zarr.scale.Methods, optional
         Downsampling method to use.
         Available methods are:
         - `nearest`: Nearest neighbor downsampling.
-        - `resize`: Resize-based downsampling using `skimage.transform.resize` with anti-aliasing.
-          This is the default method and is recommended for most use cases.
+        - `resize`: Resize-based downsampling using `skimage.transform.resize` with anti-aliasing (default).
         - `laplacian`: Laplacian pyramid downsampling using `skimage.transform.pyramid_laplacian`.
         - `local_mean`: Local mean downsampling using `skimage.transform.downscale_local_mean`.
         - `zoom`: Zoom-based downsampling using `scipy.ndimage.zoom`.
-
-        Default: `resize`.
     scaler : ome_zarr.scale.Scaler, optional
         [DEPRECATED] Scaler implementation for downsampling the image. Passing this
         argument will raise a warning and is no longer supported. Use `scale_factors` and
@@ -575,14 +578,6 @@ def write_image(
     """
     from .scale import _build_pyramid
 
-    if scaler is not None:
-        msg = """
-        The 'scaler' argument is deprecated and will be removed in version 0.13.0.
-        Please use the 'scale_factors' argument instead.
-        """
-        scale_factors = tuple(2**i for i in range(1, scaler.max_layer + 1))
-        warnings.warn(msg, DeprecationWarning)
-
     if method is None:
         method = Methods.RESIZE
 
@@ -602,13 +597,39 @@ def write_image(
     axes = _get_valid_axes(len(image.shape), axes, fmt)
     dims = _extract_dims_from_axes(axes)
 
+    # parse scale_factors
+    # if scaler is provided, we ignore scale_factors and infer the scale_factors
+    # from the Scaler attrbutes instead.
+    if scaler is not None:
+        msg = """
+        The 'scaler' argument is deprecated and will be removed in version 0.13.0.
+        Please use the 'scale_factors' argument instead.
+        """
+        scale_factors = [
+            {d: 2**i if d in SPATIAL_DIMS else 1 for d in dims}
+            for i in range(1, scaler.max_layer + 1)
+        ]
+        warnings.warn(msg, DeprecationWarning)
+
+    # scale_factors are passed as [2, 4, 8, 16, ...]
+    if isinstance(scale_factors, list | tuple) and all(
+        isinstance(s, int) for s in scale_factors
+    ):
+        scales = []
+        for i in range(1, len(scale_factors) + 1):
+            scale = {d: 2**i if d in SPATIAL_DIMS else 1 for d in dims}
+            if "z" in dims:
+                scale["z"] = 1
+            scales.append(scale)
+        scale_factors = scales
+
     if method is None:
         method = Methods.RESIZE
 
     # Create the pyramid
     pyramid = _build_pyramid(
         image,
-        list(scale_factors),
+        cast(list[dict[str, int]], scale_factors),
         dims=dims,
         method=method,
     )
@@ -657,6 +678,15 @@ def _write_pyramid_to_zarr(
     compute: bool | None = True,
     **metadata: str | JSONDict | list[JSONDict],
 ) -> list:
+
+    group, fmt = check_group_fmt(group, fmt)
+
+    if scaler is not None:
+        msg = """
+        The 'scaler' argument is deprecated and will be removed in version 0.13.0.
+        Please use the 'scale_factors' argument instead.
+        """
+        warnings.warn(msg, DeprecationWarning)
 
     # Set up common kwargs for da.to_zarr
     # zarr_array_kwargs needs dask 2025.12.0 or later
@@ -936,7 +966,7 @@ def write_labels(
     group: zarr.Group | str,
     name: str,
     scaler: Scaler | None = Scaler(order=0),
-    scale_factors: tuple[int, ...] = (2, 4, 8, 16),
+    scale_factors: list[int] | tuple[int, ...] | list[dict[str, int]] = (2, 4, 8, 16),
     method: Methods = Methods.NEAREST,
     fmt: Format | None = None,
     axes: AxesType = None,
@@ -965,7 +995,12 @@ def write_labels(
         argument will raise a warning and is no longer supported. Use `scale_factors` and
         `method` instead.
     scale_factors : tuple of int, optional
-        The downsampling factors for each pyramid level. Default: (2, 4, 8).
+        The downsampling factors for each pyramid level. Default: (2, 4, 8, 16).
+        Passing a list of integers (i.e., [2, 4, 8]) will apply the downsampling in all
+        spatial dimensions *except the z dimension*, which will be left at a scale factor of 1.
+        To apply downsampling to the z-dimension, pass the scale factors as a list of dicts, e.g.
+        `[{"z": 1, "y": 2, "x": 2}, {"z": 1, "y": 4, "x": 4}, {"z": 1, "y": 8, "x": 8}]`.
+        This default behavior may change in future versions.
     method : ome_zarr.scale.Methods, optional
         Downsampling method to use. Default: Methods.NEAREST (recommended for labels).
         See also `ome_zarr.scale.Methods` for available methods.
