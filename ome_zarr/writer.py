@@ -744,6 +744,12 @@ def _write_dask_image(
             for i in range(1, scaler.max_layer + 1)
         ]
 
+    scale_factors = cast(list[dict[str, int]], scale_factors)
+
+    # Make sure every dimension is represented in the scale factors
+    for i, level in enumerate(scale_factors):
+        scale_factors[i] = {d: level.get(d, 1) for d in dims}
+
     if method is None:
         method = Methods.RESIZE
 
@@ -774,7 +780,7 @@ def _write_dask_image(
     # Create the pyramid
     pyramid = _build_pyramid(
         image,
-        cast(list[dict[str, int]], scale_factors),
+        scale_factors,
         dims=dims,
         method=method,
     )
