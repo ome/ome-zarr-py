@@ -681,13 +681,6 @@ def _write_pyramid_to_zarr(
 
     group, fmt = check_group_fmt(group, fmt)
 
-    if scaler is not None:
-        msg = """
-        The 'scaler' argument is deprecated and will be removed in version 0.13.0.
-        Please use the 'scale_factors' argument instead.
-        """
-        warnings.warn(msg, DeprecationWarning)
-
     # Set up common kwargs for da.to_zarr
     # zarr_array_kwargs needs dask 2025.12.0 or later
     zarr_array_kwargs: dict[str, Any] = {}
