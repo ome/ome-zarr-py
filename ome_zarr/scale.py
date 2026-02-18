@@ -9,7 +9,7 @@ import warnings
 from collections.abc import Callable, Iterator, Sequence
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Union
+from typing import Any, Union, cast
 
 import dask.array as da
 import numpy as np
@@ -402,13 +402,15 @@ def _build_pyramid(
     if isinstance(scale_factors, list | tuple) and all(
         isinstance(s, int) for s in scale_factors
     ):
-        scales = []
+        scales: list[dict[str, int]] = []
         for i in range(1, len(scale_factors) + 1):
             scale = {d: 2**i if d in SPATIAL_DIMS else 1 for d in dims}
             if "z" in dims:
                 scale["z"] = 1
             scales.append(scale)
         scale_factors = scales
+    else:
+        scale_factors = cast(list[dict[str, int]], scale_factors)
 
     images: list[da.Array] = [image]
 
