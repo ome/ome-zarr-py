@@ -746,7 +746,7 @@ def _write_dask_image(
 
     scale_factors = cast(list[dict[str, int]], scale_factors)
 
-    # Make sure every dimension is represented in the scale factors
+    # Make sure scale_factors are represented in the same order as dims
     for i, level in enumerate(scale_factors):
         scale_factors[i] = {d: level.get(d, 1) for d in dims}
 
