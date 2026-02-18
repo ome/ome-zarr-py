@@ -1,10 +1,11 @@
 import pathlib
+import tempfile
 
 import dask.array as da
 import numpy as np
 import pytest
 import zarr
-import tempfile
+
 from ome_zarr.scale import Scaler
 from ome_zarr.writer import write_image, write_multiscale
 
@@ -206,7 +207,7 @@ class TestScaler:
                         current_shape[dim_idx]
                         == previous_shape[dim_idx] // relative_scale
                     )
-        
+
         # now write the pyramid to zarr to make sure it works with dask arrays
         with tempfile.TemporaryDirectory() as tmpdir:
             write_multiscale(
