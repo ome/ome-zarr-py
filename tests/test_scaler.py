@@ -167,6 +167,11 @@ class TestScaler:
                 ["t", "c", "z", "y", "x"],
             ),
             (
+                (1, 2, 1, 256, 256),
+                [2, 4, 8, 16],
+                ["t", "c", "z", "y", "x"],
+            ),
+            (
                 #  check that missing t and c dimensions should be coerced to 1 and preserved
                 (1, 2, 1, 256, 256),
                 [
