@@ -230,7 +230,7 @@ class TestScaler:
             if isinstance(scale_factors[0], int):
                 scale_factors = [
                     {d: scale_factors[i] if d in ("y", "x") else 1 for d in dims}
-                    for i in range(0, len(scale_factors))
+                    for i in range(len(scale_factors))
                 ]
 
             # check if factors for z are different from 1 across levels
