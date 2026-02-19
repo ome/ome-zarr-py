@@ -202,30 +202,77 @@ class TestScaler:
             ),
         ],
     )
-    def test_build_pyramid(self, shape, scale_factors, dims, method):
+    def test_build_pyramid(self, shape, scale_factors, dims, method, tmpdir):
 
         data = self.create_data(shape)
 
-        # write the pyramid to zarr to make sure it works with dask arrays
-        with tempfile.TemporaryDirectory() as tmpdir:
-            write_image(
-                data,
-                group=zarr.open_group(tmpdir, mode="w"),
-                scale_factors=scale_factors,
-                axes=dims,
-                method=method,
-            )
+        write_image(
+            data,
+            group=zarr.open_group(str(tmpdir), mode="w"),
+            scale_factors=scale_factors,
+            axes=dims,
+            method=method,
+        )
 
-            # read back the pyramid to check it was written correctly
-            pyramid = [
-                da.from_array(zarr.open_group(tmpdir, mode="r")[f"{i}"])
-                for i in range(len(scale_factors) + 1)
+        # read back the pyramid to check it was written correctly
+        pyramid = [
+            da.from_array(zarr.open_group(str(tmpdir), mode="r")[f"{i}"])
+            for i in range(len(scale_factors) + 1)
+        ]
+
+        assert (
+            len(pyramid) == len(scale_factors) + 1
+        )  # original + (n_levels - 1) downscaled
+        assert pyramid[0].shape == data.shape
+
+        if isinstance(scale_factors[0], int):
+            scale_factors = [
+                {d: scale_factors[i] if d in ("y", "x") else 1 for d in dims}
+                for i in range(0, len(scale_factors))
             ]
 
-            assert (
-                len(pyramid) == len(scale_factors) + 1
-            )  # original + (n_levels - 1) downscaled
-            assert pyramid[0].shape == data.shape
+        # check if factors for z are different from 1 across levels
+        # to determine if z should have been downsampled
+        z_factors = [sf.get("z") for sf in scale_factors]
+        if all(zf == 1 for zf in z_factors):
+            downsample_z = False
+        else:
+            downsample_z = True
+
+        # Make sure channel and time dimensions are preserved
+        for level in pyramid:
+            for idx, d in enumerate(dims):
+                if d in ("t", "c"):
+                    assert level.shape[idx] == data.shape[idx]
+
+                # make sure z is not downsampled by default unless specifically requested
+                if "z" in dims and not downsample_z:
+                    assert (
+                        level.shape[dims.index("z")] == data.shape[dims.index("z")]
+                    )
+
+        for idx, level in enumerate(pyramid[1:], start=1):
+            previous_shape = pyramid[idx - 1].shape
+            current_shape = level.shape
+
+            if idx == 1:
+                previous_scale_factor = dict.fromkeys(dims, 1)
+                current_scale_factor = scale_factors[0]
+            else:
+                previous_scale_factor = scale_factors[idx - 2]
+                current_scale_factor = scale_factors[idx - 1]
+
+            relative_factor = {
+                d: current_scale_factor[d] / previous_scale_factor[d] for d in dims
+            }
+
+            # Check all spatial dimensions are scaled correctly
+            for dim_idx, dim_name in enumerate(dims):
+                if dim_name in ("y", "x", "z"):
+                    expected_dim_size = int(
+                        np.ceil(previous_shape[dim_idx] / relative_factor[dim_name])
+                    )
+                    assert current_shape[dim_idx] == expected_dim_size
 
             if isinstance(scale_factors[0], int):
                 scale_factors = [
