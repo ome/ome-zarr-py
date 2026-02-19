@@ -70,6 +70,7 @@ def resize(
     )[output_slices]
     return output.rechunk(image.chunksize).astype(image.dtype)
 
+
 def local_mean(
     image: da.Array, output_shape: Sequence[int], *args, **kwargs
 ) -> da.Array:

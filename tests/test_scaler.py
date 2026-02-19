@@ -7,7 +7,7 @@ import pytest
 import zarr
 
 from ome_zarr.scale import Scaler
-from ome_zarr.writer import write_image, write_multiscale
+from ome_zarr.writer import write_image
 
 
 class TestScaler:
@@ -153,14 +153,12 @@ class TestScaler:
         data_dir = tmpdir.mkdir("test_big_dask_pyramid")
         da.to_zarr(level_1, str(data_dir))
 
-    @pytest.mark.parametrize(
-        "method", ["nearest", "resize", "local_mean", "zoom"]
-    )
+    @pytest.mark.parametrize("method", ["nearest", "resize", "local_mean", "zoom"])
     @pytest.mark.parametrize(
         "shape, scale_factors, dims",
         [
             (
-                (1, 2, 1, 256, 256), 
+                (1, 2, 1, 256, 256),
                 [
                     {"t": 1, "c": 1, "z": 1, "y": 2, "x": 2},
                     {"t": 1, "c": 1, "z": 1, "y": 4, "x": 4},
@@ -170,7 +168,7 @@ class TestScaler:
             ),
             (
                 #  check that missing t and c dimensions should be coerced to 1 and preserved
-                (1, 2, 1, 256, 256), 
+                (1, 2, 1, 256, 256),
                 [
                     {"z": 1, "y": 2, "x": 2},
                     {"z": 1, "y": 4, "x": 4},
@@ -196,12 +194,10 @@ class TestScaler:
                     {"y": 8, "x": 8},
                 ],
                 ["y", "x"],
-
             ),
         ],
     )
     def test_build_pyramid(self, shape, scale_factors, dims, method):
-        from ome_zarr.scale import _build_pyramid
 
         data = self.create_data(shape)
 
@@ -221,7 +217,9 @@ class TestScaler:
                 for i in range(len(scale_factors) + 1)
             ]
 
-            assert len(pyramid) == len(scale_factors) + 1  # original + (n_levels - 1) downscaled
+            assert (
+                len(pyramid) == len(scale_factors) + 1
+            )  # original + (n_levels - 1) downscaled
             assert pyramid[0].shape == data.shape
 
             if isinstance(scale_factors[0], int):
@@ -233,7 +231,7 @@ class TestScaler:
             # check if factors for z are different from 1 across levels
             # to determine if z should have been downsampled
             z_factors = [sf.get("z") for sf in scale_factors]
-            if all (zf == 1 for zf in z_factors):
+            if all(zf == 1 for zf in z_factors):
                 downsample_z = False
             else:
                 downsample_z = True
@@ -246,22 +244,23 @@ class TestScaler:
 
                     # make sure z is not downsampled by default unless specifically requested
                     if "z" in dims and not downsample_z:
-                        assert level.shape[dims.index("z")] == data.shape[dims.index("z")]
+                        assert (
+                            level.shape[dims.index("z")] == data.shape[dims.index("z")]
+                        )
 
             for idx, level in enumerate(pyramid[1:], start=1):
                 previous_shape = pyramid[idx - 1].shape
                 current_shape = level.shape
 
                 if idx == 1:
-                    previous_scale_factor = {d: 1 for d in dims}
+                    previous_scale_factor = dict.fromkeys(dims, 1)
                     current_scale_factor = scale_factors[0]
                 else:
                     previous_scale_factor = scale_factors[idx - 2]
                     current_scale_factor = scale_factors[idx - 1]
 
                 relative_factor = {
-                    d: current_scale_factor[d] / previous_scale_factor[d]
-                    for d in dims
+                    d: current_scale_factor[d] / previous_scale_factor[d] for d in dims
                 }
 
                 # Check all spatial dimensions are scaled correctly
@@ -271,7 +270,6 @@ class TestScaler:
                             np.ceil(previous_shape[dim_idx] / relative_factor[dim_name])
                         )
                         assert current_shape[dim_idx] == expected_dim_size
-
 
     @pytest.mark.parametrize("method", ["gaussian", "laplacian"])
     def test_pyramid_args(self, shape, tmpdir, method):
