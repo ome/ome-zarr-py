@@ -218,6 +218,13 @@ class TestScaler:
                 method=method,
             )
 
+        with tempfile.TemporaryDirectory() as tmpdir:
+            write_multiscale(
+                pyramid=pyramid,
+                group=zarr.open_group(tmpdir, mode="w"),
+                axes=dims,
+            )
+
     @pytest.mark.parametrize("method", ["gaussian", "laplacian"])
     def test_pyramid_args(self, shape, tmpdir, method):
         path = pathlib.Path(tmpdir.mkdir("data"))
