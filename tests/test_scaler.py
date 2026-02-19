@@ -154,7 +154,7 @@ class TestScaler:
         da.to_zarr(level_1, str(data_dir))
 
     @pytest.mark.parametrize(
-        "method", ["nearest", "resize", "laplacian", "local_mean", "zoom"]
+        "method", ["nearest", "resize", "local_mean", "zoom"]
     )
     @pytest.mark.parametrize("n_levels", [1, 2, 3, 4])
     def test_build_pyramid(self, shape, method, n_levels):

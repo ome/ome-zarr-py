@@ -25,7 +25,6 @@ from skimage.transform import (
     resize,
 )
 
-from .dask_utils import laplacian as dask_laplacian
 from .dask_utils import local_mean as dask_local_mean
 from .dask_utils import resize as dask_resize
 from .dask_utils import zoom as dask_zoom
@@ -332,12 +331,6 @@ method_dispatch = {
             "preserve_range": True,
         },
         "used_function": "skimage.transform.resize",
-        "version": skimage_version,
-    },
-    Methods.LAPLACIAN: {
-        "func": dask_laplacian,
-        "kwargs": {"preserve_range": True},
-        "used_function": "skimage.transform.pyramid_laplacian",
         "version": skimage_version,
     },
     Methods.LOCAL_MEAN: {
