@@ -273,55 +273,40 @@ class TestScaler:
                         np.ceil(previous_shape[dim_idx] / relative_factor[dim_name])
                     )
                     assert current_shape[dim_idx] == expected_dim_size
+    
+    @pytest.mark.parametrize(
+        "method", ["nearest", "gaussian", "local_mean", "zoom", "resize_image"],
+    )
+    @pytest.mark.parametrize(
+        "max_levels", [1, 2, 3],
+    )
+    def test_legacy_scaler(self, shape, tmpdir, max_levels, method):
+        path = tmpdir.mkdir("data")
+        group = zarr.open_group(str(path), mode="w")
 
-            if isinstance(scale_factors[0], int):
-                scale_factors = [
-                    {d: scale_factors[i] if d in ("y", "x") else 1 for d in dims}
-                    for i in range(0, len(scale_factors))
-                ]
+        data = self.create_data(shape)
 
-            # check if factors for z are different from 1 across levels
-            # to determine if z should have been downsampled
-            z_factors = [sf.get("z") for sf in scale_factors]
-            if all(zf == 1 for zf in z_factors):
-                downsample_z = False
-            else:
-                downsample_z = True
+        scaler = Scaler(
+            downscale=2,
+            method=method,
+            max_layer=max_levels + 1,  # +1 to account for the original layer (level 0)
+        )
 
-            # Make sure channel and time dimensions are preserved
-            for level in pyramid:
-                for idx, d in enumerate(dims):
-                    if d in ("t", "c"):
-                        assert level.shape[idx] == data.shape[idx]
+        axes = "tczyx"[-len(shape) :]
+        write_image(
+            image=data,
+            group=group,
+            scaler=scaler,
+            axes=axes,
+        )
 
-                    # make sure z is not downsampled by default unless specifically requested
-                    if "z" in dims and not downsample_z:
-                        assert (
-                            level.shape[dims.index("z")] == data.shape[dims.index("z")]
-                        )
+        # read back the pyramid to check it was written correctly
+        pyramid = [
+            da.from_array(zarr.open_group(str(path), mode="r")[f"{i}"])
+            for i in range(max_levels + 1)
+        ]
 
-            for idx, level in enumerate(pyramid[1:], start=1):
-                previous_shape = pyramid[idx - 1].shape
-                current_shape = level.shape
-
-                if idx == 1:
-                    previous_scale_factor = dict.fromkeys(dims, 1)
-                    current_scale_factor = scale_factors[0]
-                else:
-                    previous_scale_factor = scale_factors[idx - 2]
-                    current_scale_factor = scale_factors[idx - 1]
-
-                relative_factor = {
-                    d: current_scale_factor[d] / previous_scale_factor[d] for d in dims
-                }
-
-                # Check all spatial dimensions are scaled correctly
-                for dim_idx, dim_name in enumerate(dims):
-                    if dim_name in ("y", "x", "z"):
-                        expected_dim_size = int(
-                            np.ceil(previous_shape[dim_idx] / relative_factor[dim_name])
-                        )
-                        assert current_shape[dim_idx] == expected_dim_size
+        assert len(pyramid) == max_levels + 1  # original + max_levels downscaled
 
     @pytest.mark.parametrize("method", ["gaussian", "laplacian"])
     def test_pyramid_args(self, shape, tmpdir, method):
