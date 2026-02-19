@@ -640,12 +640,6 @@ def write_image(
     The `scaler` argument is deprecated and will be removed in a future version. Use
     `scale_factors` and `method` for all new code.
     """
-    if scaler is not None:
-        msg = """
-        The 'scaler' argument is deprecated and will be removed in version 0.13.0.
-        Please use the 'scale_factors' argument instead.
-        """
-        warnings.warn(msg, DeprecationWarning)
 
     if method is None:
         method = Methods.RESIZE
@@ -717,13 +711,6 @@ def _write_dask_image(
 
     group, fmt = check_group_fmt(group, fmt)
 
-    if scaler is not None:
-        msg = """
-        The 'scaler' argument is deprecated and will be removed in version 0.13.0.
-        Please use the 'scale_factors' argument instead.
-        """
-        warnings.warn(msg, DeprecationWarning)
-
     axes = _get_valid_axes(len(image.shape), axes, fmt)
     dims = _extract_dims_from_axes(axes)
 
@@ -741,10 +728,31 @@ def _write_dask_image(
 
     # for path, data in enumerate(pyramid):
     if scaler is not None:
+        msg = """
+            The 'scaler' argument is deprecated and will be removed in a future version.
+            Please use the 'scale_factors' argument instead.
+            """
+        warnings.warn(msg, DeprecationWarning)
+
         scale_factors = [
             {d: 2**i if d in SPATIAL_DIMS else 1 for d in dims}
             for i in range(1, scaler.max_layer + 1)
         ]
+        if scaler.method == "local_mean":
+            method = Methods.LOCAL_MEAN
+        elif scaler.method == "resize_image":
+            method = Methods.RESIZE
+        elif scaler.method == "laplacian":
+            method = Methods.RESIZE
+            warnings.warn(
+                "Laplacian downsampling is not supported anymore."
+                "Falling back to `resize`",
+                UserWarning,
+            )
+        elif scaler.method == "zoom":
+            method = Methods.ZOOM
+        else:
+            method = Methods.RESIZE
 
     scale_factors = cast(list[dict[str, int]], scale_factors)
 
@@ -1102,12 +1110,6 @@ def write_labels(
     `scale_factors` and `method` for all new code. Labels downsampling should avoid interpolation;
     nearest-neighbor is recommended.
     """
-    if scaler is not None:
-        msg = """
-        The 'scaler' argument is deprecated and will be removed in version 0.13.0.
-        Please use the 'scale_factors' argument instead.
-        """
-        warnings.warn(msg, DeprecationWarning)
 
     group, fmt = check_group_fmt(group, fmt)
     sub_group = group.require_group(f"labels/{name}")
