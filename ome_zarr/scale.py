@@ -305,7 +305,6 @@ SPATIAL_DIMS = ("z", "y", "x")
 class Methods(Enum):
     RESIZE = "resize"
     NEAREST = "nearest"
-    LAPLACIAN = "laplacian"
     LOCAL_MEAN = "local_mean"
     ZOOM = "zoom"
 
