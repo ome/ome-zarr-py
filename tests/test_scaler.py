@@ -238,7 +238,6 @@ class TestScaler:
             else:
                 downsample_z = True
 
-
             # Make sure channel and time dimensions are preserved
             for level in pyramid:
                 for idx, d in enumerate(dims):
@@ -294,6 +293,3 @@ class TestScaler:
             scaler=scaler,
             axes=axes,
         )
-
-if __name__ == "__main__":
-    pytest.main([__file__])
