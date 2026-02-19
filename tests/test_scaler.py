@@ -245,6 +245,13 @@ class TestScaler:
                 if d in ("t", "c"):
                     assert level.shape[idx] == data.shape[idx]
 
+            # convert list[int] scale factors to list[dict] for consistent checks below
+            if isinstance(scale_factors[0], int):
+                scale_factors = [
+                    {d: scale_factors[i] if d in ("y", "x") else 1 for d in dims}
+                    for i in range(len(scale_factors))
+                ]
+
                 # make sure z is not downsampled by default unless specifically requested
                 if "z" in dims and not downsample_z:
                     assert (
@@ -263,7 +270,7 @@ class TestScaler:
                 current_scale_factor = scale_factors[idx - 1]
 
             relative_factor = {
-                d: current_scale_factor[d] / previous_scale_factor[d] for d in dims
+                d: (current_scale_factor[d] // previous_scale_factor[d]) for d in dims
             }
 
             # Check all spatial dimensions are scaled correctly
