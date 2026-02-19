@@ -1527,7 +1527,6 @@ class TestLabelWriter:
         ),
     )
     @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])
-    @pytest.mark.parametrize("scale_type", ["custom", "noop", "default"])
     def test_write_labels(self, shape, format_version, array_constructor, scale_type):
 
         fmt = format_version()
@@ -1546,8 +1545,6 @@ class TestLabelWriter:
             transformations.append(
                 [{"type": "scale", "scale": transf["scale"][-len(shape) :]}]
             )
-            # if scale_type == "noop":
-            #     break
 
         # create the actual label data: zeros with blobs
         label_data = np.zeros(shape, dtype=np.uint8)
