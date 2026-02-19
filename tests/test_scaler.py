@@ -1,5 +1,4 @@
 import pathlib
-import tempfile
 
 import dask.array as da
 import numpy as np
@@ -228,7 +227,7 @@ class TestScaler:
         if isinstance(scale_factors[0], int):
             scale_factors = [
                 {d: scale_factors[i] if d in ("y", "x") else 1 for d in dims}
-                for i in range(0, len(scale_factors))
+                for i in range(len(scale_factors))
             ]
 
         # check if factors for z are different from 1 across levels
@@ -254,9 +253,7 @@ class TestScaler:
 
                 # make sure z is not downsampled by default unless specifically requested
                 if "z" in dims and not downsample_z:
-                    assert (
-                        level.shape[dims.index("z")] == data.shape[dims.index("z")]
-                    )
+                    assert level.shape[dims.index("z")] == data.shape[dims.index("z")]
 
         for idx, level in enumerate(pyramid[1:], start=1):
             previous_shape = pyramid[idx - 1].shape
@@ -280,12 +277,14 @@ class TestScaler:
                         np.ceil(previous_shape[dim_idx] / relative_factor[dim_name])
                     )
                     assert current_shape[dim_idx] == expected_dim_size
-    
+
     @pytest.mark.parametrize(
-        "method", ["nearest", "gaussian", "local_mean", "zoom", "resize_image"],
+        "method",
+        ["nearest", "gaussian", "local_mean", "zoom", "resize_image"],
     )
     @pytest.mark.parametrize(
-        "max_levels", [1, 2, 3],
+        "max_levels",
+        [1, 2, 3],
     )
     def test_legacy_scaler(self, shape, tmpdir, max_levels, method):
         path = tmpdir.mkdir("data")
