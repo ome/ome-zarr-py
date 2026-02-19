@@ -1527,7 +1527,7 @@ class TestLabelWriter:
         ),
     )
     @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])
-    def test_write_labels(self, shape, format_version, array_constructor, scale_type):
+    def test_write_labels(self, shape, format_version, array_constructor):
 
         fmt = format_version()
         if fmt.version == "0.5":
@@ -1584,8 +1584,7 @@ class TestLabelWriter:
         )
 
         for level in label_data:
-            if scale_type == "default":
-                assert np.unique(level.compute()).tolist() == [0, 2]
+            assert np.unique(level.compute()).tolist() == [0, 2]
 
         if fmt.version == "0.4":
             test_root = zarr.open(self.path)
