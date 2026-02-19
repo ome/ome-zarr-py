@@ -740,6 +740,8 @@ def _write_dask_image(
         ]
         if scaler.method == "local_mean":
             method = Methods.LOCAL_MEAN
+        elif scaler.method == "nearest":
+            method = Methods.NEAREST
         elif scaler.method == "resize_image":
             method = Methods.RESIZE
         elif scaler.method == "laplacian":
