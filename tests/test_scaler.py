@@ -306,13 +306,8 @@ class TestScaler:
             axes=axes,
         )
 
-        # read back the pyramid to check it was written correctly
-        pyramid = [
-            da.from_array(zarr.open_group(str(path), mode="r")[f"{i}"])
-            for i in range(max_levels + 1)
-        ]
-
-        assert len(pyramid) == max_levels + 1  # original + max_levels downscaled
+        node_metadata = zarr.open_group(str(path)).attrs["ome"]
+        assert len(node_metadata["multiscales"][0]["datasets"]) == max_levels + 1
 
     @pytest.mark.parametrize("method", ["gaussian", "laplacian"])
     def test_pyramid_args(self, shape, tmpdir, method):
