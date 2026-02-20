@@ -295,7 +295,7 @@ class TestScaler:
         scaler = Scaler(
             downscale=2,
             method=method,
-            max_layer=max_levels + 1,  # +1 to account for the original layer (level 0)
+            max_layer=max_levels,
         )
 
         axes = "tczyx"[-len(shape) :]
