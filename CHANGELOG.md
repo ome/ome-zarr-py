@@ -55,7 +55,7 @@
 - Exclude fsspec 2023.9.0 fixes FileNotFoundError ([#307](https://github.com/ome/ome-zarr-py/pull/307))
 - Set minimum fsspec version. Thanks to [Evan Lyall](https://github.com/elyall) ([#295](https://github.com/ome/ome-zarr-py/pull/295))
 - Add conda install instructions to README. Thanks to [David Stansby](https://github.com/dstansby) ([#313](https://github.com/ome/ome-zarr-py/pull/313))
-- Cody tidy fixes. Thanks to [Dimitri Papadopoulos Orfanos](https://github.com/DimitriPapadopoulos) ([#310](https://github.com/ome/ome-zarr-py/pull/310), [#312](https://github.com/ome/ome-zarr-py/pull/312))
+- Code tidy fixes. Thanks to [Dimitri Papadopoulos Orfanos](https://github.com/DimitriPapadopoulos) ([#310](https://github.com/ome/ome-zarr-py/pull/310), [#312](https://github.com/ome/ome-zarr-py/pull/312))
 # 0.8.0 (June 2023)
 
 - Add `ome_zarr view image.zarr` to server and view in browser ([#285](https://github.com/ome/ome-zarr-py/pull/285))

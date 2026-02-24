@@ -1527,8 +1527,7 @@ class TestLabelWriter:
         ),
     )
     @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])
-    @pytest.mark.parametrize("scale_type", ["custom", "noop", "default"])
-    def test_write_labels(self, shape, format_version, array_constructor, scale_type):
+    def test_write_labels(self, shape, format_version, array_constructor):
 
         fmt = format_version()
         if fmt.version == "0.5":
@@ -1546,8 +1545,6 @@ class TestLabelWriter:
             transformations.append(
                 [{"type": "scale", "scale": transf["scale"][-len(shape) :]}]
             )
-            # if scale_type == "noop":
-            #     break
 
         # create the actual label data: zeros with blobs
         label_data = np.zeros(shape, dtype=np.uint8)
@@ -1587,8 +1584,7 @@ class TestLabelWriter:
         )
 
         for level in label_data:
-            if scale_type == "default":
-                assert np.unique(level.compute()).tolist() == [0, 2]
+            assert np.unique(level.compute()).tolist() == [0, 2]
 
         if fmt.version == "0.4":
             test_root = zarr.open(self.path)

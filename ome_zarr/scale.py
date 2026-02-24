@@ -25,7 +25,6 @@ from skimage.transform import (
     resize,
 )
 
-from .dask_utils import laplacian as dask_laplacian
 from .dask_utils import local_mean as dask_local_mean
 from .dask_utils import resize as dask_resize
 from .dask_utils import zoom as dask_zoom
@@ -306,7 +305,6 @@ SPATIAL_DIMS = ("z", "y", "x")
 class Methods(Enum):
     RESIZE = "resize"
     NEAREST = "nearest"
-    LAPLACIAN = "laplacian"
     LOCAL_MEAN = "local_mean"
     ZOOM = "zoom"
 
@@ -332,12 +330,6 @@ method_dispatch = {
             "preserve_range": True,
         },
         "used_function": "skimage.transform.resize",
-        "version": skimage_version,
-    },
-    Methods.LAPLACIAN: {
-        "func": dask_laplacian,
-        "kwargs": {},
-        "used_function": "skimage.transform.pyramid_laplacian",
         "version": skimage_version,
     },
     Methods.LOCAL_MEAN: {
@@ -424,14 +416,9 @@ def _build_pyramid(
                 list(scale_factors[idx - 1].values())
             )
 
-        # Build per-dimension factor (only spatial dims are downsampled)
-        per_dim_factor = tuple(
-            relative_factors[i] if d in SPATIAL_DIMS else 1 for i, d in enumerate(dims)
-        )
-
         # Calculate target shape, leave non-spatial dims unchanged
         target_shape = []
-        for s, d, f in zip(images[-1].shape, dims, per_dim_factor):
+        for s, d, f in zip(images[-1].shape, dims, relative_factors):
             if d in SPATIAL_DIMS:
                 if s // f == 0:
                     target_shape.append(1)
