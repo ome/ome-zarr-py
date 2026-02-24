@@ -602,16 +602,35 @@ def write_image(
     # parse scale_factors
     # if scaler is provided, we ignore scale_factors and infer the scale_factors
     # from the Scaler attributes instead.
+    # for path, data in enumerate(pyramid):
     if scaler is not None:
         msg = """
-        The 'scaler' argument is deprecated and will be removed in version 0.13.0.
-        Please use the 'scale_factors' argument instead.
-        """
+            The 'scaler' argument is deprecated and will be removed in a future version.
+            Please use the 'scale_factors' argument instead.
+            """
+        warnings.warn(msg, DeprecationWarning)
+
         scale_factors = [
             {d: 2**i if d in SPATIAL_DIMS else 1 for d in dims}
             for i in range(1, scaler.max_layer + 1)
         ]
-        warnings.warn(msg, DeprecationWarning)
+        if scaler.method == "local_mean":
+            method = Methods.LOCAL_MEAN
+        elif scaler.method == "nearest":
+            method = Methods.NEAREST
+        elif scaler.method == "resize_image":
+            method = Methods.RESIZE
+        elif scaler.method == "laplacian":
+            method = Methods.RESIZE
+            warnings.warn(
+                "Laplacian downsampling is not supported anymore."
+                "Falling back to `resize`",
+                UserWarning,
+            )
+        elif scaler.method == "zoom":
+            method = Methods.ZOOM
+        else:
+            method = Methods.RESIZE
 
     if method is None:
         method = Methods.RESIZE
