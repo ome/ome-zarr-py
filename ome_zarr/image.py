@@ -164,7 +164,7 @@ class NgffMultiscales:
         scales = []
         for shape in [d.shape for d in pyramid]:
             scale = [full / level for full, level in zip(image.data.shape, shape)]
-            scales.append({d: s * image.scale[d] for d, s in zip(image.dims, scale)})
+            scales.append({d: s * image.scale[d] if d in image.scale else 1.0 for d, s in zip(image.dims, scale)})
 
         # Create Image instances for each pyramid level
         images = []
