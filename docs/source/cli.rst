@@ -28,7 +28,7 @@ Local data::
 view
 ====
 
-Use the `ome_zarr` command to serve local Zarr data and view in the https://ome.github.io/ome-ngff-validator::
+Use the `ome_zarr` command to serve local Zarr data and view it in the https://ome.github.io/ome-ngff-validator::
 
     ome_zarr view 6001240.zarr/
 
@@ -56,19 +56,49 @@ Specify a different output directory::
 
     ome_zarr download https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.5/idr0062A/6001240_labels.zarr --output image_dir
 
+scale
+=====
+
+Use the `ome_zarr scale` command to generate a multiscale pyramid from a Zarr array.
+This creates downsampled resolutions of the input image using the specified downsampling method.
+
+Basic usage::
+
+    ome_zarr scale input.zarr output.zarr zyx
+
+This reads the input Zarr array with dimensions 'zyx' and writes a multiscale pyramid to the output directory.
+
+Options:
+
+- `--downscale`: The downsampling factor (default: 2). For example, `--downscale 2` creates scale factors of 2, 4, 8, etc.
+- `--max_layer`: Maximum number of pyramid levels to generate (default: 4)
+- `--method`: Downsampling method to use (default: "resize"). Options are:
+    - `nearest`: Nearest neighbor
+    - `resize`: Resize with anti-aliasing (default)
+    - `laplacian`: Laplacian pyramid
+    - `local_mean`: Local mean
+    - `zoom`: Scipy zoom
+- `--copy-metadata`: If specified, copies the input array metadata to the output group
+
+Example with custom options::
+
+    ome_zarr scale input.zarr output.zarr tczyx --downscale 3 --max_layer 5 --method nearest --copy-metadata
+
+
+
 create
 ======
 
-To create sample OME-Zarr image from the `skimage <https://scikit-image.org/docs/stable/api/skimage.data.html>`_
+To create a sample OME-Zarr image from the `skimage <https://scikit-image.org/docs/stable/api/skimage.data.html>`_
 data.
 
-Create an OME-Zarr image in coinsdata/ dir using 'coins' method in OME-Zarr latest version or v0.4::
+Create an OME-Zarr image in coinsdata.zarr using the 'coins' method in OME-Zarr latest version or v0.4::
 
     ome_zarr create coinsdata.zarr
 
     ome_zarr create coinsdata.zarr --format 0.4
 
-Create an rgb image from skimage astronaut in testimage dir::
+Create an RGB image from the skimage astronaut dataset in testimage.zarr::
 
     ome_zarr create testimage.zarr --method=astronaut
 

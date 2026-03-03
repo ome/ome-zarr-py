@@ -13,7 +13,7 @@ of 2 in the X and Y dimensions.
 Alternatively, the :py:func:`ome_zarr.writer.write_multiscale` can be used, which takes a
 "pyramid" of pre-computed `numpy` arrays.
 
-The default version of OME-NGFF is v0.5, is based on Zarr v3. A zarr v3 group and store is created
+The default version of OME-NGFF is v0.5, which is based on Zarr v3. A zarr v3 group and store is created
 by `zarr.open_group()` below. To write OME-NGFF v0.4 (Zarr v2), add the `zarr_format=2` argument.
 
 The following code creates a 3D Image in OME-Zarr::
@@ -37,6 +37,47 @@ This image can be viewed in `napari` using the
 `napari-ome-zarr <https://github.com/ome/napari-ome-zarr>`_ plugin::
 
     $ napari test_ngff_image.zarr
+
+Building a pyramid
+------------------
+
+Multi-resolution pyramids are an integral part of ome-zarr image data
+and enable fast rendering of large images.
+The entrypoints to writing ome-zarr images in ome-zarr-py (`write_image` and `write_labels`)
+build these pyramids under the hood as delayed dask arrays based on the settings for the scaling functions and scale factors.
+
+The scale factors can be passed as a list of integers or a list of dicts::
+
+    from ome_zarr.writer import write_image
+
+    scale_factors = [2, 4, 8]
+    write_image(
+        your_data
+        path,
+        axes="zyx",
+        scale_factors=scale_factors,
+        )
+
+In this example, the downsampling will be applied in all spatial dimensions *except the z dimension*, which will be left at a scale factor of 1.
+To apply equal or custom downsampling factors along all spatial dimensions, pass the scale factors as a list of dicts, e.g.::
+
+    from ome_zarr.writer import write_image
+
+    scale_factors = [
+        {"z": 2, "y": 2, "x": 2},
+        {"z": 4, "y": 4, "x": 4},
+        {"z": 8, "y": 8, "x": 8}
+        ]
+    write_image(
+        your_data
+        path,
+        axes="zyx",
+        scale_factors=scale_factors,
+        )
+
+If you have already built a pyramid representation by other means,
+you can pass it directly to the :py:func:`ome_zarr.writer.write_multiscale` or use :py:func:`ome_zarr.writer.write_multiscale_labels`,
+which do not perform any down-sampling but just write the passed pyramid to disk with the correct metadata.
 
 Rendering settings
 ------------------
@@ -66,7 +107,7 @@ The following code creates a 3D Image in OME-Zarr with labels::
     path = "test_ngff_image_labels.zarr"
     os.mkdir(path)
 
-    mean_val=10
+    mean_val = 10
     size_xy = 128
     size_z = 10
     rng = np.random.default_rng(0)
@@ -131,7 +172,7 @@ This sample code shows how to write a high-content screening dataset (i.e. cultu
     field_paths = ["0", "1", "2"]
 
     # generate data
-    mean_val=10
+    mean_val = 10
     num_wells = len(well_paths)
     num_fields = len(field_paths)
     size_xy = 128

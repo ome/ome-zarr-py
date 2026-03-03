@@ -85,7 +85,7 @@ def scale(args: argparse.Namespace) -> None:
     write_image(
         data,
         args.output_directory,
-        axes=str(args.dims),
+        axes=str(args.axes),
         method=args.method,
         scale_factors=scale_factors,
     )

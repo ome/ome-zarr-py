@@ -15,7 +15,9 @@ import dask.array as da
 import numpy as np
 import zarr
 from deprecated import deprecated
+from scipy import __version__ as scipy_version
 from scipy.ndimage import zoom
+from skimage import __version__ as skimage_version
 from skimage.transform import (
     downscale_local_mean,
     pyramid_gaussian,
@@ -23,7 +25,6 @@ from skimage.transform import (
     resize,
 )
 
-from .dask_utils import laplacian as dask_laplacian
 from .dask_utils import local_mean as dask_local_mean
 from .dask_utils import resize as dask_resize
 from .dask_utils import zoom as dask_zoom
@@ -35,8 +36,8 @@ ArrayLike = Union[da.Array, np.ndarray]  # noqa: UP007  # FIXME
 
 
 @deprecated(
-    reason="Downsampling via the `Scaler` class has been deprecated. Please use the `scale_Factors` argument instead.",
-    version="0.13.0",
+    reason="Downsampling via the `Scaler` class has been deprecated. Please use the `scale_factors` argument instead.",
+    version="0.14.0",
 )
 @dataclass
 class Scaler:
@@ -304,14 +305,51 @@ SPATIAL_DIMS = ("z", "y", "x")
 class Methods(Enum):
     RESIZE = "resize"
     NEAREST = "nearest"
-    LAPLACIAN = "laplacian"
     LOCAL_MEAN = "local_mean"
     ZOOM = "zoom"
 
 
+method_dispatch = {
+    Methods.RESIZE: {
+        "func": dask_resize,
+        "kwargs": {
+            "order": 1,
+            "mode": "reflect",
+            "anti_aliasing": True,
+            "preserve_range": True,
+        },
+        "used_function": "skimage.transform.resize",
+        "version": skimage_version,
+    },
+    Methods.NEAREST: {
+        "func": dask_resize,
+        "kwargs": {
+            "order": 0,
+            "mode": "reflect",
+            "anti_aliasing": False,
+            "preserve_range": True,
+        },
+        "used_function": "skimage.transform.resize",
+        "version": skimage_version,
+    },
+    Methods.LOCAL_MEAN: {
+        "func": dask_local_mean,
+        "kwargs": {},
+        "used_function": "skimage.transform.downscale_local_mean",
+        "version": skimage_version,
+    },
+    Methods.ZOOM: {
+        "func": dask_zoom,
+        "kwargs": {},
+        "used_function": "scipy.ndimage.zoom",
+        "version": scipy_version,
+    },
+}
+
+
 def _build_pyramid(
     image: da.Array | np.ndarray,
-    scale_factors: list[int],
+    scale_factors: list[dict[str, int]],
     dims: Sequence[str],
     method: str | Methods = "nearest",
     chunks: tuple[int, ...] | None | str = None,
@@ -323,13 +361,18 @@ def _build_pyramid(
     ----------
     image : dask.array.Array or numpy.ndarray
         The input image to downscale.
-    scale_factors : list of int
-        The downscaling factors for each pyramid level.
+    scale_factors : list of dict
+        The downscaling factors for each pyramid level. Each dictionary should
+        map dimension names to their respective downscaling factors.
+        I.e., [{"y": 2, "x": 2}, {"y": 4, "x": 4}] to create two levels with downsampling factors of 2 and 4.
     dims : sequence of str
         The dimension names corresponding to the image axes.
     method : str or Methods, optional
         The downsampling method to use. Options are "resize" or "nearest".
         Default is "nearest".
+    exact : bool, optional
+        Whether to use exact resizing. Only applicable for certain methods.
+        Default is False.
     chunks : tuple of int, str, or None, optional
         The chunk size to use for dask arrays. If None, the array's existing
         chunking is used. If a string, it should be a valid dask chunking
@@ -350,20 +393,16 @@ def _build_pyramid(
     for idx, factor in enumerate(scale_factors):
         # Compute relative factor for this level
         # May or may not be an integer depending on passed scale factors
-        relative_factor: float | int
         if idx == 0:
-            relative_factor = scale_factors[0]
+            relative_factors = np.asarray(list(scale_factors[0].values()))
         else:
-            relative_factor = factor / scale_factors[idx - 1]
-
-        # Build per-dimension factor (only spatial dims are downsampled)
-        per_dim_factor = tuple(
-            relative_factor if d in SPATIAL_DIMS else 1 for d in dims
-        )
+            relative_factors = np.asarray(list(factor.values())) / np.asarray(
+                list(scale_factors[idx - 1].values())
+            )
 
         # Calculate target shape, leave non-spatial dims unchanged
         target_shape = []
-        for s, d, f in zip(images[-1].shape, dims, per_dim_factor):
+        for s, d, f in zip(images[-1].shape, dims, relative_factors):
             if d in SPATIAL_DIMS:
                 if s // f == 0:
                     target_shape.append(1)
@@ -377,39 +416,15 @@ def _build_pyramid(
             else:
                 target_shape.append(int(s))
 
-        if method == Methods.RESIZE:
-            new_image = dask_resize(
-                images[-1],
-                output_shape=target_shape,
-                order=1,
-                preserve_range=True,
-                anti_aliasing=True,
-            )
-        elif method == Methods.NEAREST:
-            new_image = dask_resize(
-                images[-1],
-                output_shape=target_shape,
-                order=0,
-                preserve_range=True,
-                anti_aliasing=False,
-            )
-        elif method == Methods.LAPLACIAN:
-            new_image = dask_laplacian(
-                images[-1],
-                output_shape=tuple(target_shape),
-            )
-        elif method == Methods.LOCAL_MEAN:
-            new_image = dask_local_mean(
-                images[-1],
-                output_shape=target_shape,
-            )
-        elif method == Methods.ZOOM:
-            new_image = dask_zoom(
-                images[-1],
-                output_shape=target_shape,
-            )
-        else:
+        if method not in method_dispatch:
             raise ValueError(f"Unknown downsampling method: {method}")
+
+        # apply the downsampling method to the last image in the list
+        new_image = method_dispatch[method]["func"](
+            images[-1],
+            output_shape=tuple(target_shape),
+            **method_dispatch[method]["kwargs"],
+        )
 
         images.append(new_image)
 

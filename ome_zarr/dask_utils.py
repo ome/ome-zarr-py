@@ -71,34 +71,6 @@ def resize(
     return output.rechunk(image.chunksize).astype(image.dtype)
 
 
-def laplacian(
-    image: da.Array, output_shape: Sequence[int], *args, **kwargs
-) -> da.Array:
-    r"""
-    Laplacian pyramid downscaling.
-    :type image: :class:`dask.array`
-    :param image: The dask array to resize
-    :type output_shape: Sequence[int]
-    :param output_shape: The shape of the resize array
-    :return: Resized image.
-    """
-    from skimage.transform import pyramid_laplacian
-
-    factors = np.array(output_shape) / np.array(image.shape).astype(float)
-    better_chunksize, block_output_shape = _better_chunksize(image, factors)
-    image_prepared = image.rechunk(better_chunksize)
-
-    def laplacian_block(image_block: da.Array) -> da.Array:
-        laplacian = pyramid_laplacian(image_block, *args, **kwargs)
-        return next(laplacian).astype(image_block.dtype)
-
-    output_slices = tuple(slice(0, d) for d in output_shape)
-    output = da.map_blocks(
-        laplacian_block, image_prepared, dtype=image.dtype, chunks=block_output_shape
-    )[output_slices]
-    return output.rechunk(image.chunksize).astype(image.dtype)
-
-
 def local_mean(
     image: da.Array, output_shape: Sequence[int], *args, **kwargs
 ) -> da.Array:
@@ -113,12 +85,14 @@ def local_mean(
     """
     from skimage.transform import downscale_local_mean
 
-    factors = np.array(output_shape) / np.array(image.shape).astype(float)
-    better_chunksize, block_output_shape = _better_chunksize(image, factors)
+    factors = np.array(image.shape).astype(float) / np.array(output_shape)
+    better_chunksize, block_output_shape = _better_chunksize(image, 1 / factors)
     image_prepared = image.rechunk(better_chunksize)
 
     def local_mean_block(image_block: da.Array) -> da.Array:
-        local_mean = downscale_local_mean(image_block, factors, *args, **kwargs)
+        local_mean = downscale_local_mean(
+            image_block, tuple(factors.astype(int)), *args, **kwargs
+        )
         return local_mean.astype(image_block.dtype)
 
     output_slices = tuple(slice(0, d) for d in output_shape)
@@ -140,8 +114,8 @@ def zoom(image: da.Array, output_shape: Sequence[int], *args, **kwargs) -> da.Ar
     """
     from scipy.ndimage import zoom
 
-    factors = np.array(output_shape) / np.array(image.shape).astype(float)
-    better_chunksize, block_output_shape = _better_chunksize(image, factors)
+    factors = np.array(image.shape).astype(float) / np.array(output_shape)
+    better_chunksize, block_output_shape = _better_chunksize(image, 1 / factors)
     image_prepared = image.rechunk(better_chunksize)
 
     def zoom_block(image_block: da.Array) -> da.Array:
