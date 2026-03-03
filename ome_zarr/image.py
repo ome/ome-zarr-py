@@ -164,7 +164,12 @@ class NgffMultiscales:
         scales = []
         for shape in [d.shape for d in pyramid]:
             scale = [full / level for full, level in zip(image.data.shape, shape)]
-            scales.append({d: s * image.scale[d] if d in image.scale else 1.0 for d, s in zip(image.dims, scale)})
+            scales.append(
+                {
+                    d: s * image.scale[d] if d in image.scale else 1.0
+                    for d, s in zip(image.dims, scale)
+                }
+            )
 
         # Create Image instances for each pyramid level
         images = []
@@ -241,7 +246,7 @@ class NgffMultiscales:
 
     def to_ome_zarr(
         self,
-        group: zarr.Group | str,#
+        group: zarr.Group | str,
         labels: NgffMultiscales | dict[str, NgffMultiscales] | None = None,
         storage_options: dict[str, Any] | None = None,
         version: str | None = "0.6",
@@ -315,19 +320,23 @@ class NgffMultiscales:
 
             _write_pyramid_to_zarr(
                 pyramid=[
-                    img.data if isinstance(img.data, da.Array) else da.from_array(img.data)
+                    (
+                        img.data
+                        if isinstance(img.data, da.Array)
+                        else da.from_array(img.data)
+                    )
                     for img in label_pyramid.images
                 ],
                 group=label_group,
                 storage_options=storage_options,
                 fmt=fmt,
-                axes=[dict(ax) for ax in label_pyramid.metadata.coordinateSystems[0].axes],
+                axes=[
+                    dict(ax) for ax in label_pyramid.metadata.coordinateSystems[0].axes
+                ],
                 compute=compute,
             )
 
-        list_of_labels = [
-            str(label.name) for label in labels.values()
-        ]
+        list_of_labels = [str(label.name) for label in labels.values()]
 
         if isinstance(group, str):
             group = zarr.open(group, mode="r+")
@@ -348,22 +357,19 @@ class NgffMultiscales:
                 "multiscales": [
                     _recursive_pop_nones(self.metadata.to_version(version).model_dump())
                 ],
-                "labels": list_of_labels if list_of_labels else None,
+                "labels": list_of_labels or None,
             }
             group.attrs["ome"] = metadata_dict
 
         elif version == "0.6":
             metadata_dict = {
                 "version": version,
-                "multiscales": [
-                    _recursive_pop_nones(self.metadata.model_dump())
-                ],
-                "labels": list_of_labels if list_of_labels else None,
+                "multiscales": [_recursive_pop_nones(self.metadata.model_dump())],
+                "labels": list_of_labels or None,
             }
             group.attrs["ome"] = metadata_dict
         else:
             raise ValueError(f"Unsupported OME-Zarr version: {version}")
-
 
     @classmethod
     def from_ome_zarr(
