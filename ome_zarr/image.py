@@ -7,14 +7,16 @@ from typing import Any
 import dask.array as da
 import numpy as np
 import zarr
-from ome_zarr_models._v06.coordinate_transforms import (
+from ome_zarr_models.v05.axes import (
     Axis,
-    CoordinateSystem,
-    CoordinateSystemIdentifier,
-    Scale,
-    Transform,
 )
-from ome_zarr_models._v06.multiscales import (
+
+from ome_zarr_models.v05.coordinate_transformations import (
+    VectorScale as Scale,
+    VectorTranslation as Translation,
+    Identity as Identity,
+)
+from ome_zarr_models.v05.multiscales import (
     Dataset,
     Multiscale,
 )
@@ -107,8 +109,6 @@ class NgffMultiscales:
         Downsampling factors for each pyramid level. Default: [2, 4, 8, 16].
     method : str or Methods, optional
         Downsampling method to use. Default: Methods.RESIZE.
-    coordinate_system_name : str, optional
-        Name of the coordinate system. Default: "physical".
 
     Attributes
     ----------
@@ -131,15 +131,13 @@ class NgffMultiscales:
     image: InitVar[NgffImage]
     scale_factors: InitVar[list[int]] = [2, 4, 8, 16]
     method: str | Methods = Methods.RESIZE
-    coordinate_system_name: InitVar[str | None] = "physical"
-    coordinateTransformations: InitVar[list[Transform]] = []
+    coordinateTransformations: InitVar[list[Scale | Translation | Identity]] = []
 
     def __post_init__(
         self,
         image: NgffImage,
         scale_factors=[2, 4, 8, 16],
-        coordinate_system_name: str | None = "physical",
-        coordinateTransformations: list[Transform] = [],
+        coordinateTransformations: list[Scale | Translation | Identity] = [],
     ):
         from .scale import _build_pyramid
 
@@ -147,9 +145,6 @@ class NgffMultiscales:
         method = self.method
         if isinstance(method, Methods):
             method = str(method.value)
-
-        if not coordinate_system_name:
-            coordinate_system_name = "physical"
 
         # Build the pyramid data
         pyramid = _build_pyramid(
@@ -185,10 +180,8 @@ class NgffMultiscales:
                     path=f"scale{idx}",
                     coordinateTransformations=(
                         Scale(
-                            input=f"scale{idx}",
-                            output="physical",
-                            scale=tuple(level_scale.values()),
-                            path=None,
+                            type="scale",
+                            scale=list(level_scale.values()),
                         ),
                     ),
                 )
@@ -211,32 +204,11 @@ class NgffMultiscales:
             else:
                 axes.append(Axis(name=d, type="custom", unit=image.axes_units.get(d)))
 
-        # check if any additional coordinate transforms have been passed and if so
-        # add them to metadata and create a new output coordinate system
-        coordinate_systems = []
-        if coordinateTransformations:
-            for tf in coordinateTransformations:
-                if type(tf) is CoordinateSystemIdentifier:
-                    name = tf.name
-                else:
-                    name = tf.output
-                coordinate_systems.append(
-                    CoordinateSystem(
-                        name=name,
-                        axes=tuple(
-                            Axis(name=d.name, type=d.type, unit=d.unit) for d in axes
-                        ),
-                    )
-                )
-
         self.metadata = Multiscale(
-            coordinateSystems=(
-                CoordinateSystem(name=coordinate_system_name, axes=tuple(axes)),
-                *coordinate_systems,
-            ),
+            axes=tuple(axes),
             datasets=tuple(datasets),
             name=image.name,
-            coordinateTransformations=tuple(coordinateTransformations),
+            coordinateTransformations=coordinateTransformations,
         )
 
     def to_ome_zarr(
@@ -301,7 +273,7 @@ class NgffMultiscales:
             group=group,
             storage_options=storage_options,
             fmt=fmt,
-            axes=[dict(ax) for ax in self.metadata.coordinateSystems[0].axes],
+            axes=[dict(ax) for ax in self.metadata.axes],
             compute=compute,
         )
 
@@ -321,7 +293,7 @@ class NgffMultiscales:
                 group=label_group,
                 storage_options=storage_options,
                 fmt=fmt,
-                axes=[dict(ax) for ax in label_pyramid.metadata.coordinateSystems[0].axes],
+                axes=[dict(ax) for ax in label_pyramid.metadata.axes],
                 compute=compute,
             )
 
@@ -352,15 +324,6 @@ class NgffMultiscales:
             }
             group.attrs["ome"] = metadata_dict
 
-        elif version == "0.6":
-            metadata_dict = {
-                "version": version,
-                "multiscales": [
-                    _recursive_pop_nones(self.metadata.model_dump())
-                ],
-                "labels": list_of_labels if list_of_labels else None,
-            }
-            group.attrs["ome"] = metadata_dict
         else:
             raise ValueError(f"Unsupported OME-Zarr version: {version}")
 
@@ -412,13 +375,6 @@ class NgffMultiscales:
             ome_attrs = group.attrs.get("ome", {})
             metadata_json = ome_attrs.get("multiscales", [None])[0]
             metadata = Multiscalev05.model_validate(metadata_json).to_version("0.6")
-        elif version == "0.6":
-            from ome_zarr_models._v06.multiscales import Multiscale
-
-            ome_attrs = group.attrs.get("ome", {})
-            metadata_json = ome_attrs.get("multiscales", [None])[0]
-            metadata_json = _recursive_pop_nones(metadata_json)
-            metadata = Multiscale.model_validate(metadata_json)
         else:
             raise ValueError(f"Unsupported OME-Zarr version: {version}")
 
