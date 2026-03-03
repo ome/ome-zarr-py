@@ -241,7 +241,8 @@ class NgffMultiscales:
 
     def to_ome_zarr(
         self,
-        group: zarr.Group | str,
+        group: zarr.Group | str,#
+        labels: NgffMultiscales | dict[str, NgffMultiscales] | None = None,
         storage_options: dict[str, Any] | None = None,
         version: str | None = "0.6",
         compute: bool = True,
@@ -253,6 +254,10 @@ class NgffMultiscales:
         ----------
         group : zarr.Group or str
             The target Zarr group or path where the OME-Zarr data will be written.
+        labels : NgffMultiscales or dict of str to NgffMultiscales, optional
+            Optional labels to write alongside the image data. Can be a single NgffMultiscales
+            instance (for a single label pyramid) or a dict mapping label names to NgffMultiscales
+            instances (for multiple label pyramids). Default is None (no labels).
         storage_options : dict, optional
             Additional storage options to pass to Zarr, such as:
             - `compressor`: A Zarr compressor instance for compressing the data.
@@ -290,6 +295,7 @@ class NgffMultiscales:
             for img in self.images
         ]
 
+        # write the actual image to disk
         _write_pyramid_to_zarr(
             pyramid=pyramid,
             group=group,
@@ -299,6 +305,30 @@ class NgffMultiscales:
             compute=compute,
         )
 
+        # write labels data if passed
+        if labels is not None:
+            if isinstance(labels, NgffMultiscales):
+                labels = {str(labels.name): labels}
+
+            for label_name, label_pyramid in labels.items():
+                label_group = group.require_group(f"labels/{label_name}")
+
+            _write_pyramid_to_zarr(
+                pyramid=[
+                    img.data if isinstance(img.data, da.Array) else da.from_array(img.data)
+                    for img in label_pyramid.images
+                ],
+                group=label_group,
+                storage_options=storage_options,
+                fmt=fmt,
+                axes=[dict(ax) for ax in label_pyramid.metadata.coordinateSystems[0].axes],
+                compute=compute,
+            )
+
+        list_of_labels = [
+            str(label.name) for label in labels.values()
+        ]
+
         if isinstance(group, str):
             group = zarr.open(group, mode="r+")
 
@@ -306,13 +336,31 @@ class NgffMultiscales:
             # in v0.4, metadata is stored under "multiscales" attribute
             metadata_dict = self.metadata.to_version("0.4").model_dump()
             metadata_json = _recursive_pop_nones(metadata_dict)
+
+            if list_of_labels:
+                metadata_json["labels"] = list_of_labels
+
             group.attrs["multiscales"] = [metadata_json]
-        elif version in ("0.5", "0.6"):
+
+        elif version == "0.5":
             metadata_dict = {
                 "version": version,
                 "multiscales": [_recursive_pop_nones(self.metadata.to_version(version).model_dump())],
             }
             group.attrs["ome"] = metadata_dict
+
+        elif version == "0.6":
+            metadata_dict = {
+                "version": version,
+                "multiscales": [
+                    _recursive_pop_nones(self.metadata.model_dump())
+                ],
+                "labels": list_of_labels if list_of_labels else None,
+            }
+            group.attrs["ome"] = metadata_dict
+        else:
+            raise ValueError(f"Unsupported OME-Zarr version: {version}")
+
 
     @classmethod
     def from_ome_zarr(
