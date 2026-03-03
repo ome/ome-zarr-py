@@ -85,7 +85,7 @@ class NgffImage:
 
         # coerce scale to dict if it's a sequence
         if isinstance(self.scale, Sequence):
-            self.scale = {d: s for d, s in zip(self.dims, self.scale)}
+            self.scale = dict(zip(self.dims, self.scale))
 
         # coerce data to dask array
         if not isinstance(self.data, da.Array):
@@ -132,16 +132,20 @@ class NgffMultiscales:
     """
 
     image: InitVar[NgffImage]
-    scale_factors: InitVar[list[int]] = [2, 4, 8, 16]
+    scale_factors: InitVar[list[int] | None] = None
     method: str | Methods = Methods.RESIZE
-    coordinateTransformations: InitVar[list[Scale | Translation | Identity]] = []
+    coordinateTransformations: InitVar[list[Scale | Translation | Identity] | None] = None
 
     def __post_init__(
         self,
         image: NgffImage,
-        scale_factors=[2, 4, 8, 16],
-        coordinateTransformations: list[Scale | Translation | Identity] = [],
+        scale_factors: list[int] | None,
+        coordinateTransformations: list[Scale | Translation | Identity] | None,
     ):
+        if scale_factors is None:
+            scale_factors = [2, 4, 8, 16]
+        if coordinateTransformations is None:
+            coordinateTransformations = []
         from .scale import _build_pyramid
 
         self.name = image.name
@@ -160,11 +164,14 @@ class NgffMultiscales:
         # build scales for each level based on the original image shape
         # and the pyramid level shapes
         scales = []
+        # image.scale is guaranteed to be a dict after NgffImage.__post_init__
+        image_scale = image.scale
+        assert isinstance(image_scale, dict)
         for shape in [d.shape for d in pyramid]:
             scale = [full / level for full, level in zip(image.data.shape, shape)]
             scales.append(
                 {
-                    d: s * image.scale[d] if d in image.scale else 1.0
+                    d: s * image_scale[d] if d in image_scale else 1.0
                     for d, s in zip(image.dims, scale)
                 }
             )
@@ -255,14 +262,12 @@ class NgffMultiscales:
         if os.path.exists(str(group)):
             shutil.rmtree(str(group))
 
-        fmt = None
-        if version == "0.6" or version == "0.5":
-            from .format import FormatV05
+        from .format import Format, FormatV04, FormatV05
 
+        fmt: Format | None = None
+        if version  == "0.5":
             fmt = FormatV05()
         elif version == "0.4":
-            from .format import FormatV04
-
             fmt = FormatV04()
         else:
             raise ValueError(f"Unsupported OME-Zarr version: {version}")
@@ -293,23 +298,25 @@ class NgffMultiscales:
             for label_name, label_pyramid in labels.items():
                 label_group = group.require_group(f"labels/{label_name}")
 
-            _write_pyramid_to_zarr(
-                pyramid=[
-                    (
-                        img.data
-                        if isinstance(img.data, da.Array)
-                        else da.from_array(img.data)
-                    )
-                    for img in label_pyramid.images
-                ],
-                group=label_group,
-                storage_options=storage_options,
-                fmt=fmt,
-                axes=[dict(ax) for ax in label_pyramid.metadata.axes],
-                compute=compute,
-            )
+                _write_pyramid_to_zarr(
+                    pyramid=[
+                        (
+                            img.data
+                            if isinstance(img.data, da.Array)
+                            else da.from_array(img.data)
+                        )
+                        for img in label_pyramid.images
+                    ],
+                    group=label_group,
+                    storage_options=storage_options,
+                    fmt=fmt,
+                    axes=[dict(ax) for ax in label_pyramid.metadata.axes],
+                    compute=compute,
+                )
 
-        list_of_labels = [str(label.name) for label in labels.values()]
+        list_of_labels = (
+            [str(label.name) for label in labels.values()] if labels else []
+        )
 
         if isinstance(group, str):
             group = zarr.open(group, mode="r+")
@@ -359,10 +366,10 @@ class NgffMultiscales:
         if isinstance(group, str):
             group = zarr.open(group, mode="r")
 
-        def _finditem(obj, key):
+        def _finditem(obj: dict, key: str):
             if key in obj:
                 return obj[key]
-            for k, v in obj.items():
+            for v in obj.values():
                 if isinstance(v, dict):
                     item = _finditem(v, key)
                     if item is not None:
@@ -392,8 +399,13 @@ class NgffMultiscales:
             path = dataset.path
             data = da.from_zarr(group[path])
             scale = dataset.coordinateTransformations[0].scale
-            axes_units = {ax.name: ax.unit for ax in metadata.coordinateSystems[0].axes}
-            if all(s is None for s in axes_units.values()):
+            # Filter out axes with no unit, and set to None if empty
+            axes_units: dict[str, str] | None = {
+                ax.name: ax.unit
+                for ax in metadata.coordinateSystems[0].axes
+                if ax.unit is not None
+            }
+            if not axes_units:
                 axes_units = None
             images.append(
                 NgffImage(
@@ -414,10 +426,10 @@ class NgffMultiscales:
         return instance
 
 
-def _recursive_pop_nones(input: dict) -> dict:
+def _recursive_pop_nones(data: dict) -> dict:
     """Recursively remove None values from a nested dictionary."""
-    output = {}
-    for key, value in input.items():
+    output: dict = {}
+    for key, value in data.items():
         if isinstance(value, dict):
             nested = _recursive_pop_nones(value)
             if nested:
