@@ -10,11 +10,14 @@ import zarr
 from ome_zarr_models.v05.axes import (
     Axis,
 )
-
+from ome_zarr_models.v05.coordinate_transformations import (
+    Identity as Identity,
+)
 from ome_zarr_models.v05.coordinate_transformations import (
     VectorScale as Scale,
+)
+from ome_zarr_models.v05.coordinate_transformations import (
     VectorTranslation as Translation,
-    Identity as Identity,
 )
 from ome_zarr_models.v05.multiscales import (
     Dataset,
