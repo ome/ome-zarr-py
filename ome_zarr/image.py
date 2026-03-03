@@ -134,7 +134,9 @@ class NgffMultiscales:
     image: InitVar[NgffImage]
     scale_factors: InitVar[list[int] | None] = None
     method: str | Methods = Methods.RESIZE
-    coordinateTransformations: InitVar[list[Scale | Translation | Identity] | None] = None
+    coordinateTransformations: InitVar[list[Scale | Translation | Identity] | None] = (
+        None
+    )
 
     def __post_init__(
         self,
@@ -265,7 +267,7 @@ class NgffMultiscales:
         from .format import Format, FormatV04, FormatV05
 
         fmt: Format | None = None
-        if version  == "0.5":
+        if version == "0.5":
             fmt = FormatV05()
         elif version == "0.4":
             fmt = FormatV04()
