@@ -93,32 +93,6 @@ class NgffImage:
                 f"does not match number of dims ({len(self.dims)})"
             )
 
-    def to_multiscales(
-        self,
-        scale_factors: list[int] | None = None,
-        method: str | Methods = Methods.RESIZE,
-    ) -> NgffMultiscales:
-        """
-        Build a multiscale pyramid from this image.
-
-        Parameters
-        ----------
-        scale_factors : list of int, optional
-            Downsampling factors for each pyramid level. Default: [2, 4, 8].
-        method : str or Methods, optional
-            Downsampling method to use. Default: Methods.RESIZE.
-
-        Returns
-        -------
-        Multiscales
-            A Multiscales container with this image and its downsampled versions.
-        """
-        return NgffMultiscales.from_image(
-            image=self,
-            scale_factors=scale_factors,
-            method=method,
-        )
-
 
 @dataclass
 class NgffMultiscales:
@@ -264,35 +238,6 @@ class NgffMultiscales:
             name=image.name,
             coordinateTransformations=tuple(coordinateTransformations),
         )
-
-    @classmethod
-    def from_image(
-        cls,
-        image: NgffImage,
-        scale_factors: list[int] | None = None,
-        method: str | Methods = Methods.RESIZE,
-    ) -> NgffMultiscales:
-        """
-        Build a multiscale pyramid from a base image.
-
-        Parameters
-        ----------
-        image : Image
-            The base (highest resolution) image.
-        scale_factors : list of int, optional
-            Downsampling factors for each pyramid level. Default: [2, 4, 8].
-        method : str or Methods, optional
-            Downsampling method to use. Default: Methods.RESIZE.
-
-        Returns
-        -------
-        Multiscales
-            A Multiscales container with the pyramid images and metadata.
-        """
-        if scale_factors is None:
-            scale_factors = [2, 4, 8]
-
-        return cls(image=image, scale_factors=scale_factors, method=method)
 
     def to_ome_zarr(
         self,
