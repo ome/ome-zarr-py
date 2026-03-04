@@ -43,6 +43,7 @@ from ome_zarr.writer import (
     write_plate_metadata,
     write_well_metadata,
 )
+from ome_zarr.image import NgffImage, NgffMultiscales
 
 TRANSFORMATIONS = [
     [{"scale": [1, 1, 0.5, 0.18, 0.18], "type": "scale"}],
@@ -80,6 +81,87 @@ class TestWriter:
     )
     def shape(self, request):
         return request.param
+    
+    @pytest.mark.parametrize(
+        "format_version",
+        (
+            pytest.param(FormatV04, id="V04"),
+            pytest.param(FormatV05, id="V05"),
+        ),
+    )
+    @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])
+    @pytest.mark.parametrize("storage_options_list", [True, False])
+    def test_image_class_writer(
+        self, shape, format_version, array_constructor, storage_options_list
+    ):
+        version = format_version()
+
+        if version.version == "0.5":
+            grp_path = self.path_v3 / "test"
+        else:
+            grp_path = self.path / "test"
+
+        data = self.create_data(shape)
+        data = array_constructor(data)
+        axes = "tczyx"[-len(shape) :]
+        transformations = []
+        for dataset_transfs in TRANSFORMATIONS:
+            transf = dataset_transfs[0]
+            # e.g. slice [1, 1, z, x, y] -> [z, x, y] for 3D
+            transformations.append(
+                [{"type": "scale", "scale": transf["scale"][-len(shape) :]}]
+            )
+
+        chunks = [(128, 128), (50, 50), (25, 25), (25, 25), (25, 25), (25, 25)]
+        storage_options = {"chunks": chunks[0]}
+
+        image = NgffImage(
+            data=data,
+            dims=axes,
+        )
+        image_multiscales = NgffMultiscales(
+            image=image
+        )
+        image_multiscales.to_ome_zarr(
+            group=str(grp_path),
+            version=version.version,
+            storage_options=storage_options
+        )
+
+        # Verify
+        out = zarr.open_group(grp_path)
+        node_metadata = out.attrs
+        if "ome" in node_metadata:
+            node_metadata = node_metadata["ome"]
+        assert "multiscales" in node_metadata
+        paths = [d["path"] for d in node_metadata["multiscales"][0]["datasets"]]
+        node_data = [da.from_zarr(grp_path / path) for path in paths]
+        if version.version in ("0.1", "0.2"):
+            # v0.1 and v0.2 MUST be 5D
+            assert node_data[0].ndim == 5
+        else:
+            assert node_data[0].shape == shape
+        print("node.metadata", node_metadata)
+        if version.version not in ("0.1", "0.2", "0.3"):
+            cts = [
+                d["coordinateTransformations"]
+                for d in node_metadata["multiscales"][0]["datasets"]
+            ]
+            for transf, expected in zip(cts, transformations):
+                assert transf == expected
+            assert len(cts) == len(node_data)
+        # check chunks for first 2 resolutions (before shape gets smaller than chunk)
+        for level, nd_array in enumerate(node_data[:2]):
+            expected = chunks[level] if storage_options_list else chunks[0]
+            first_chunk = [c[0] for c in nd_array.chunks]
+            assert tuple(first_chunk) == _retuple(expected, nd_array.shape)
+        assert np.allclose(data, node_data[0][...].compute())
+
+        if version.version == "0.4":
+            # Validate with ome-zarr-models-py: only supports v0.4
+            Models04Image.from_zarr(out)
+        elif version.version == "0.5":
+            Models05Image.from_zarr(out)
 
     @pytest.mark.parametrize(
         "format_version",
@@ -1725,3 +1807,6 @@ class TestLabelWriter:
         assert "labels" in attrs
         assert len(attrs["labels"]) == len(label_names)
         assert all(label_name in attrs["labels"] for label_name in label_names)
+
+if __name__ == "__main__":
+    pytest.main([__file__])
