@@ -146,8 +146,6 @@ class NgffMultiscales:
     ):
         if scale_factors is None:
             scale_factors = [2, 4, 8, 16]
-        if coordinateTransformations is None:
-            coordinateTransformations = []
         from .scale import _build_pyramid
 
         self.name = image.name
