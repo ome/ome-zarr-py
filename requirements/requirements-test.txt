@@ -1,3 +1,4 @@
 pytest
 pytest-cov
+pydantic==2.12.5
 ome-zarr-models
