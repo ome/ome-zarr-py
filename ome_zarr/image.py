@@ -335,7 +335,7 @@ class NgffMultiscales:
             metadata_dict = {
                 "version": version,
                 "multiscales": [
-                    _recursive_pop_nones(self.metadata.to_version(version).model_dump())
+                    _recursive_pop_nones(self.metadata.model_dump())
                 ],
                 "labels": list_of_labels or None,
             }
