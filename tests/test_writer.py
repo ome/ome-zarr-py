@@ -30,6 +30,7 @@ from ome_zarr.format import (
     FormatV05,
     format_from_version,
 )
+from ome_zarr.image import NgffImage, NgffMultiscales
 from ome_zarr.scale import _build_pyramid
 from ome_zarr.writer import (
     _get_valid_axes,
@@ -43,7 +44,6 @@ from ome_zarr.writer import (
     write_plate_metadata,
     write_well_metadata,
 )
-from ome_zarr.image import NgffImage, NgffMultiscales
 
 TRANSFORMATIONS = [
     [{"scale": [1, 1, 0.5, 0.18, 0.18], "type": "scale"}],
@@ -81,7 +81,7 @@ class TestWriter:
     )
     def shape(self, request):
         return request.param
-    
+
     @pytest.mark.parametrize(
         "format_version",
         (
@@ -119,13 +119,11 @@ class TestWriter:
             data=data,
             dims=axes,
         )
-        image_multiscales = NgffMultiscales(
-            image=image
-        )
+        image_multiscales = NgffMultiscales(image=image)
         image_multiscales.to_ome_zarr(
             group=str(grp_path),
             version=version.version,
-            storage_options=storage_options
+            storage_options=storage_options,
         )
 
         # Verify
@@ -1807,6 +1805,7 @@ class TestLabelWriter:
         assert "labels" in attrs
         assert len(attrs["labels"]) == len(label_names)
         assert all(label_name in attrs["labels"] for label_name in label_names)
+
 
 if __name__ == "__main__":
     pytest.main([__file__])
