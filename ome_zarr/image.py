@@ -334,9 +334,7 @@ class NgffMultiscales:
         elif version == "0.5":
             metadata_dict = {
                 "version": version,
-                "multiscales": [
-                    _recursive_pop_nones(self.metadata.model_dump())
-                ],
+                "multiscales": [_recursive_pop_nones(self.metadata.model_dump())],
                 "labels": list_of_labels or None,
             }
             group.attrs["ome"] = metadata_dict
