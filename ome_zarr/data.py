@@ -9,7 +9,6 @@ from scipy.ndimage import zoom
 from skimage import data
 from skimage.filters import threshold_otsu
 from skimage.measure import label
-
 from skimage.segmentation import clear_border
 
 from .format import CurrentFormat, Format
@@ -31,7 +30,8 @@ def coins() -> tuple[list, list]:
     labels :
         List of labels.
     """
-    from skimage.morphology import closing, remove_small_objects, footprint_rectangle
+    from skimage.morphology import closing, footprint_rectangle, remove_small_objects
+
     # Thanks to Juan
     # https://gist.github.com/jni/62e07ddd135dbb107278bc04c0f9a8e7
     image = data.coins()[50:-50, 50:-50]
