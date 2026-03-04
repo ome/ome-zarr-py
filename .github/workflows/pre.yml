@@ -37,11 +37,18 @@ jobs:
             libxcb-render-util0 libxcb-xinerama0 \
             libxcb-xinput0 libxcb-xfixes0"
 
-      - name: Install & test
+      - name: Install dependencies
         run: |
-          python -m pip install -U pip setuptools wheel pytest
-          python -m pip install -r requirements/requirements-dev.txt
-          tox -e ${{ matrix.toxenv }} --pre
+            python -m pip install --upgrade pip
+            python -m pip install tox tox-gh-actions
+      - name: Test with tox
+        run: tox --conf tox.ini
+
+      # - name: Install & test
+      #   run: |
+      #     python -m pip install -U pip setuptools wheel pytest
+      #     python -m pip install -r requirements/requirements-dev.txt
+      #     tox -e ${{ matrix.toxenv }} --pre
 
       # If something goes wrong, we can open an issue in the repo
       - name: Report Failures
