@@ -9,7 +9,6 @@ from scipy.ndimage import zoom
 from skimage import data
 from skimage.filters import threshold_otsu
 from skimage.measure import label
-from skimage.morphology import closing, remove_small_objects, square
 from skimage.segmentation import clear_border
 
 from .format import CurrentFormat, Format
@@ -31,12 +30,14 @@ def coins() -> tuple[list, list]:
     labels :
         List of labels.
     """
+    from skimage.morphology import closing, footprint_rectangle, remove_small_objects
+
     # Thanks to Juan
     # https://gist.github.com/jni/62e07ddd135dbb107278bc04c0f9a8e7
     image = data.coins()[50:-50, 50:-50]
     thresh = threshold_otsu(image)
-    bw = closing(image > thresh, square(4))
-    cleared = remove_small_objects(clear_border(bw), 20)
+    bw = closing(image > thresh, footprint_rectangle((4, 4)))
+    cleared = remove_small_objects(clear_border(bw), max_size=20)
     label_image = label(cleared)
 
     pyramid = list(reversed([zoom(image, 2**i, order=3) for i in range(4)]))
