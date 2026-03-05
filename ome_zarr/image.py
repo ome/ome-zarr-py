@@ -382,20 +382,13 @@ class NgffMultiscales:
 
             metadata_json = group.attrs.get("multiscales", [None])[0]
 
-            metadata = Multiscalev04.model_validate(metadata_json).to_version("0.6")
+            metadata = Multiscalev04.model_validate(metadata_json).to_version("0.5")
         elif version == "0.5":
             from ome_zarr_models._v05.multiscales import Multiscale as Multiscalev05
 
             ome_attrs = group.attrs.get("ome", {})
             metadata_json = ome_attrs.get("multiscales", [None])[0]
-            metadata = Multiscalev05.model_validate(metadata_json).to_version("0.6")
-        elif version == "0.6":
-            from ome_zarr_models._v06.multiscales import Multiscale
-
-            ome_attrs = group.attrs.get("ome", {})
-            metadata_json = ome_attrs.get("multiscales", [None])[0]
-            metadata_json = _recursive_pop_nones(metadata_json)
-            metadata = Multiscale.model_validate(metadata_json)
+            metadata = Multiscalev05.model_validate(metadata_json)
         else:
             raise ValueError(f"Unsupported OME-Zarr version: {version}")
 
