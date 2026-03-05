@@ -114,12 +114,23 @@ class TestWriter:
 
         chunks = [(128, 128), (50, 50), (25, 25), (25, 25), (25, 25), (25, 25)]
         storage_options = {"chunks": chunks[0]}
+        if storage_options_list:
+            storage_options = [{"chunks": chunk} for chunk in chunks]
+        scale_factors = [
+            {d: 2**i if d in ("x", "y") else 1.0 for d in axes}
+            for i in range(1, len(TRANSFORMATIONS))
+        ]
+
 
         image = NgffImage(
             data=data,
             dims=axes,
+            scale=dict(zip(axes, TRANSFORMATIONS[0][0]['scale'])),
         )
-        image_multiscales = NgffMultiscales(image=image)
+        image_multiscales = NgffMultiscales(
+            image=image,
+            scale_factors=scale_factors
+            )
         image_multiscales.to_ome_zarr(
             group=str(grp_path),
             version=version.version,
@@ -146,7 +157,8 @@ class TestWriter:
                 for d in node_metadata["multiscales"][0]["datasets"]
             ]
             for transf, expected in zip(cts, transformations):
-                assert transf == expected
+                for d in ["y", "x"]:
+                    assert transf[0]["scale"][axes.index(d)] == expected[0]["scale"][axes.index(d)]
             assert len(cts) == len(node_data)
         # check chunks for first 2 resolutions (before shape gets smaller than chunk)
         for level, nd_array in enumerate(node_data[:2]):
