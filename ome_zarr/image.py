@@ -141,7 +141,7 @@ class NgffMultiscales:
     def __post_init__(
         self,
         image: NgffImage,
-        scale_factors: list[int] | None,
+        scale_factors: list[int] | list[dict[str, int]] |None,
         coordinateTransformations: list[Scale | Translation | Identity] | None,
     ):
         if scale_factors is None:
@@ -230,7 +230,7 @@ class NgffMultiscales:
         self,
         group: zarr.Group | str,
         labels: NgffMultiscales | dict[str, NgffMultiscales] | None = None,
-        storage_options: dict[str, Any] | None = None,
+        storage_options: list[dict[str, Any]] | dict[str, Any] | None = None,
         version: str | None = "0.6",
         compute: bool = True,
     ):
@@ -245,7 +245,7 @@ class NgffMultiscales:
             Optional labels to write alongside the image data. Can be a single NgffMultiscales
             instance (for a single label pyramid) or a dict mapping label names to NgffMultiscales
             instances (for multiple label pyramids). Default is None (no labels).
-        storage_options : dict, optional
+        storage_options : dict or list of dict, optional
             Additional storage options to pass to Zarr, such as:
             - `compressor`: A Zarr compressor instance for compressing the data.
             - `chunks`: A tuple specifying the chunk shape for writing data.
