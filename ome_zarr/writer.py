@@ -754,12 +754,12 @@ def _write_pyramid_to_zarr(
             da.to_zarr(
                 arr=level_image,
                 url=group.store,
-                component=str(Path(group.path, f"scale{idx}")),
+                component=str(Path(group.path, f"s{idx}")),
                 compute=False,
                 zarr_array_kwargs=zarr_array_kwargs,
             )
         )
-        datasets.append({"path": f"scale{idx}"})
+        datasets.append({"path": f"s{idx}"})
 
     # Computing delayed jobs if necessary
     if compute:

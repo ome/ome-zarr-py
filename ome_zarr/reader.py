@@ -425,7 +425,7 @@ class Well(Spec):
                 # handle e.g. 2x2 grid with only 3 images/fields
                 if field_index < len(image_paths):
                     image_path = image_paths[field_index]
-                    path = f"{image_path}/{level}"
+                    path = f"{image_path}/s{level}"
                     data = self.zarr.load(path)
             except ValueError:
                 LOGGER.error("Failed to load %s", path)
@@ -521,7 +521,7 @@ class Plate(Spec):
     def get_tile_path(self, level: int, row: int, col: int) -> str:
         return (
             f"{self.row_names[row]}/"
-            f"{self.col_names[col]}/{self.first_field_path}/{level}"
+            f"{self.col_names[col]}/{self.first_field_path}/s{level}"
         )
 
     def get_stitched_grid(self, level: int, tile_shape: tuple) -> da.core.Array:
