@@ -141,7 +141,7 @@ class NgffMultiscales:
     def __post_init__(
         self,
         image: NgffImage,
-        scale_factors: list[int] | list[dict[str, int]] |None,
+        scale_factors: list[int] | list[dict[str, int]] | None,
         coordinateTransformations: list[Scale | Translation | Identity] | None,
     ):
         if scale_factors is None:
