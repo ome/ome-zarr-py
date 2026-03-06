@@ -144,7 +144,7 @@ class TestWriter:
         # check written coordinatetransormations match relative factors between array sizes
         for level, nd_array in enumerate(node_data):
             if level == 0:
-                # check first written scale values explicitly match those in TRANFORMATIONS
+                # check first written scale values explicitly match those in TRANSFORMATIONS
                 for d in axes:
                     assert (
                         node_metadata["multiscales"][0]["datasets"][level][
