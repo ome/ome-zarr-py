@@ -146,11 +146,12 @@ class TestWriter:
             if level == 0:
                 # check first written scale values explicitly match those in TRANFORMATIONS
                 for d in axes:
-                    assert node_metadata["multiscales"][0]["datasets"][level][
-                        "coordinateTransformations"
-                    ][0]["scale"][axes.index(d)] == TRANSFORMATIONS[0][0]["scale"][
-                        axes.index(d)
-                    ]
+                    assert (
+                        node_metadata["multiscales"][0]["datasets"][level][
+                            "coordinateTransformations"
+                        ][0]["scale"][axes.index(d)]
+                        == TRANSFORMATIONS[0][0]["scale"][axes.index(d)]
+                    )
                 continue
 
             # first calculate relative factors between this and previous level
@@ -167,13 +168,12 @@ class TestWriter:
 
             # make sure we are doing this correctly for dimensions that
             # are not supposed to be downsampled
-            if 't' in axes:
-                assert expected_scale['t'] == 1.0
-            if 'c' in axes:
-                assert expected_scale['c'] == 1.0
-            if 'z' in axes:
-                assert relative_factors['z'] == 1.0
-
+            if "t" in axes:
+                assert expected_scale["t"] == 1.0
+            if "c" in axes:
+                assert expected_scale["c"] == 1.0
+            if "z" in axes:
+                assert relative_factors["z"] == 1.0
 
             # retrieve written scale factors from metadata and check they match expected
             cts = node_metadata["multiscales"][0]["datasets"][level][
@@ -184,7 +184,7 @@ class TestWriter:
             assert transf["type"] == "scale"
             for d in axes:
                 assert transf["scale"][axes.index(d)] == expected_scale[d]
-        
+
         # check chunks for first 2 resolutions (before shape gets smaller than chunk)
         for level, nd_array in enumerate(node_data[:2]):
             expected = chunks[level] if storage_options_list else chunks[0]
