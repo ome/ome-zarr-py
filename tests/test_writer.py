@@ -102,13 +102,6 @@ class TestWriter:
         data = self.create_data(shape)
         data = array_constructor(data)
         axes = "tczyx"[-len(shape) :]
-        transformations = []
-        for dataset_transfs in TRANSFORMATIONS:
-            transf = dataset_transfs[0]
-            # e.g. slice [1, 1, z, x, y] -> [z, x, y] for 3D
-            transformations.append(
-                [{"type": "scale", "scale": transf["scale"][-len(shape) :]}]
-            )
 
         chunks = [(128, 128), (50, 50), (25, 25), (25, 25), (25, 25), (25, 25)]
         storage_options = {"chunks": chunks[0]}
@@ -145,18 +138,50 @@ class TestWriter:
         else:
             assert node_data[0].shape == shape
         print("node.metadata", node_metadata)
-        if version.version not in ("0.1", "0.2", "0.3"):
-            cts = [
-                d["coordinateTransformations"]
-                for d in node_metadata["multiscales"][0]["datasets"]
-            ]
-            for transf, expected in zip(cts, transformations):
-                for d in ["y", "x"]:
+
+        # check written coordinatetransormations match relative factors between array sizes
+        for level, nd_array in enumerate(node_data):
+            if level == 0:
+                # check first written scale values explicitly match those in TRANFORMATIONS
+                for d in axes:
                     assert (
-                        transf[0]["scale"][axes.index(d)]
-                        == expected[0]["scale"][axes.index(d)]
+                        node_metadata["multiscales"][0]["datasets"][level][
+                            "coordinateTransformations"
+                        ][0]["scale"][axes.index(d)]
+                        == TRANSFORMATIONS[0][0]["scale"][axes.index(d)]
                     )
-            assert len(cts) == len(node_data)
+                continue
+
+            # first calculate relative factors between this and previous level
+            relative_factors = {
+                d: node_data[0].shape[axes.index(d)] / nd_array.shape[axes.index(d)]
+                for d in axes
+            }
+
+            # then convert into corresponding scale values
+            expected_scale = {
+                d: TRANSFORMATIONS[0][0]["scale"][axes.index(d)] * relative_factors[d]
+                for d in axes
+            }
+
+            # make sure we are doing this correctly for dimensions that
+            # are not supposed to be downsampled
+            if "t" in axes:
+                assert expected_scale["t"] == 1.0
+            if "c" in axes:
+                assert expected_scale["c"] == 1.0
+            if "z" in axes:
+                assert relative_factors["z"] == 1.0
+
+            # retrieve written scale factors from metadata and check they match expected
+            cts = node_metadata["multiscales"][0]["datasets"][level][
+                "coordinateTransformations"
+            ]
+            assert len(cts) == 1
+            transf = cts[0]
+            assert transf["type"] == "scale"
+            for d in axes:
+                assert transf["scale"][axes.index(d)] == expected_scale[d]
         # check chunks for first 2 resolutions (before shape gets smaller than chunk)
         for level, nd_array in enumerate(node_data[:2]):
             expected = chunks[level] if storage_options_list else chunks[0]
