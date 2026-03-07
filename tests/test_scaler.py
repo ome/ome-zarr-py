@@ -215,7 +215,7 @@ class TestScaler:
 
         # read back the pyramid to check it was written correctly
         pyramid = [
-            da.from_array(zarr.open_group(str(tmpdir), mode="r")[f"{i}"])
+            da.from_array(zarr.open_group(str(tmpdir), mode="r")[f"s{i}"])
             for i in range(len(scale_factors) + 1)
         ]
 

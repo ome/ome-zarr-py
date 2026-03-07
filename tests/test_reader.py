@@ -155,6 +155,8 @@ class TestHCSReader:
         # if we compute(), expect to get numpy array
         result = pyramid[0].compute()
         assert isinstance(result, np.ndarray)
+        print("result.max()", result.max())
+        assert result.max() > 0, "Expected non-zero values in the array"
 
         # Get the plate node's array. It should be fused from the first field of all
         # well arrays (which in this test are non-zero), with zero values for wells
@@ -174,3 +176,4 @@ class TestHCSReader:
         assert isinstance(pyramid[0], da.Array)
         result = pyramid[0].compute()
         assert isinstance(result, np.ndarray)
+        assert result.max() > 0, "Expected non-zero values in the array"
