@@ -292,6 +292,8 @@ class NgffMultiscales:
             fmt = FormatV05()
         elif version == "0.4":
             fmt = FormatV04()
+        elif version == "0.6":
+            fmt = FormatV05()
         else:
             raise ValueError(f"Unsupported OME-Zarr version: {version}")
 
