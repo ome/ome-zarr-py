@@ -16,6 +16,7 @@ from ome_zarr.writer import (
     write_plate_metadata,
     write_well_metadata,
 )
+from ome_zarr.image import NgffImage, NgffMultiscales
 
 
 class TestReader:
