@@ -192,7 +192,7 @@ class NgffMultiscales:
             )
             datasets.append(
                 Dataset(
-                    path=f"scale{idx}",
+                    path=f"s{idx}",
                     coordinateTransformations=(
                         Scale(
                             type="scale",
@@ -325,19 +325,25 @@ class NgffMultiscales:
             # in v0.4, metadata is stored under "multiscales" attribute
             metadata_dict = self.metadata.to_version("0.4").model_dump()
             metadata_json = _recursive_pop_nones(metadata_dict)
+            group.attrs["multiscales"] = [metadata_json]
 
             if list_of_labels:
-                metadata_json["labels"] = list_of_labels
-
-            group.attrs["multiscales"] = [metadata_json]
+                group_labels = group["labels"]
+                group_labels.attrs["labels"] = list_of_labels
 
         elif version == "0.5":
             metadata_dict = {
                 "version": version,
                 "multiscales": [_recursive_pop_nones(self.metadata.model_dump())],
-                "labels": list_of_labels or None,
             }
             group.attrs["ome"] = metadata_dict
+
+            if list_of_labels:
+                group_labels = group["labels"]
+                group_labels.attrs["ome"] = {
+                    "version": version,
+                    "labels": list_of_labels
+                }
 
         else:
             raise ValueError(f"Unsupported OME-Zarr version: {version}")
