@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import InitVar, dataclass, field
-from typing import Any
+from typing import Any, cast
 
 import dask.array as da
 import numpy as np
@@ -23,7 +23,6 @@ from ome_zarr_models.v05.multiscales import (
     Dataset,
     Multiscale,
 )
-from ome_zarr_models.common.image_label_types import LabelBase
 
 from .scale import Methods
 
@@ -137,12 +136,14 @@ class NgffMultiscales:
     """
 
     image: InitVar[NgffImage]
-    scale_factors: InitVar[list[int] | None] = None
+    scale_factors: list[int] | list[dict[str, int]] = field(default_factory=lambda: [2, 4, 8, 16])
     method: str | Methods = Methods.RESIZE
     coordinateTransformations: InitVar[list[Scale | Translation | Identity] | None] = (
         None
     )
-    labels: NgffMultiscales | list[NgffMultiscales] | dict[str, NgffMultiscales] | None = None
+    labels: (
+        NgffMultiscales | list[NgffMultiscales] | dict[str, NgffMultiscales] | None
+    ) = None
 
     def __post_init__(
         self,
@@ -150,8 +151,8 @@ class NgffMultiscales:
         scale_factors: list[int] | list[dict[str, int]] |None,
         coordinateTransformations: list[Scale | Translation | Identity] | None,
     ):
-        if scale_factors is None:
-            scale_factors = [2, 4, 8, 16]
+        if self.scale_factors is None:
+            self.scale_factors = [2, 4, 8, 16]
         from .scale import _build_pyramid
 
         self.name = image.name
@@ -163,7 +164,7 @@ class NgffMultiscales:
         pyramid = _build_pyramid(
             image=image.data,
             dims=image.dims,
-            scale_factors=scale_factors,
+            scale_factors=self.scale_factors,
             method=method,
         )
 
@@ -245,7 +246,7 @@ class NgffMultiscales:
         storage_options: list[dict[str, Any]] | dict[str, Any] | None = None,
         version: str | None = "0.6",
         compute: bool = True,
-    ):
+    ) -> list:
         """
         Serialize the multiscale pyramid to an OME-Zarr group.
 
@@ -261,6 +262,12 @@ class NgffMultiscales:
             The OME-Zarr format version to use. Defaults to the current format.
         compute : bool, optional
             If True, compute immediately; otherwise return delayed objects.
+
+        Returns
+        -------
+        list
+            If `compute` is False, returns a list of Dask delayed objects
+            representing the write operations. 
         """
         import os
         import shutil
@@ -289,7 +296,7 @@ class NgffMultiscales:
         ]
 
         # write the actual image to disk
-        _write_pyramid_to_zarr(
+        delayed = _write_pyramid_to_zarr(
             pyramid=pyramid,
             group=group,
             storage_options=storage_options,
@@ -300,10 +307,11 @@ class NgffMultiscales:
 
         # write labels data if passed
         if self.labels is not None:
-            for label_name, label_pyramid in self.labels.items():
+            labels_dict = cast(dict[str, NgffMultiscales], self.labels)
+            for label_name, label_pyramid in labels_dict.items():
                 label_group = group.require_group(f"labels/{label_name}")
 
-                _write_pyramid_to_zarr(
+                delayed += _write_pyramid_to_zarr(
                     pyramid=[
                         (
                             img.data
@@ -320,7 +328,7 @@ class NgffMultiscales:
                 )
 
         list_of_labels = (
-            [str(label.name) for label in self.labels.values()] if self.labels else []
+            [str(label.name) for label in labels_dict.values()] if self.labels else []
         )
 
         # write the metadata to disk
@@ -354,6 +362,8 @@ class NgffMultiscales:
 
         else:
             raise ValueError(f"Unsupported OME-Zarr version: {version}")
+        
+        return delayed
 
     @classmethod
     def from_ome_zarr(
@@ -426,9 +436,7 @@ class NgffMultiscales:
             scale = dataset.coordinateTransformations[0].scale
             # Filter out axes with no unit, and set to None if empty
             axes_units: dict[str, str] | None = {
-                ax.name: ax.unit
-                for ax in metadata.axes
-                if ax.unit is not None
+                ax.name: ax.unit for ax in metadata.axes if ax.unit is not None
             }
             if not axes_units:
                 axes_units = None
@@ -436,10 +444,7 @@ class NgffMultiscales:
                 NgffImage(
                     data=data,
                     dims=[ax.name for ax in metadata.axes],
-                    scale={
-                        d.name: s
-                        for d, s in zip(metadata.axes, scale)
-                    },
+                    scale={d.name: s for d, s in zip(metadata.axes, scale)},
                     axes_units=axes_units,
                     name=metadata.name,
                 )
@@ -457,7 +462,6 @@ class NgffMultiscales:
                 label_multiscale = cls.from_ome_zarr(label_group)
                 labels[label_name] = label_multiscale
             instance.labels = labels
-
 
         return instance
 

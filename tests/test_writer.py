@@ -121,15 +121,12 @@ class TestWriter:
         assert all(image.scale[d] == 1.0 for d in axes)
 
         # convert to image classes
+        labels_name = "test_labels"
         image = NgffImage(
             data=data,
             dims=axes,
             scale=dict(zip(axes, TRANSFORMATIONS[0][0]["scale"]))
         )
-        image_multiscales = NgffMultiscales(image=image, scale_factors=scale_factors)
-
-        # convert labels to image classes
-        labels_name = "test_labels"
         labels = NgffImage(
             data=data_labels,
             dims=axes,
@@ -138,12 +135,23 @@ class TestWriter:
         )
         labels_multiscales = NgffMultiscales(image=labels, scale_factors=scale_factors)
 
+        image_multiscales = NgffMultiscales(
+            image=image,
+            scale_factors=scale_factors,
+            labels=labels_multiscales,
+        )
+
+        image_multiscales = NgffMultiscales(
+            image=image,
+            scale_factors=scale_factors,
+            labels=labels_multiscales,
+        )
+
         # write image and labels to disk
         image_multiscales.to_ome_zarr(
             group=str(grp_path),
             version=version.version,
             storage_options=storage_options,
-            labels=labels_multiscales,
         )
 
         # Verify image data
@@ -212,13 +220,17 @@ class TestWriter:
         assert np.allclose(data, node_data[0][...].compute())
 
         # Verify labels data
-
         label_group = zarr.open(f"{grp_path}/labels", mode="r")
         label_group_attrs = label_group.attrs
         if version.version == "0.5":
             label_group_attrs = label_group_attrs["ome"]
         assert "labels" in label_group_attrs
         assert labels_name in label_group_attrs["labels"]
+
+        # read data back in
+        image = NgffMultiscales.from_ome_zarr(str(grp_path))
+
+        assert labels_name in list(image.labels.keys())
 
         if version.version == "0.4":
             # Validate with ome-zarr-models-py: only supports v0.4
