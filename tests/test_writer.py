@@ -136,12 +136,12 @@ class TestWriter:
             name=labels_name,
         )
         labels_multiscales = NgffMultiscales(image=labels, scale_factors=scale_factors)
-        
+
         image_multiscales = NgffMultiscales(
             image=image,
             scale_factors=scale_factors,
             labels=labels_multiscales,
-            )        
+        )
 
         # write image and labels to disk
         image_multiscales.to_ome_zarr(

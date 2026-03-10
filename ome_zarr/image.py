@@ -141,7 +141,9 @@ class NgffMultiscales:
     coordinateTransformations: InitVar[list[Scale | Translation | Identity] | None] = (
         None
     )
-    labels: NgffMultiscales | list[NgffMultiscales] | dict[str, NgffMultiscales] | None = None
+    labels: (
+        NgffMultiscales | list[NgffMultiscales] | dict[str, NgffMultiscales] | None
+    ) = None
 
     def __post_init__(
         self,
@@ -452,7 +454,6 @@ class NgffMultiscales:
                 label_multiscale = cls.from_ome_zarr(label_group)
                 labels[label_name] = label_multiscale
             instance.labels = labels
-
 
         return instance
 
