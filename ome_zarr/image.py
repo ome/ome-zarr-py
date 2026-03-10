@@ -344,7 +344,7 @@ class NgffMultiscales:
                 group_labels = group["labels"]
                 group_labels.attrs["ome"] = {
                     "version": version,
-                    "labels": list_of_labels
+                    "labels": list_of_labels,
                 }
 
         else:

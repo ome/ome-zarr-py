@@ -102,7 +102,9 @@ class TestWriter:
             grp_path = self.path / "test"
 
         data = self.create_data(shape)
-        data_labels = (data > data.mean()).astype(np.uint8)  # just some binary data for testing
+        data_labels = (data > data.mean()).astype(
+            np.uint8
+        )  # just some binary data for testing
         data = array_constructor(data)
         axes = "tczyx"[-len(shape) :]
 
@@ -124,9 +126,7 @@ class TestWriter:
 
         # convert to image classes
         image = NgffImage(
-            data=data,
-            dims=axes,
-            scale=dict(zip(axes, TRANSFORMATIONS[0][0]["scale"]))
+            data=data, dims=axes, scale=dict(zip(axes, TRANSFORMATIONS[0][0]["scale"]))
         )
         image_multiscales = NgffMultiscales(image=image, scale_factors=scale_factors)
 
