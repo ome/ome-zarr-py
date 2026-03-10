@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from dataclasses import InitVar, dataclass, field
+from dataclasses import InitVar, dataclass
 from typing import Any
 
 import dask.array as da
@@ -23,7 +23,6 @@ from ome_zarr_models.v05.multiscales import (
     Dataset,
     Multiscale,
 )
-from ome_zarr_models.common.image_label_types import LabelBase
 
 from .scale import Methods
 
@@ -407,9 +406,7 @@ class NgffMultiscales:
             scale = dataset.coordinateTransformations[0].scale
             # Filter out axes with no unit, and set to None if empty
             axes_units: dict[str, str] | None = {
-                ax.name: ax.unit
-                for ax in metadata.axes
-                if ax.unit is not None
+                ax.name: ax.unit for ax in metadata.axes if ax.unit is not None
             }
             if not axes_units:
                 axes_units = None
@@ -417,10 +414,7 @@ class NgffMultiscales:
                 NgffImage(
                     data=data,
                     dims=[ax.name for ax in metadata.axes],
-                    scale={
-                        d.name: s
-                        for d, s in zip(metadata.axes, scale)
-                    },
+                    scale={d.name: s for d, s in zip(metadata.axes, scale)},
                     axes_units=axes_units,
                     name=metadata.name,
                 )
