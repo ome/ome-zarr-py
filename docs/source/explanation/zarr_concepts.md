@@ -1,6 +1,6 @@
 # Zarr Concepts
 
-[Zarr](https://zarr.dev/) is the underlying storage format for OME-NGFF. Understanding 
+[Zarr](https://zarr.dev/) is the underlying storage format for OME-NGFF. Understanding
 Zarr concepts helps when working with OME-Zarr data.
 
 ## Key Concepts

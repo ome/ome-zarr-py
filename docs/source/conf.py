@@ -19,7 +19,7 @@ extensions = [
     "sphinx.ext.napoleon",
     "sphinx.ext.viewcode",
     "sphinx.ext.autosummary",
-    #"sphinxcontrib.bibtex",
+    # "sphinxcontrib.bibtex",
     "sphinx_jupyterbook_latex",
 ]
 

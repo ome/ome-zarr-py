@@ -1,6 +1,6 @@
 # Understanding OME-NGFF
 
-OME-NGFF (Open Microscopy Environment - Next Generation File Format) is a specification for storing 
+OME-NGFF (Open Microscopy Environment - Next Generation File Format) is a specification for storing
 bioimaging data in a cloud-ready, analysis-friendly format based on [Zarr](https://zarr.dev/).
 
 ## What is OME-NGFF?

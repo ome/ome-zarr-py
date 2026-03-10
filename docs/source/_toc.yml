@@ -12,11 +12,11 @@ parts:
     - file: tutorials/write_labels
     - file: tutorials/write_hcs_plate
     - file: tutorials/cli_basics
+    - file: tutorials/view_ome_zarr
 
   - caption: How-To Guides
     chapters:
     - file: howtos/build_custom_pyramid
-    - file: howtos/write_from_tiles
 
   - caption: Explanation
     chapters:

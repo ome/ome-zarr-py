@@ -1,11 +1,11 @@
 # Multiscale Pyramids
 
-Multiscale image pyramids are a fundamental concept in OME-NGFF that enable efficient 
+Multiscale image pyramids are a fundamental concept in OME-NGFF that enable efficient
 visualization and analysis of large images.
 
 ## Why Pyramids?
 
-Modern microscopy produces images that can be gigabytes or even terabytes in size. 
+Modern microscopy produces images that can be gigabytes or even terabytes in size.
 Loading an entire image at full resolution is:
 
 - **Slow**: Transferring large amounts of data takes time
@@ -23,7 +23,7 @@ Level 2: 1024 x 1024  (4x downsampled)
 Level 3:  512 x  512  (8x downsampled)
 ```
 
-Viewers load only the resolution level appropriate for the current zoom level, 
+Viewers load only the resolution level appropriate for the current zoom level,
 enabling smooth navigation of arbitrarily large images.
 
 ## Downsampling Methods
