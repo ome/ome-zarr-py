@@ -102,6 +102,7 @@ class TestWriter:
             grp_path = self.path / "test"
 
         data = self.create_data(shape)
+        data_labels = (data > data.mean()).astype(np.uint8)  # just some binary data for testing
         data = array_constructor(data)
         axes = "tczyx"[-len(shape) :]
 
@@ -114,19 +115,40 @@ class TestWriter:
             for i in range(1, len(TRANSFORMATIONS))
         ]
 
+        # make sure default is set correctly when not providing scale
         image = NgffImage(
             data=data,
             dims=axes,
-            scale=dict(zip(axes, TRANSFORMATIONS[0][0]["scale"])),
+        )
+        assert all(image.scale[d] == 1.0 for d in axes)
+
+        # convert to image classes
+        image = NgffImage(
+            data=data,
+            dims=axes,
+            scale=dict(zip(axes, TRANSFORMATIONS[0][0]["scale"]))
         )
         image_multiscales = NgffMultiscales(image=image, scale_factors=scale_factors)
+
+        # convert labels to image classes
+        labels_name = "test_labels"
+        labels = NgffImage(
+            data=data_labels,
+            dims=axes,
+            scale=dict(zip(axes, TRANSFORMATIONS[0][0]["scale"])),
+            name=labels_name,
+        )
+        labels_multiscales = NgffMultiscales(image=labels, scale_factors=scale_factors)
+
+        # write image and labels to disk
         image_multiscales.to_ome_zarr(
             group=str(grp_path),
             version=version.version,
             storage_options=storage_options,
+            labels=labels_multiscales,
         )
 
-        # Verify
+        # Verify image data
         out = zarr.open_group(grp_path)
         node_metadata = out.attrs
         if "ome" in node_metadata:
@@ -191,6 +213,15 @@ class TestWriter:
             first_chunk = [c[0] for c in nd_array.chunks]
             assert tuple(first_chunk) == _retuple(expected, nd_array.shape)
         assert np.allclose(data, node_data[0][...].compute())
+
+        # Verify labels data
+
+        label_group = zarr.open(f"{grp_path}/labels", mode="r")
+        label_group_attrs = label_group.attrs
+        if version.version == "0.5":
+            label_group_attrs = label_group_attrs["ome"]
+        assert "labels" in label_group_attrs
+        assert labels_name in label_group_attrs["labels"]
 
         if version.version == "0.4":
             # Validate with ome-zarr-models-py: only supports v0.4
