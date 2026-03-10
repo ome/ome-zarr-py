@@ -380,6 +380,12 @@ class NgffMultiscales:
                     item = _finditem(v, key)
                     if item is not None:
                         return item
+                elif isinstance(v, list):
+                    for item in v:
+                        if isinstance(item, dict):
+                            result = _finditem(item, key)
+                            if result is not None:
+                                return result
 
         version = _finditem(group.attrs, "version")
         if version is None:
