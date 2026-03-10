@@ -192,7 +192,7 @@ class NgffMultiscales:
             )
             datasets.append(
                 Dataset(
-                    path=f"scale{idx}",
+                    path=f"s{idx}",
                     coordinateTransformations=(
                         Scale(
                             type="scale",
