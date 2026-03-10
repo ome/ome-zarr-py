@@ -15,6 +15,7 @@ from ome_zarr.writer import (
     write_plate_metadata,
     write_well_metadata,
 )
+from ome_zarr.image import NgffImage, NgffMultiscales
 
 
 class TestReader:
@@ -62,6 +63,11 @@ class TestReader:
             "version": "0.5",
             "multiscales": [
                 {
+                    "axes": [
+                        {"name": "z", "type": "space"},
+                        {"name": "y", "type": "space"},
+                        {"name": "x", "type": "space"},
+                    ],
                     "datasets": [
                         {
                             "path": "s0",
@@ -81,6 +87,11 @@ class TestReader:
         assert len(nodes) == 1
         image_node = nodes[0]
         assert np.allclose(data, image_node.data[0])
+
+        # now the same with the class-based API for v0.5
+        ms = NgffMultiscales.from_ome_zarr(img_path)
+
+        assert len(ms.images) == 1
 
 
 class TestInvalid:
@@ -177,3 +188,6 @@ class TestHCSReader:
         result = pyramid[0].compute()
         assert isinstance(result, np.ndarray)
         assert result.max() > 0, "Expected non-zero values in the array"
+
+if __name__ == "__main__":
+    pytest.main([__file__])
