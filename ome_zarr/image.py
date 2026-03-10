@@ -23,6 +23,7 @@ from ome_zarr_models.v05.multiscales import (
     Dataset,
     Multiscale,
 )
+from ome_zarr_models.common.image_label_types import LabelBase
 
 from .scale import Methods
 
@@ -71,7 +72,7 @@ class NgffImage:
     data: da.Array | np.ndarray
     dims: Sequence[str] | str
     scale: Sequence[float] | dict[str, float] | None = None
-    axes_units: dict[str, str] | None = field(default_factory=dict)
+    axes_units: dict[str, str] | None = None
     name: str | None = "image"
 
     def __post_init__(self):
@@ -318,6 +319,7 @@ class NgffMultiscales:
             [str(label.name) for label in labels.values()] if labels else []
         )
 
+        # write the metadata to disk
         if isinstance(group, str):
             group = zarr.open(group, mode="r+")
 
@@ -342,7 +344,7 @@ class NgffMultiscales:
                 group_labels = group["labels"]
                 group_labels.attrs["ome"] = {
                     "version": version,
-                    "labels": list_of_labels
+                    "labels": list_of_labels,
                 }
 
         else:
@@ -378,19 +380,25 @@ class NgffMultiscales:
                     item = _finditem(v, key)
                     if item is not None:
                         return item
+                elif isinstance(v, list):
+                    for item in v:
+                        if isinstance(item, dict):
+                            result = _finditem(item, key)
+                            if result is not None:
+                                return result
 
         version = _finditem(group.attrs, "version")
         if version is None:
             raise ValueError("Could not find 'version' in group attributes")
 
         if version == "0.4":
-            from ome_zarr_models._v04.multiscales import Multiscale as Multiscalev04
+            from ome_zarr_models.v04.multiscales import Multiscale as Multiscalev04
 
             metadata_json = group.attrs.get("multiscales", [None])[0]
 
             metadata = Multiscalev04.model_validate(metadata_json).to_version("0.5")
         elif version == "0.5":
-            from ome_zarr_models._v05.multiscales import Multiscale as Multiscalev05
+            from ome_zarr_models.v05.multiscales import Multiscale as Multiscalev05
 
             ome_attrs = group.attrs.get("ome", {})
             metadata_json = ome_attrs.get("multiscales", [None])[0]
@@ -406,7 +414,7 @@ class NgffMultiscales:
             # Filter out axes with no unit, and set to None if empty
             axes_units: dict[str, str] | None = {
                 ax.name: ax.unit
-                for ax in metadata.coordinateSystems[0].axes
+                for ax in metadata.axes
                 if ax.unit is not None
             }
             if not axes_units:
@@ -414,10 +422,10 @@ class NgffMultiscales:
             images.append(
                 NgffImage(
                     data=data,
-                    dims=[ax.name for ax in metadata.coordinateSystems[0].axes],
+                    dims=[ax.name for ax in metadata.axes],
                     scale={
                         d.name: s
-                        for d, s in zip(metadata.coordinateSystems[0].axes, scale)
+                        for d, s in zip(metadata.axes, scale)
                     },
                     axes_units=axes_units,
                     name=metadata.name,
