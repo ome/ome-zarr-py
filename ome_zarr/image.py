@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import InitVar, dataclass
-from typing import Any
+from typing import Any, cast
 
 import dask.array as da
 import numpy as np
@@ -299,7 +299,8 @@ class NgffMultiscales:
 
         # write labels data if passed
         if self.labels is not None:
-            for label_name, label_pyramid in self.labels.items():
+            labels_dict = cast(dict[str, NgffMultiscales], self.labels)
+            for label_name, label_pyramid in labels_dict.items():
                 label_group = group.require_group(f"labels/{label_name}")
 
                 _write_pyramid_to_zarr(
@@ -319,7 +320,7 @@ class NgffMultiscales:
                 )
 
         list_of_labels = (
-            [str(label.name) for label in self.labels.values()] if self.labels else []
+            [str(label.name) for label in labels_dict.values()] if self.labels else []
         )
 
         # write the metadata to disk
