@@ -113,6 +113,10 @@ class NgffMultiscales:
         Downsampling factors for each pyramid level. Default: [2, 4, 8, 16].
     method : str or Methods, optional
         Downsampling method to use. Default: Methods.RESIZE.
+    labels : NgffMultiscales or dict of str to NgffMultiscales, optional
+        Optional labels to associate with the image pyramid. Can be a single NgffMultiscales
+        instance (for a single label pyramid) or a dict mapping label names to NgffMultiscales
+        instances (for multiple label pyramids). Default is None (no labels).
 
     Attributes
     ----------
@@ -138,6 +142,7 @@ class NgffMultiscales:
     coordinateTransformations: InitVar[list[Scale | Translation | Identity] | None] = (
         None
     )
+    labels: NgffMultiscales | list[NgffMultiscales] | dict[str, NgffMultiscales] | None = None
 
     def __post_init__(
         self,
@@ -227,10 +232,16 @@ class NgffMultiscales:
             coordinateTransformations=coordinateTransformations,
         )
 
+        # coerce labels to dict if it's a single NgffMultiscales or a list
+        if self.labels is not None:
+            if isinstance(self.labels, NgffMultiscales):
+                self.labels = {str(self.labels.name): self.labels}
+            elif isinstance(self.labels, list):
+                self.labels = {str(label.name): label for label in self.labels}
+
     def to_ome_zarr(
         self,
         group: zarr.Group | str,
-        labels: NgffMultiscales | dict[str, NgffMultiscales] | None = None,
         storage_options: list[dict[str, Any]] | dict[str, Any] | None = None,
         version: str | None = "0.6",
         compute: bool = True,
@@ -242,10 +253,6 @@ class NgffMultiscales:
         ----------
         group : zarr.Group or str
             The target Zarr group or path where the OME-Zarr data will be written.
-        labels : NgffMultiscales or dict of str to NgffMultiscales, optional
-            Optional labels to write alongside the image data. Can be a single NgffMultiscales
-            instance (for a single label pyramid) or a dict mapping label names to NgffMultiscales
-            instances (for multiple label pyramids). Default is None (no labels).
         storage_options : dict or list of dict, optional
             Additional storage options to pass to Zarr, such as:
             - `compressor`: A Zarr compressor instance for compressing the data.
@@ -292,11 +299,8 @@ class NgffMultiscales:
         )
 
         # write labels data if passed
-        if labels is not None:
-            if isinstance(labels, NgffMultiscales):
-                labels = {str(labels.name): labels}
-
-            for label_name, label_pyramid in labels.items():
+        if self.labels is not None:
+            for label_name, label_pyramid in self.labels.items():
                 label_group = group.require_group(f"labels/{label_name}")
 
                 _write_pyramid_to_zarr(
@@ -316,7 +320,7 @@ class NgffMultiscales:
                 )
 
         list_of_labels = (
-            [str(label.name) for label in labels.values()] if labels else []
+            [str(label.name) for label in self.labels.values()] if self.labels else []
         )
 
         # write the metadata to disk
@@ -327,6 +331,7 @@ class NgffMultiscales:
             # in v0.4, metadata is stored under "multiscales" attribute
             metadata_dict = self.metadata.to_version("0.4").model_dump()
             metadata_json = _recursive_pop_nones(metadata_dict)
+            metadata_json["version"] = version
             group.attrs["multiscales"] = [metadata_json]
 
             if list_of_labels:
@@ -391,18 +396,26 @@ class NgffMultiscales:
         if version is None:
             raise ValueError("Could not find 'version' in group attributes")
 
+        list_of_labels = []
         if version == "0.4":
             from ome_zarr_models.v04.multiscales import Multiscale as Multiscalev04
 
             metadata_json = group.attrs.get("multiscales", [None])[0]
-
             metadata = Multiscalev04.model_validate(metadata_json).to_version("0.5")
+
+            if "labels" in group:
+                labels_json = group["labels"].attrs.get("labels", [])
+                list_of_labels = labels_json if isinstance(labels_json, list) else []
         elif version == "0.5":
             from ome_zarr_models.v05.multiscales import Multiscale as Multiscalev05
 
             ome_attrs = group.attrs.get("ome", {})
             metadata_json = ome_attrs.get("multiscales", [None])[0]
             metadata = Multiscalev05.model_validate(metadata_json)
+
+            if "labels" in group:
+                labels_ome_attrs = group["labels"].attrs.get("ome", {})
+                list_of_labels = labels_ome_attrs.get("labels", [])
         else:
             raise ValueError(f"Unsupported OME-Zarr version: {version}")
 
@@ -435,6 +448,17 @@ class NgffMultiscales:
         instance = cls.__new__(cls)
         instance.images = images
         instance.metadata = metadata
+
+        # add labels if they exist
+        if list_of_labels:
+            labels = {}
+            for label_name in list_of_labels:
+                label_group = group[f"labels/{label_name}"]
+                label_multiscale = cls.from_ome_zarr(label_group)
+                labels[label_name] = label_multiscale
+            instance.labels = labels
+
+
         return instance
 
 
