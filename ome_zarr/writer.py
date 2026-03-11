@@ -325,7 +325,7 @@ def write_multiscale(
     axes = _get_valid_axes(dims, axes, fmt)
 
     if not scale:
-        scale = {d: 1.0 for d in _extract_dims_from_axes(axes)}
+        scale = dict.fromkeys(_extract_dims_from_axes(axes), 1.0)
 
     pyramid = [
         da.from_array(level) if not isinstance(level, da.Array) else level
@@ -613,7 +613,7 @@ def write_image(
     dims = _extract_dims_from_axes(axes)
 
     if scale is None:
-        scale = {d: 1.0 for d in dims}
+        scale = dict.fromkeys(dims, 1.0)
 
     if coordinate_transformations is not None:
         msg = """
@@ -808,7 +808,7 @@ def _write_pyramid_to_zarr(
                 transform[0]["scale"] = [
                     transform[0]["scale"][i] * scale.get(d, 1.0)
                     for i, d in enumerate(dims)
-                    ]
+                ]
 
     # we validate again later, but this catches length mismatch before zip(datasets...)
     fmt.validate_coordinate_transformations(
@@ -990,7 +990,7 @@ def write_multiscale_labels(
 
     if scale is None:
         _axes = _get_valid_axes(len(pyramid[0].shape), axes, fmt)
-        scale = {d: 1.0 for d in _extract_dims_from_axes(_axes)}
+        scale = dict.fromkeys(_extract_dims_from_axes(_axes), 1.0)
 
     dask_delayed_jobs = _write_pyramid_to_zarr(
         pyramid,
@@ -1108,7 +1108,7 @@ def write_labels(
     dims = _extract_dims_from_axes(axes)
 
     if scale is None:
-        scale = {d: 1.0 for d in dims}
+        scale = dict.fromkeys(dims, 1.0)
 
     if scaler is not None:
         msg = """
