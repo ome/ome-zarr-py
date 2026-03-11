@@ -716,7 +716,8 @@ def _write_pyramid_to_zarr(
 ) -> list:
 
     group, fmt = check_group_fmt(group, fmt)
-    dims = _extract_dims_from_axes(axes)
+    _axes = _get_valid_axes(len(pyramid[0].shape), axes, fmt)
+    dims = _extract_dims_from_axes(_axes)
 
     # make sure every axis is represented in `scale`;
     # coerce to 1.0 if not provided
