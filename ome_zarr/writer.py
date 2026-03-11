@@ -263,6 +263,7 @@ def check_format(
 def write_multiscale(
     pyramid: ListOfArrayLike,
     group: zarr.Group,
+    scale: dict[str, float] | None = None,
     fmt: Format | None = None,
     axes: AxesType = None,
     coordinate_transformations: list[list[dict[str, Any]]] | None = None,
@@ -280,6 +281,11 @@ def write_multiscale(
         5-dimensional with dimensions ordered (t, c, z, y, x)
     :type group: :class:`zarr.Group`
     :param group: The group within the zarr store to store the data in
+    :type scale: dict of str to float, optional
+    :param scale:
+        The physical pixel size for each dimension, e.g. {"z": 0.1, "y": 0.1, "x": 0.5}.
+        The pixel sizes for every resolution level are calculated directly from the defined `scale` and
+        `scale_factors` for each level.
     :type chunks: int or tuple of ints, optional
     :param chunks:
         The size of the saved chunks to store the image.
@@ -318,6 +324,9 @@ def write_multiscale(
     dims = len(pyramid[0].shape)
     axes = _get_valid_axes(dims, axes, fmt)
 
+    if not scale:
+        scale = dict.fromkeys(_extract_dims_from_axes(axes), 1.0)
+
     pyramid = [
         da.from_array(level) if not isinstance(level, da.Array) else level
         for level in pyramid
@@ -326,6 +335,7 @@ def write_multiscale(
         pyramid,
         group,
         fmt=fmt,
+        scale=scale,
         axes=axes,
         coordinate_transformations=coordinate_transformations,
         storage_options=storage_options,
@@ -511,14 +521,7 @@ def write_image(
     image: ArrayLike,
     group: zarr.Group | str,
     scale: dict[str, float] | None = None,
-    scale_factors: list[int] | tuple[int, ...] | list[dict[str, int]] | None = (
-        2,
-        4,
-        8,
-        16,
-    ),
-    axes_units: dict[str, str] | None = None,
-    name: str = "image",
+    scale_factors: list[int] | tuple[int, ...] | list[dict[str, int]] = (2, 4, 8, 16),
     method: Methods | None = Methods.RESIZE,
     scaler: Scaler | None = None,
     fmt: Format | None = None,
@@ -572,8 +575,8 @@ def write_image(
         The names of the axes, e.g. ["t", "c", "z", "y", "x"]. Ignored for versions 0.1 and 0.2.
         Required for version 0.3 or greater.
     coordinate_transformations : list of list of dict, optional
-        For each resolution, a list of transformation dicts (not validated). Each list of dicts
-        is added to each dataset in order.
+        [Deprecated] For each resolution, a list of transformation dicts (not validated).
+        Each list of dicts is added to each dataset in order.
     storage_options : dict or list of dict, optional
         Options to be passed on to the storage backend. A list must match the number of datasets
         in a multiresolution pyramid. Allows different chunk sizes for each level.
@@ -609,12 +612,17 @@ def write_image(
     axes = _get_valid_axes(len(image.shape), axes, fmt)
     dims = _extract_dims_from_axes(axes)
 
-    # default settings for scale
     if scale is None:
         scale = dict.fromkeys(dims, 1.0)
 
-    # make sure every axis is present and order of dims is correct
-    scale = {d: scale.get(d, 1.0) for d in dims}
+    if coordinate_transformations is not None:
+        msg = """
+            The 'coordinate_transformations' argument is deprecated and will be removed in a future version.
+            Please use the `scale` argument to specify the physical pixel size for each dimension instead.
+            The pixel sizes for every resolution level are calculated directly from the defined `scale` and
+            `scale_factors` for each level.
+            """
+        warnings.warn(msg, DeprecationWarning)
 
     # parse scale_factors
     # if scaler is provided, we ignore scale_factors and infer the scale_factors
@@ -688,6 +696,7 @@ def _write_pyramid_to_zarr(
     pyramid: list[da.Array],
     group: zarr.Group,
     fmt: Format,
+    scale: dict[str, float],
     axes: AxesType = None,
     coordinate_transformations: list[list[dict[str, Any]]] | None = None,
     storage_options: JSONDict | list[JSONDict] | None = None,
@@ -697,6 +706,13 @@ def _write_pyramid_to_zarr(
 ) -> list:
 
     group, fmt = check_group_fmt(group, fmt)
+    _axes = _get_valid_axes(len(pyramid[0].shape), axes, fmt)
+    dims = _extract_dims_from_axes(_axes)
+
+    # make sure every axis is represented in `scale`;
+    # coerce to 1.0 if not provided
+    # but don't allow missing axes to avoid silent errors
+    scale = {d: scale.get(d, 1.0) for d in dims}
 
     # Set up common kwargs for da.to_zarr
     # zarr_array_kwargs needs dask 2025.12.0 or later
@@ -777,6 +793,13 @@ def _write_pyramid_to_zarr(
     if coordinate_transformations is None:
         # shapes = [data.shape for data in delayed]
         coordinate_transformations = fmt.generate_coordinate_transformations(shapes)
+
+        if coordinate_transformations:
+            for idx, transform in enumerate(coordinate_transformations):
+                transform[0]["scale"] = [
+                    transform[0]["scale"][i] * scale.get(d, 1.0)
+                    for i, d in enumerate(dims)
+                ]
 
     # we validate again later, but this catches length mismatch before zip(datasets...)
     fmt.validate_coordinate_transformations(
@@ -888,6 +911,7 @@ def write_multiscale_labels(
     pyramid: list,
     group: zarr.Group | str,
     name: str,
+    scale: dict[str, float] | None = None,
     fmt: Format | None = None,
     axes: AxesType = None,
     coordinate_transformations: list[list[dict[str, Any]]] | None = None,
@@ -911,6 +935,11 @@ def write_multiscale_labels(
     :param group: The zarr group or path to write the metadata in.
     :type name: str, optional
     :param name: The name of this labels data.
+    :type scale: dict of str to float, optional
+    :param scale:
+        The physical pixel size for each dimension, e.g. {"z": 0.1, "y": 0.1, "x": 0.5}.
+        The pixel sizes for every resolution level are calculated directly from the defined `scale` and
+        `scale_factors` for each level.
     :type chunks: int or tuple of ints, optional
     :type fmt: :class:`ome_zarr.format.Format`, optional
     :param fmt:
@@ -950,10 +979,15 @@ def write_multiscale_labels(
         for level in pyramid
     ]
 
+    if scale is None:
+        _axes = _get_valid_axes(len(pyramid[0].shape), axes, fmt)
+        scale = dict.fromkeys(_extract_dims_from_axes(_axes), 1.0)
+
     dask_delayed_jobs = _write_pyramid_to_zarr(
         pyramid,
         sub_group,
         fmt=fmt,
+        scale=scale,
         axes=axes,
         coordinate_transformations=coordinate_transformations,
         storage_options=storage_options,
@@ -975,6 +1009,7 @@ def write_labels(
     labels: np.ndarray | da.Array,
     group: zarr.Group | str,
     name: str,
+    scale: dict[str, float] | None = None,
     scaler: Scaler | None = Scaler(order=0),
     scale_factors: list[int] | tuple[int, ...] | list[dict[str, int]] | None = (
         2,
@@ -1003,6 +1038,10 @@ def write_labels(
         dimensions ordered (t, c, z, y, x).
     group : zarr.Group
         The group within the zarr store to write the metadata in.
+    scale: dict of str to float, optional
+        The physical pixel size for each dimension, e.g. {"z": 0.1, "y": 0.1, "x": 0.5}.
+        THe pixel sizes for every resolution level are calculated directly from the defined `scale` and
+        `scale_factors` for each level.
     name : str
         The name of this labels data.
     scaler : ome_zarr.scale.Scaler, optional
@@ -1025,7 +1064,7 @@ def write_labels(
         The names of the axes, e.g. ["t", "c", "z", "y", "x"]. Ignored for versions 0.1 and 0.2.
         Required for version 0.3 or greater.
     coordinate_transformations : list of list of dict, optional
-        For each resolution, a list of transformation dicts (not validated). Each list of dicts
+        [DEPRECATED] For each resolution, a list of transformation dicts (not validated). Each list of dicts
         is added to each dataset in order.
     storage_options : dict or list of dict, optional
         Options to be passed on to the storage backend. A list must match the number of datasets
@@ -1061,6 +1100,9 @@ def write_labels(
 
     axes = _get_valid_axes(len(labels.shape), axes, fmt)
     dims = _extract_dims_from_axes(axes)
+
+    if scale is None:
+        scale = dict.fromkeys(dims, 1.0)
 
     if scaler is not None:
         msg = """
