@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from dataclasses import InitVar, dataclass
+from dataclasses import InitVar, dataclass, field
 from typing import Any, cast
 
 import dask.array as da
@@ -136,7 +136,7 @@ class NgffMultiscales:
     """
 
     image: InitVar[NgffImage]
-    scale_factors: InitVar[list[int] | None] = None
+    scale_factors: list[int] | list[dict[str, int]] = field(default_factory=lambda: [2, 4, 8, 16])
     method: str | Methods = Methods.RESIZE
     coordinateTransformations: InitVar[list[Scale | Translation | Identity] | None] = (
         None
@@ -148,11 +148,10 @@ class NgffMultiscales:
     def __post_init__(
         self,
         image: NgffImage,
-        scale_factors: list[int] | list[dict[str, int]] | None,
         coordinateTransformations: list[Scale | Translation | Identity] | None,
     ):
-        if scale_factors is None:
-            scale_factors = [2, 4, 8, 16]
+        if self.scale_factors is None:
+            self.scale_factors = [2, 4, 8, 16]
         from .scale import _build_pyramid
 
         self.name = image.name
@@ -164,7 +163,7 @@ class NgffMultiscales:
         pyramid = _build_pyramid(
             image=image.data,
             dims=image.dims,
-            scale_factors=scale_factors,
+            scale_factors=self.scale_factors,
             method=method,
         )
 
@@ -246,7 +245,7 @@ class NgffMultiscales:
         storage_options: list[dict[str, Any]] | dict[str, Any] | None = None,
         version: str | None = "0.6",
         compute: bool = True,
-    ):
+    ) -> list:
         """
         Serialize the multiscale pyramid to an OME-Zarr group.
 
@@ -262,6 +261,12 @@ class NgffMultiscales:
             The OME-Zarr format version to use. Defaults to the current format.
         compute : bool, optional
             If True, compute immediately; otherwise return delayed objects.
+
+        Returns
+        -------
+        list
+            If `compute` is False, returns a list of Dask delayed objects
+            representing the write operations. 
         """
         import os
         import shutil
@@ -290,7 +295,7 @@ class NgffMultiscales:
         ]
 
         # write the actual image to disk
-        _write_pyramid_to_zarr(
+        delayed = _write_pyramid_to_zarr(
             pyramid=pyramid,
             group=group,
             storage_options=storage_options,
@@ -305,7 +310,7 @@ class NgffMultiscales:
             for label_name, label_pyramid in labels_dict.items():
                 label_group = group.require_group(f"labels/{label_name}")
 
-                _write_pyramid_to_zarr(
+                delayed += _write_pyramid_to_zarr(
                     pyramid=[
                         (
                             img.data
@@ -356,6 +361,8 @@ class NgffMultiscales:
 
         else:
             raise ValueError(f"Unsupported OME-Zarr version: {version}")
+        
+        return delayed
 
     @classmethod
     def from_ome_zarr(
