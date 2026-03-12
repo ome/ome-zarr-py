@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import InitVar, dataclass, field
-from typing import Any
+from typing import Any, cast
 
 import dask.array as da
 import numpy as np
@@ -129,7 +129,7 @@ class NgffMultiscales:
     """
 
     image: InitVar[NgffImage]
-    scale_factors: InitVar[list[int] | None] = None
+    scale_factors: list[int] | list[dict[str, int]] = field(default_factory=lambda: [2, 4, 8, 16])
     method: str | Methods = Methods.RESIZE
     coordinate_system_name: InitVar[str | None] = "physical"
     coordinateTransformations: InitVar[list[Transform]] = []
@@ -137,12 +137,11 @@ class NgffMultiscales:
     def __post_init__(
         self,
         image: NgffImage,
-        scale_factors=[2, 4, 8, 16],
         coordinate_system_name: str | None = "physical",
         coordinateTransformations: list[Transform] = [],
     ):
-        if scale_factors is None:
-            scale_factors = [2, 4, 8, 16]
+        if self.scale_factors is None:
+            self.scale_factors = [2, 4, 8, 16]
         from .scale import _build_pyramid
 
         self.name = image.name
@@ -157,7 +156,7 @@ class NgffMultiscales:
         pyramid = _build_pyramid(
             image=image.data,
             dims=image.dims,
-            scale_factors=scale_factors,
+            scale_factors=self.scale_factors,
             method=method,
         )
 
@@ -256,7 +255,7 @@ class NgffMultiscales:
         storage_options: dict[str, Any] | None = None,
         version: str | None = "0.6",
         compute: bool = True,
-    ):
+    ) -> list:
         """
         Serialize the multiscale pyramid to an OME-Zarr group.
 
@@ -276,6 +275,12 @@ class NgffMultiscales:
             The OME-Zarr format version to use. Defaults to the current format.
         compute : bool, optional
             If True, compute immediately; otherwise return delayed objects.
+
+        Returns
+        -------
+        list
+            If `compute` is False, returns a list of Dask delayed objects
+            representing the write operations. 
         """
         import os
         import shutil
@@ -306,7 +311,7 @@ class NgffMultiscales:
         ]
 
         # write the actual image to disk
-        _write_pyramid_to_zarr(
+        delayed = _write_pyramid_to_zarr(
             pyramid=pyramid,
             group=group,
             storage_options=storage_options,
@@ -323,17 +328,21 @@ class NgffMultiscales:
             for label_name, label_pyramid in labels.items():
                 label_group = group.require_group(f"labels/{label_name}")
 
-            _write_pyramid_to_zarr(
-                pyramid=[
-                    img.data if isinstance(img.data, da.Array) else da.from_array(img.data)
-                    for img in label_pyramid.images
-                ],
-                group=label_group,
-                storage_options=storage_options,
-                fmt=fmt,
-                axes=[dict(ax) for ax in label_pyramid.metadata.coordinateSystems[0].axes],
-                compute=compute,
-            )
+                delayed += _write_pyramid_to_zarr(
+                    pyramid=[
+                        (
+                            img.data
+                            if isinstance(img.data, da.Array)
+                            else da.from_array(img.data)
+                        )
+                        for img in label_pyramid.images
+                    ],
+                    group=label_group,
+                    storage_options=storage_options,
+                    fmt=fmt,
+                    axes=[dict(ax) for ax in label_pyramid.metadata.axes],
+                    compute=compute,
+                )
 
         list_of_labels = (
             [str(label.name) for label in labels.values()] if labels else []
@@ -371,6 +380,8 @@ class NgffMultiscales:
             group.attrs["ome"] = metadata_dict
         else:
             raise ValueError(f"Unsupported OME-Zarr version: {version}")
+        
+        return delayed
 
     @classmethod
     def from_ome_zarr(
