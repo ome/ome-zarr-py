@@ -213,7 +213,6 @@ class TestWriter:
         print("node.metadata", node_metadata)
         if version.version not in ("0.1", "0.2", "0.3"):
             datasets = node_metadata["multiscales"][0]["datasets"]
-            expected_scale = scale
             for idx, (level, ds) in enumerate(zip(node_data, datasets)):
                 transforms = ds["coordinateTransformations"][0]
                 if idx == 0:
