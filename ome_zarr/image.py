@@ -136,7 +136,9 @@ class NgffMultiscales:
     """
 
     image: InitVar[NgffImage]
-    scale_factors: list[int] | list[dict[str, int]] = field(default_factory=lambda: [2, 4, 8, 16])
+    scale_factors: list[int] | list[dict[str, int]] = field(
+        default_factory=lambda: [2, 4, 8, 16]
+    )
     method: str | Methods = Methods.RESIZE
     coordinateTransformations: InitVar[list[Scale | Translation | Identity] | None] = (
         None
@@ -266,7 +268,7 @@ class NgffMultiscales:
         -------
         list
             If `compute` is False, returns a list of Dask delayed objects
-            representing the write operations. 
+            representing the write operations.
         """
         import os
         import shutil
@@ -361,7 +363,7 @@ class NgffMultiscales:
 
         else:
             raise ValueError(f"Unsupported OME-Zarr version: {version}")
-        
+
         return delayed
 
     @classmethod
