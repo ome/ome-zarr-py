@@ -30,6 +30,7 @@ from ome_zarr.format import (
     FormatV05,
     format_from_version,
 )
+from ome_zarr.image import NgffImage, NgffMultiscales
 from ome_zarr.scale import _build_pyramid
 from ome_zarr.writer import (
     _get_valid_axes,
@@ -80,6 +81,159 @@ class TestWriter:
     )
     def shape(self, request):
         return request.param
+
+    @pytest.mark.parametrize(
+        "format_version",
+        (
+            pytest.param(FormatV04, id="V04"),
+            pytest.param(FormatV05, id="V05"),
+        ),
+    )
+    @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])
+    @pytest.mark.parametrize("storage_options_list", [True, False])
+    def test_image_class_writer(
+        self, shape, format_version, array_constructor, storage_options_list
+    ):
+        version = format_version()
+
+        if version.version == "0.5":
+            grp_path = self.path_v3 / "test"
+        else:
+            grp_path = self.path / "test"
+
+        data = self.create_data(shape)
+        data_labels = (data > data.mean()).astype(
+            np.uint8
+        )  # just some binary data for testing
+        data = array_constructor(data)
+        axes = "tczyx"[-len(shape) :]
+
+        chunks = [(128, 128), (50, 50), (25, 25), (25, 25), (25, 25), (25, 25)]
+        storage_options = {"chunks": chunks[0]}
+        if storage_options_list:
+            storage_options = [{"chunks": chunk} for chunk in chunks]
+        scale_factors = [
+            {d: 2 ** i if d in ("x", "y") else 1.0 for d in axes}
+            for i in range(1, len(TRANSFORMATIONS))
+        ]
+
+        # make sure default is set correctly when not providing scale
+        image = NgffImage(
+            data=data,
+            dims=axes,
+        )
+        assert all(image.scale[d] == 1.0 for d in axes)
+
+        # convert to image classes
+        labels_name = "test_labels"
+        image = NgffImage(
+            data=data, dims=axes, scale=dict(zip(axes, TRANSFORMATIONS[0][0]["scale"]))
+        )
+        labels = NgffImage(
+            data=data_labels,
+            dims=axes,
+            scale=dict(zip(axes, TRANSFORMATIONS[0][0]["scale"])),
+            name=labels_name,
+        )
+        labels_multiscales = NgffMultiscales(image=labels, scale_factors=scale_factors)
+
+        image_multiscales = NgffMultiscales(
+            image=image,
+            scale_factors=scale_factors,
+            labels=labels_multiscales,
+        )
+
+        # write image and labels to disk
+        image_multiscales.to_ome_zarr(
+            group=str(grp_path),
+            version=version.version,
+            storage_options=storage_options,
+        )
+
+        # Verify image data
+        out = zarr.open_group(grp_path)
+        node_metadata = out.attrs
+        if "ome" in node_metadata:
+            node_metadata = node_metadata["ome"]
+        assert "multiscales" in node_metadata
+        paths = [d["path"] for d in node_metadata["multiscales"][0]["datasets"]]
+        node_data = [da.from_zarr(grp_path / path) for path in paths]
+        if version.version in ("0.1", "0.2"):
+            # v0.1 and v0.2 MUST be 5D
+            assert node_data[0].ndim == 5
+        else:
+            assert node_data[0].shape == shape
+        print("node.metadata", node_metadata)
+
+        # check written coordinatetransormations match relative factors between array sizes
+        for level, nd_array in enumerate(node_data):
+            if level == 0:
+                # check first written scale values explicitly match those in TRANSFORMATIONS
+                for d in axes:
+                    assert (
+                        node_metadata["multiscales"][0]["datasets"][level][
+                            "coordinateTransformations"
+                        ][0]["scale"][axes.index(d)]
+                        == TRANSFORMATIONS[0][0]["scale"][axes.index(d)]
+                    )
+                continue
+
+            # first calculate relative factors between this and previous level
+            relative_factors = {
+                d: node_data[0].shape[axes.index(d)] / nd_array.shape[axes.index(d)]
+                for d in axes
+            }
+
+            # then convert into corresponding scale values
+            expected_scale = {
+                d: TRANSFORMATIONS[0][0]["scale"][axes.index(d)] * relative_factors[d]
+                for d in axes
+            }
+
+            # make sure we are doing this correctly for dimensions that
+            # are not supposed to be downsampled
+            if "t" in axes:
+                assert expected_scale["t"] == 1.0
+            if "c" in axes:
+                assert expected_scale["c"] == 1.0
+            if "z" in axes:
+                assert relative_factors["z"] == 1.0
+
+            # retrieve written scale factors from metadata and check they match expected
+            cts = node_metadata["multiscales"][0]["datasets"][level][
+                "coordinateTransformations"
+            ]
+            assert len(cts) == 1
+            transf = cts[0]
+            assert transf["type"] == "scale"
+            for d in axes:
+                assert transf["scale"][axes.index(d)] == expected_scale[d]
+
+        # check chunks for first 2 resolutions (before shape gets smaller than chunk)
+        for level, nd_array in enumerate(node_data[:2]):
+            expected = chunks[level] if storage_options_list else chunks[0]
+            first_chunk = [c[0] for c in nd_array.chunks]
+            assert tuple(first_chunk) == _retuple(expected, nd_array.shape)
+        assert np.allclose(data, node_data[0][...].compute())
+
+        # Verify labels data
+        label_group = zarr.open(f"{grp_path}/labels", mode="r")
+        label_group_attrs = label_group.attrs
+        if version.version == "0.5":
+            label_group_attrs = label_group_attrs["ome"]
+        assert "labels" in label_group_attrs
+        assert labels_name in label_group_attrs["labels"]
+
+        # read data back in
+        image = NgffMultiscales.from_ome_zarr(str(grp_path))
+
+        assert labels_name in list(image.labels.keys())
+
+        if version.version == "0.4":
+            # Validate with ome-zarr-models-py: only supports v0.4
+            Models04Image.from_zarr(out)
+        elif version.version == "0.5":
+            Models05Image.from_zarr(out)
 
     @pytest.mark.parametrize(
         "format_version",
@@ -1725,3 +1879,7 @@ class TestLabelWriter:
         assert "labels" in attrs
         assert len(attrs["labels"]) == len(label_names)
         assert all(label_name in attrs["labels"] for label_name in label_names)
+
+
+if __name__ == "__main__":
+    pytest.main([__file__])

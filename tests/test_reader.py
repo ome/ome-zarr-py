@@ -6,6 +6,7 @@ from numpy import ones, zeros
 
 from ome_zarr.data import create_zarr
 from ome_zarr.format import FormatV04
+from ome_zarr.image import NgffMultiscales
 from ome_zarr.io import parse_url
 from ome_zarr.reader import Node, Plate, Reader, Well
 from ome_zarr.writer import (
@@ -62,6 +63,11 @@ class TestReader:
             "version": "0.5",
             "multiscales": [
                 {
+                    "axes": [
+                        {"name": "z", "type": "space"},
+                        {"name": "y", "type": "space"},
+                        {"name": "x", "type": "space"},
+                    ],
                     "datasets": [
                         {
                             "path": "s0",
@@ -72,7 +78,7 @@ class TestReader:
                                 }
                             ],
                         }
-                    ]
+                    ],
                 }
             ],
         }
@@ -81,6 +87,11 @@ class TestReader:
         assert len(nodes) == 1
         image_node = nodes[0]
         assert np.allclose(data, image_node.data[0])
+
+        # now the same with the class-based API for v0.5
+        ms = NgffMultiscales.from_ome_zarr(img_path)
+
+        assert len(ms.images) == 1
 
 
 class TestInvalid:
@@ -177,3 +188,7 @@ class TestHCSReader:
         result = pyramid[0].compute()
         assert isinstance(result, np.ndarray)
         assert result.max() > 0, "Expected non-zero values in the array"
+
+
+if __name__ == "__main__":
+    pytest.main([__file__])
