@@ -170,7 +170,9 @@ class TestWriter:
         ),
     )
     def test_writer_with_scale(
-        self, shape, format_version,
+        self,
+        shape,
+        format_version,
     ):
         """
         This test checks whether the `scale` parameter is converted to the correct
@@ -217,8 +219,13 @@ class TestWriter:
                 if idx == 0:
                     assert transforms["scale"] == list(scale.values())
                 else:
-                    relative_scale = [node_data[idx].shape[i] / node_data[idx-1].shape[i] for i in range(len(shape))]
-                    scale = {d: scale[d] / relative_scale[i] for i, d in enumerate(axes)}
+                    relative_scale = [
+                        node_data[idx].shape[i] / node_data[idx - 1].shape[i]
+                        for i in range(len(shape))
+                    ]
+                    scale = {
+                        d: scale[d] / relative_scale[i] for i, d in enumerate(axes)
+                    }
                     assert transforms["scale"] == list(scale.values())
 
         if version.version == "0.4":
@@ -1790,6 +1797,7 @@ class TestLabelWriter:
         assert "labels" in attrs
         assert len(attrs["labels"]) == len(label_names)
         assert all(label_name in attrs["labels"] for label_name in label_names)
+
 
 if __name__ == "__main__":
     pytest.main([__file__])
