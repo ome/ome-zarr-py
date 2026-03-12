@@ -510,15 +510,17 @@ def write_well_metadata(
 def write_image(
     image: ArrayLike,
     group: zarr.Group | str,
-    scale_factors: list[int] | tuple[int, ...] | list[dict[str, int]] = (2, 4, 8, 16),
+    scale: dict[str, float] | None = None,
+    scale_factors: list[int] | list[dict[str, int]] = [2, 4, 8, 16],
+    axes_units: dict[str, str] | None = None,
+    name: str = "image",
     method: Methods | None = Methods.RESIZE,
     scaler: Scaler | None = None,
     fmt: Format | None = None,
     axes: AxesType = None,
     coordinate_transformations: list[list[dict[str, Any]]] | None = None,
     storage_options: JSONDict | list[JSONDict] | None = None,
-    compute: bool | None = True,
-    **metadata: str | JSONDict | list[JSONDict],
+    compute: bool = True,
 ) -> list:
     """
     Write an image to the zarr store according to the OME-Zarr specification, supporting multiscale pyramids.
@@ -531,7 +533,10 @@ def write_image(
         dimensions ordered (t, c, z, y, x). Can be a NumPy or Dask array.
     group : zarr.Group or str
         The zarr group to write the metadata, or a path to create
-    scale_factors : list of int or list of dict, optional
+    scale: dict of str to float, optional
+        The physical pixel size for each spatial dimension, e.g. {"z": 0.5, "y": 0.1, "x": 0.1}.
+        If unset, the used pixel sizes default to 1.0 for all dimensions.
+    scale_factors : Sequence[int] | list[dict[str, int]], optional
         The downsampling factors for each pyramid level. Default: [2, 4, 8, 16].
         Passing a list of integers (i.e., [2, 4, 8]) will apply the downsampling in all
         spatial dimensions *except the z dimension*, which will be left at a scale factor of 1.
@@ -539,6 +544,11 @@ def write_image(
         `[{"z": 2, "y": 2, "x": 2}, {"z": 4, "y": 4, "x": 4}, {"z": 8, "y": 8, "x": 8}]`.
         If dimensions are omitted in this dictionary,
         the downsampling factor for that dimension will default to 1.
+    axes_units : dict of str to str, optional
+        The units for each spatial dimension, e.g. {"t": "second", "y": "micrometer", "x": "micrometer"}.
+        Unspecified axes will be omitted from the metadata.
+    name: str, optional
+        The name of the image, to be included in the metadata. Defaults to "image".
     method : ome_zarr.scale.Methods, optional
         Downsampling method to use.
         Available methods are:
@@ -564,8 +574,6 @@ def write_image(
         in a multiresolution pyramid. Allows different chunk sizes for each level.
     compute : bool, optional
         If True, compute immediately; otherwise, return a list of dask.delayed.Delayed objects.
-    `**metadata` : dict
-        Additional metadata to store.
 
     Returns
     -------
@@ -578,7 +586,7 @@ def write_image(
     The `scaler` argument is deprecated and will be removed in a future version. Use
     `scale_factors` and `method` for all new code.
     """
-    from .scale import _build_pyramid
+    from .image import NgffImage, NgffMultiscales
 
     if method is None:
         method = Methods.RESIZE
@@ -595,6 +603,13 @@ def write_image(
 
     axes = _get_valid_axes(len(image.shape), axes, fmt)
     dims = _extract_dims_from_axes(axes)
+
+    # default settings for scale
+    if scale is None:
+        scale = dict.fromkeys(dims, 1.0)
+
+    # make sure every axis is present and order of dims is correct
+    scale = {d: scale.get(d, 1.0) for d in dims}
 
     # parse scale_factors
     # if scaler is provided, we ignore scale_factors and infer the scale_factors
@@ -632,29 +647,20 @@ def write_image(
     if method is None:
         method = Methods.RESIZE
 
-    # Create the pyramid
-    pyramid = _build_pyramid(
-        image,
-        scale_factors,
-        dims=dims,
+    ngff_image = NgffImage(
+        data=image, scale=scale, dims=dims, name=name, axes_units=axes_units
+    )
+    ngff_multiscales = NgffMultiscales(
+        image=ngff_image,
+        scale_factors=scale_factors,
         method=method,
     )
 
-    name = metadata.pop("name", None)
-    name = str(name) if name is not None else None
-
-    dask_delayed_jobs = []
-
-    dask_delayed_jobs = _write_pyramid_to_zarr(
-        pyramid,
-        group,
-        fmt=fmt,
-        axes=axes,
-        coordinate_transformations=coordinate_transformations,
+    dask_delayed_jobs = ngff_multiscales.to_ome_zarr(
+        group=group,
         storage_options=storage_options,
-        name=name,
+        version=fmt.version,
         compute=compute,
-        **metadata,
     )
 
     return dask_delayed_jobs
@@ -965,14 +971,14 @@ def write_labels(
     group: zarr.Group | str,
     name: str,
     scaler: Scaler | None = Scaler(order=0),
-    scale_factors: list[int] | tuple[int, ...] | list[dict[str, int]] = (2, 4, 8, 16),
+    scale_factors: list[int] | list[dict[str, int]] = [2, 4, 8, 16],
     method: Methods = Methods.NEAREST,
     fmt: Format | None = None,
     axes: AxesType = None,
     coordinate_transformations: list[list[dict[str, Any]]] | None = None,
     storage_options: JSONDict | list[JSONDict] | None = None,
     label_metadata: JSONDict | None = None,
-    compute: bool | None = True,
+    compute: bool = True,
     **metadata: JSONDict,
 ) -> list:
     """
@@ -993,8 +999,8 @@ def write_labels(
         [DEPRECATED] Scaler implementation for downsampling the label data. Passing this
         argument will raise a warning and is no longer supported. Use `scale_factors` and
         `method` instead.
-    scale_factors : tuple of int, optional
-        The downsampling factors for each pyramid level. Default: (2, 4, 8, 16).
+    scale_factors : Sequence[int] | list[dict[str, int]], optional
+        The downsampling factors for each pyramid level. Default: [2, 4, 8, 16].
         Passing a list of integers (i.e., [2, 4, 8]) will apply the downsampling in all
         spatial dimensions *except the z dimension*, which will be left at a scale factor of 1.
         To apply downsampling to the z-dimension, pass the scale factors as a list of dicts, e.g.
@@ -1033,7 +1039,7 @@ def write_labels(
     `scale_factors` and `method` for all new code. Labels downsampling should avoid interpolation;
     nearest-neighbor is recommended.
     """
-    from .scale import _build_pyramid
+    from .image import NgffImage, NgffMultiscales
 
     group, fmt = check_group_fmt(group, fmt)
     sub_group = group.require_group(f"labels/{name}")
@@ -1060,28 +1066,21 @@ def write_labels(
     if method is None:
         method = Methods.NEAREST
 
-    if not isinstance(labels, da.Array):
-        labels = da.from_array(labels)
-
-    pyramid = _build_pyramid(
-        labels,
-        scale_factors,
+    ngff_image = NgffImage(
+        data=labels,
         dims=dims,
+        name=name,
+    )
+    ngff_multiscales = NgffMultiscales(
+        image=ngff_image,
+        scale_factors=scale_factors,
         method=method,
     )
-
-    dask_delayed_jobs = []
-
-    dask_delayed_jobs = _write_pyramid_to_zarr(
-        pyramid,
-        sub_group,
-        fmt=fmt,
-        axes=axes,
-        coordinate_transformations=coordinate_transformations,
+    dask_delayed_jobs = ngff_multiscales.to_ome_zarr(
+        group=sub_group,
         storage_options=storage_options,
-        name=name,
+        version=fmt.version,
         compute=compute,
-        **metadata,
     )
 
     write_label_metadata(
