@@ -530,7 +530,12 @@ def write_image(
     image: ArrayLike,
     group: zarr.Group | str,
     scale: dict[str, float] | None = None,
-    scale_factors: list[int] | tuple[int, ...] | list[dict[str, int]] = (2, 4, 8, 16),
+    scale_factors: list[int] | tuple[int, ...] | list[dict[str, int]] | None = (
+        2,
+        4,
+        8,
+        16,
+    ),
     axes_units: dict[str, str] | None = None,
     method: Methods | None = Methods.RESIZE,
     scaler: Scaler | None = None,

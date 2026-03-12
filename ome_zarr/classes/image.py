@@ -172,7 +172,7 @@ class NgffMultiscales:
     ):
         if scale_factors is None:
             scale_factors = (2, 4, 8, 16)
-        from .scale import _build_pyramid
+        from ..scale import _build_pyramid
 
         self.name = image.name
         method = self.method
