@@ -30,7 +30,12 @@ The following code creates a 3D Image in OME-Zarr::
     rng = np.random.default_rng(0)
     data = rng.poisson(lam=10, size=(size_z, size_xy, size_xy)).astype(np.uint8)
 
-    write_image(data, path, axes="zyx")
+    write_image(
+        data,
+        path,
+        axes="zyx",
+        scale={"z": 0.5, "y": 0.1, "x": 0.1},
+        )
 
 
 This image can be viewed in `napari` using the
@@ -46,19 +51,28 @@ and enable fast rendering of large images.
 The entrypoints to writing ome-zarr images in ome-zarr-py (`write_image` and `write_labels`)
 build these pyramids under the hood as delayed dask arrays based on the settings for the scaling functions and scale factors.
 
-The scale factors can be passed as a list of integers or a list of dicts::
+The scale factors can be passed as a list of integers or a list of dicts;
+similar to the previous example you can pass the `scale` argument to specify
+the physical pixel sizes in each dimension and the `scale_factors` argument
+to specify the down-sampling factors for each level of the pyramid.
+The corresponding scale parameters for every resolution level are calculated on-the-fly.
+
+::
 
     from ome_zarr.writer import write_image
 
     scale_factors = [2, 4, 8]
     write_image(
-        your_data
+        your_data,
         path,
         axes="zyx",
+        scale={"y": 0.1, "x": 0.1}, # only downsample in Y and X
         scale_factors=scale_factors,
         )
 
-In this example, the downsampling will be applied in all spatial dimensions *except the z dimension*, which will be left at a scale factor of 1.
+In this example, the downsampling will be applied in all spatial dimensions
+*except the z dimension*, which will be left at a scale factor of 1.
+Note that unspecified dimensions in the `scale` dictionary will default to 1.0.
 To apply equal or custom downsampling factors along all spatial dimensions, pass the scale factors as a list of dicts, e.g.::
 
     from ome_zarr.writer import write_image
@@ -69,9 +83,10 @@ To apply equal or custom downsampling factors along all spatial dimensions, pass
         {"z": 8, "y": 8, "x": 8}
         ]
     write_image(
-        your_data
+        your_data,
         path,
         axes="zyx",
+        scale={"z": 0.5, "y": 0.1, "x": 0.1},
         scale_factors=scale_factors,
         )
 
