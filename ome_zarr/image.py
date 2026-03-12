@@ -364,20 +364,21 @@ class NgffMultiscales:
         elif version == "0.5":
             metadata_dict = {
                 "version": version,
-                "multiscales": [_recursive_pop_nones(self.metadata.model_dump())],
+                "multiscales": [self.metadata.model_dump()],
                 "labels": list_of_labels or None,
             }
+            metadata_dict = _recursive_pop_nones(metadata_dict)
             group.attrs["ome"] = metadata_dict
 
         elif version == "0.6":
             metadata_dict = {
                 "version": version,
                 "multiscales": [
-                    _recursive_pop_nones(self.metadata.model_dump())
+                    self.metadata.model_dump()
                 ],
                 "labels": list_of_labels if list_of_labels else None,
             }
-            group.attrs["ome"] = metadata_dict
+            group.attrs["ome"] = _recursive_pop_nones(metadata_dict)
         else:
             raise ValueError(f"Unsupported OME-Zarr version: {version}")
         
