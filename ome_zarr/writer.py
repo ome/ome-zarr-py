@@ -14,7 +14,7 @@ from dask.graph_manipulation import bind
 from numcodecs import Blosc
 
 from .axes import Axes
-from .format import CurrentFormat, Format, FormatV01, FormatV02, FormatV04
+from .format import CurrentFormat, Format, FormatV01, FormatV02, FormatV03, FormatV04
 from .scale import Methods, Scaler
 from .types import JSONDict
 
@@ -588,13 +588,10 @@ def write_image(
     if not isinstance(image, da.Array):
         image = da.from_array(image)
 
-    # for 0.1 and 0.2 we need to ensure 5D shape
-    if type(fmt) in (FormatV01, FormatV02):
-        while len(image.shape) < 5:
-            image = image[None, :]
-
-        # TODO: Better way to get chunksize in type-safe manner?
-        axes = ["t", "c", "z", "y", "x"]
+    if type(fmt) in (FormatV01, FormatV02, FormatV03):
+        raise DeprecationWarning(
+            f"Writing ome-zarr v{fmt.version} is deprecated and has been removed in version 0.15.0."
+        )
 
     axes = _get_valid_axes(len(image.shape), axes, fmt)
     dims = _extract_dims_from_axes(axes)
@@ -1041,12 +1038,11 @@ def write_labels(
     group, fmt = check_group_fmt(group, fmt)
     sub_group = group.require_group(f"labels/{name}")
 
-    # for 0.1 and 0.2 we need to ensure 5D shape
-    if type(fmt) in (FormatV01, FormatV02):
-        while len(labels.shape) < 5:
-            labels = labels[None, :]
 
-        axes = ["t", "c", "z", "y", "x"]
+    if type(fmt) in (FormatV01, FormatV02, FormatV03):
+        raise DeprecationWarning(
+            f"Writing ome-zarr v{fmt.version} is deprecated and has been removed in version 0.15.0."
+        )
 
     axes = _get_valid_axes(len(labels.shape), axes, fmt)
     dims = _extract_dims_from_axes(axes)

@@ -84,9 +84,6 @@ class TestWriter:
     @pytest.mark.parametrize(
         "format_version",
         (
-            pytest.param(FormatV01, id="V01"),
-            pytest.param(FormatV02, id="V02"),
-            pytest.param(FormatV03, id="V03"),
             pytest.param(FormatV04, id="V04"),
             pytest.param(FormatV05, id="V05"),
         ),
@@ -562,53 +559,6 @@ class TestWriter:
             # more than 1 transformation
             fmt.validate_coordinate_transformations(2, 2, scale_then_trans2)
 
-    def test_dim_names(self):
-        v03 = FormatV03()
-
-        # v0.3 MUST specify axes for 3D or 4D data
-        with pytest.raises(ValueError):
-            _get_valid_axes(3, axes=None, fmt=v03)
-
-        # ndims must match axes length
-        with pytest.raises(ValueError):
-            _get_valid_axes(3, axes="yx", fmt=v03)
-
-        # axes must be ordered tczyx
-        with pytest.raises(ValueError):
-            _get_valid_axes(3, axes="yxt", fmt=v03)
-        with pytest.raises(ValueError):
-            _get_valid_axes(2, axes=["x", "y"], fmt=v03)
-        with pytest.raises(ValueError):
-            _get_valid_axes(5, axes="xyzct", fmt=v03)
-
-        # valid axes - no change, converted to list
-        assert _get_valid_axes(2, axes=["y", "x"], fmt=v03) == ["y", "x"]
-        assert _get_valid_axes(5, axes="tczyx", fmt=v03) == [
-            "t",
-            "c",
-            "z",
-            "y",
-            "x",
-        ]
-
-        # if 2D or 5D, axes can be assigned automatically
-        assert _get_valid_axes(2, axes=None, fmt=v03) == ["y", "x"]
-        assert _get_valid_axes(5, axes=None, fmt=v03) == ["t", "c", "z", "y", "x"]
-
-        # for v0.1 or v0.2, axes should be None
-        assert _get_valid_axes(2, axes=["y", "x"], fmt=FormatV01()) is None
-        assert _get_valid_axes(2, axes=["y", "x"], fmt=FormatV02()) is None
-
-        # check that write_image is checking axes
-        data = self.create_data((125, 125))
-        with pytest.raises(ValueError):
-            write_image(
-                image=data,
-                group=self.group,
-                fmt=v03,
-                axes="xyz",
-            )
-
     def test_axes_dicts(self):
         v04 = FormatV04()
 
@@ -724,13 +674,6 @@ class TestMultiscalesMetadata:
             if fmt.version == "0.5":
                 Models05Image.from_zarr(out)
 
-    @pytest.mark.parametrize("fmt", (FormatV01(), FormatV02(), FormatV03()))
-    def test_version(self, fmt):
-        write_multiscales_metadata(self.root, [{"path": "0"}], fmt=fmt)
-        assert "multiscales" in self.root.attrs
-        assert self.root.attrs["multiscales"][0]["version"] == fmt.version
-        assert self.root.attrs["multiscales"][0]["datasets"] == [{"path": "0"}]
-
     @pytest.mark.parametrize(
         "axes",
         (
@@ -754,14 +697,6 @@ class TestMultiscalesMetadata:
         with pytest.raises(ValueError):
             # for v0.4 and above, paths no-longer supported (need dataset dicts)
             write_multiscales_metadata(self.root, ["0"], axes=axes, fmt=FormatV04())
-
-    @pytest.mark.parametrize("fmt", (FormatV01(), FormatV02()))
-    def test_axes_ignored(self, fmt):
-        write_multiscales_metadata(
-            self.root, [{"path": "0"}], fmt=fmt, axes=["t", "c", "z", "y", "x"]
-        )
-        assert "multiscales" in self.root.attrs
-        assert "axes" not in self.root.attrs["multiscales"][0]
 
     @pytest.mark.parametrize(
         "axes",
@@ -1101,18 +1036,6 @@ class TestPlateMetadata:
         elif fmt.version == "0.5":
             Models05HCS.from_zarr(group)
 
-    @pytest.mark.parametrize("fmt", (FormatV01(), FormatV02(), FormatV03()))
-    def test_legacy_wells(self, fmt):
-        write_plate_metadata(self.root, ["A"], ["1"], ["A/1"], fmt=fmt)
-        assert "plate" in self.root.attrs
-        assert self.root.attrs["plate"]["columns"] == [{"name": "1"}]
-        assert self.root.attrs["plate"]["rows"] == [{"name": "A"}]
-        assert self.root.attrs["plate"]["version"] == fmt.version
-        assert self.root.attrs["plate"]["wells"] == [{"path": "A/1"}]
-        assert "name" not in self.root.attrs["plate"]
-        assert "field_count" not in self.root.attrs["plate"]
-        assert "acquisitions" not in self.root.attrs["plate"]
-
     def test_plate_name(self):
         # We don't need to test v04 and v05 for all tests since
         # the metadata is the same
@@ -1252,20 +1175,6 @@ class TestPlateMetadata:
         with pytest.raises(ValueError):
             write_plate_metadata(self.root, ["A"], ["1"], wells, fmt=FormatV04())
 
-    @pytest.mark.parametrize("fmt", (FormatV01(), FormatV02(), FormatV03()))
-    def test_legacy_unspecified_well_keys(self, fmt):
-        wells = [
-            {"path": "A/1", "unspecified_key": "alpha"},
-            {"path": "A/2", "unspecified_key": "beta"},
-            {"path": "B/1", "unspecified_key": "gamma"},
-        ]
-        write_plate_metadata(self.root, ["A", "B"], ["1", "2"], wells, fmt=fmt)
-        assert "plate" in self.root.attrs
-        assert self.root.attrs["plate"]["columns"] == [{"name": "1"}, {"name": "2"}]
-        assert self.root.attrs["plate"]["rows"] == [{"name": "A"}, {"name": "B"}]
-        assert self.root.attrs["plate"]["version"] == fmt.version
-        assert self.root.attrs["plate"]["wells"] == wells
-
     def test_unspecified_well_keys(self):
         wells = [
             {
@@ -1385,13 +1294,6 @@ class TestWellMetadata:
         ]
         assert self.root_v3.attrs["ome"]["version"] == FormatV05().version
         Models05Well.from_zarr(self.root_v3)
-
-    @pytest.mark.parametrize("fmt", (FormatV01(), FormatV02(), FormatV03()))
-    def test_version(self, fmt):
-        write_well_metadata(self.root, ["0"], fmt=fmt)
-        assert "well" in self.root.attrs
-        assert self.root.attrs["well"]["images"] == [{"path": "0"}]
-        assert self.root.attrs["well"]["version"] == fmt.version
 
     def test_multiple_acquisitions(self):
         images = [
@@ -1519,9 +1421,6 @@ class TestLabelWriter:
     @pytest.mark.parametrize(
         "format_version",
         (
-            pytest.param(FormatV01, id="V01"),
-            pytest.param(FormatV02, id="V02"),
-            pytest.param(FormatV03, id="V03"),
             pytest.param(FormatV04, id="V04"),
             pytest.param(FormatV05, id="V05"),
         ),
@@ -1593,9 +1492,6 @@ class TestLabelWriter:
     @pytest.mark.parametrize(
         "format_version",
         (
-            pytest.param(FormatV01, id="V01"),
-            pytest.param(FormatV02, id="V02"),
-            pytest.param(FormatV03, id="V03"),
             pytest.param(FormatV04, id="V04"),
             pytest.param(FormatV05, id="V05"),
         ),
