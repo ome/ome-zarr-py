@@ -8,3 +8,15 @@ rangehttpserver
 scipy
 scikit-image
 Deprecated
+sphinx-copybutton
+sphinx-togglebutton
+myst-nb
+sphinx-thebe
+sphinx-comments
+sphinx-design
+sphinx-book-theme
+sphinx-external-toc
+sphinx-jupyterbook-latex
+linkify-it-py
+napari
+pyqt6

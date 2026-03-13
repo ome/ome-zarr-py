@@ -43,6 +43,12 @@ ArrayLike = Union[da.Array, np.ndarray]  # noqa: UP007  # FIXME
 class Scaler:
     """Helper class for performing various types of downsampling.
 
+    .. deprecated:: 0.14.0
+        **This class is deprecated and should not be used.**
+
+        Downsampling via the `Scaler` class has been deprecated.
+        Please use the `scale_factors` argument in the :py:func:`ome_zarr.writer.write_image()` function instead.
+
     A method can be chosen by name such as "nearest". All methods on this
     that do not begin with "_" and not either "methods" or "scale" are valid
     choices. These values can be returned by the
@@ -303,10 +309,46 @@ SPATIAL_DIMS = ("z", "y", "x")
 
 
 class Methods(Enum):
+    """Downsampling methods for multi-scale image generation.
+
+    Each method uses different algorithms and parameters. Refer to the
+    `method_dispatch` dictionary for detailed configuration of each approach.
+    """
+
     RESIZE = "resize"
+    """Bilinear interpolation downsampling (default).
+
+    Uses :func:`skimage.transform.resize` with:
+
+    - order=1 (bilinear interpolation)
+    - mode='reflect'
+    - anti_aliasing=True
+    - preserve_range=True
+    """
+
     NEAREST = "nearest"
+    """Nearest-neighbor downsampling.
+
+    Uses :func:`skimage.transform.resize` with:
+
+    - order=0 (nearest neighbor)
+    - mode='reflect'
+    - anti_aliasing=False
+    - preserve_range=True
+    """
+
     LOCAL_MEAN = "local_mean"
+    """Local mean downsampling.
+
+    Uses :func:`skimage.transform.downscale_local_mean` to average pixel values
+    in fixed-size neighborhoods.
+    """
+
     ZOOM = "zoom"
+    """Zoom-based flexible downsampling.
+
+    Uses :func:`scipy.ndimage.zoom` for general-purpose downsampling.
+    """
 
 
 method_dispatch = {
