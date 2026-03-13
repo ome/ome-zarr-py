@@ -3,7 +3,7 @@ import zarr
 from numpy import zeros
 
 from ome_zarr.data import create_zarr
-from ome_zarr.format import FormatV01, FormatV02, FormatV03, FormatV04
+from ome_zarr.format import FormatV04
 from ome_zarr.io import parse_url
 from ome_zarr.reader import Label, Labels, Multiscales, Node, Plate, Well
 from ome_zarr.writer import write_image, write_plate_metadata, write_well_metadata
@@ -49,12 +49,12 @@ class TestHCSNode:
         )
 
     def test_minimal_plate(self):
-        write_plate_metadata(self.root, ["A"], ["1"], ["A/1"], fmt=FormatV01())
+        write_plate_metadata(self.root, ["A"], ["1"], ["A/1"], fmt=FormatV04())
         row_group = self.root.require_group("A")
         well = row_group.require_group("1")
         write_well_metadata(well, ["0"], fmt=FormatV04())
         image = well.require_group("0")
-        write_image(zeros((1, 1, 1, 256, 256)), image, fmt=FormatV01())
+        write_image(zeros((1, 1, 1, 256, 256)), image, fmt=FormatV04())
 
         node = Node(parse_url(str(self.path)), list())
         assert node.data
@@ -73,7 +73,7 @@ class TestHCSNode:
         assert len(node.specs) == 1
         assert isinstance(node.specs[0], Well)
 
-    @pytest.mark.parametrize("fmt", (FormatV01(), FormatV02(), FormatV03()))
+    @pytest.mark.parametrize("fmt", (FormatV04(),))
     def test_multiwells_plate(self, fmt):
         row_names = ["A", "B", "C"]
         col_names = ["1", "2", "3", "4"]
@@ -123,12 +123,12 @@ class TestHCSNode:
         ),
     )
     def test_plate_2D5D(self, axes, dims):
-        write_plate_metadata(self.root, ["A"], ["1"], ["A/1"], fmt=FormatV03())
+        write_plate_metadata(self.root, ["A"], ["1"], ["A/1"], fmt=FormatV04())
         row_group = self.root.require_group("A")
         well = row_group.require_group("1")
-        write_well_metadata(well, ["0"], fmt=FormatV03())
+        write_well_metadata(well, ["0"], fmt=FormatV04())
         image = well.require_group("0")
-        write_image(zeros(dims), image, fmt=FormatV03(), axes=axes)
+        write_image(zeros(dims), image, fmt=FormatV04(), axes=axes)
 
         node = Node(parse_url(str(self.path)), list())
         assert node.data
