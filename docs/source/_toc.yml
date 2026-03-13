@@ -9,9 +9,10 @@ parts:
     chapters:
     - file: basic/write_image
     - file: basic/read_image
+    - file: basic/view_images
     - file: basic/write_labels
     - file: basic/cli_basics
-    - file: basic/view_images
+
 
   - caption: Advanced
     chapters:
