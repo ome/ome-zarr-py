@@ -1038,7 +1038,6 @@ def write_labels(
     group, fmt = check_group_fmt(group, fmt)
     sub_group = group.require_group(f"labels/{name}")
 
-
     if type(fmt) in (FormatV01, FormatV02, FormatV03):
         raise DeprecationWarning(
             f"Writing ome-zarr v{fmt.version} is deprecated and has been removed in version 0.15.0."

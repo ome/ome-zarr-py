@@ -3,7 +3,7 @@ import zarr
 from numpy import zeros
 
 from ome_zarr.data import create_zarr
-from ome_zarr.format import FormatV03, FormatV04, FormatV05
+from ome_zarr.format import FormatV04
 from ome_zarr.io import parse_url
 from ome_zarr.reader import Label, Labels, Multiscales, Node, Plate, Well
 from ome_zarr.writer import write_image, write_plate_metadata, write_well_metadata

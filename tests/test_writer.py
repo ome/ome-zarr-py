@@ -23,8 +23,6 @@ from zarr.codecs import BloscCodec
 
 from ome_zarr.format import (
     CurrentFormat,
-    FormatV01,
-    FormatV02,
     FormatV03,
     FormatV04,
     FormatV05,

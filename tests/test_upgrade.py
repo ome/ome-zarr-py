@@ -8,6 +8,7 @@ from ome_zarr.format import CurrentFormat
 from ome_zarr.io import parse_url
 from ome_zarr.reader import Multiscales, Reader
 
+
 class TestUpgrade:
     @pytest.fixture(autouse=True)
     def initdir(self, tmpdir):
