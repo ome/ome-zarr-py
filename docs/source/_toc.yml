@@ -5,18 +5,18 @@ options:
   numbered: False
 
 parts:
-  - caption: Tutorials
+  - caption: Basic
     chapters:
-    - file: tutorials/write_image
-    - file: tutorials/read_image
-    - file: tutorials/write_labels
-    - file: tutorials/write_hcs_plate
-    - file: tutorials/cli_basics
-    - file: tutorials/view_ome_zarr
+    - file: basic/write_image
+    - file: basic/read_image
+    - file: basic/write_labels
+    - file: basic/cli_basics
+    - file: basic/view_images
 
-  - caption: How-To Guides
+  - caption: Advanced
     chapters:
-    - file: howtos/build_custom_pyramid
+    - file: advanced/build_custom_pyramid
+    - file: advanced/write_hcs_plate
 
   - caption: Explanation
     chapters:
