@@ -27,7 +27,7 @@ OME-ZARR defines conventions for storing multi-dimensional microscopy images wit
 
 ### Tools
 
-A comprehensive list of tools to generate, convert, view or work wth ome-zarr images in general
+A comprehensive list of tools to generate, convert, view or work with ome-zarr images in general
 is provided on the [ngff website](https://ngff.openmicroscopy.org/resources/tools/index.html)
 
 ### Community
