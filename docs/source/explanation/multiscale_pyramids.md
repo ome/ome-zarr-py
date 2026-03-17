@@ -32,12 +32,12 @@ Different downsampling methods are appropriate for different data types:
 
 | Method | Use Case |
 |--------|----------|
-| `gaussian` | General intensity images |
-| `nearest` | Categorical data (labels, segmentations) |
-| `mean` | Averaging for smoother results |
-| `resize` | Fast skimage-based resizing |
+|`ome_zarr.scale.Methods.resize` | Fast skimage-based resizing |
+| `ome_zarr.scale.Methods.nearest` | Categorical data (labels, segmentations) |
+| `ome_zarr.scale.Methods.zoom` | Downsampling using the [scipy zoom function](https://docs.scipy.org/doc/scipy/reference/generated/scipy.ndimage.zoom.html#scipy.ndimage.zoom) |
+| `ome_zarr.scale.Methods.local_mean` | Local averaging for smoother results |
 
-See {py:class}`ome_zarr.scale.Methods` for available options.
+See {py:class}`ome_zarr.scale.Methods` for all available options and more details.
 
 ## Resources
 
