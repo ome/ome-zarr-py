@@ -24,7 +24,6 @@ parts:
     - file: explanation/ome_ngff_overview
     - file: explanation/multiscale_pyramids
     - file: explanation/zarr_concepts
-    - file: explanation/related_tools
 
   - caption: API Reference
     chapters:

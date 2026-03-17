@@ -1,4 +1,5 @@
 # View OME-ZARR images
+(basic:view_images)
 
 A variety of tools exist to view ome-zarr images in different frameworks.
 

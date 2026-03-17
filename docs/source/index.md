@@ -7,7 +7,7 @@ is not yet supported by all OME-Zarr tools. See the documentation for more infor
 
 ## Features
 
-- {doc}`tutorials/cli_basics` for reading and downloading OME-ZARR filesets.
+- {doc}`basic/cli_basics` for reading and downloading OME-ZARR filesets.
 - {doc}`api` for reading and writing OME-ZARR filesets.
 - Used by the [napari-ome-zarr](https://github.com/ome/napari-ome-zarr) plugin for viewing OME-ZARR filesets in [napari](https://github.com/napari/napari).
 
