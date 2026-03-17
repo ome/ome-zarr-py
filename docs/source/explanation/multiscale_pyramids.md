@@ -41,5 +41,5 @@ See {py:class}`ome_zarr.scale.Methods` for all available options and more detail
 
 ## Resources
 
-- [Zarr Chunking Guide](https://zarr.readthedocs.io/en/stable/tutorial.html#chunk-optimizations)
+- [Zarr Chunking Guide](https://zarr.readthedocs.io/en/stable/user-guide/performance/#chunk-optimizations)
 - [Dask Array Documentation](https://docs.dask.org/en/stable/array.html)
