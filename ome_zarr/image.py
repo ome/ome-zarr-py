@@ -45,7 +45,8 @@ class NgffImage:
         match the order of `dims`. If a dict is provided, keys should be dimension names,
         e.g. {'x': 0.1, 'y': 0.1, 'z': 0.5}. Default is None, which sets all scales to 1.0.
     axes_units : dict of str to str, optional
-        Units for each dimension, e.g. {'x': 'micrometer', 'y': 'micrometer'}. Default is empty dict.
+        Units for each axis, e.g. {'x': 'micrometer', 'y': 'micrometer'}.
+        Default is None (no units).
     name : str, optional
         Name of the image. Default is "image".
 
@@ -53,23 +54,19 @@ class NgffImage:
     ----------
     data : dask.array.Array
         The image data array.
-    dims : sequence of str
-        The dimension names.
+    axes : sequence of str
+        The axis names.
     scale : dict of str to float
-        The physical scale for each dimension.
+        The physical scale for each axis.
     axes_units : dict of str to str
-        Units for each dimension.
+        Units for each axis, e.g. {'x': 'micrometer', 'y': 'micrometer'}.
+        Default is None (no units).
     name : str
         Name of the image.
-
-    Methods
-    -------
-    to_multiscales(scale_factors=None, method=Methods.RESIZE) -> NgffMultiscales
-        Build a multiscale pyramid from this image.
     """
 
     data: da.Array | np.ndarray
-    dims: Sequence[str] | str
+    axes: Sequence[str] | str
     scale: Sequence[float] | dict[str, float] | None = None
     axes_units: dict[str, str] | None = None
     name: str | None = "image"
@@ -77,25 +74,25 @@ class NgffImage:
     def __post_init__(self):
         # set default scale if unset
         if not self.scale:
-            self.scale = tuple(1.0 for _ in range(len(self.dims)))
+            self.scale = tuple(1.0 for _ in range(len(self.axes)))
 
-        # coerce dims to list
-        if isinstance(self.dims, str):
-            self.dims = list(self.dims)
+        # coerce axes to list
+        if isinstance(self.axes, str):
+            self.axes = list(self.axes)
 
         # coerce scale to dict if it's a sequence
         if isinstance(self.scale, Sequence):
-            self.scale = dict(zip(self.dims, self.scale))
+            self.scale = dict(zip(self.axes, self.scale))
 
         # coerce data to dask array
         if not isinstance(self.data, da.Array):
             self.data = da.from_array(self.data)
 
         # validate dimensions match data shape
-        if len(self.dims) != len(self.data.shape):
+        if len(self.axes) != len(self.data.shape):
             raise ValueError(
                 f"Number of dimensions in data ({len(self.data.shape)}) "
-                f"does not match number of dims ({len(self.dims)})"
+                f"does not match number of dims ({len(self.axes)})"
             )
 
 
@@ -109,13 +106,22 @@ class NgffMultiscales:
     image : NgffImage
         The base (highest resolution) image.
     scale_factors : list of int, optional
-        Downsampling factors for each pyramid level. Default: [2, 4, 8, 16].
+        Downsampling factors for each pyramid level. 
+        If passed as a list of integers (i.e. [2, 4, 8]),
+        the same factors will be applied to all *spatial* dimensions
+        except for the z-axis (if present).
+        To customize this behavior, pass a list of dicts mapping dimension names to factors, e.g.
+        `[{'x': 2, 'y': 2}, {'x': 4, 'y': 4}, {'x': 8, 'y': 8}]`
+        Default: [2, 4, 8, 16].
     method : str or Methods, optional
         Downsampling method to use. Default: Methods.RESIZE.
-    labels : NgffMultiscales or dict of str to NgffMultiscales, optional
-        Optional labels to associate with the image pyramid. Can be a single NgffMultiscales
-        instance (for a single label pyramid) or a dict mapping label names to NgffMultiscales
-        instances (for multiple label pyramids). Default is None (no labels).
+    labels : :class:`NgffMultiscales` or dict of str to :class:`NgffMultiscales`, optional
+        Optional labels to associate with the image pyramid.
+        Can be a single :class:`NgffMultiscales` instance (for a single label pyramid)
+        or a dict mapping label names to :class:`NgffMultiscales` instances
+        (for multiple label pyramids), e.g.
+        `{'nuclei': nuclei_multiscale, 'cells': cells_multiscale}`.
+        Default is None (no labels).
 
     Attributes
     ----------
@@ -123,22 +129,10 @@ class NgffMultiscales:
         List of images at each pyramid level.
     metadata : Multiscale
         OME-Zarr multiscale metadata.
-
-    Methods
-    -------
-    from_image(image, scale_factors=None, method=Methods.RESIZE) -> NgffMultiscales
-        Build a multiscale pyramid from a base image.
-    to_ome_zarr(group, storage_options=None, version="0.6", compute=True)
-        Serialize the multiscale pyramid to an OME-Zarr group.
-    from_ome_zarr(group) -> NgffMultiscales
-        Load a multiscale pyramid from an OME-Zarr group.
-
     """
 
     image: InitVar[NgffImage]
-    scale_factors: list[int] | list[dict[str, int]] = field(
-        default_factory=lambda: [2, 4, 8, 16]
-    )
+    scale_factors: InitVar[list[int] | list[dict[str, int]] | None] = None
     method: str | Methods = Methods.RESIZE
     coordinateTransformations: InitVar[list[Scale | Translation | Identity] | None] = (
         None
@@ -150,11 +144,11 @@ class NgffMultiscales:
     def __post_init__(
         self,
         image: NgffImage,
-        scale_factors: list[int] | list[dict[str, int]] |None,
+        scale_factors: list[int] | list[dict[str, int]] | None,
         coordinateTransformations: list[Scale | Translation | Identity] | None,
     ):
-        if self.scale_factors is None:
-            self.scale_factors = [2, 4, 8, 16]
+        if scale_factors is None:
+            scale_factors = [2, 4, 8, 16]
         from .scale import _build_pyramid
 
         self.name = image.name
@@ -165,8 +159,8 @@ class NgffMultiscales:
         # Build the pyramid data
         pyramid = _build_pyramid(
             image=image.data,
-            dims=image.dims,
-            scale_factors=self.scale_factors,
+            dims=image.axes,
+            scale_factors=scale_factors,
             method=method,
         )
 
@@ -181,7 +175,7 @@ class NgffMultiscales:
             scales.append(
                 {
                     d: s * image_scale[d] if d in image_scale else 1.0
-                    for d, s in zip(image.dims, scale)
+                    for d, s in zip(image.axes, scale)
                 }
             )
 
@@ -193,7 +187,7 @@ class NgffMultiscales:
             images.append(
                 NgffImage(
                     data=level_data,
-                    dims=image.dims,
+                    axes=image.axes,
                     scale=level_scale,
                     axes_units=image.axes_units,
                     name=image.name,
@@ -218,7 +212,7 @@ class NgffMultiscales:
             image.axes_units = {}
 
         axes = []
-        for d in image.dims:
+        for d in image.axes:
             if d in SPATIAL_DIMS:
                 axes.append(Axis(name=d, type="space", unit=image.axes_units.get(d)))
             elif d == "t":
@@ -246,7 +240,7 @@ class NgffMultiscales:
         self,
         group: zarr.Group | str,
         storage_options: list[dict[str, Any]] | dict[str, Any] | None = None,
-        version: str | None = "0.6",
+        version: str | None = "0.5",
         compute: bool = True,
     ) -> list:
         """
@@ -260,8 +254,11 @@ class NgffMultiscales:
             Additional storage options to pass to Zarr, such as:
             - `compressor`: A Zarr compressor instance for compressing the data.
             - `chunks`: A tuple specifying the chunk shape for writing data.
+            To specifiy separately for each resolution level,
+            pass a list of dicts with storage options for each level, e.g.
+            `[{'compressor': Blosc(), 'chunks': (64, 64, 64)}, {'compressor': Blosc(), 'chunks': (128, 128, 128)}, ...]`
         fmt : Format, optional
-            The OME-Zarr format version to use. Defaults to the current format.
+            The OME-Zarr format version to use. Defaults to the current format (0.5).
         compute : bool, optional
             If True, compute immediately; otherwise return delayed objects.
 
@@ -382,8 +379,8 @@ class NgffMultiscales:
 
         Returns
         -------
-        NgffMultiscales
-            A NgffMultiscales container with the loaded images and metadata.
+        NgffMultiscales`
+            A :class:`NgffMultiscales` container with the loaded images and metadata.
         """
 
         if isinstance(group, str):
@@ -445,7 +442,7 @@ class NgffMultiscales:
             images.append(
                 NgffImage(
                     data=data,
-                    dims=[ax.name for ax in metadata.axes],
+                    axes=[ax.name for ax in metadata.axes],
                     scale={d.name: s for d, s in zip(metadata.axes, scale)},
                     axes_units=axes_units,
                     name=metadata.name,
