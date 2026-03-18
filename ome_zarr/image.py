@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from dataclasses import InitVar, dataclass, field
+from dataclasses import InitVar, dataclass
 from typing import Any, cast
 
 import dask.array as da
@@ -106,7 +106,7 @@ class NgffMultiscales:
     image : NgffImage
         The base (highest resolution) image.
     scale_factors : list of int, optional
-        Downsampling factors for each pyramid level. 
+        Downsampling factors for each pyramid level.
         If passed as a list of integers (i.e. [2, 4, 8]),
         the same factors will be applied to all *spatial* dimensions
         except for the z-axis (if present).
@@ -132,7 +132,9 @@ class NgffMultiscales:
     """
 
     image: InitVar[NgffImage]
-    scale_factors: InitVar[list[int] | list[dict[str, int]] | None] = None
+    scale_factors: InitVar[
+        list[int] | tuple[int, ...] | list[dict[str, int]] | None
+    ] = None
     method: str | Methods = Methods.RESIZE
     coordinateTransformations: InitVar[list[Scale | Translation | Identity] | None] = (
         None
@@ -144,11 +146,11 @@ class NgffMultiscales:
     def __post_init__(
         self,
         image: NgffImage,
-        scale_factors: list[int] | list[dict[str, int]] | None,
+        scale_factors: list[int] | tuple[int, ...] | list[dict[str, int]] | None,
         coordinateTransformations: list[Scale | Translation | Identity] | None,
     ):
         if scale_factors is None:
-            scale_factors = [2, 4, 8, 16]
+            scale_factors = (2, 4, 8, 16)
         from .scale import _build_pyramid
 
         self.name = image.name
@@ -254,7 +256,7 @@ class NgffMultiscales:
             Additional storage options to pass to Zarr, such as:
             - `compressor`: A Zarr compressor instance for compressing the data.
             - `chunks`: A tuple specifying the chunk shape for writing data.
-            To specifiy separately for each resolution level,
+            To specify separately for each resolution level,
             pass a list of dicts with storage options for each level, e.g.
             `[{'compressor': Blosc(), 'chunks': (64, 64, 64)}, {'compressor': Blosc(), 'chunks': (128, 128, 128)}, ...]`
         fmt : Format, optional
