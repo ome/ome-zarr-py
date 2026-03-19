@@ -1,0 +1,40 @@
+format: jb-book
+root: index
+
+options:
+  numbered: False
+
+parts:
+  - caption: Basic
+    chapters:
+    - file: basic/write_image
+    - file: basic/read_image
+    - file: basic/view_images
+    - file: basic/write_labels
+    - file: basic/cli_basics
+
+
+  - caption: Advanced
+    chapters:
+    - file: advanced/build_custom_pyramid
+    - file: advanced/write_hcs_plate
+
+  - caption: Explanation
+    chapters:
+    - file: explanation/ome_ngff_overview
+    - file: explanation/multiscale_pyramids
+    - file: explanation/zarr_concepts
+
+  - caption: API Reference
+    chapters:
+    - file: api
+      sections:
+      - file: api/writer
+      - file: api/reader
+      - file: api/io
+      - file: api/scale
+      - file: api/format
+      - file: api/cli
+      - file: api/utils
+      - file: api/csv
+      - file: api/data

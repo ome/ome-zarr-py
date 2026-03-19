@@ -1,70 +1,77 @@
-.. highlight:: bash
-
-
-Command-line tool
------------------
+# Command-line tool
+(basics:cli)
 
 Open Zarr filesets containing images with associated OME metadata.
 The examples below use the image at http://idr.openmicroscopy.org/webclient/?show=image-6001240.
 
-All examples can be made more or less verbose by passing `-v` or `-q` one or more times::
+All examples can be made more or less verbose by passing `-v` or `-q` one or more times:
 
-    ome_zarr -vvv ...
+```bash
+ome_zarr -vvv ...
+```
 
-
-info
-====
+## info
 
 Use the `ome_zarr` command to interrogate Zarr datasets.
 
-Remote data::
+Remote data:
 
-    ome_zarr info https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.5/idr0062A/6001240_labels.zarr/
+```bash
+ome_zarr info https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.5/idr0062A/6001240_labels.zarr/
+```
 
-Local data::
+Local data:
 
-    ome_zarr info 6001240_labels.zarr/
+```bash
+ome_zarr info 6001240_labels.zarr/
+```
 
-view
-====
+## view
 
-Use the `ome_zarr` command to serve local Zarr data and view it in the https://ome.github.io/ome-ngff-validator::
+Use the `ome_zarr` command to serve local Zarr data and view it in the https://ome.github.io/ome-ngff-validator:
 
-    ome_zarr view 6001240.zarr/
+```bash
+ome_zarr view 6001240.zarr/
 
-    # Use -f or --force to open in browser even if no valid data is found
-    ome_zarr view 6001240.zarr/ -f
+# Use -f or --force to open in browser even if no valid data is found
+ome_zarr view 6001240.zarr/ -f
+```
 
-finder
-======
+## finder
 
 Use the `ome_zarr` command to display multiple OME-Zarr images in the BioFile Finder app
 in a browser. This command parses the specified directory to find all OME-Zarr Images
 and Plates, combines them into a `biofile_finder.csv` file and opens this in the
-app, which allows you to browse thumbnails of all images::
+app, which allows you to browse thumbnails of all images:
 
+```bash
     ome_zarr finder /path/to/dir/
+```
 
-download
-========
+## download
 
-To download all the resolutions and metadata for an image use ``ome_zarr download``. This creates ``6001240.zarr`` locally::
+To download all the resolutions and metadata for an image use ``ome_zarr download``. This creates ``6001240.zarr`` locally:
 
-    ome_zarr download https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.5/idr0062A/6001240_labels.zarr
+```bash
+ome_zarr download https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.5/idr0062A/6001240_labels.zarr
+```
 
-Specify a different output directory::
+Specify a different output directory:
 
-    ome_zarr download https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.5/idr0062A/6001240_labels.zarr --output image_dir
+```bash
+ome_zarr download https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.5/idr0062A/6001240_labels.zarr --output image_dir
+```
 
-scale
-=====
+## scale
 
 Use the `ome_zarr scale` command to generate a multiscale pyramid from a Zarr array.
 This creates downsampled resolutions of the input image using the specified downsampling method.
 
-Basic usage::
+Basic usage:
 
-    ome_zarr scale input.zarr output.zarr zyx
+```bash
+ome_zarr scale input.zarr output.zarr zyx
+```
 
 This reads the input Zarr array with dimensions 'zyx' and writes a multiscale pyramid to the output directory.
 
@@ -80,30 +87,33 @@ Options:
     - `zoom`: Scipy zoom
 - `--copy-metadata`: If specified, copies the input array metadata to the output group
 
-Example with custom options::
+Example with custom options:
 
-    ome_zarr scale input.zarr output.zarr tczyx --downscale 3 --max_layer 5 --method nearest --copy-metadata
+```bash
+ome_zarr scale input.zarr output.zarr tczyx --downscale 3 --max_layer 5 --method nearest --copy-metadata
+```
 
 
-
-create
-======
+## create
 
 To create a sample OME-Zarr image from the `skimage <https://scikit-image.org/docs/stable/api/skimage.data.html>`_
 data.
 
-Create an OME-Zarr image in coinsdata.zarr using the 'coins' method in OME-Zarr latest version or v0.4::
+Create an OME-Zarr image in coinsdata.zarr using the 'coins' method in OME-Zarr latest version or v0.4:
 
-    ome_zarr create coinsdata.zarr
+```bash
+ome_zarr create coinsdata.zarr
 
-    ome_zarr create coinsdata.zarr --format 0.4
+ome_zarr create coinsdata.zarr --format 0.4
+```
 
-Create an RGB image from the skimage astronaut dataset in testimage.zarr::
+Create an RGB image from the skimage astronaut dataset in testimage.zarr:
 
-    ome_zarr create testimage.zarr --method=astronaut
+```bash
+ome_zarr create testimage.zarr --method=astronaut
+```
 
-csv to labels
-=============
+## csv_to_labels
 
 The `csv_to_labels` command uses a CSV file to add key:value properties to labels
 under an OME-Zarr Image or Plate.
@@ -125,13 +135,16 @@ to specify the data-type for each column (string by default).
  - `s`: `StringColumn`, for text
  - `b`: `BoolColumn`, for true/false
 
-Use e.g. `#d` as a suffix in the column name to denote a `float` column, no spaces etc.::
+Use e.g. `#d` as a suffix in the column name to denote a `float` column, no spaces etc.:
 
-    "area#d,label_text#s,Width#l,Height#l"
-
+```bash
+"area#d,label_text#s,Width#l,Height#l"
+```
 
 For example, to take values from columns named `area`, `label_text`, `Width` and `Height`
 within a CSV file named `labels_data.csv` with an ID column named `shape_id` and add these
-values to label properties with an ID key of `omero:shapeId` in an Image or Plate named `123.zarr`::
+values to label properties with an ID key of `omero:shapeId` in an Image or Plate named `123.zarr`:
 
-    ome_zarr csv_to_labels labels_data.csv shape_id "area#d,label_text#s,Width#l,Height#l" 123.zarr omero:shapeId
+```bash
+ome_zarr csv_to_labels labels_data.csv shape_id "area#d,label_text#s,Width#l,Height#l" 123.zarr omero:shapeId
+```
