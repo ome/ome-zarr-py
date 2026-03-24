@@ -251,12 +251,13 @@ Please use the 'storage_options' argument instead."""
             if chunks_opt is not None:
                 data = da.array(data).rechunk(chunks=chunks_opt)
                 options["chunks"] = chunks_opt
+            compressor = options.pop("compressor", zarr.storage.default_compressor)
             da_delayed = da.to_zarr(
                 arr=data,
                 url=group.store,
                 component=str(Path(group.path, str(path))),
-                storage_options=options,
-                compressor=options.get("compressor", zarr.storage.default_compressor),
+                storage_options=options if len(options) > 0 else None,
+                compressor=compressor,
                 dimension_separator=group._store._dimension_separator,
                 compute=compute,
             )
@@ -609,14 +610,15 @@ Please use the 'storage_options' argument instead."""
         LOGGER.debug(
             "write dask.array to_zarr shape: %s, dtype: %s", image.shape, image.dtype
         )
+        compressor = options.get("compressor", zarr.storage.default_compressor)
         delayed.append(
             da.to_zarr(
                 arr=image,
                 url=group.store,
                 component=str(Path(group.path, str(path))),
-                storage_options=options,
+                storage_options=options if len(options) > 0 else None,
                 compute=False,
-                compressor=options.get("compressor", zarr.storage.default_compressor),
+                compressor=compressor,
                 dimension_separator=group._store._dimension_separator,
             )
         )
