@@ -1,9 +1,12 @@
+import json
 import logging
 import os
+from pathlib import Path
 
 import pytest
 
 from ome_zarr.data import astronaut, create_zarr
+from ome_zarr.format import FormatV05
 from ome_zarr.utils import download, info
 
 
@@ -46,3 +49,22 @@ class TestOmeZarr:
         # check download progress in stdout
         out = capsys.readouterr().out
         assert "100% Completed" in out
+
+    def test_download_v3_preserves_root_zarr_json(self, tmpdir):
+        source = tmpdir / "data-v3"
+        create_zarr(str(source), method=astronaut, fmt=FormatV05())
+
+        target = tmpdir / "out"
+        download(str(source), output_dir=str(target))
+
+        root_json = json.loads(
+            (Path(target) / "data-v3" / "zarr.json").read_text(encoding="utf-8")
+        )
+
+        assert root_json["node_type"] == "group"
+        assert root_json["zarr_format"] == 3
+        assert "attributes" not in root_json["attributes"]
+        assert "node_type" not in root_json["attributes"]
+        assert "zarr_format" not in root_json["attributes"]
+        assert "ome" in root_json["attributes"]
+        assert root_json["attributes"]["ome"]["version"] == FormatV05().version

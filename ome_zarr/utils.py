@@ -349,14 +349,9 @@ def download(input_path: str, output_dir: str = ".") -> None:
 
         metadata: JSONDict = {}
         node.write_metadata(metadata)
-
         if fmt.zarr_format == 3:
             # For zarr v3, we need to put metadata under "ome" namespace
-            metadata = {
-                "attributes": {"ome": metadata},
-                "zarr_format": 3,
-                "node_type": "group",
-            }
+            metadata = {"ome": metadata}
 
         root = zarr.open_group(
             target_path, mode="w", zarr_format=fmt.zarr_format, attributes=metadata
