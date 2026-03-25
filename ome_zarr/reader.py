@@ -282,7 +282,7 @@ class Multiscales(Spec):
         axes = multiscales[0].get("axes")
         fmt = format_from_version(version)
         # Raises ValueError if not valid
-        axes_obj = Axes(axes, fmt)
+        axes_obj = Axes(axes, fmt=fmt)
         node.metadata["axes"] = axes_obj.to_list()
         # This will get overwritten by 'omero' metadata if present
         node.metadata["name"] = multiscales[0].get("name")
