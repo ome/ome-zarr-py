@@ -302,29 +302,22 @@ class NgffMultiscales:
             group=group,
             storage_options=storage_options,
             fmt=fmt,
+            scale=cast(dict[str, float], self.images[0].scale),
             axes=[dict(ax) for ax in self.metadata.axes],
             compute=compute,
+            name=self.name,
         )
 
         # write labels data if passed
         if self.labels is not None:
             labels_dict = cast(dict[str, NgffMultiscales], self.labels)
-            for label_name, label_pyramid in labels_dict.items():
+            for label_name, ms_labels in labels_dict.items():
                 label_group = group.require_group(f"labels/{label_name}")
 
-                delayed += _write_pyramid_to_zarr(
-                    pyramid=[
-                        (
-                            img.data
-                            if isinstance(img.data, da.Array)
-                            else da.from_array(img.data)
-                        )
-                        for img in label_pyramid.images
-                    ],
+                delayed += ms_labels.to_ome_zarr(
                     group=label_group,
                     storage_options=storage_options,
-                    fmt=fmt,
-                    axes=[dict(ax) for ax in label_pyramid.metadata.axes],
+                    version=version,
                     compute=compute,
                 )
 
@@ -360,9 +353,6 @@ class NgffMultiscales:
                     "version": version,
                     "labels": list_of_labels,
                 }
-
-        else:
-            raise ValueError(f"Unsupported OME-Zarr version: {version}")
 
         return delayed
 
