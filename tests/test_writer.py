@@ -101,6 +101,15 @@ class TestWriter:
         data = self.create_data(shape)
         data = array_constructor(data)
         axes = "tczyx"[-len(shape) :]
+
+        # add some units
+        axes_units = {}
+        for ax in axes:
+            if ax == "t":
+                axes_units[ax] = "second"
+            elif ax == "z" or ax in ("y", "x"):
+                axes_units[ax] = "micrometer"
+
         transformations = []
         for dataset_transfs in TRANSFORMATIONS:
             transf = dataset_transfs[0]
@@ -118,6 +127,7 @@ class TestWriter:
             group=str(grp_path),
             fmt=version,
             axes=axes,
+            axes_units=axes_units,
             coordinate_transformations=transformations,
             storage_options=storage_options,
         )
@@ -135,6 +145,11 @@ class TestWriter:
             assert node_data[0].ndim == 5
         else:
             assert node_data[0].shape == shape
+
+        for ax in node_metadata["multiscales"][0].get("axes"):
+            if ax["name"] in axes_units:
+                assert ax.get("unit") == axes_units[ax["name"]]
+
         print("node.metadata", node_metadata)
         if version.version not in ("0.1", "0.2", "0.3"):
             cts = [
@@ -1690,7 +1705,3 @@ class TestLabelWriter:
         assert "labels" in attrs
         assert len(attrs["labels"]) == len(label_names)
         assert all(label_name in attrs["labels"] for label_name in label_names)
-
-
-if __name__ == "__main__":
-    pytest.main([__file__])

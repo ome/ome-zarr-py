@@ -1,16 +1,72 @@
 """Axes class for validating and transforming axes"""
 
+import warnings
 from typing import Any
 
 from .format import CurrentFormat, Format
 
 KNOWN_AXES = {"x": "space", "y": "space", "z": "space", "c": "channel", "t": "time"}
+KNOWN_SPATIAL_UNITS = [
+    "angstrom",
+    "attometer",
+    "femtometer",
+    "picometer",
+    "nanometer",
+    "millimeter",
+    "micrometer",
+    "centimeter",
+    "decimeter",
+    "meter",
+    "kilometer",
+    "megameter",
+    "hectometer",
+    "gigameter",
+    "terameter",
+    "petameter",
+    "exameter",
+    "inch",
+    "foot",
+    "mile",
+    "yard",
+    "parsec",
+    "yoctometer",
+    "yottameter",
+    "zeptometer",
+    "zettameter",
+]
+
+KNOWN_TEMPORAL_UNITS = [
+    "attosecond",
+    "centisecond",
+    "day",
+    "decisecond",
+    "exasecond",
+    "femtosecond",
+    "gigasecond",
+    "hectosecond",
+    "hour",
+    "kilosecond",
+    "megasecond",
+    "microsecond",
+    "millisecond",
+    "minute",
+    "nanosecond",
+    "petasecond",
+    "picosecond",
+    "second",
+    "terasecond",
+    "yoctosecond",
+    "yottasecond",
+    "zeptosecond",
+    "zettasecond",
+]
 
 
 class Axes:
     def __init__(
         self,
         axes: list[str] | list[dict[str, str]],
+        axes_units: dict[str, str] | None = None,
         fmt: Format = CurrentFormat(),
     ) -> None:
         """
@@ -23,6 +79,18 @@ class Axes:
         elif fmt.version in ("0.1", "0.2"):
             # strictly 5D
             self.axes = self._axes_to_dicts(["t", "c", "z", "y", "x"])
+
+        for ax in self.axes:
+            if axes_units and ax["name"] in axes_units:
+                ax["unit"] = axes_units[ax["name"]]
+                if ax.get("type") == "space" and ax["unit"] not in KNOWN_SPATIAL_UNITS:
+                    warnings.warn(
+                        f"Unit {ax['unit']} for axis {ax['name']} is not a known spatial unit"
+                    )
+                if ax.get("type") == "time" and ax["unit"] not in KNOWN_TEMPORAL_UNITS:
+                    warnings.warn(
+                        f"Unit {ax['unit']} for axis {ax['name']} is not a known temporal unit"
+                    )
         self.fmt = fmt
         self.validate()
 
