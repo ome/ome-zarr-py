@@ -21,6 +21,7 @@ from skimage.data import binary_blobs
 from zarr.abc.codec import BytesBytesCodec
 from zarr.codecs import BloscCodec
 
+from ome_zarr import USE_DASK_ARRAY_KWARGS
 from ome_zarr.format import (
     CurrentFormat,
     FormatV03,
@@ -30,7 +31,6 @@ from ome_zarr.format import (
 )
 from ome_zarr.scale import _build_pyramid
 from ome_zarr.writer import (
-    DASK_ARRAY_KWARGS,
     _get_valid_axes,
     _retuple,
     get_metadata,
@@ -1596,7 +1596,7 @@ class TestLabelWriter:
             level0.chunks == expected_chunks
         ), f"Expected chunks {expected_chunks}, got {level0.chunks}"
 
-        if DASK_ARRAY_KWARGS and fmt.version == "0.5" and hasattr(level0, "shards"):
+        if USE_DASK_ARRAY_KWARGS and fmt.version == "0.5" and hasattr(level0, "shards"):
             expected_shards = _retuple(storage_options["shards"], level0.shape)
             assert (
                 level0.shards == expected_shards
@@ -1606,13 +1606,13 @@ class TestLabelWriter:
 
         if level0.compressors:
             if fmt.version == "0.5":
-                if DASK_ARRAY_KWARGS:
+                if USE_DASK_ARRAY_KWARGS:
                     assert level0.compressors[0].cname.name == "zstd"
                 else:
                     assert level0.compressors[0].to_dict()["name"] == "zstd"
             else:
                 assert level0.compressors[0].cname == "zstd"
-            if DASK_ARRAY_KWARGS:
+            if USE_DASK_ARRAY_KWARGS:
                 assert level0.compressors[0].clevel == 3
                 if fmt.version == "0.5" and hasattr(level0, "serializer"):
                     assert (
@@ -1770,7 +1770,11 @@ class TestLabelWriter:
                 level.chunks == expected_chunks
             ), f"Level {level_idx}: Expected chunks {expected_chunks}, got {level.chunks}"
 
-            if DASK_ARRAY_KWARGS and fmt.version == "0.5" and hasattr(level, "shards"):
+            if (
+                USE_DASK_ARRAY_KWARGS
+                and fmt.version == "0.5"
+                and hasattr(level, "shards")
+            ):
                 expected_shards = _retuple(storage_options["shards"], level.shape)
                 assert (
                     level.shards == expected_shards
@@ -1782,13 +1786,13 @@ class TestLabelWriter:
 
             if level.compressors:
                 if fmt.version == "0.5":
-                    if DASK_ARRAY_KWARGS:
+                    if USE_DASK_ARRAY_KWARGS:
                         assert level.compressors[0].cname.name == "zstd"
                     else:
                         assert level.compressors[0].to_dict()["name"] == "zstd"
                 else:
                     assert level.compressors[0].cname == "zstd"
-                if DASK_ARRAY_KWARGS:
+                if USE_DASK_ARRAY_KWARGS:
                     assert level.compressors[0].clevel == 3
                     if fmt.version == "0.5" and hasattr(level, "serializer"):
                         assert (

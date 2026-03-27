@@ -24,11 +24,11 @@ from dask.diagnostics import ProgressBar
 # Not needed with python 3.15+? https://github.com/python/cpython/issues/86809
 from RangeHTTPServer import RangeRequestHandler
 
+from . import USE_DASK_ARRAY_KWARGS
 from .format import format_from_version
 from .io import parse_url
 from .reader import Multiscales, Node, Reader
 from .types import Any, JSONDict
-from .writer import DASK_ARRAY_KWARGS
 
 LOGGER = logging.getLogger("ome_zarr.utils")
 
@@ -366,7 +366,7 @@ def download(input_path: str, output_dir: str = ".") -> None:
                 datasets = spec.datasets
                 resolutions = node.data
                 zarr_array_kwargs: dict[str, Any] = {"zarr_format": fmt.zarr_format}
-                if DASK_ARRAY_KWARGS and fmt.zarr_format == 2:
+                if USE_DASK_ARRAY_KWARGS and fmt.zarr_format == 2:
                     zarr_array_kwargs["chunk_key_encoding"] = {
                         "name": "v2",
                         "separator": "/",

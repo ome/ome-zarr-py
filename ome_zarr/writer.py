@@ -10,19 +10,16 @@ import dask
 import dask.array as da
 import numpy as np
 import zarr
-from dask import __version__ as dask_version
 from dask.graph_manipulation import bind
 from numcodecs import Blosc
-from packaging.version import Version
 
+from . import USE_DASK_ARRAY_KWARGS
 from .axes import Axes
 from .format import CurrentFormat, Format, FormatV01, FormatV02, FormatV03, FormatV04
 from .scale import Methods, Scaler
 from .types import JSONDict
 
 LOGGER = logging.getLogger("ome_zarr.writer")
-# If not 2026.3.0 it must be 2025.11.0 or lower. Name indicates kwargs only contain array kwargs in the dask version.
-DASK_ARRAY_KWARGS = Version(dask_version) >= Version("2026.3.0")
 
 ListOfArrayLike = list[da.Array] | list[np.ndarray]
 ArrayLike: TypeAlias = da.Array | np.ndarray
@@ -696,7 +693,7 @@ def _write_pyramid_to_zarr(
     zarr_format = zarr_array_kwargs["zarr_format"] = fmt.zarr_format
     options = _resolve_storage_options(storage_options, 0)
 
-    if DASK_ARRAY_KWARGS:
+    if USE_DASK_ARRAY_KWARGS:
         if zarr_format == 2:
             zarr_array_kwargs["chunk_key_encoding"] = {"name": "v2", "separator": "/"}
 
@@ -724,7 +721,7 @@ def _write_pyramid_to_zarr(
     for idx, level in enumerate(pyramid):
         zarr_array_kwargs_copy = zarr_array_kwargs.copy()
         options = _resolve_storage_options(storage_options, idx)
-        if DASK_ARRAY_KWARGS:
+        if USE_DASK_ARRAY_KWARGS:
             options.pop("compressor", None)
         else:
             zarr_array_kwargs_copy["compressor"] = options.pop("compressor", None)
@@ -732,7 +729,7 @@ def _write_pyramid_to_zarr(
         # ensure that the chunk dimensions match the image dimensions
         # (which might have been changed for versions 0.1 or 0.2)
         # if chunks are explicitly set in the storage options
-        if "compressors" not in zarr_array_kwargs_copy and DASK_ARRAY_KWARGS:
+        if "compressors" not in zarr_array_kwargs_copy and USE_DASK_ARRAY_KWARGS:
             zarr_array_kwargs_copy["compressors"] = options.pop("compressors", "auto")
 
         chunks_opt = options.get("chunks", "auto")
@@ -767,7 +764,7 @@ def _write_pyramid_to_zarr(
             if k not in zarr_array_kwargs_copy:
                 zarr_array_kwargs_copy[k] = v
 
-        if not DASK_ARRAY_KWARGS:
+        if not USE_DASK_ARRAY_KWARGS:
             if "chunks" in zarr_array_kwargs_copy:
                 level_image = level_image.rechunk(zarr_array_kwargs_copy["chunks"])
                 del zarr_array_kwargs_copy["chunks"]
