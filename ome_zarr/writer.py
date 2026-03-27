@@ -10,8 +10,10 @@ import dask
 import dask.array as da
 import numpy as np
 import zarr
+from dask import __version__ as dask_version
 from dask.graph_manipulation import bind
 from numcodecs import Blosc
+from packaging.version import Version
 
 from .axes import Axes
 from .format import CurrentFormat, Format, FormatV01, FormatV02, FormatV03, FormatV04
@@ -19,6 +21,8 @@ from .scale import Methods, Scaler
 from .types import JSONDict
 
 LOGGER = logging.getLogger("ome_zarr.writer")
+# If not 2026.3.0 it must be 2025.11.0 or lower. Name indicates kwargs only contain array kwargs in the dask version.
+DASK_ARRAY_KWARGS = Version(dask_version) >= Version("2026.3.0")
 
 ListOfArrayLike = list[da.Array] | list[np.ndarray]
 ArrayLike: TypeAlias = da.Array | np.ndarray
@@ -232,11 +236,12 @@ def check_group_fmt(
     OR check fmt is compatible with group
     """
     if isinstance(group, str):
-        if fmt is None:
-            fmt = CurrentFormat()
-        group = zarr.open_group(group, mode=mode, zarr_format=fmt.zarr_format)
-    else:
-        fmt = check_format(group, fmt)
+        if not fmt:
+            group = zarr.open_group(group, mode=mode)
+        else:
+            group = zarr.open_group(group, mode=mode, zarr_format=fmt.zarr_format)
+
+    fmt = check_format(group, fmt)
     return group, fmt
 
 
@@ -643,8 +648,6 @@ def write_image(
     name = metadata.pop("name", None)
     name = str(name) if name is not None else None
 
-    dask_delayed_jobs = []
-
     dask_delayed_jobs = _write_pyramid_to_zarr(
         pyramid,
         group,
@@ -690,17 +693,13 @@ def _write_pyramid_to_zarr(
     # Set up common kwargs for da.to_zarr
     # zarr_array_kwargs needs dask 2025.12.0 or later
     zarr_array_kwargs: dict[str, Any] = {}
-    zarr_format = fmt.zarr_format
+    zarr_format = zarr_array_kwargs["zarr_format"] = fmt.zarr_format
     options = _resolve_storage_options(storage_options, 0)
 
-    if zarr_format == 2:
-        zarr_array_kwargs["chunk_key_encoding"] = {"name": "v2", "separator": "/"}
-        zarr_array_kwargs["compressor"] = options.pop("compressor", _blosc_compressor())
-    else:
-        if axes is not None:
-            zarr_array_kwargs["dimension_names"] = [
-                a["name"] for a in axes if isinstance(a, dict)
-            ]
+    if DASK_ARRAY_KWARGS:
+        if zarr_format == 2:
+            zarr_array_kwargs["chunk_key_encoding"] = {"name": "v2", "separator": "/"}
+
         if "compressor" in options:
             # We use 'compressors' for group.create_array() but da.to_zarr() below uses
             # zarr.create() which doesn't support 'compressors'
@@ -709,33 +708,47 @@ def _write_pyramid_to_zarr(
 
             # ValueError: compressor cannot be used for arrays with zarr_format 3.
             # Use bytes-to-bytes codecs instead.
-            zarr_array_kwargs["compressor"] = options.pop("compressor")
+            zarr_array_kwargs["compressors"] = options.pop("compressor")
+    elif zarr_format == 2:
+        zarr_array_kwargs["dimension_separator"] = "/"
+
+    if axes is not None and zarr_format != 2:
+        zarr_array_kwargs["dimension_names"] = [
+            a["name"] for a in axes if isinstance(a, dict)
+        ]
 
     shapes = []
     datasets: list[dict] = []
     delayed = []
 
     for idx, level in enumerate(pyramid):
-
-        # LOGGER.debug(f"write_image path: {path}")
+        zarr_array_kwargs_copy = zarr_array_kwargs.copy()
         options = _resolve_storage_options(storage_options, idx)
+        if DASK_ARRAY_KWARGS:
+            options.pop("compressor", None)
+        else:
+            zarr_array_kwargs_copy["compressor"] = options.pop("compressor", None)
 
         # ensure that the chunk dimensions match the image dimensions
         # (which might have been changed for versions 0.1 or 0.2)
         # if chunks are explicitly set in the storage options
-        chunks_opt = None
-        if isinstance(storage_options, list) and isinstance(storage_options[idx], dict):
-            if "chunks" in storage_options[idx]:
-                chunks_opt = options.pop("chunks", None)
+        if "compressors" not in zarr_array_kwargs_copy and DASK_ARRAY_KWARGS:
+            zarr_array_kwargs_copy["compressors"] = options.pop("compressors", "auto")
 
-        elif isinstance(storage_options, dict) and "chunks" in storage_options:
-            chunks_opt = options.pop("chunks", None)
+        chunks_opt = options.get("chunks", "auto")
+        shards_opt = options.get("shards", None)
 
-        if chunks_opt is not None:
+        # If shards are defined, one dask chunk should correspond to 1 shard to prevent concurrent writes to 1 shard.
+        # In this case user defined chunks will correspond to zarr chunks and not dask chunks.
+        # Check against string is purely because of mypy
+        if not isinstance(chunks_opt, str) and not shards_opt:
             chunks_opt = _retuple(chunks_opt, level.shape)
-            # image.chunks will be used by da.to_zarr
-            zarr_array_kwargs["chunks"] = chunks_opt
             level_image = da.array(level).rechunk(chunks=chunks_opt)
+        elif shards_opt is not None:
+            # This ensures that shards are always divisible by chunks, which is a requirement.
+            chunks_opt = _retuple(chunks_opt, level.shape)
+            shards_opt = _retuple(shards_opt, level.shape)
+            level_image = da.array(level).rechunk(shards_opt)
         else:
             level_image = level
 
@@ -747,13 +760,33 @@ def _write_pyramid_to_zarr(
             level_image.dtype,
         )
 
+        zarr_array_kwargs_copy["chunks"] = chunks_opt
+        zarr_array_kwargs_copy["shards"] = shards_opt
+
+        for k, v in options.items():
+            if k not in zarr_array_kwargs_copy:
+                zarr_array_kwargs_copy[k] = v
+
+        if not DASK_ARRAY_KWARGS:
+            if "chunks" in zarr_array_kwargs_copy:
+                level_image = level_image.rechunk(zarr_array_kwargs_copy["chunks"])
+                del zarr_array_kwargs_copy["chunks"]
+            if zarr_format != 2:
+                # zarr.create only allows compressor for zarr format 2, for 3 bytes-to-bytes codecs should be used.
+                zarr_array_kwargs_copy["compressor"] = "auto"
+
+            # Possibly non-exhaustive list of arguments not supported for zarr.create used by dask <=2025.11.0
+            zarr_array_kwargs_copy.pop("compressors", None)
+            zarr_array_kwargs_copy.pop("shards", None)
+            zarr_array_kwargs_copy.pop("serializer", None)
+
         delayed.append(
             da.to_zarr(
                 arr=level_image,
                 url=group.store,
                 component=str(Path(group.path, f"s{idx}")),
                 compute=False,
-                zarr_array_kwargs=zarr_array_kwargs,
+                **zarr_array_kwargs_copy,
             )
         )
         datasets.append({"path": f"s{idx}"})

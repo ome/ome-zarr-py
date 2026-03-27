@@ -28,6 +28,7 @@ from .format import format_from_version
 from .io import parse_url
 from .reader import Multiscales, Node, Reader
 from .types import Any, JSONDict
+from .writer import DASK_ARRAY_KWARGS
 
 LOGGER = logging.getLogger("ome_zarr.utils")
 
@@ -357,21 +358,25 @@ def download(input_path: str, output_dir: str = ".") -> None:
             target_path, mode="w", zarr_format=fmt.zarr_format, attributes=metadata
         )
 
-        resolutions: list[da.core.Array] = []
-        datasets: list[str] = []
+        resolutions: list[da.core.Array]
+        datasets: list[str]
 
         for spec in node.specs:
             if isinstance(spec, Multiscales):
                 datasets = spec.datasets
                 resolutions = node.data
-                zarr_array_kwargs: dict[str, Any] = {}
-                if fmt.zarr_format == 2:
+                zarr_array_kwargs: dict[str, Any] = {"zarr_format": fmt.zarr_format}
+                if DASK_ARRAY_KWARGS and fmt.zarr_format == 2:
                     zarr_array_kwargs["chunk_key_encoding"] = {
                         "name": "v2",
                         "separator": "/",
                     }
-                else:
+                elif fmt.zarr_format == 3:
                     zarr_array_kwargs["chunk_key_encoding"] = fmt.chunk_key_encoding
+                else:
+                    zarr_array_kwargs["dimension_separator"] = "/"
+
+                if fmt.zarr_format != 2:
                     zarr_array_kwargs["dimension_names"] = [
                         axis["name"] for axis in node.metadata["axes"]
                     ]
@@ -384,7 +389,7 @@ def download(input_path: str, output_dir: str = ".") -> None:
                                 arr=data,
                                 url=root.store,
                                 component=dataset,
-                                zarr_array_kwargs=zarr_array_kwargs,
+                                **zarr_array_kwargs,
                             )
             else:
                 # Assume a group that needs metadata, like labels
