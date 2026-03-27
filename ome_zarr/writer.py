@@ -306,8 +306,13 @@ def write_multiscale(
     :param storage_options:
         Options to be passed on to the storage backend.
         A list would need to match the number of datasets in a multiresolution pyramid.
-        One can provide different chunk size for each level of a pyramid using this
-        option.
+        One can provide different chunk size and / or shards for each level of a pyramid using this
+        option. Regarding the key, value pairs in the dictionar(y)(ies), these depend both on the zarr_format used
+        for writing and the dask version being used. For dask version <=2025.11.0, please refer to
+        https://zarr.readthedocs.io/en/stable/api/zarr/create/#zarr.create for arguments that can be passed on.
+        For >=2026.3.0 and up, please refer to https://zarr.readthedocs.io/en/stable/api/zarr/create/#zarr.create_array.
+        It might be that you have to adjust the version of the docs. Note that the docs will also mention the
+        differences of allowed arguments between zarr_format 2 and 3.
     :param compute:
         If true compute immediately otherwise a list of :class:`dask.delayed.Delayed`
         is returned.
@@ -564,6 +569,12 @@ def write_image(
     storage_options : dict or list of dict, optional
         Options to be passed on to the storage backend. A list must match the number of datasets
         in a multiresolution pyramid. Allows different chunk sizes for each level.
+        Regarding the key, value pairs in the dictionar(y)(ies), these depend both on the zarr_format used
+        for writing and the dask version being used. For dask version <=2025.11.0, please refer to
+        https://zarr.readthedocs.io/en/stable/api/zarr/create/#zarr.create for arguments that can be passed on.
+        For >=2026.3.0 and up, please refer to https://zarr.readthedocs.io/en/stable/api/zarr/create/#zarr.create_array.
+        It might be that you have to adjust the version of the docs. Note that the docs will also mention the
+        differences of allowed arguments between zarr_format 2 and 3.
     compute : bool, optional
         If True, compute immediately; otherwise, return a list of dask.delayed.Delayed objects.
     `**metadata` : dict
@@ -949,6 +960,12 @@ def write_multiscale_labels(
         A list would need to match the number of datasets in a multiresolution pyramid.
         One can provide different chunk size for each level of a pyramid using this
         option.
+        Regarding the key, value pairs in the dictionar(y)(ies), these depend both on the zarr_format used
+        for writing and the dask version being used. For dask version <=2025.11.0, please refer to
+        https://zarr.readthedocs.io/en/stable/api/zarr/create/#zarr.create for arguments that can be passed on.
+        For >=2026.3.0 and up, please refer to https://zarr.readthedocs.io/en/stable/api/zarr/create/#zarr.create_array.
+        It might be that you have to adjust the version of the docs. Note that the docs will also mention the
+        differences of allowed arguments between zarr_format 2 and 3.
     :type label_metadata: dict, optional
     :param label_metadata:
       Image label metadata. See :meth:`write_label_metadata` for details
@@ -1044,6 +1061,12 @@ def write_labels(
     storage_options : dict or list of dict, optional
         Options to be passed on to the storage backend. A list must match the number of datasets
         in a multiresolution pyramid. Allows different chunk sizes for each level.
+        Regarding the key, value pairs in the dictionar(y)(ies), these depend both on the zarr_format used
+        for writing and the dask version being used. For dask version <=2025.11.0, please refer to
+        https://zarr.readthedocs.io/en/stable/api/zarr/create/#zarr.create for arguments that can be passed on.
+        For >=2026.3.0 and up, please refer to https://zarr.readthedocs.io/en/stable/api/zarr/create/#zarr.create_array.
+        It might be that you have to adjust the version of the docs. Note that the docs will also mention the
+        differences of allowed arguments between zarr_format 2 and 3.
     label_metadata : dict, optional
         Image label metadata. See :meth:`write_label_metadata` for details.
     compute : bool, optional
