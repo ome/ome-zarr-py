@@ -18,7 +18,6 @@ from ome_zarr_models.v05.coordinate_transformations import (
 from ome_zarr_models.v05.coordinate_transformations import (
     VectorScale as Scale,
 )
-from ome_zarr_models.v05.image_label_types import Label
 from ome_zarr_models.v05.coordinate_transformations import (
     VectorTranslation as Translation,
 )

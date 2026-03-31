@@ -193,6 +193,7 @@ class TestHCSReader:
 
 def test_class_reader():
     from ome_zarr_models.common.omero import Omero
+
     url = "https://livingobjects.ebi.ac.uk/idr/zarr/v0.5/idr0062A/6001240_labels.zarr"
     image = NgffMultiscales.from_ome_zarr(url)
 

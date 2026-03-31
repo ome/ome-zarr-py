@@ -9,7 +9,6 @@ import pytest
 import zarr
 from dask import persist
 from numcodecs import Blosc
-from ome_zarr import NgffImage, NgffMultiscales
 from ome_zarr_models.v04 import HCS as Models04HCS
 from ome_zarr_models.v04 import Image as Models04Image
 from ome_zarr_models.v04 import Labels as Models04Labels
@@ -21,6 +20,7 @@ from skimage.data import binary_blobs
 from zarr.abc.codec import BytesBytesCodec
 from zarr.codecs import BloscCodec
 
+from ome_zarr import NgffImage, NgffMultiscales
 from ome_zarr.format import (
     CurrentFormat,
     FormatV03,
@@ -1637,6 +1637,32 @@ class TestLabelWriter:
             assert node_data[0].ndim == 5
         else:
             assert node_data[0].shape == shape
+
+        cts = [
+            d["coordinateTransformations"]
+            for d in node_metadata["multiscales"][0]["datasets"]
+        ]
+
+        axes = list(scale.keys())
+        for level, transfs in enumerate(cts):
+            assert len(transfs) == 1
+            assert transfs[0]["type"] == "scale"
+            assert len(transfs[0]["scale"]) == len(shape)
+
+            # default downsamples by factor 2 each level, except z-axis
+            for idx, value in enumerate(transfs[0]["scale"]):
+                axis_name = axes[idx]
+                if axis_name == "z":
+                    # z-axis is not downsampled by default
+                    assert value == scale[axis_name]
+                elif axis_name in ("x", "y"):
+                    # spatial dimensions are downsampled
+                    assert value == scale[axis_name] * shape[idx] / (
+                        shape[idx] // (2**level)
+                    )
+                else:
+                    # non-spatial dimensions (t, c) are not downsampled
+                    assert value == 1.0
 
         cts = [
             d["coordinateTransformations"]

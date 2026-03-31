@@ -826,9 +826,7 @@ def _write_pyramid_to_zarr(
         for dataset, transform in zip(datasets, coordinate_transformations):
             dataset["coordinateTransformations"] = transform
 
-    write_multiscales_metadata(
-        group, datasets, fmt, axes, axes_units, name, **metadata
-    )
+    write_multiscales_metadata(group, datasets, fmt, axes, axes_units, name, **metadata)
     return delayed
 
 
