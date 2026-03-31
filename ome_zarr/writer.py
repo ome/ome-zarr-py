@@ -6,11 +6,9 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, TypeAlias
 
-import dask
 import dask.array as da
 import numpy as np
 import zarr
-from dask.graph_manipulation import bind
 from numcodecs import Blosc
 
 from .axes import Axes
