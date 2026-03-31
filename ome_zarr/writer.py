@@ -820,7 +820,7 @@ def _write_pyramid_to_zarr(
         coordinate_transformations = fmt.generate_coordinate_transformations(shapes)
 
         if coordinate_transformations:
-            for idx, transform in enumerate(coordinate_transformations):
+            for transform in coordinate_transformations:
                 transform[0]["scale"] = [
                     transform[0]["scale"][i] * scale.get(d, 1.0)
                     for i, d in enumerate(dims)
