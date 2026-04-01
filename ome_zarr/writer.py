@@ -313,6 +313,12 @@ def write_multiscale(
         For >=2026.3.0 and up, please refer to https://zarr.readthedocs.io/en/stable/api/zarr/create/#zarr.create_array.
         It might be that you have to adjust the version of the docs. Note that the docs will also mention the
         differences of allowed arguments between zarr_format 2 and 3.
+
+        Note: for chunks the default of `auto` is not allowed. This because the argument here refers to zarr chunks and
+        autochunking here can result in different chunks then for the dask array. This can cause inconsistent overlap
+        between dask and zarr chunks, potentially resulting in corrupted data. The default will be that if no sharding
+        is specified, that the chunks correspond to the dask chunksize. This is also the case when chunks are provided as
+        `None` and no sharding is provided.
     :param compute:
         If true compute immediately otherwise a list of :class:`dask.delayed.Delayed`
         is returned.
@@ -575,6 +581,12 @@ def write_image(
         For >=2026.3.0 and up, please refer to https://zarr.readthedocs.io/en/stable/api/zarr/create/#zarr.create_array.
         It might be that you have to adjust the version of the docs. Note that the docs will also mention the
         differences of allowed arguments between zarr_format 2 and 3.
+
+        Note: for chunks the default of `auto` is not allowed. This because the argument here refers to zarr chunks and
+        autochunking here can result in different chunks then for the dask array. This can cause inconsistent overlap
+        between dask and zarr chunks, potentially resulting in corrupted data. The default will be that if no sharding
+        is specified, that the chunks correspond to the dask chunksize. This is also the case when chunks are provided as
+        `None` and no sharding is provided.
     compute : bool, optional
         If True, compute immediately; otherwise, return a list of dask.delayed.Delayed objects.
     `**metadata` : dict
@@ -743,21 +755,38 @@ def _write_pyramid_to_zarr(
         if "compressors" not in zarr_array_kwargs_copy and USE_DASK_ARRAY_KWARGS:
             zarr_array_kwargs_copy["compressors"] = options.pop("compressors", "auto")
 
-        chunks_opt = options.get("chunks", "auto")
+        chunks_opt = options.get("chunks", None)
         shards_opt = options.get("shards", None)
 
         # If shards are defined, one dask chunk should correspond to 1 shard to prevent concurrent writes to 1 shard.
         # In this case user defined chunks will correspond to zarr chunks and not dask chunks.
         # Check against string is purely because of mypy
-        if not isinstance(chunks_opt, str) and not shards_opt:
+        if chunks_opt and not isinstance(chunks_opt, str) and not shards_opt:
             chunks_opt = _retuple(chunks_opt, level.shape)
             level_image = da.array(level).rechunk(chunks=chunks_opt)
         elif shards_opt is not None:
             # This ensures that shards are always divisible by chunks, which is a requirement.
+            if chunks_opt != "auto":
+                chunks_opt = _retuple(chunks_opt, level.shape)  # type: ignore[arg-type]
+            else:
+                # Technically not needed as ultimately in this case dask chunks will correspond to shards.
+                # Simply adding this warning here to make the user used to not using "auto".
+                if chunks_opt == "auto":
+                    warnings.warn(
+                        f"Setting `chunks` to `auto` is not allowed. Defaulting to the chunksize "
+                        f"of dask array: {level.chunksize}."
+                    )
+                chunks_opt = level.chunksize
             chunks_opt = _retuple(chunks_opt, level.shape)
             shards_opt = _retuple(shards_opt, level.shape)
             level_image = da.array(level).rechunk(shards_opt)
         else:
+            if chunks_opt == "auto":
+                warnings.warn(
+                    f"Setting `chunks` to `auto` is not allowed. Defaulting to the chunksize "
+                    f"of dask array: {level.chunksize}."
+                )
+            chunks_opt = level.chunksize
             level_image = level
 
         shapes.append(level_image.shape)
@@ -966,6 +995,12 @@ def write_multiscale_labels(
         For >=2026.3.0 and up, please refer to https://zarr.readthedocs.io/en/stable/api/zarr/create/#zarr.create_array.
         It might be that you have to adjust the version of the docs. Note that the docs will also mention the
         differences of allowed arguments between zarr_format 2 and 3.
+
+        Note: for chunks the default of `auto` is not allowed. This because the argument here refers to zarr chunks and
+        autochunking here can result in different chunks then for the dask array. This can cause inconsistent overlap
+        between dask and zarr chunks, potentially resulting in corrupted data. The default will be that if no sharding
+        is specified, that the chunks correspond to the dask chunksize. This is also the case when chunks are provided as
+        `None` and no sharding is provided.
     :type label_metadata: dict, optional
     :param label_metadata:
       Image label metadata. See :meth:`write_label_metadata` for details
@@ -1067,6 +1102,12 @@ def write_labels(
         For >=2026.3.0 and up, please refer to https://zarr.readthedocs.io/en/stable/api/zarr/create/#zarr.create_array.
         It might be that you have to adjust the version of the docs. Note that the docs will also mention the
         differences of allowed arguments between zarr_format 2 and 3.
+
+        Note: for chunks the default of `auto` is not allowed. This because the argument here refers to zarr chunks and
+        autochunking here can result in different chunks then for the dask array. This can cause inconsistent overlap
+        between dask and zarr chunks, potentially resulting in corrupted data. The default will be that if no sharding
+        is specified, that the chunks correspond to the dask chunksize. This is also the case when chunks are provided as
+        `None` and no sharding is provided.
     label_metadata : dict, optional
         Image label metadata. See :meth:`write_label_metadata` for details.
     compute : bool, optional
