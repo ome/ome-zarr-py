@@ -766,7 +766,7 @@ def _write_pyramid_to_zarr(
             level_image = da.array(level).rechunk(chunks=chunks_opt)
         elif shards_opt is not None:
             # This ensures that shards are always divisible by chunks, which is a requirement.
-            if chunks_opt != "auto":
+            if chunks_opt and chunks_opt != "auto":
                 chunks_opt = _retuple(chunks_opt, level.shape)  # type: ignore[arg-type]
             else:
                 # Technically not needed as ultimately in this case dask chunks will correspond to shards.
