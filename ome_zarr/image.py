@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+import warnings
 from collections.abc import Sequence
 from dataclasses import InitVar, dataclass
 from typing import Any, cast
-import warnings
+
 import dask.array as da
 import numpy as np
 import zarr
+from ome_zarr_models.common.omero import Omero
 from ome_zarr_models.v05.axes import (
     Axis,
 )
@@ -16,14 +18,16 @@ from ome_zarr_models.v05.coordinate_transformations import (
 from ome_zarr_models.v05.coordinate_transformations import (
     VectorScale as Scale,
 )
+from ome_zarr_models.v05.image_label_types import Label
 from ome_zarr_models.v05.coordinate_transformations import (
     VectorTranslation as Translation,
 )
+from ome_zarr_models.v05.image_label_types import Label
 from ome_zarr_models.v05.multiscales import (
     Dataset,
     Multiscale,
 )
-from ome_zarr_models.common.omero import Omero, Channel, Window
+from pydantic import ValidationError
 
 from .scale import Methods
 
@@ -39,11 +43,11 @@ class NgffImage:
     ----------
     data : dask.array.Array or numpy.ndarray
         The image data array.
-    dims : sequence of str or str
-        The dimension names corresponding to the data array axes, i.e. ('c', 'z', 'y', 'x').
+    axes : sequence of str or str
+        The axis names corresponding to the data array axes, i.e. ('c', 'z', 'y', 'x').
     scale : sequence of float or dict of str to float, optional
-        The physical scale for each dimension. If a sequence is provided, it should
-        match the order of `dims`. If a dict is provided, keys should be dimension names,
+        The physical scale for each axis. If a sequence is provided, it should
+        match the order of `axes`. If a dict is provided, keys should be axis names,
         e.g. {'x': 0.1, 'y': 0.1, 'z': 0.5}. Default is None, which sets all scales to 1.0.
     axes_units : dict of str to str, optional
         Units for each axis, e.g. {'x': 'micrometer', 'y': 'micrometer'}.
@@ -123,6 +127,16 @@ class NgffMultiscales:
         (for multiple label pyramids), e.g.
         `{'nuclei': nuclei_multiscale, 'cells': cells_multiscale}`.
         Default is None (no labels).
+    omero : dict or Omero, optional
+        Optional Omero metadata to include in the OME-Zarr attributes.
+        Can be passed as a dict or an instance of the [Omero model](https://ome-zarr-models-py.readthedocs.io/en/stable/api/v04/image/#omero-metadata)
+        Default is None (no Omero metadata).
+        For example metadata, see [ngff specification](https://ngff.openmicroscopy.org/specifications/0.5/index.html#omero-metadata-transitional)
+    image_label : dict or Label, optional
+        Optional image-label metadata to describe rendering options specifically for label images.
+        Can signal to viewers that this image should be rendered as labels.
+        Can be passed as a dict or an instance of the [Label model](https://ome-zarr-models-py.readthedocs.io/en/stable/api/v05/image-label/)
+        For example metadata, see [ngff specification](https://ngff.openmicroscopy.org/specifications/0.5/index.html#labels-metadata)
 
     Attributes
     ----------
@@ -130,6 +144,10 @@ class NgffMultiscales:
         List of images at each pyramid level.
     metadata : Multiscale
         OME-Zarr multiscale metadata.
+    omero : Omero or None
+        Optional Omero metadata included in the OME-Zarr attributes.
+    image_label : Label or None
+        Optional image-label metadata included in the OME-Zarr attributes.
     """
 
     image: InitVar[NgffImage]
@@ -144,6 +162,7 @@ class NgffMultiscales:
         NgffMultiscales | list[NgffMultiscales] | dict[str, NgffMultiscales] | None
     ) = None
     omero: dict[str, Any] | Omero | None = None
+    image_label: dict[str, Any] | Label | None = None
 
     def __post_init__(
         self,
@@ -230,7 +249,7 @@ class NgffMultiscales:
             axes=tuple(axes),
             datasets=tuple(datasets),
             name=image.name,
-            coordinateTransformations=coordinateTransformations
+            coordinateTransformations=coordinateTransformations,
         )
 
         # coerce labels to dict if it's a single NgffMultiscales or a list
@@ -248,10 +267,21 @@ class NgffMultiscales:
                 return
             if isinstance(self.omero, Omero):
                 return
-            
+
             self.omero = Omero.model_validate(self.omero)
-        except Exception as e:
-            raise ValueError(f"Invalid Omero metadata: {e}")
+        except ValidationError as e:
+            warnings.warn(f"Invalid Omero metadata: {e}")
+
+        # parse image label metadata, if passed
+        try:
+            if self.image_label is None:
+                return
+            if isinstance(self.image_label, Label):
+                return
+
+            self.image_label = Label.model_validate(self.image_label)
+        except ValidationError as e:
+            warnings.warn(f"Invalid image-label metadata: {e}")
 
     def to_ome_zarr(
         self,
@@ -348,9 +378,11 @@ class NgffMultiscales:
             # in v0.4, metadata is stored under "multiscales" attribute
             metadata_dict = self.metadata.to_version("0.4").model_dump()
             metadata_dict = _recursive_pop_nones(metadata_dict)
-            
+
             if self.omero and isinstance(self.omero, Omero):
                 metadata_dict["omero"] = self.omero.model_dump()
+            if self.image_label and isinstance(self.image_label, Label):
+                metadata_dict["image-label"] = self.image_label.model_dump()
             metadata_dict["version"] = version
             group.attrs["multiscales"] = [metadata_dict]
 
@@ -365,6 +397,8 @@ class NgffMultiscales:
             }
             if self.omero and isinstance(self.omero, Omero):
                 metadata_dict["omero"] = self.omero.model_dump()
+            if self.image_label and isinstance(self.image_label, Label):
+                metadata_dict["image-label"] = self.image_label.model_dump()
             group.attrs["ome"] = metadata_dict
 
             if list_of_labels:
@@ -419,6 +453,7 @@ class NgffMultiscales:
 
         list_of_labels = []
         omero_dict = None
+        image_label_dict = None
 
         # This is purely for backwards compatibility
         # need to handle loading older metadata explicitly here
@@ -451,7 +486,9 @@ class NgffMultiscales:
                 ]
 
                 if idx == 0:
-                    transforms = (VectorScale(type="scale", scale=scale_level),)
+                    transforms: tuple[VectorScale | VectorTranslation, ...] = (
+                        VectorScale(type="scale", scale=scale_level),
+                    )
                 else:
                     translate = [
                         2.0 ** (idx - 1) - 0.5 if s.name in ("z", "y", "x") else 0.0
@@ -489,6 +526,8 @@ class NgffMultiscales:
                 list_of_labels = labels_json if isinstance(labels_json, list) else []
             if "omero" in metadata_json:
                 omero_dict = metadata_json.get("omero", None)
+            if "image-label" in metadata_json:
+                image_label_dict = metadata_json.get("image-label", None)
         elif version == "0.5":
             from ome_zarr_models.v05.multiscales import Multiscale as Multiscalev05
 
@@ -502,6 +541,8 @@ class NgffMultiscales:
 
             if "omero" in ome_attrs:
                 omero_dict = ome_attrs.get("omero", None)
+            if "image-label" in ome_attrs:
+                image_label_dict = ome_attrs.get("image-label", None)
         else:
             raise ValueError(f"Unsupported OME-Zarr version: {version}")
 
@@ -534,8 +575,15 @@ class NgffMultiscales:
         try:
             if omero_dict is not None:
                 instance.omero = Omero.model_validate(omero_dict)
-        except Exception as e:
+        except ValidationError as e:
             warnings.warn(f"Invalid Omero metadata: {e}")
+
+        # parse image label metadata
+        try:
+            if image_label_dict is not None:
+                instance.image_label = Label.model_validate(image_label_dict)
+        except ValidationError as e:
+            warnings.warn(f"Invalid image-label metadata: {e}")
 
         if metadata.name is not None:
             instance.name = metadata.name
