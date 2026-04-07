@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import InitVar, dataclass
 from typing import Any, cast
-
+import warnings
 import dask.array as da
 import numpy as np
 import zarr
@@ -23,6 +23,7 @@ from ome_zarr_models.v05.multiscales import (
     Dataset,
     Multiscale,
 )
+from ome_zarr_models.common.omero import Omero, Channel, Window
 
 from .scale import Methods
 
@@ -142,6 +143,7 @@ class NgffMultiscales:
     labels: (
         NgffMultiscales | list[NgffMultiscales] | dict[str, NgffMultiscales] | None
     ) = None
+    omero: dict[str, Any] | Omero | None = None
 
     def __post_init__(
         self,
@@ -228,7 +230,7 @@ class NgffMultiscales:
             axes=tuple(axes),
             datasets=tuple(datasets),
             name=image.name,
-            coordinateTransformations=coordinateTransformations,
+            coordinateTransformations=coordinateTransformations
         )
 
         # coerce labels to dict if it's a single NgffMultiscales or a list
@@ -237,6 +239,19 @@ class NgffMultiscales:
                 self.labels = {str(self.labels.name): self.labels}
             elif isinstance(self.labels, list):
                 self.labels = {str(label.name): label for label in self.labels}
+
+        # parse omero metadata, if passed;
+        # We don't want to fail the entire initialization if the omero metadata is invalid, so we
+        # escape possible validation errors and just warn the user that the omero metadata is invalid
+        try:
+            if self.omero is None:
+                return
+            if isinstance(self.omero, Omero):
+                return
+            
+            self.omero = Omero.model_validate(self.omero)
+        except Exception as e:
+            raise ValueError(f"Invalid Omero metadata: {e}")
 
     def to_ome_zarr(
         self,
@@ -332,9 +347,12 @@ class NgffMultiscales:
         if version == "0.4":
             # in v0.4, metadata is stored under "multiscales" attribute
             metadata_dict = self.metadata.to_version("0.4").model_dump()
-            metadata_json = _recursive_pop_nones(metadata_dict)
-            metadata_json["version"] = version
-            group.attrs["multiscales"] = [metadata_json]
+            metadata_dict = _recursive_pop_nones(metadata_dict)
+            
+            if self.omero and isinstance(self.omero, Omero):
+                metadata_dict["omero"] = self.omero.model_dump()
+            metadata_dict["version"] = version
+            group.attrs["multiscales"] = [metadata_dict]
 
             if list_of_labels:
                 group_labels = group["labels"]
@@ -345,6 +363,8 @@ class NgffMultiscales:
                 "version": version,
                 "multiscales": [_recursive_pop_nones(self.metadata.model_dump())],
             }
+            if self.omero and isinstance(self.omero, Omero):
+                metadata_dict["omero"] = self.omero.model_dump()
             group.attrs["ome"] = metadata_dict
 
             if list_of_labels:
@@ -398,6 +418,7 @@ class NgffMultiscales:
             raise ValueError("Could not find 'version' in group attributes")
 
         list_of_labels = []
+        omero_dict = None
 
         # This is purely for backwards compatibility
         # need to handle loading older metadata explicitly here
@@ -405,6 +426,7 @@ class NgffMultiscales:
             from ome_zarr_models.v05.axes import Axis as AxisV05
             from ome_zarr_models.v05.coordinate_transformations import (
                 VectorScale,
+                VectorTranslation,
             )
             from ome_zarr_models.v05.multiscales import Multiscale as Multiscalev05
 
@@ -424,16 +446,21 @@ class NgffMultiscales:
 
             datasets = []
             for idx, ds in enumerate(metadata_json.get("datasets", [])):
-                scale_level = [2.0**idx if s.name in ("z", "y", "x") else 1.0 for s in axes]
-                
+                scale_level = [
+                    2.0 ** idx if s.name in ("z", "y", "x") else 1.0 for s in axes
+                ]
+
                 if idx == 0:
                     transforms = (VectorScale(type="scale", scale=scale_level),)
                 else:
-                    translate = [2.0**(idx - 1) - 0.5 if s.name in ("z", "y", "x") else 0.0 for s in axes]
+                    translate = [
+                        2.0 ** (idx - 1) - 0.5 if s.name in ("z", "y", "x") else 0.0
+                        for s in axes
+                    ]
                     transforms = (
                         VectorScale(type="scale", scale=scale_level),
-                        VectorTranslation(type="translation", translation=translate)
-                        )
+                        VectorTranslation(type="translation", translation=translate),
+                    )
 
                 datasets.append(
                     Dataset(
@@ -450,25 +477,31 @@ class NgffMultiscales:
                 coordinateTransformations=None,
                 name=metadata_json.get("name", "image"),
             )
+
         elif version == "0.4":
             from ome_zarr_models.v04.multiscales import Multiscale as Multiscalev04
 
-            metadata_json = group.attrs.get("multiscales", [None])[0]
+            metadata_json = cast(dict, group.attrs.get("multiscales", [None])[0])
             metadata = Multiscalev04.model_validate(metadata_json).to_version("0.5")
 
             if "labels" in group:
                 labels_json = group["labels"].attrs.get("labels", [])
                 list_of_labels = labels_json if isinstance(labels_json, list) else []
+            if "omero" in metadata_json:
+                omero_dict = metadata_json.get("omero", None)
         elif version == "0.5":
             from ome_zarr_models.v05.multiscales import Multiscale as Multiscalev05
 
-            ome_attrs = group.attrs.get("ome", {})
+            ome_attrs = cast(dict, group.attrs.get("ome", {}))
             metadata_json = ome_attrs.get("multiscales", [None])[0]
             metadata = Multiscalev05.model_validate(metadata_json)
 
             if "labels" in group:
                 labels_ome_attrs = group["labels"].attrs.get("ome", {})
                 list_of_labels = labels_ome_attrs.get("labels", [])
+
+            if "omero" in ome_attrs:
+                omero_dict = ome_attrs.get("omero", None)
         else:
             raise ValueError(f"Unsupported OME-Zarr version: {version}")
 
@@ -496,6 +529,13 @@ class NgffMultiscales:
         instance = cls.__new__(cls)
         instance.images = images
         instance.metadata = metadata
+
+        # Finally, parse omero metadata
+        try:
+            if omero_dict is not None:
+                instance.omero = Omero.model_validate(omero_dict)
+        except Exception as e:
+            warnings.warn(f"Invalid Omero metadata: {e}")
 
         if metadata.name is not None:
             instance.name = metadata.name
