@@ -169,12 +169,14 @@ class NgffMultiscales:
         scale_factors: list[int] | tuple[int, ...] | list[dict[str, int]] | None,
         coordinateTransformations: list[Scale | Translation | Identity] | None,
     ):
+        from ome_zarr.scale import _build_pyramid
+
         if scale_factors is None:
             scale_factors = (2, 4, 8, 16)
-        from ..scale import _build_pyramid
 
         self.name = image.name
         method = self.method
+
         if isinstance(method, Methods):
             method = str(method.value)
 
@@ -317,12 +319,11 @@ class NgffMultiscales:
         import os
         import shutil
 
-        from ..writer import _write_pyramid_to_zarr, check_group_fmt
+        from ome_zarr.writer import _write_pyramid_to_zarr, check_group_fmt
+        from ome_zarr.format import Format, FormatV04, FormatV05
 
         if os.path.exists(str(group)):
             shutil.rmtree(str(group))
-
-        from ..format import Format, FormatV04, FormatV05
 
         fmt: Format | None = None
         if version == "0.5":
