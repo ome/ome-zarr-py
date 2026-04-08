@@ -9,6 +9,7 @@ import pytest
 import zarr
 from dask import persist
 from numcodecs import Blosc
+from ome_zarr import NgffImage, NgffMultiscales
 from ome_zarr_models.v04 import HCS as Models04HCS
 from ome_zarr_models.v04 import Image as Models04Image
 from ome_zarr_models.v04 import Labels as Models04Labels
@@ -27,7 +28,6 @@ from ome_zarr.format import (
     FormatV05,
     format_from_version,
 )
-from ome_zarr.image import NgffImage, NgffMultiscales
 from ome_zarr.scale import _build_pyramid
 from ome_zarr.writer import (
     _get_valid_axes,
@@ -171,7 +171,7 @@ class TestWriter:
         # check written coordinatetransormations match relative factors between array sizes
         for level, nd_array in enumerate(node_data):
             if level == 0:
-                # check first written scale values explicitly match those in TRANFORMATIONS
+                # check first written scale values explicitly match those in TRANSFORMATIONS
                 for d in axes:
                     assert (
                         node_metadata["multiscales"][0]["datasets"][level][

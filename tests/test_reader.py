@@ -4,9 +4,9 @@ import pytest
 import zarr
 from numpy import ones, zeros
 
+from ome_zarr import NgffMultiscales
 from ome_zarr.data import create_zarr
 from ome_zarr.format import FormatV04
-from ome_zarr.image import NgffMultiscales
 from ome_zarr.io import parse_url
 from ome_zarr.reader import Node, Plate, Reader, Well
 from ome_zarr.writer import (
@@ -190,5 +190,20 @@ class TestHCSReader:
         assert result.max() > 0, "Expected non-zero values in the array"
 
 
-if __name__ == "__main__":
-    pytest.main([__file__])
+def test_class_reader():
+    from ome_zarr_models.common.omero import Omero
+    url = "https://livingobjects.ebi.ac.uk/idr/zarr/v0.5/idr0062A/6001240_labels.zarr"
+    image = NgffMultiscales.from_ome_zarr(url)
+
+    # image is known to have "omero" metadata with "channels" key
+    assert image.omero is not None
+    assert isinstance(image.omero, Omero)
+    assert hasattr(image.omero, "channels")
+
+    # image is known to have one labels image of name "0"
+    assert len(image.labels) == 1
+    assert "0" in image.labels
+
+    label_image = image.labels["0"]
+    assert isinstance(label_image, NgffMultiscales)
+    assert label_image.image_label is not None

@@ -7,9 +7,4 @@ except ImportError:
 
 from .classes import NgffImage, NgffMultiscales
 
-
-__all__ = [
-    "__version__",
-    "NgffImage",
-    "NgffMultiscales"
-    ]
+__all__ = ["NgffImage", "NgffMultiscales", "__version__"]

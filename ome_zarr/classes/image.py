@@ -29,7 +29,7 @@ from ome_zarr_models.v05.multiscales import (
 )
 from pydantic import ValidationError
 
-from ..scale import Methods
+from ome_zarr.scale import Methods
 
 SPATIAL_DIMS = ["z", "y", "x"]
 
