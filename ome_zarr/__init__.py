@@ -5,5 +5,11 @@ try:
 except ImportError:
     __version__ = "0+unknown"
 
+from .classes import NgffImage, NgffMultiscales
 
-__all__ = ["__version__"]
+
+__all__ = [
+    "__version__",
+    "NgffImage",
+    "NgffMultiscales"
+    ]
