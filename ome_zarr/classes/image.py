@@ -321,6 +321,7 @@ class NgffMultiscales:
 
         from ome_zarr.format import Format, FormatV04, FormatV05
         from ome_zarr.writer import _write_pyramid_to_zarr, check_group_fmt
+        from ome_zarr.utils import _recursive_pop_nones
 
         if os.path.exists(str(group)):
             shutil.rmtree(str(group))
@@ -428,28 +429,11 @@ class NgffMultiscales:
         NgffMultiscales`
             A :class:`NgffMultiscales` container with the loaded images and metadata.
         """
-
+        from ome_zarr.utils import _get_version
         if isinstance(group, str):
             group = zarr.open(group, mode="r")
 
-        def _finditem(obj: dict, key: str):
-            if key in obj:
-                return obj[key]
-            for v in obj.values():
-                if isinstance(v, dict):
-                    item = _finditem(v, key)
-                    if item is not None:
-                        return item
-                elif isinstance(v, list):
-                    for item in v:
-                        if isinstance(item, dict):
-                            result = _finditem(item, key)
-                            if result is not None:
-                                return result
-
-        version = _finditem(group.attrs, "version")
-        if version is None:
-            raise ValueError("Could not find 'version' in group attributes")
+        version = _get_version(group)
 
         list_of_labels = []
         omero_dict = None
@@ -606,26 +590,3 @@ class NgffMultiscales:
 
         return instance
 
-
-def _recursive_pop_nones(data: dict) -> dict:
-    """Recursively remove None values from a nested dictionary."""
-    output: dict = {}
-    for key, value in data.items():
-        if isinstance(value, dict):
-            nested = _recursive_pop_nones(value)
-            if nested:
-                output[key] = nested
-        elif isinstance(value, list | tuple):
-            nested_list = []
-            for item in value:
-                if isinstance(item, dict):
-                    nested_item = _recursive_pop_nones(item)
-                    if nested_item:
-                        nested_list.append(nested_item)
-                elif item is not None:
-                    nested_list.append(item)
-            if nested_list:
-                output[key] = nested_list
-        elif value is not None:
-            output[key] = value
-    return output
