@@ -3,6 +3,7 @@ import numpy as np
 import pytest
 import zarr
 from numpy import ones, zeros
+from ome_zarr.image import NgffMultiscales
 
 from ome_zarr import NgffMultiscales
 from ome_zarr.data import create_zarr
@@ -16,7 +17,6 @@ from ome_zarr.writer import (
     write_plate_metadata,
     write_well_metadata,
 )
-from ome_zarr.image import NgffImage, NgffMultiscales
 
 
 class TestReader:
