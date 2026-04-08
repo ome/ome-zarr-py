@@ -3,7 +3,6 @@ import numpy as np
 import pytest
 import zarr
 from numpy import ones, zeros
-from ome_zarr import NgffMultiscales
 
 from ome_zarr import NgffMultiscales
 from ome_zarr.data import create_zarr
