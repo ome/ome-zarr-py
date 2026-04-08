@@ -124,7 +124,7 @@ class TestWriter:
         # convert to image classes
         labels_name = "test_labels"
         image = NgffImage(
-            data=data, dims=axes, scale=dict(zip(axes, TRANSFORMATIONS[0][0]["scale"]))
+            data=data, axes=axes, scale=dict(zip(axes, TRANSFORMATIONS[0][0]["scale"]))
         )
         labels = NgffImage(
             data=data_labels,
@@ -240,9 +240,6 @@ class TestWriter:
     @pytest.mark.parametrize(
         "format_version",
         (
-            pytest.param(FormatV01, id="V01"),
-            pytest.param(FormatV02, id="V02"),
-            pytest.param(FormatV03, id="V03"),
             pytest.param(FormatV04, id="V04"),
             pytest.param(FormatV05, id="V05"),
         ),

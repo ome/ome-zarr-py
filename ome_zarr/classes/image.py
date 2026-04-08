@@ -317,12 +317,12 @@ class NgffMultiscales:
         import os
         import shutil
 
-        from .writer import _write_pyramid_to_zarr, check_group_fmt
+        from ..writer import _write_pyramid_to_zarr, check_group_fmt
 
         if os.path.exists(str(group)):
             shutil.rmtree(str(group))
 
-        from .format import Format, FormatV04, FormatV05
+        from ..format import Format, FormatV04, FormatV05
 
         fmt: Format | None = None
         if version == "0.5":
