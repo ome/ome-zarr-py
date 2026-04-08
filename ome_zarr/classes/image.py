@@ -320,8 +320,8 @@ class NgffMultiscales:
         import shutil
 
         from ome_zarr.format import Format, FormatV04, FormatV05
-        from ome_zarr.writer import _write_pyramid_to_zarr, check_group_fmt
         from ome_zarr.utils import _recursive_pop_nones
+        from ome_zarr.writer import _write_pyramid_to_zarr, check_group_fmt
 
         if os.path.exists(str(group)):
             shutil.rmtree(str(group))
@@ -430,6 +430,7 @@ class NgffMultiscales:
             A :class:`NgffMultiscales` container with the loaded images and metadata.
         """
         from ome_zarr.utils import _get_version
+
         if isinstance(group, str):
             group = zarr.open(group, mode="r")
 
@@ -589,4 +590,3 @@ class NgffMultiscales:
             instance.labels = labels
 
         return instance
-

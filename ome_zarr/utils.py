@@ -462,6 +462,7 @@ def _get_version(group: zarr.Group) -> str:
         "or group.attrs['multiscales'][0]['version'] (v0.4 or lower)"
     )
 
+
 def _recursive_pop_nones(data: dict) -> dict:
     """
     Recursively remove None values from a nested dictionary.
