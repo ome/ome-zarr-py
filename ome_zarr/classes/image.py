@@ -319,8 +319,8 @@ class NgffMultiscales:
         import os
         import shutil
 
-        from ome_zarr.writer import _write_pyramid_to_zarr, check_group_fmt
         from ome_zarr.format import Format, FormatV04, FormatV05
+        from ome_zarr.writer import _write_pyramid_to_zarr, check_group_fmt
 
         if os.path.exists(str(group)):
             shutil.rmtree(str(group))
