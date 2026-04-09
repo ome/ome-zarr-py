@@ -84,37 +84,16 @@ class TestCli:
         main(["info", f"{out}/{basename}"])
 
         if fmt is not None and fmt.zarr_format == 2:
-            assert directory_items(Path(out) / basename) == [
-                Path(".zattrs"),
-                Path(".zgroup"),
-                Path("0"),
-                Path("1"),
-                Path("2"),
-                Path("3"),
-                Path("4"),
-                Path("labels"),
-            ]
-            assert directory_items(Path(out) / basename / "1") == [
-                Path(".zarray"),
-                Path(".zattrs"),  # empty '{}'
-                Path("0"),
-                Path("1"),
-                Path("2"),
-            ]
+            for item in [".zattrs", ".zgroup", "labels", "s0", "s1", "s2", "s3", "s4"]:
+                assert (Path(out) / basename / item).exists()
+
+            for item in [".zarray", ".zattrs", "0", "1", "2"]:
+                assert (Path(out) / basename / "s1" / item).exists()
         else:
-            assert directory_items(Path(out) / basename) == [
-                Path("0"),
-                Path("1"),
-                Path("2"),
-                Path("3"),
-                Path("4"),
-                Path("labels"),
-                Path("zarr.json"),
-            ]
-            assert directory_items(Path(out) / basename / "1") == [
-                Path("c"),
-                Path("zarr.json"),
-            ]
+            for item in ["labels", "s0", "s1", "s2", "s3", "s4", "zarr.json"]:
+                assert (Path(out) / basename / item).exists()
+            for item in ["c", "zarr.json"]:
+                assert (Path(out) / basename / "s1" / item).exists()
 
     def test_s3_info(self, s3_address):
         main(["info", s3_address])

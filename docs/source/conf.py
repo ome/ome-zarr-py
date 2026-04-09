@@ -4,16 +4,32 @@ import sys
 # alternative is to make code installable (which it is!)
 sys.path.insert(0, pathlib.Path(__file__).parents[2].resolve().as_posix())
 
-
+exclude_patterns = ["**.ipynb_checkpoints", ".DS_Store", "Thumbs.db", "_build"]
 extensions = [
-    "sphinx.ext.doctest",
-    "sphinx.ext.autodoc",
+    "sphinx_togglebutton",
+    "sphinx_copybutton",
+    "myst_nb",
+    "sphinx_thebe",
+    "sphinx_comments",
+    "sphinx_external_toc",
     "sphinx.ext.intersphinx",
-    "sphinx_rtd_theme",
+    "sphinx_design",
+    "sphinx_book_theme",
+    "sphinx.ext.autodoc",
+    "sphinx.ext.napoleon",
+    "sphinx.ext.viewcode",
+    "sphinx.ext.autosummary",
+    # "sphinxcontrib.bibtex",
+    "sphinx_jupyterbook_latex",
 ]
 
-# use index.rst instead of contents.rst
-master_doc = "index"
+myst_enable_extensions = [
+    "colon_fence",
+    "dollarmath",
+    "linkify",
+    "substitution",
+    "tasklist",
+]
 
 # -- Project information -----------------------------------------------------
 

@@ -282,7 +282,7 @@ class Multiscales(Spec):
         axes = multiscales[0].get("axes")
         fmt = format_from_version(version)
         # Raises ValueError if not valid
-        axes_obj = Axes(axes, fmt)
+        axes_obj = Axes(axes, fmt=fmt)
         node.metadata["axes"] = axes_obj.to_list()
         # This will get overwritten by 'omero' metadata if present
         node.metadata["name"] = multiscales[0].get("name")
@@ -410,6 +410,9 @@ class Well(Spec):
         # shapes etc.
         image_zarr = self.zarr.create(image_paths[0])
         image_node = Node(image_zarr, node)
+        self.ds_paths = [
+            d["path"] for d in image_zarr.root_attrs["multiscales"][0]["datasets"]
+        ]
         x_index = len(image_node.metadata["axes"]) - 1
         y_index = len(image_node.metadata["axes"]) - 2
         self.numpy_type = image_node.data[0].dtype
@@ -425,7 +428,7 @@ class Well(Spec):
                 # handle e.g. 2x2 grid with only 3 images/fields
                 if field_index < len(image_paths):
                     image_path = image_paths[field_index]
-                    path = f"{image_path}/{level}"
+                    path = f"{image_path}/{self.ds_paths[level]}"
                     data = self.zarr.load(path)
             except ValueError:
                 LOGGER.error("Failed to load %s", path)
@@ -495,6 +498,11 @@ class Plate(Spec):
         if well_spec is None:
             raise Exception("Could not find first well")
         self.first_field_path = well_spec.well_data["images"][0]["path"]
+        img0 = self.zarr.create(f"{self.well_paths[0]}/{self.first_field_path}")
+        self.img_paths = [
+            d["path"] for d in img0.root_attrs["multiscales"][0]["datasets"]
+        ]
+
         self.numpy_type = well_spec.numpy_type
 
         LOGGER.debug("img_pyramid_shapes: %s", well_spec.img_pyramid_shapes)
@@ -521,7 +529,7 @@ class Plate(Spec):
     def get_tile_path(self, level: int, row: int, col: int) -> str:
         return (
             f"{self.row_names[row]}/"
-            f"{self.col_names[col]}/{self.first_field_path}/{level}"
+            f"{self.col_names[col]}/{self.first_field_path}/{self.img_paths[level]}"
         )
 
     def get_stitched_grid(self, level: int, tile_shape: tuple) -> da.core.Array:
