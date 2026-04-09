@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import InitVar, dataclass, field
-from typing import Any, cast
+from typing import Any
 
 import dask.array as da
 import numpy as np
@@ -129,7 +129,9 @@ class NgffMultiscales:
     """
 
     image: InitVar[NgffImage]
-    scale_factors: list[int] | list[dict[str, int]] = field(default_factory=lambda: [2, 4, 8, 16])
+    scale_factors: list[int] | list[dict[str, int]] = field(
+        default_factory=lambda: [2, 4, 8, 16]
+    )
     method: str | Methods = Methods.RESIZE
     coordinate_system_name: InitVar[str | None] = "physical"
     coordinateTransformations: InitVar[list[Transform]] = []
@@ -280,7 +282,7 @@ class NgffMultiscales:
         -------
         list
             If `compute` is False, returns a list of Dask delayed objects
-            representing the write operations. 
+            representing the write operations.
         """
         import os
         import shutil
@@ -373,15 +375,13 @@ class NgffMultiscales:
         elif version == "0.6":
             metadata_dict = {
                 "version": version,
-                "multiscales": [
-                    self.metadata.model_dump()
-                ],
-                "labels": list_of_labels if list_of_labels else None,
+                "multiscales": [self.metadata.model_dump()],
+                "labels": list_of_labels or None,
             }
             group.attrs["ome"] = _recursive_pop_nones(metadata_dict)
         else:
             raise ValueError(f"Unsupported OME-Zarr version: {version}")
-        
+
         return delayed
 
     @classmethod

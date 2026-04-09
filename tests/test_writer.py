@@ -20,8 +20,7 @@ from skimage.data import binary_blobs
 from zarr.abc.codec import BytesBytesCodec
 from zarr.codecs import BloscCodec
 
-from ome_zarr import NgffImage, NgffMultiscales
-from ome_zarr import USE_DASK_ARRAY_KWARGS
+from ome_zarr import USE_DASK_ARRAY_KWARGS, NgffImage, NgffMultiscales
 from ome_zarr.format import (
     CurrentFormat,
     FormatV03,

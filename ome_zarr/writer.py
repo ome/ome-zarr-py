@@ -552,7 +552,7 @@ def write_image(
     axes: AxesType = None,
     coordinate_transformations: list[list[dict[str, Any]]] | None = None,
     storage_options: JSONDict | list[JSONDict] | None = None,
-    compute: bool = True
+    compute: bool = True,
 ) -> list:
     """
     Write an image to the zarr store according to the OME-Zarr specification, supporting multiscale pyramids.
@@ -700,11 +700,7 @@ def write_image(
         method = Methods.RESIZE
 
     ngff_image = NgffImage(
-        data=image,
-        scale=scale,
-        axes=dims,
-        name=name,
-        axes_units=axes_units
+        data=image, scale=scale, axes=dims, name=name, axes_units=axes_units
     )
     ngff_multiscales = NgffMultiscales(
         image=ngff_image,
