@@ -219,8 +219,6 @@ def main(args: list[str] | None = None) -> None:
     )
     parser_csv_to_labels.set_defaults(func=csv_to_labels)
 
-    ns = parser.parse_args(args)
-
     if args is None:
         ns = parser.parse_args(sys.argv[1:])
     else:

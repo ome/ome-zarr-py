@@ -17,6 +17,9 @@ coverage.xml
 # Generated version file
 ome_zarr/_version.py
 
+# IDE
+.idea/
+
 # MyST build outputs
 _build
 
