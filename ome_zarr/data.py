@@ -132,7 +132,6 @@ def create_zarr(
     assert loc
     grp = zarr.group(loc.store)
     axes = None
-    size_c = 1
     if fmt.version not in ("0.1", "0.2"):
         if pyramid[0].ndim == 3:
             axes = "cyx"
