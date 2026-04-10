@@ -375,9 +375,17 @@ class NgffMultiscales:
         if isinstance(group, str):
             group = zarr.open(group, mode="r+")
 
+        # Create a copy of metadata with normalized paths (s0, s1, etc.)
+        # to match the paths used by _write_pyramid_to_zarr
+        write_datasets = tuple(
+            ds.model_copy(update={"path": f"s{idx}"})
+            for idx, ds in enumerate(self.metadata.datasets)
+        )
+        write_metadata = self.metadata.model_copy(update={"datasets": write_datasets})
+
         if version == "0.4":
             # in v0.4, metadata is stored under "multiscales" attribute
-            metadata_dict = self.metadata.to_version("0.4").model_dump()
+            metadata_dict = write_metadata.to_version("0.4").model_dump()
             metadata_dict = _recursive_pop_nones(metadata_dict)
 
             if self.omero and isinstance(self.omero, Omero):
@@ -394,7 +402,7 @@ class NgffMultiscales:
         elif version == "0.5":
             metadata_dict = {
                 "version": version,
-                "multiscales": [_recursive_pop_nones(self.metadata.model_dump())],
+                "multiscales": [_recursive_pop_nones(write_metadata.model_dump())],
             }
             if self.omero and isinstance(self.omero, Omero):
                 metadata_dict["omero"] = self.omero.model_dump()
