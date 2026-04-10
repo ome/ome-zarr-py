@@ -119,9 +119,9 @@ class TestWriter:
 
     @pytest.mark.parametrize("storage_options_list", [True, False])
     def test_image_class_writer(
-        self, shape, format_version, array_constructor, storage_options_list
+        self, shape, format_version_all, array_constructor, storage_options_list
     ):
-        version = format_version()
+        version = format_version_all()
 
         if version.version == "0.5":
             grp_path = self.path_v3 / "test"
@@ -2104,8 +2104,9 @@ class TestLabelWriter:
         if fmt.version == "0.4":
             Models04Labels.from_zarr(group["labels"])
 
+        scale = dict(zip(axes, transformations[0][0]["scale"][-len(shape) :]))
         self.verify_label_data(
-            img_path, label_name, label_data, fmt, shape, transformations
+            img_path, label_name, label_data, fmt, shape, transformations, scale
         )
 
     @pytest.mark.parametrize(
