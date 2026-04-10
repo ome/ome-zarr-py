@@ -267,14 +267,6 @@ class TestWriter:
         elif version.version == "0.5":
             Models05Image.from_zarr(out)
 
-    @pytest.mark.parametrize(
-        "format_version",
-        (
-            pytest.param(FormatV04, id="V04"),
-            pytest.param(FormatV05, id="V05"),
-        ),
-    )
-    @pytest.mark.parametrize("array_constructor", [np.array, da.from_array])
     @pytest.mark.parametrize("storage_options_list", [True, False])
     def test_writer(
         self, shape, format_version_all, array_constructor, storage_options_list
