@@ -16,6 +16,7 @@ parts:
 
   - caption: Advanced
     chapters:
+    - file: advanced/sharding
     - file: advanced/build_custom_pyramid
     - file: advanced/write_hcs_plate
 
