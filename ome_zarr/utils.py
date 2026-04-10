@@ -429,3 +429,66 @@ def strip_common_prefix(parts: list[list[str]]) -> str:
         parts[idx] = parts[idx][first_mismatch - 1 :]
 
     return common
+
+
+def _get_version(group: zarr.Group) -> str:
+    """
+    Safely extract version from OME-Zarr group attributes.
+
+    Checks for version in known locations:
+    - group.attrs["ome"]["version"] for v0.5+
+    - group.attrs["multiscales"][0]["version"] for v0.4 or lower
+
+    Returns
+    -------
+    str
+        The OME-Zarr format version.
+
+    Raises
+    ------
+    ValueError
+        If version cannot be found in expected locations.
+    """
+    # Try v0.5+ format first
+    ome_attrs = group.attrs.get("ome")
+    if isinstance(ome_attrs, dict) and "version" in ome_attrs:
+        return ome_attrs["version"]
+
+    # Try v0.4 or lower format
+    multiscales = group.attrs.get("multiscales")
+    if isinstance(multiscales, list) and len(multiscales) > 0:
+        multiscale = multiscales[0]
+        if isinstance(multiscale, dict) and "version" in multiscale:
+            return multiscale["version"]
+
+    raise ValueError(
+        "Could not find 'version' in group attributes. "
+        "Expected location: group.attrs['ome']['version'] (v0.5+) "
+        "or group.attrs['multiscales'][0]['version'] (v0.4 or lower)"
+    )
+
+
+def _recursive_pop_nones(data: dict) -> dict:
+    """
+    Recursively remove None values from a nested dictionary.
+    """
+    output: dict = {}
+    for key, value in data.items():
+        if isinstance(value, dict):
+            nested = _recursive_pop_nones(value)
+            if nested:
+                output[key] = nested
+        elif isinstance(value, list | tuple):
+            nested_list = []
+            for item in value:
+                if isinstance(item, dict):
+                    nested_item = _recursive_pop_nones(item)
+                    if nested_item:
+                        nested_list.append(nested_item)
+                elif item is not None:
+                    nested_list.append(item)
+            if nested_list:
+                output[key] = nested_list
+        elif value is not None:
+            output[key] = value
+    return output

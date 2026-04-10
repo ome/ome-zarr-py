@@ -12,6 +12,7 @@ docs/build/
 .tox*
 .coverage*
 coverage.xml
+*.ome.zarr
 
 # Generated version file
 ome_zarr/_version.py

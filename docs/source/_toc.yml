@@ -30,6 +30,7 @@ parts:
     chapters:
     - file: api
       sections:
+      - file: api/image
       - file: api/writer
       - file: api/reader
       - file: api/io
