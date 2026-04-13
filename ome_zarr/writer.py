@@ -6,11 +6,9 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, TypeAlias
 
-import dask
 import dask.array as da
 import numpy as np
 import zarr
-from dask.graph_manipulation import bind
 from numcodecs import Blosc
 
 from . import USE_DASK_ARRAY_KWARGS
@@ -844,16 +842,9 @@ def _write_pyramid_to_zarr(
     if coordinate_transformations is not None:
         for dataset, transform in zip(datasets, coordinate_transformations):
             dataset["coordinateTransformations"] = transform
-    if not compute:
-        write_multiscales_metadata_delayed = dask.delayed(write_multiscales_metadata)
-        return delayed + [
-            bind(write_multiscales_metadata_delayed, delayed)(
-                group, datasets, fmt, axes, name, **metadata
-            )
-        ]
-    else:
-        write_multiscales_metadata(group, datasets, fmt, axes, name, **metadata)
-        return delayed
+
+    write_multiscales_metadata(group, datasets, fmt, axes, name, **metadata)
+    return delayed
 
 
 def write_label_metadata(
