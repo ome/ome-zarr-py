@@ -631,7 +631,7 @@ def write_image(
         warnings.warn(msg, DeprecationWarning)
 
         scale_factors = [
-            {d: 2**i if d in SPATIAL_DIMS else 1 for d in dims}
+            {d: 2 ** i if d in ("y", "x") else 1 for d in dims}
             for i in range(1, scaler.max_layer + 1)
         ]
         if scaler.method == "local_mean":
@@ -1037,7 +1037,7 @@ def write_labels(
     labels: np.ndarray | da.Array,
     group: zarr.Group | str,
     name: str,
-    scaler: Scaler | None = Scaler(order=0),
+    scaler: Scaler | None = None,
     scale_factors: list[int] | tuple[int, ...] | list[dict[str, int]] = (2, 4, 8, 16),
     method: Methods = Methods.NEAREST,
     fmt: Format | None = None,
@@ -1137,7 +1137,7 @@ def write_labels(
         Please use the 'scale_factors' argument instead.
         """
         scale_factors = [
-            {d: 2**i if d in SPATIAL_DIMS else 1 for d in dims}
+            {d: 2 ** i if d in ("y", "x") else 1 for d in dims}
             for i in range(1, scaler.max_layer + 1)
         ]
         warnings.warn(msg, DeprecationWarning)
