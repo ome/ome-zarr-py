@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import warnings
 from collections.abc import Sequence
-from dataclasses import InitVar, dataclass
+from dataclasses import InitVar, dataclass, field
 from typing import Any, cast
 
 import dask.array as da
@@ -148,7 +148,10 @@ class NgffMultiscales:
     image_label : Label or None
         Optional image-label metadata included in the OME-Zarr attributes.
     """
+    # Attributes that are populated in __post_init__ and not passed by the user
+    images: list[NgffImage] = field(init=False)
 
+    # InitVars for parameters passed by the user
     image: InitVar[NgffImage]
     scale_factors: InitVar[
         list[int] | tuple[int, ...] | list[dict[str, int]] | None
