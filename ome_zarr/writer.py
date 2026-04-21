@@ -1114,6 +1114,7 @@ def write_labels(
     labels: np.ndarray | da.Array,
     group: zarr.Group | str,
     name: str,
+    scale: dict[str, float] | None = None,
     scaler: Scaler | None = None,
     scale_factors: list[int] | tuple[int, ...] | list[dict[str, int]] = (2, 4, 8, 16),
     axes_units: dict[str, str] | None = None,
@@ -1137,12 +1138,12 @@ def write_labels(
         dimensions ordered (t, c, z, y, x).
     group : zarr.Group
         The group within the zarr store to write the metadata in.
+    name : str
+        The name of this labels data.
     scale: dict of str to float, optional
         The physical pixel size for each dimension, e.g. {"z": 0.1, "y": 0.1, "x": 0.5}.
         THe pixel sizes for every resolution level are calculated directly from the defined `scale` and
         `scale_factors` for each level.
-    name : str
-        The name of this labels data.
     scaler : ome_zarr.scale.Scaler, optional
         [DEPRECATED] Scaler implementation for downsampling the label data. Passing this
         argument will raise a warning and is no longer supported. Use `scale_factors` and
