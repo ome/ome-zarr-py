@@ -148,6 +148,7 @@ class NgffMultiscales:
     image_label : Label or None
         Optional image-label metadata included in the OME-Zarr attributes.
     """
+
     # Attributes that are populated in __post_init__ and not passed by the user
     images: list[NgffImage] = field(init=False)
 
