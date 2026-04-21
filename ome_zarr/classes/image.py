@@ -522,8 +522,8 @@ class NgffMultiscales:
                 list_of_labels = labels_json if isinstance(labels_json, list) else []
             if "omero" in group.attrs:
                 omero_dict = group.attrs.get("omero", None)
-            if "image-label" in metadata_json:
-                image_label_dict = metadata_json.get("image-label", None)
+            if "image-label" in group.attrs:
+                image_label_dict = group.attrs.get("image-label", None)
         elif version == "0.5":
             from ome_zarr_models.v05.multiscales import Multiscale as Multiscalev05
 
