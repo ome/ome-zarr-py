@@ -30,6 +30,14 @@ import zarr
 arr = zarr.zeros((10000, 10000), chunks=(1000, 1000))
 ```
 
+### Sharding
+Zarr now provides the option to bundle multiple chunks into a so-called shard file (see [sharding proposal](https://zarr.dev/zeps/accepted/ZEP0002.html)).
+On local file systems, this reduces the number of files written to disk, which improves several aspects of data handling (i.e., data transfer speeds). Moreover, depending on the used file system, there are limits on the total number of binary files per volume, which sharding helps to mitigate.
+On remote file systems, this can limit the overhead during streaming operations (i.e., when reading data from an S3 store), which can improve performance.
+
+The API to actually write shards depends on the respective implementation and usage of the Zarr standard.
+In ome-zarr-py, the sharding options are documented [here](#advanced:sharding).
+
 ### Zarr v2 vs v3
 
 OME-NGFF v0.4 uses Zarr v2, while OME-NGFF v0.5 uses Zarr v3:
