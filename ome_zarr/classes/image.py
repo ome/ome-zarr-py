@@ -520,8 +520,8 @@ class NgffMultiscales:
             if "labels" in group:
                 labels_json = group["labels"].attrs.get("labels", [])
                 list_of_labels = labels_json if isinstance(labels_json, list) else []
-            if "omero" in metadata_json:
-                omero_dict = metadata_json.get("omero", None)
+            if "omero" in group.attrs:
+                omero_dict = group.attrs.get("omero", None)
             if "image-label" in metadata_json:
                 image_label_dict = metadata_json.get("image-label", None)
         elif version == "0.5":
