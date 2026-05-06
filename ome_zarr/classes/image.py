@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from ensurepip import version
 import warnings
 from collections.abc import Sequence
 from dataclasses import InitVar, dataclass, field
@@ -375,10 +374,9 @@ class NgffMultiscales:
                 compute=compute,
                 name=self.name,
             )
-        else:
-            # Open existing store for updating labels only
-            if isinstance(group, str):
-                group = zarr.open(group, mode="r+")
+        # Open existing store for updating labels only
+        elif isinstance(group, str):
+            group = zarr.open(group, mode="r+")
 
         # write labels data if passed
         if self.labels is not None:
@@ -427,11 +425,13 @@ class NgffMultiscales:
 
             if version == "0.4":
                 # in v0.4, metadata is stored under "multiscales" attribute
-                metadata_dict = write_metadata.to_version("0.4").model_dump(by_alias=True)
+                metadata_dict = write_metadata.to_version("0.4").model_dump(
+                    by_alias=True
+                )
                 metadata_dict = _recursive_pop_nones(metadata_dict)
                 metadata_dict["version"] = version
                 group.attrs["multiscales"] = [metadata_dict]
-                
+
                 if self.omero and isinstance(self.omero, Omero):
                     omero_dict = self.omero.model_dump(by_alias=True)
                     omero_dict["version"] = version
@@ -449,7 +449,7 @@ class NgffMultiscales:
                     "version": version,
                     "multiscales": [
                         _recursive_pop_nones(write_metadata.model_dump(by_alias=True))
-                        ],
+                    ],
                 }
 
                 if self.omero and isinstance(self.omero, Omero):
@@ -468,18 +468,17 @@ class NgffMultiscales:
                         "labels": list_of_labels,
                     }
                 group.attrs["ome"] = metadata_dict
-        else:
-            # Update mode: only update the labels list in metadata
-            if list_of_labels:
-                if version == "0.4":
-                    group_labels = group["labels"]
-                    group_labels.attrs["labels"] = list_of_labels
-                elif version == "0.5":
-                    group_labels = group["labels"]
-                    group_labels.attrs["ome"] = {
-                        "version": version,
-                        "labels": list_of_labels,
-                    }
+        # Update mode: only update the labels list in metadata
+        elif list_of_labels:
+            if version == "0.4":
+                group_labels = group["labels"]
+                group_labels.attrs["labels"] = list_of_labels
+            elif version == "0.5":
+                group_labels = group["labels"]
+                group_labels.attrs["ome"] = {
+                    "version": version,
+                    "labels": list_of_labels,
+                }
 
         return delayed
 
