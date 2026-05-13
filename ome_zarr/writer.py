@@ -610,8 +610,6 @@ def write_image(
         The physical units for each dimension,
         e.g. {"t": "millisecond", "z": "micrometer", "y": "micrometer", "x": "micrometer"}.
         For a list of recommended units, see [ngff specification](https://ngff.openmicroscopy.org/specifications/0.5/index.html#axes-metadata).
-    name: str, optional
-        The name of the image, to be included in the metadata. Defaults to "image".
     method : ome_zarr.scale.Methods, optional
         Downsampling method to use.
         Available methods are:
@@ -1211,7 +1209,7 @@ def write_labels(
         The name of this labels data.
     scale: dict of str to float, optional
         The physical pixel size for each dimension, e.g. {"z": 0.1, "y": 0.1, "x": 0.5}.
-        THe pixel sizes for every resolution level are calculated directly from the defined `scale` and
+        The pixel sizes for every resolution level are calculated directly from the defined `scale` and
         `scale_factors` for each level.
     scaler : ome_zarr.scale.Scaler, optional
         [DEPRECATED] Scaler implementation for downsampling the label data. Passing this

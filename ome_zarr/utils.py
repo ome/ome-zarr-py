@@ -478,7 +478,7 @@ def _recursive_pop_nones(data: dict) -> dict:
             nested = _recursive_pop_nones(value)
             if nested:
                 output[key] = nested
-        elif isinstance(value, list | tuple):
+        elif isinstance(value, (list, tuple)):
             nested_list = []
             for item in value:
                 if isinstance(item, dict):

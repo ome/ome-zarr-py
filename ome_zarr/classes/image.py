@@ -77,7 +77,7 @@ class NgffImage:
 
     def __post_init__(self):
         # set default scale if unset
-        if not self.scale:
+        if self.scale is None:
             self.scale = tuple(1.0 for _ in range(len(self.axes)))
 
         # coerce axes to list
@@ -648,11 +648,6 @@ class NgffMultiscales:
                 instance.image_label = Label.model_validate(image_label_dict)
         except ValidationError as e:
             warnings.warn(f"Invalid image-label metadata: {e}")
-
-        if metadata.name is not None:
-            instance.name = metadata.name
-        else:
-            instance.name = "image"
 
         if metadata.name is not None:
             instance.name = metadata.name
