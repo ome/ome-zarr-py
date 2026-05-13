@@ -132,6 +132,15 @@ class TestWriter:
         data = self.create_data(shape)
         data = array_constructor(data)
         axes = "tczyx"[-len(shape) :]
+
+        # add some units
+        axes_units = {}
+        for ax in axes:
+            if ax == "t":
+                axes_units[ax] = "second"
+            elif ax == "z" or ax in ("y", "x"):
+                axes_units[ax] = "micrometer"
+
         transformations = []
         for dataset_transfs in TRANSFORMATIONS:
             transf = dataset_transfs[0]
@@ -160,6 +169,7 @@ class TestWriter:
             group=str(grp_path),
             fmt=fmt,
             axes=axes,
+            axes_units=axes_units,
             coordinate_transformations=transformations,
             storage_options=storage_options,
         )
@@ -177,6 +187,11 @@ class TestWriter:
             assert node_data[0].ndim == 5
         else:
             assert node_data[0].shape == shape
+
+        for ax in node_metadata["multiscales"][0].get("axes"):
+            if ax["name"] in axes_units:
+                assert ax.get("unit") == axes_units[ax["name"]]
+
         print("node.metadata", node_metadata)
         if fmt.version not in ("0.1", "0.2", "0.3"):
             cts = [
@@ -198,6 +213,77 @@ class TestWriter:
             # Validate with ome-zarr-models-py: only supports v0.4
             Models04Image.from_zarr(out)
         elif fmt.version == "0.5":
+            Models05Image.from_zarr(out)
+
+    @pytest.mark.parametrize(
+        "format_version",
+        (
+            pytest.param(FormatV04, id="V04"),
+            pytest.param(FormatV05, id="V05"),
+        ),
+    )
+    def test_writer_with_scale(
+        self,
+        shape,
+        format_version,
+    ):
+        """
+        This test checks whether the `scale` parameter is converted to the correct
+        values for all subsequent pyramid levels
+        """
+        version = format_version()
+
+        if version.version == "0.5":
+            grp_path = self.path_v3 / "test"
+        else:
+            grp_path = self.path / "test"
+
+        data = self.create_data(shape)
+        axes = "tczyx"[-len(shape) :]
+        scale = {d: 0.5 if d in ["y", "x"] else 1.0 for d in axes}
+
+        write_image(
+            image=data,
+            group=str(grp_path),
+            fmt=version,
+            scale=scale,
+            axes=axes,
+        )
+
+        # Verify
+        out = zarr.open_group(grp_path)
+        node_metadata = out.attrs
+        if "ome" in node_metadata:
+            node_metadata = node_metadata["ome"]
+        assert "multiscales" in node_metadata
+        paths = [d["path"] for d in node_metadata["multiscales"][0]["datasets"]]
+        node_data = [da.from_zarr(out[path]) for path in paths]
+        if version.version in ("0.1", "0.2"):
+            # v0.1 and v0.2 MUST be 5D
+            assert node_data[0].ndim == 5
+        else:
+            assert node_data[0].shape == shape
+        print("node.metadata", node_metadata)
+        if version.version not in ("0.1", "0.2", "0.3"):
+            datasets = node_metadata["multiscales"][0]["datasets"]
+            for idx, (level, ds) in enumerate(zip(node_data, datasets)):
+                transforms = ds["coordinateTransformations"][0]
+                if idx == 0:
+                    assert transforms["scale"] == list(scale.values())
+                else:
+                    relative_scale = [
+                        node_data[idx].shape[i] / node_data[idx - 1].shape[i]
+                        for i in range(len(shape))
+                    ]
+                    scale = {
+                        d: scale[d] / relative_scale[i] for i, d in enumerate(axes)
+                    }
+                    assert transforms["scale"] == list(scale.values())
+
+        if version.version == "0.4":
+            # Validate with ome-zarr-models-py: only supports v0.4
+            Models04Image.from_zarr(out)
+        elif version.version == "0.5":
             Models05Image.from_zarr(out)
 
     def test_mix_zarr_formats(self):
