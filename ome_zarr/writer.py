@@ -264,14 +264,12 @@ def check_format(
 def write_multiscale(
     pyramid: ListOfArrayLike,
     group: zarr.Group,
-    scale: dict[str, float] | None = None,
     fmt: Format | None = None,
     axes: AxesType = None,
-    axes_units: dict[str, str] | None = None,
     coordinate_transformations: list[list[dict[str, Any]]] | None = None,
     storage_options: JSONDict | list[JSONDict] | None = None,
     name: str | None = None,
-    compute: bool | None = True,
+    compute: bool = True,
     scale: dict[str, float] | None = None,
     axes_units: dict[str, str] | None = None,
     **metadata: str | JSONDict | list[JSONDict],
@@ -566,7 +564,6 @@ def write_well_metadata(
 def write_image(
     image: ArrayLike,
     group: zarr.Group | str,
-    scale: dict[str, float] | None = None,
     scale_factors: list[int] | tuple[int, ...] | list[dict[str, int]] | None = (
         2,
         4,
@@ -574,14 +571,13 @@ def write_image(
         16,
     ),
     name: str | None = "image",
-    axes_units: dict[str, str] | None = None,
     method: Methods | None = Methods.RESIZE,
     scaler: Scaler | None = None,
     fmt: Format | None = None,
     axes: AxesType = None,
     coordinate_transformations: list[list[dict[str, Any]]] | None = None,
     storage_options: JSONDict | list[JSONDict] | None = None,
-    compute: bool | None = True,
+    compute: bool = True,
     scale: dict[str, float] | None = None,
     axes_units: dict[str, str] | None = None,
     **metadata: str | JSONDict | list[JSONDict],
@@ -785,7 +781,7 @@ def _write_pyramid_to_zarr(
     coordinate_transformations: list[list[dict[str, Any]]] | None = None,
     storage_options: JSONDict | list[JSONDict] | None = None,
     name: str | None = None,
-    compute: bool | None = True,
+    compute: bool = True,
     **metadata: str | JSONDict | list[JSONDict],
 ) -> list:
 
@@ -1042,16 +1038,14 @@ def write_multiscale_labels(
     pyramid: list,
     group: zarr.Group | str,
     name: str,
-    scale: dict[str, float] | None = None,
     fmt: Format | None = None,
     axes: AxesType = None,
-    axes_units: dict[str, str] | None = None,
     coordinate_transformations: list[list[dict[str, Any]]] | None = None,
     storage_options: JSONDict | list[JSONDict] | None = None,
     label_metadata: JSONDict | None = None,
     scale: dict[str, float] | None = None,
     axes_units: dict[str, str] | None = None,
-    compute: bool | None = True,
+    compute: bool = True,
     **metadata: JSONDict,
 ) -> list:
     """
@@ -1186,7 +1180,6 @@ def write_labels(
     name: str,
     scaler: Scaler | None = Scaler(order=0),
     scale_factors: list[int] | tuple[int, ...] | list[dict[str, int]] = (2, 4, 8, 16),
-    axes_units: dict[str, str] | None = None,
     method: Methods = Methods.NEAREST,
     fmt: Format | None = None,
     axes: AxesType = None,
@@ -1195,7 +1188,7 @@ def write_labels(
     label_metadata: JSONDict | None = None,
     scale: dict[str, float] | None = None,
     axes_units: dict[str, str] | None = None,
-    compute: bool | None = True,
+    compute: bool = True,
     **metadata: JSONDict,
 ) -> list:
     """
