@@ -188,6 +188,14 @@ class NgffMultiscales:
 
         if isinstance(method, Methods):
             method = str(method.value)
+        elif method is None:
+            method = str(Methods.RESIZE.value)
+
+        if self.image_label is not None and method != str(Methods.NEAREST.value):
+            warnings.warn(
+                f"Image label metadata provided but method is {method}, not 'nearest'. "
+                f"Consider using method='nearest' label image multiresolution pyramids."
+            )
 
         # Build the pyramid data
         pyramid = _build_pyramid(
