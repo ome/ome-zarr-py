@@ -580,7 +580,7 @@ def write_image(
     compute: bool = True,
     scale: dict[str, float] | None = None,
     axes_units: dict[str, str] | None = None,
-    **metadata: str | JSONDict | list[JSONDict],
+    **metadata: JSONDict,
 ) -> list:
     """
     Write an image to the zarr store according to the OME-Zarr specification, supporting multiscale pyramids.
@@ -654,7 +654,7 @@ def write_image(
         e.g. {"t": "millisecond", "z": "micrometer", "y": "micrometer", "x": "micrometer"}.
         For a list of recommended units, see [ngff specification](https://ngff.openmicroscopy.org/specifications/0.5/index.html#axes-metadata).
     `**metadata` : dict
-        Additional metadata to store.
+        Additional metadata to store, i.e. {"omero": {...}}. This is passed through to the multiscales metadata.
 
     Returns
     -------
@@ -693,11 +693,6 @@ def write_image(
             "The 'coordinate_transformations' argument is deprecated and will "
             "be removed in a future version. Please use the `scale` argument "
             "to specify the physical pixel size for each dimension instead. "
-            "When `coordinate_transformations` is provided, it takes "
-            "precedence over `scale`, so `scale` is not applied. When "
-            "`coordinate_transformations` is not provided, the pixel sizes "
-            "for every resolution level are calculated from `scale` and "
-            "`scale_factors`."
         )
         warnings.warn(msg, DeprecationWarning)
 
@@ -734,8 +729,9 @@ def write_image(
         else:
             method = Methods.RESIZE
 
-    if method is None:
-        method = Methods.RESIZE
+    omero = None
+    if "omero" in metadata:
+        omero = metadata["omero"]
 
     ngff_image = NgffImage(
         data=image, scale=scale, axes=dims, name=name, axes_units=axes_units
@@ -744,6 +740,7 @@ def write_image(
         image=ngff_image,
         scale_factors=scale_factors,
         method=method,
+        omero=omero,
     )
 
     dask_delayed_jobs = ngff_multiscales.to_ome_zarr(
@@ -1265,7 +1262,7 @@ def write_labels(
         e.g. {"t": "millisecond", "z": "micrometer", "y": "micrometer", "x": "micrometer"}.
         For a list of recommended units, see [ngff specification](https://ngff.openmicroscopy.org/specifications/0.5/index.html#axes-metadata).
     `**metadata` : dict
-        Additional metadata to store.
+        Additional metadata to store, i.e. {"image-label": {...}}. This is passed through to the image-label metadata.
 
     Returns
     -------
@@ -1295,6 +1292,13 @@ def write_labels(
     if scale is None:
         scale = dict.fromkeys(dims, 1.0)
 
+    if method is None:
+        method = Methods.NEAREST
+    
+    image_label = None
+    if "image-label" in metadata:
+        image_label = metadata["image-label"]
+
     if scaler is not None:
         msg = """
         The 'scaler' argument is deprecated and will be removed in version 0.13.0.
@@ -1311,16 +1315,8 @@ def write_labels(
             "The 'coordinate_transformations' argument is deprecated and will "
             "be removed in a future version. Please use the `scale` argument "
             "to specify the physical pixel size for each dimension instead. "
-            "When `coordinate_transformations` is provided, it takes "
-            "precedence over `scale`, so `scale` is not applied. When "
-            "`coordinate_transformations` is not provided, the pixel sizes "
-            "for every resolution level are calculated from `scale` and "
-            "`scale_factors`."
         )
         warnings.warn(msg, DeprecationWarning)
-
-    if method is None:
-        method = Methods.NEAREST
 
     ngff_image = NgffImage(
         data=labels, axes=dims, name=name, scale=scale, axes_units=axes_units
@@ -1329,6 +1325,7 @@ def write_labels(
         image=ngff_image,
         scale_factors=scale_factors,
         method=method,
+        image_label=image_label,
     )
     dask_delayed_jobs = ngff_multiscales.to_ome_zarr(
         group=sub_group,
