@@ -24,7 +24,7 @@ from ome_zarr_models.v05.coordinate_transformations import (
 )
 from ome_zarr_models.v05.multiscales import (
     Dataset,
-    Multiscale,
+    Multiscale as MultiscaleV05,
 )
 from pydantic import ValidationError
 
@@ -250,7 +250,7 @@ class NgffMultiscales:
             else:
                 axes.append(Axis(name=d, type="custom", unit=image.axes_units.get(d)))
 
-        self.metadata = Multiscale(
+        self.metadata = MultiscaleV05(
             axes=tuple(axes),
             datasets=tuple(datasets),
             name=image.name,
