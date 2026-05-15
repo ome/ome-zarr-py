@@ -38,6 +38,13 @@ from ome_zarr.writer import (
             True,
             True,
         ),
+        (  # one for reading 0.3 metadata with only 3 axes (t, y, x)
+            {
+                "0.3": "https://livingobjects.ebi.ac.uk/idr/zarr/v0.3/idr0109A/12922361.zarr"
+            },
+            True,
+            False,
+        ),
     ],
 )
 def test_class_reader_legacy(url, has_omero, has_labels):
