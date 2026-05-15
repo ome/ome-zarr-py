@@ -647,7 +647,7 @@ class NgffMultiscales:
 
 
     @staticmethod
-    def _read_legacy_metadata(group, version) -> MultiscaleV05:
+    def _read_legacy_metadata(group, version: str) -> MultiscaleV05:
         from ome_zarr_models.v05.axes import Axis as AxisV05
         from ome_zarr_models.v05.coordinate_transformations import (
             VectorScale,
