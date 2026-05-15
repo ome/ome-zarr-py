@@ -392,8 +392,11 @@ class NgffMultiscales:
                 # coerce image name to name in labels dict
                 ms_labels.name = label_name
 
-                if label_name in label_group:
-                    # Skip this label, it already exists
+                if label_name in label_group and not overwrite:
+                    warnings.warn(
+                        f"Label group {label_name} already exists in store. "
+                        f"Skipping writing this label since overwrite=False."
+                    )
                     continue
 
                 label_subgroup = label_group.require_group(label_name)
@@ -473,16 +476,30 @@ class NgffMultiscales:
                         "labels": list_of_labels,
                     }
                 group.attrs["ome"] = metadata_dict
-        # Update mode: only update the labels list in metadata
+
+        # Update mode: merge new labels with existing labels in metadata
         elif list_of_labels:
+            group_labels = group["labels"]
+            
             if version == "0.4":
-                group_labels = group["labels"]
-                group_labels.attrs["labels"] = list_of_labels
+                existing_labels = group_labels.attrs.get("labels", [])
+                # Merge: add new labels not already in existing list
+                merged_labels = list(existing_labels)
+                for label in list_of_labels:
+                    if label not in merged_labels:
+                        merged_labels.append(label)
+                group_labels.attrs["labels"] = merged_labels
             elif version == "0.5":
-                group_labels = group["labels"]
+                existing_ome = group_labels.attrs.get("ome", {})
+                existing_labels = existing_ome.get("labels", [])
+                # Merge: add new labels not already in existing list
+                merged_labels = list(existing_labels)
+                for label in list_of_labels:
+                    if label not in merged_labels:
+                        merged_labels.append(label)
                 group_labels.attrs["ome"] = {
                     "version": version,
-                    "labels": list_of_labels,
+                    "labels": merged_labels,
                 }
 
         return delayed

@@ -2194,6 +2194,92 @@ class TestLabelWriter:
         assert len(attrs["labels"]) == len(label_names)
         assert all(label_name in attrs["labels"] for label_name in label_names)
 
+    @pytest.mark.parametrize(
+        "fmt",
+        (pytest.param(FormatV04(), id="V04"), pytest.param(FormatV05(), id="V05")),
+    )
+    def write_labels_class_API(self, fmt):
+        from ome_zarr import NgffImage, NgffMultiscales
 
-if __name__ == "__main__":
-    pytest.main([__file__])
+        if fmt.version == "0.5":
+            img_path = self.path_v3
+            group = self.root_v3
+        else:
+            img_path = self.path
+            group = self.root
+
+        # create dummy data
+        image_data = np.random.randint(0, 1000, size=(1, 2, 1, 128, 128))
+        label_data1 = np.random.randint(0, 1000, size=(1, 2, 1, 128, 128))
+        label_data2 = np.random.randint(0, 1000, size=(1, 2, 1, 128, 128))
+        label_data3 = np.random.randint(0, 1000, size=(1, 2, 1, 128, 128))
+
+        # create single-scale objects
+        ngff_image = NgffImage(data=image_data, axes="tczyx")
+        ngff_labels = NgffImage(data=label_data1, axes="tczyx")
+        ngff_labels2 = NgffImage(data=label_data2, axes="tczyx")
+        ngff_labels3 = NgffImage(data=label_data3, axes="tczyx")
+
+        # create multiscale objects
+        ngff_ms_labels = NgffMultiscales(image=ngff_labels, method="nearest")
+        ngff_ms_labels2 = NgffMultiscales(image=ngff_labels2, method="nearest")
+        ngff_ms_labels3 = NgffMultiscales(image=ngff_labels3, method="nearest")
+        ngff_ms = NgffMultiscales(image=ngff_image, labels={"first_labels": ngff_ms_labels})
+
+        # write to zarr
+        ngff_ms.to_ome_zarr(group, version=fmt.version)
+
+        # now check that the respective groups and metadata exist and is correct
+        label_group = zarr.open(f"{img_path}/labels", mode="r")
+        if fmt.version == "0.5":
+            label_attrs = label_group.attrs["ome"]
+        elif fmt.version == "0.4":
+            label_attrs = label_group.attrs
+
+        assert "labels" in label_attrs
+        assert "first_labels" in label_attrs["labels"]
+
+        # read from group and make sure the written labels are in the .labels attribute
+        ngff_ms_test = NgffMultiscales.from_ome_zarr(group)
+        assert "first_labels" in ngff_ms_test.labels
+
+        # now we add the other labels to that attribute
+        ngff_ms_test.labels["second_labels"] = ngff_ms_labels2
+        ngff_ms_test.to_ome_zarr(group, version=fmt.version, overwrite=False)
+
+        # now check that we still have both labels in the metadata
+        label_group = zarr.open(f"{img_path}/labels", mode="r")
+        if fmt.version == "0.5":
+            label_attrs = label_group.attrs["ome"]
+        elif fmt.version == "0.4":
+            label_attrs = label_group.attrs
+
+        assert "labels" in label_attrs
+        assert "first_labels" in label_attrs["labels"]
+        assert "second_labels" in label_attrs["labels"]
+
+        # Lastly, we check that the overwrite for labels works as intended:
+        ngff_ms.labels = {"third_labels": ngff_ms_labels3}
+        ngff_ms.to_ome_zarr(group, version=fmt.version, overwrite=True)
+
+        # Now, only the third label should be present in the metadata and as a zarr group,
+        # but the first and second labels should be gone
+        label_group = zarr.open(f"{img_path}/labels", mode="r")
+        if fmt.version == "0.5":
+            label_attrs = label_group.attrs["ome"]
+        elif fmt.version == "0.4":
+            label_attrs = label_group.attrs
+
+        assert "labels" in label_attrs
+        assert "first_labels" not in label_attrs["labels"]
+        assert "second_labels" not in label_attrs["labels"]
+        assert "third_labels" in label_attrs["labels"]
+        assert "first_labels" not in label_group
+        assert "second_labels" not in label_group
+        assert "third_labels" in label_group
+
+        ngff_ms_test = NgffMultiscales.from_ome_zarr(group)
+        assert "third_labels" in ngff_ms_test.labels
+
+
+
