@@ -86,6 +86,11 @@ class NgffImage:
 
         # coerce scale to dict if it's a sequence
         if isinstance(self.scale, Sequence):
+            if len(self.scale) != len(self.axes):
+                raise ValueError(
+                    f"Number of scale values ({len(self.scale)}) "
+                    f"does not match number of axes ({len(self.axes)})"
+                )
             self.scale = dict(zip(self.axes, self.scale))
 
         # coerce data to dask array
