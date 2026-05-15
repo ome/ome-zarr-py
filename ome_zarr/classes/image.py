@@ -24,6 +24,8 @@ from ome_zarr_models.v05.coordinate_transformations import (
 )
 from ome_zarr_models.v05.multiscales import (
     Dataset,
+)
+from ome_zarr_models.v05.multiscales import (
     Multiscale as MultiscaleV05,
 )
 from pydantic import ValidationError
@@ -488,7 +490,7 @@ class NgffMultiscales:
         # Update mode: merge new labels with existing labels in metadata
         elif list_of_labels:
             group_labels = group["labels"]
-            
+
             if version == "0.4":
                 existing_labels = group_labels.attrs.get("labels", [])
                 # Merge: add new labels not already in existing list
@@ -645,7 +647,6 @@ class NgffMultiscales:
 
         return instance
 
-
     @staticmethod
     def _read_legacy_metadata(group, version: str) -> MultiscaleV05:
         from ome_zarr_models.v05.axes import Axis as AxisV05
@@ -654,9 +655,7 @@ class NgffMultiscales:
             VectorTranslation,
         )
 
-        metadata_json = cast(
-            dict[str, Any], group.attrs.get("multiscales", [None])[0]
-        )
+        metadata_json = cast(dict[str, Any], group.attrs.get("multiscales", [None])[0])
 
         axes = {
             "t": AxisV05(name="t", type="time"),
@@ -666,11 +665,13 @@ class NgffMultiscales:
             "x": AxisV05(name="x", type="space"),
         }
 
-        axes_order = ["t", "c", "z", "y", "x"]    
+        axes_order = ["t", "c", "z", "y", "x"]
         if version == "0.3":
             axes_order = metadata_json.get("axes", None)
             if axes_order is None:
-                raise ValueError("Metadata version 0.3 requires 'axes' field in metadata")
+                raise ValueError(
+                    "Metadata version 0.3 requires 'axes' field in metadata"
+                )
 
         axes = [axes[ax] for ax in axes_order]
 

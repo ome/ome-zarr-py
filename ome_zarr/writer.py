@@ -1294,7 +1294,7 @@ def write_labels(
 
     if method is None:
         method = Methods.NEAREST
-    
+
     image_label = None
     if "image-label" in metadata:
         image_label = metadata["image-label"]
