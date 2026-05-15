@@ -657,7 +657,7 @@ class NgffMultiscales:
 
         metadata_json = cast(dict[str, Any], group.attrs.get("multiscales", [None])[0])
 
-        axes = {
+        axes_map = {
             "t": AxisV05(name="t", type="time"),
             "c": AxisV05(name="c", type="channel"),
             "z": AxisV05(name="z", type="space"),
@@ -665,15 +665,16 @@ class NgffMultiscales:
             "x": AxisV05(name="x", type="space"),
         }
 
-        axes_order = ["t", "c", "z", "y", "x"]
+        axes_order: list[str] = ["t", "c", "z", "y", "x"]
         if version == "0.3":
-            axes_order = metadata_json.get("axes", None)
-            if axes_order is None:
+            axes_order_value = metadata_json.get("axes")
+            if axes_order_value is None:
                 raise ValueError(
                     "Metadata version 0.3 requires 'axes' field in metadata"
                 )
+            axes_order = cast(list[str], axes_order_value)
 
-        axes = [axes[ax] for ax in axes_order]
+        axes = [axes_map[ax] for ax in axes_order]
 
         datasets = []
         for idx, ds in enumerate(metadata_json.get("datasets", [])):
