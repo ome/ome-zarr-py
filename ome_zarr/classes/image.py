@@ -570,15 +570,20 @@ class NgffMultiscales:
                 NgffImage(
                     data=data,
                     axes=[ax.name for ax in metadata.axes],
-                    scale={d.name: s for d, s in zip(metadata.axes, scale)},
+                    scale={ax.name: s for ax, s in zip(metadata.axes, scale)},
                     axes_units=axes_units,
-                    name=metadata.name,
+                    name=str(metadata.name),
                 )
             )
 
+        # instantiate the NgffMultiscales object without calling __post_init__
         instance = cls.__new__(cls)
         instance.images = images
         instance.metadata = metadata
+        instance.omero = None
+        instance.image_label = None
+        instance.labels = None
+        instance.method = None
 
         # Finally, parse omero metadata
         try:
