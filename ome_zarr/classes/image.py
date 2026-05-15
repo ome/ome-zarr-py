@@ -514,62 +514,7 @@ class NgffMultiscales:
         # This is purely for backwards compatibility
         # need to handle loading older metadata explicitly here
         if version in ("0.1", "0.2", "0.3"):
-            from ome_zarr_models.v05.axes import Axis as AxisV05
-            from ome_zarr_models.v05.coordinate_transformations import (
-                VectorScale,
-                VectorTranslation,
-            )
-            from ome_zarr_models.v05.multiscales import Multiscale as Multiscalev05
-
-            metadata_json = cast(
-                dict[str, Any], group.attrs.get("multiscales", [None])[0]
-            )
-
-            axes = (
-                AxisV05(name="t", type="time"),
-                AxisV05(name="c", type="channel"),
-                AxisV05(name="z", type="space"),
-                AxisV05(name="y", type="space"),
-                AxisV05(name="x", type="space"),
-            )
-
-            scale = {s.name: 1.0 for s in axes}
-
-            datasets = []
-            for idx, ds in enumerate(metadata_json.get("datasets", [])):
-                scale_level = [
-                    2.0 ** idx if s.name in ("z", "y", "x") else 1.0 for s in axes
-                ]
-
-                if idx == 0:
-                    transforms: tuple[VectorScale | VectorTranslation, ...] = (
-                        VectorScale(type="scale", scale=scale_level),
-                    )
-                else:
-                    translate = [
-                        2.0 ** (idx - 1) - 0.5 if s.name in ("z", "y", "x") else 0.0
-                        for s in axes
-                    ]
-                    transforms = (
-                        VectorScale(type="scale", scale=scale_level),
-                        VectorTranslation(type="translation", translation=translate),
-                    )
-
-                datasets.append(
-                    Dataset(
-                        path=ds.get("path", f"s{idx}"),
-                        coordinateTransformations=transforms,
-                    )
-                )
-
-            metadata = Multiscalev05(
-                axes=axes,
-                datasets=tuple(datasets),
-                type=metadata_json.get("type", None),
-                metadata=metadata_json.get("metadata", None),
-                coordinateTransformations=None,
-                name=metadata_json.get("name", "image"),
-            )
+            metadata = cls._read_legacy_metadata(group, version)
 
             if "labels" in group:
                 labels_json = group["labels"].attrs.get("labels", [])
@@ -664,3 +609,70 @@ class NgffMultiscales:
             instance.labels = labels
 
         return instance
+
+
+    @staticmethod
+    def _read_legacy_metadata(group, version) -> MultiscaleV05:
+        from ome_zarr_models.v05.axes import Axis as AxisV05
+        from ome_zarr_models.v05.coordinate_transformations import (
+            VectorScale,
+            VectorTranslation,
+        )
+
+        metadata_json = cast(
+            dict[str, Any], group.attrs.get("multiscales", [None])[0]
+        )
+
+        axes = {
+            "t": AxisV05(name="t", type="time"),
+            "c": AxisV05(name="c", type="channel"),
+            "z": AxisV05(name="z", type="space"),
+            "y": AxisV05(name="y", type="space"),
+            "x": AxisV05(name="x", type="space"),
+        }
+
+        axes_order = ["t", "c", "z", "y", "x"]    
+        if version == "0.3":
+            axes_order = metadata_json.get("axes", None)
+            if axes_order is None:
+                raise ValueError("Metadata version 0.3 requires 'axes' field in metadata")
+
+        axes = [axes[ax] for ax in axes_order]
+
+        datasets = []
+        for idx, ds in enumerate(metadata_json.get("datasets", [])):
+            scale_level = [
+                2.0 ** idx if s.name in ("z", "y", "x") else 1.0 for s in axes
+            ]
+
+            if idx == 0:
+                transforms: tuple[VectorScale | VectorTranslation, ...] = (
+                    VectorScale(type="scale", scale=scale_level),
+                )
+            else:
+                translate = [
+                    2.0 ** (idx - 1) - 0.5 if s.name in ("z", "y", "x") else 0.0
+                    for s in axes
+                ]
+                transforms = (
+                    VectorScale(type="scale", scale=scale_level),
+                    VectorTranslation(type="translation", translation=translate),
+                )
+
+            datasets.append(
+                Dataset(
+                    path=ds.get("path", f"s{idx}"),
+                    coordinateTransformations=transforms,
+                )
+            )
+
+        metadata = MultiscaleV05(
+            axes=axes,
+            datasets=tuple(datasets),
+            type=metadata_json.get("type", None),
+            metadata=metadata_json.get("metadata", None),
+            coordinateTransformations=None,
+            name=metadata_json.get("name", "image"),
+        )
+
+        return metadata
