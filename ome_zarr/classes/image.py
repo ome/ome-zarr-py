@@ -162,7 +162,7 @@ class NgffMultiscales:
     scale_factors: InitVar[
         list[int] | tuple[int, ...] | list[dict[str, int]] | None
     ] = None
-    method: str | Methods = Methods.RESIZE
+    method: str | Methods | None = Methods.RESIZE
     coordinateTransformations: InitVar[list[Scale | Translation | Identity] | None] = (
         None
     )
