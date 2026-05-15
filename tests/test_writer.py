@@ -1746,32 +1746,6 @@ class TestLabelWriter:
                     # non-spatial dimensions (t, c) are not downsampled
                     assert value == 1.0
 
-        cts = [
-            d["coordinateTransformations"]
-            for d in node_metadata["multiscales"][0]["datasets"]
-        ]
-
-        axes = list(scale.keys())
-        for level, transfs in enumerate(cts):
-            assert len(transfs) == 1
-            assert transfs[0]["type"] == "scale"
-            assert len(transfs[0]["scale"]) == len(shape)
-
-            # default downsamples by factor 2 each level, except z-axis
-            for idx, value in enumerate(transfs[0]["scale"]):
-                axis_name = axes[idx]
-                if axis_name == "z":
-                    # z-axis is not downsampled by default
-                    assert value == scale[axis_name]
-                elif axis_name in ("x", "y"):
-                    # spatial dimensions are downsampled
-                    assert value == scale[axis_name] * shape[idx] / (
-                        shape[idx] // (2**level)
-                    )
-                else:
-                    # non-spatial dimensions (t, c) are not downsampled
-                    assert value == 1.0
-
         assert np.allclose(label_data, node_data[0][...].compute())
 
         # Verify label metadata
