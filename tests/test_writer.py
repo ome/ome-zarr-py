@@ -2224,7 +2224,9 @@ class TestLabelWriter:
         ngff_ms_labels = NgffMultiscales(image=ngff_labels, method="nearest")
         ngff_ms_labels2 = NgffMultiscales(image=ngff_labels2, method="nearest")
         ngff_ms_labels3 = NgffMultiscales(image=ngff_labels3, method="nearest")
-        ngff_ms = NgffMultiscales(image=ngff_image, labels={"first_labels": ngff_ms_labels})
+        ngff_ms = NgffMultiscales(
+            image=ngff_image, labels={"first_labels": ngff_ms_labels}
+        )
 
         # write to zarr
         ngff_ms.to_ome_zarr(group, version=fmt.version)
@@ -2280,6 +2282,3 @@ class TestLabelWriter:
 
         ngff_ms_test = NgffMultiscales.from_ome_zarr(group)
         assert "third_labels" in ngff_ms_test.labels
-
-
-
