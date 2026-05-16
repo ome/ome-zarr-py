@@ -637,9 +637,7 @@ class NgffMultiscales:
         super().__setattr__(name, value)
 
     @staticmethod
-    def _parse_image_label(
-        image_label: dict[str, Any] | Label | None
-        ) -> Label | None:
+    def _parse_image_label(image_label: dict[str, Any] | Label | None) -> Label | None:
         """
         Helper method to coerce the `image_label` attribute to an instance
         of the Label model for easier processing in other methods,
@@ -666,9 +664,7 @@ class NgffMultiscales:
             )
 
     @staticmethod
-    def _parse_omero(
-        omero: dict[str, Any] | Omero | None
-        ) -> Omero | None:
+    def _parse_omero(omero: dict[str, Any] | Omero | None) -> Omero | None:
         """
         Helper method to coerce the `omero` attribute to an instance
         of the Omero model for easier processing in other methods,
@@ -696,8 +692,10 @@ class NgffMultiscales:
 
     @staticmethod
     def _parse_labels(
-        labels: NgffMultiscales | list[NgffMultiscales] | dict[str, NgffMultiscales] | None
-        ) -> dict[str, NgffMultiscales] | None:
+        labels: (
+            NgffMultiscales | list[NgffMultiscales] | dict[str, NgffMultiscales] | None
+        ),
+    ) -> dict[str, NgffMultiscales] | None:
         """
         Helper method to coerce the `labels` attribute
         to a consistent dict format for easier processing in other methods.,
