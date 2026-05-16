@@ -273,32 +273,9 @@ class NgffMultiscales:
         )
 
         # coerce labels to dict if it's a single NgffMultiscales or a list
-        if self.labels is not None:
-            if isinstance(self.labels, NgffMultiscales):
-                self.labels = {str(self.labels.name): self.labels}
-            elif isinstance(self.labels, list):
-                self.labels = {str(label.name): label for label in self.labels}
-
-        # parse omero metadata, if passed;
-        # We don't want to fail the entire initialization if the omero metadata is invalid, so we
-        # escape possible validation errors and just warn the user that the omero metadata is invalid
-        try:
-            if isinstance(self.omero, dict):
-                self.omero = Omero.model_validate(self.omero)
-
-        except ValidationError as e:
-            warnings.warn(f"Invalid Omero metadata: {e}")
-
-        # parse image label metadata, if passed
-        try:
-            if isinstance(self.image_label, dict):
-                self.image_label = Label.model_validate(self.image_label)
-
-        except ValidationError as e:
-            warnings.warn(
-                f"Validation of image-label metadata {self.image_label} "
-                f"failed with Error {e}"
-            )
+        self.labels = self._parse_labels(self.labels)
+        self.omero = self._parse_omero(self.omero)
+        self.image_label = self._parse_image_label(self.image_label)
 
     def to_ome_zarr(
         self,
@@ -646,6 +623,101 @@ class NgffMultiscales:
             instance.labels = labels
 
         return instance
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        """
+        Override setattr to ensure labels are always stored in dict format.
+        """
+        if name == "labels":
+            value = self._parse_labels(value)
+        elif name == "omero":
+            value = self._parse_omero(value)
+        elif name == "image_label":
+            value = self._parse_image_label(value)
+        super().__setattr__(name, value)
+
+    @staticmethod
+    def _parse_image_label(
+        image_label: dict[str, Any] | Label | None
+        ) -> Label | None:
+        """
+        Helper method to coerce the `image_label` attribute to an instance
+        of the Label model for easier processing in other methods,
+        regardless of how it was originally passed by the user.
+        """
+        if image_label is None:
+            return None
+        elif isinstance(image_label, Label):
+            return image_label
+        elif isinstance(image_label, dict):
+            try:
+                # We don't want to fail the entire initialization
+                # if the image label metadata is invalid, so we
+                # escape possible validation errors and just warn
+                # the user that the image label metadata is invalid
+                return Label.model_validate(image_label)
+            except ValidationError as e:
+                warnings.warn(f"Invalid image-label metadata: {e}")
+                return None
+        else:
+            raise ValueError(
+                f"Invalid type for image_label: {type(image_label)}. "
+                "Expected dict or Label instance."
+            )
+
+    @staticmethod
+    def _parse_omero(
+        omero: dict[str, Any] | Omero | None
+        ) -> Omero | None:
+        """
+        Helper method to coerce the `omero` attribute to an instance
+        of the Omero model for easier processing in other methods,
+        regardless of how it was originally passed by the user.
+        """
+        if omero is None:
+            return None
+        elif isinstance(omero, Omero):
+            return omero
+        elif isinstance(omero, dict):
+            try:
+                # We don't want to fail the entire initialization
+                # if the omero metadata is invalid, so we
+                # escape possible validation errors and just warn
+                # the user that the omero metadata is invalid
+                return Omero.model_validate(omero)
+            except ValidationError as e:
+                warnings.warn(f"Invalid Omero metadata: {e}")
+                return None
+        else:
+            raise ValueError(
+                f"Invalid type for omero: {type(omero)}. "
+                "Expected dict or Omero instance."
+            )
+
+    @staticmethod
+    def _parse_labels(
+        labels: NgffMultiscales | list[NgffMultiscales] | dict[str, NgffMultiscales] | None
+        ) -> dict[str, NgffMultiscales] | None:
+        """
+        Helper method to coerce the `labels` attribute
+        to a consistent dict format for easier processing in other methods.,
+        regardless of how it was originally passed by the user.
+        """
+
+        if labels is None:
+            return None
+        elif isinstance(labels, NgffMultiscales):
+            return {str(labels.name): labels}
+        elif isinstance(labels, list):
+            return {str(label.name): label for label in labels}
+        elif isinstance(labels, dict):
+            return labels
+        else:
+            raise ValueError(
+                f"Invalid type for labels: {type(labels)}. "
+                "Expected NgffMultiscales, list of NgffMultiscales, "
+                "or dict of str to NgffMultiscales."
+            )
 
     @staticmethod
     def _read_legacy_metadata(group, version: str) -> MultiscaleV05:
