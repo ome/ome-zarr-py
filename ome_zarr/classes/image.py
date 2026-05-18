@@ -4,32 +4,33 @@ import warnings
 from collections.abc import Sequence
 from dataclasses import InitVar, dataclass, field
 from typing import Any, cast
-import typing
 
 import dask.array as da
 import numpy as np
 import zarr
-from ome_zarr_models.common.image_label_types import LabelBase as Label
-from ome_zarr_models.common.omero import Omero
-
 from ome_zarr_models._v06.coordinate_transforms import (
-    Scale,
-    Translation,
-    Identity,
-    Sequence as TransformSequence,
+    AnyTransform,
     Axis,
     CoordinateSystem,
     CoordinateSystemIdentifier,
-    AnyTransform,
+    Identity,
+    Scale,
+)
+from ome_zarr_models._v06.coordinate_transforms import (
+    Sequence as TransformSequence,
 )
 from ome_zarr_models._v06.multiscales import (
     Dataset,
+)
+from ome_zarr_models._v06.multiscales import (
     Multiscale as MultiscaleV06,
 )
+from ome_zarr_models.common.image_label_types import LabelBase as Label
+from ome_zarr_models.common.omero import Omero
 from ome_zarr_models.v05.multiscales import (
     Multiscale as MultiscaleV05,
 )
-from pydantic import ValidationError, TypeAdapter
+from pydantic import TypeAdapter, ValidationError
 
 from ome_zarr.scale import Methods
 
@@ -166,9 +167,9 @@ class NgffMultiscales:
         list[int] | tuple[int, ...] | list[dict[str, int]] | None
     ] = None
     method: str | Methods | None = Methods.RESIZE
-    coordinateTransformations: InitVar[tuple[AnyTransform, ...] | list[dict[str, Any]] | None] = (
-        None
-    )
+    coordinateTransformations: InitVar[
+        tuple[AnyTransform, ...] | list[dict[str, Any]] | None
+    ] = None
     labels: (
         NgffMultiscales | list[NgffMultiscales] | dict[str, NgffMultiscales] | None
     ) = None
@@ -180,7 +181,9 @@ class NgffMultiscales:
         self,
         image: NgffImage,
         scale_factors: list[int] | tuple[int, ...] | list[dict[str, int]] | None,
-        coordinateTransformations: tuple[AnyTransform, ...] | list[dict[str, Any]] | None,
+        coordinateTransformations: (
+            tuple[AnyTransform, ...] | list[dict[str, Any]] | None
+        ),
     ):
         from ome_zarr.scale import _build_pyramid
 
@@ -245,12 +248,10 @@ class NgffMultiscales:
                         Scale(
                             type="scale",
                             scale=tuple(level_scale.values()),
-                            input=CoordinateSystemIdentifier(
-                                path=f"s{idx}"
-                            ),
+                            input=CoordinateSystemIdentifier(path=f"s{idx}"),
                             output=CoordinateSystemIdentifier(
                                 name=self.default_coordinate_system_name
-                            )
+                            ),
                         ),
                     ),
                 )
@@ -408,8 +409,12 @@ class NgffMultiscales:
             ]
 
             default_cs = [
-                next(cs for cs in self.metadata.coordinateSystems if cs.name == self.default_coordinate_system_name)
-                ][0]
+                next(
+                    cs
+                    for cs in self.metadata.coordinateSystems
+                    if cs.name == self.default_coordinate_system_name
+                )
+            ][0]
 
             # write the actual image to disk
             delayed = _write_pyramid_to_zarr(
@@ -499,7 +504,9 @@ class NgffMultiscales:
                 metadata_dict = {
                     "version": version,
                     "multiscales": [
-                        _recursive_pop_nones(write_metadata.to_version("0.5").model_dump(by_alias=True))
+                        _recursive_pop_nones(
+                            write_metadata.to_version("0.5").model_dump(by_alias=True)
+                        )
                     ],
                 }
 
@@ -666,11 +673,15 @@ class NgffMultiscales:
         for ds in metadata.datasets:
             data = da.from_zarr(group[ds.path])
             transform = ds.coordinateTransformations[0]
-            
+
             cs = [
-                next(cs for cs in metadata.coordinateSystems if cs.name == transform.output.name)
-                ][0]
-            
+                next(
+                    cs
+                    for cs in metadata.coordinateSystems
+                    if cs.name == transform.output.name
+                )
+            ][0]
+
             if isinstance(transform, Scale):
                 scale = transform.scale
             elif isinstance(transform, Identity):
