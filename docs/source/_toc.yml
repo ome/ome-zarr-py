@@ -20,6 +20,7 @@ parts:
       sections:
       - file: advanced/labels/adding_labels
       - file: advanced/labels/labels_metadata
+      - file: advanced/create_scenes
 
     - file: advanced/sharding
     - file: advanced/build_custom_pyramid
