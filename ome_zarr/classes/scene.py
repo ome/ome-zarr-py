@@ -1,24 +1,19 @@
 # the class for storage representation, not exposed to the user
 import os
+from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Any, Sequence
+from typing import Any
 
-from pydantic import TypeAdapter
-
+import zarr
 from ome_zarr_models._v06.coordinate_transforms import (
-    CoordinateSystemIdentifier,
-    CoordinateSystem,
     AnyTransform,
-    Transform,
-    Translation,
-    Sequence as TransformSequence,
+    CoordinateSystem,
 )
 from ome_zarr_models._v06.scene import SceneAttrs
+from pydantic import TypeAdapter
 from zarr.storage import StoreLike
-import networkx as nx
-import zarr
+
 from .image import NgffMultiscales
-  
 
 
 # the class exposed to the user
@@ -27,7 +22,9 @@ class NgffScene:
     images: list[NgffMultiscales]
     metadata: SceneAttrs = field(init=False)
     coordinate_transformations: Sequence[AnyTransform] | list[dict[str, Any]]
-    coordinate_systems: Sequence[CoordinateSystem] | Sequence[dict[str, Any]] | None = None
+    coordinate_systems: Sequence[CoordinateSystem] | Sequence[dict[str, Any]] | None = (
+        None
+    )
     _written_image_names: set[str] = field(default_factory=set, init=False)
 
     def __post_init__(self):
@@ -54,9 +51,9 @@ class NgffScene:
 
         self.metadata = SceneAttrs(
             coordinateSystems=self.coordinate_systems,
-            coordinateTransformations=self.coordinate_transformations
+            coordinateTransformations=self.coordinate_transformations,
         )
-        
+
         # self._graph = nx.DiGraph()
 
         # if self.coordinate_systems is not None:
@@ -177,7 +174,7 @@ class NgffScene:
         transformations = []
         for tf in scene_metadata.get("coordinateTransformations", []):
             transformations.append(tf_adapter.validate_python(tf))
-        
+
         if "coordinateSystems" in scene_metadata:
             coordinate_systems = [
                 CoordinateSystem.model_validate(cs)
