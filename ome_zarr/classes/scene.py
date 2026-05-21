@@ -30,8 +30,12 @@ class NgffScene:
     def __post_init__(self):
 
         # parse coordinate systems and transforms
-        self.coordinate_systems = self._parse_coordinate_systems(self.coordinate_systems)
-        self.coordinate_transformations = self._parse_transforms(self.coordinate_transformations)
+        self.coordinate_systems = self._parse_coordinate_systems(
+            self.coordinate_systems
+        )
+        self.coordinate_transformations = self._parse_transforms(
+            self.coordinate_transformations
+        )
 
         self.metadata = SceneAttrs(
             coordinateSystems=self.coordinate_systems,
@@ -94,7 +98,9 @@ class NgffScene:
 
         """
         import shutil
+
         import tqdm
+
         from ..utils import _recursive_pop_nones
 
         if overwrite and os.path.exists(str(store)):
@@ -170,44 +176,60 @@ class NgffScene:
 
         # Use object.__new__ to create instance without triggering __init__ and __setattr__
         scene = object.__new__(cls)
-        
+
         # Set fields directly using object.__setattr__ to bypass custom __setattr__
-        object.__setattr__(scene, 'images', images)
-        object.__setattr__(scene, 'coordinate_transformations', tuple(transformations))
-        object.__setattr__(scene, 'coordinate_systems', tuple(coordinate_systems) if coordinate_systems else None)
-        object.__setattr__(scene, '_written_image_names', {img.metadata.name for img in images})
-        
+        object.__setattr__(scene, "images", images)
+        object.__setattr__(scene, "coordinate_transformations", tuple(transformations))
+        object.__setattr__(
+            scene,
+            "coordinate_systems",
+            tuple(coordinate_systems) if coordinate_systems else None,
+        )
+        object.__setattr__(
+            scene, "_written_image_names", {img.metadata.name for img in images}
+        )
+
         # Now set metadata
-        object.__setattr__(scene, 'metadata', SceneAttrs(
-            coordinateSystems=scene.coordinate_systems,
-            coordinateTransformations=scene.coordinate_transformations,
-        ))
+        object.__setattr__(
+            scene,
+            "metadata",
+            SceneAttrs(
+                coordinateSystems=scene.coordinate_systems,
+                coordinateTransformations=scene.coordinate_transformations,
+            ),
+        )
 
         return scene
-    
+
     def __setattr__(self, name: str, value: Any) -> None:
         if name == "coordinate_transformations":
             # Update metadata when coordinate transformations are set
             parsed_transforms = self._parse_transforms(value)
             super().__setattr__(name, parsed_transforms)
             # Only update metadata if it exists (not during initial construction)
-            if hasattr(self, 'metadata') and self.metadata is not None:
-                self.metadata = self.metadata.model_copy(update={"coordinateTransformations": parsed_transforms})
+            if hasattr(self, "metadata") and self.metadata is not None:
+                self.metadata = self.metadata.model_copy(
+                    update={"coordinateTransformations": parsed_transforms}
+                )
 
         elif name == "coordinate_systems":
             # Update metadata when coordinate systems are set
             parsed_coordinate_systems = self._parse_coordinate_systems(value)
             super().__setattr__(name, parsed_coordinate_systems)
             # Only update metadata if it exists (not during initial construction)
-            if hasattr(self, 'metadata') and self.metadata is not None:
-                self.metadata = self.metadata.model_copy(update={"coordinateSystems": parsed_coordinate_systems})
+            if hasattr(self, "metadata") and self.metadata is not None:
+                self.metadata = self.metadata.model_copy(
+                    update={"coordinateSystems": parsed_coordinate_systems}
+                )
 
         else:
             # Default behavior for all other attributes
             super().__setattr__(name, value)
 
     @staticmethod
-    def _parse_transforms(transforms: Sequence[AnyTransform] | list[dict[str, Any]]) -> tuple[AnyTransform, ...]:
+    def _parse_transforms(
+        transforms: Sequence[AnyTransform] | list[dict[str, Any]],
+    ) -> tuple[AnyTransform, ...]:
         """
         Helper method to parse a sequence of coordinate transformations that may be provided as either
         AnyTransform instances or dictionaries.
@@ -223,11 +245,13 @@ class NgffScene:
                 parsed_transforms.append(tf)
 
         return tuple(parsed_transforms)
-    
+
     @staticmethod
     def _parse_coordinate_systems(
-        coordinate_systems: Sequence[CoordinateSystem] | Sequence[dict[str, Any]] | None
-        ) -> tuple[CoordinateSystem, ...] | None:
+        coordinate_systems: (
+            Sequence[CoordinateSystem] | Sequence[dict[str, Any]] | None
+        ),
+    ) -> tuple[CoordinateSystem, ...] | None:
         """
         Helper method to parse a sequence of coordinate systems that may be provided as either
         CoordinateSystem instances or dictionaries.
