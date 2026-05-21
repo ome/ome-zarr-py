@@ -632,6 +632,7 @@ def write_image(
         For a list of recommended units, see [ngff specification](https://ngff.openmicroscopy.org/specifications/0.5/index.html#axes-metadata).
     `**metadata` : dict
         Additional metadata to store.
+        Use the `metadata` kwarg, e.g., `metadata={"omero": {"name": "My image"}}`.
 
     Returns
     -------
