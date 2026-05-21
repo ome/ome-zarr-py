@@ -20,7 +20,7 @@ from .image import NgffMultiscales
 @dataclass(kw_only=True)
 class NgffScene:
     images: list[NgffMultiscales]
-    metadata: SceneAttrs = field(init=False)
+    metadata: SceneAttrs = field(init=False, default=None)
     coordinate_transformations: Sequence[AnyTransform] | list[dict[str, Any]]
     coordinate_systems: Sequence[CoordinateSystem] | Sequence[dict[str, Any]] | None = (
         None
@@ -28,26 +28,10 @@ class NgffScene:
     _written_image_names: set[str] = field(default_factory=set, init=False)
 
     def __post_init__(self):
-        tf_adapter = TypeAdapter(AnyTransform)
 
-        # parse coordinate systems
-        if self.coordinate_systems is not None:
-            coordinate_systems: list[CoordinateSystem] = []
-            for cs in self.coordinate_systems:
-                if isinstance(cs, dict):
-                    coordinate_systems.append(CoordinateSystem.model_validate(cs))
-                elif isinstance(cs, CoordinateSystem):
-                    coordinate_systems.append(cs)
-            self.coordinate_systems = tuple(coordinate_systems)
-
-        # parse transforms
-        transforms = []
-        for tf in self.coordinate_transformations:
-            if isinstance(tf, dict):
-                transforms.append(tf_adapter.validate_python(tf))
-            else:
-                transforms.append(tf)
-        self.coordinate_transformations = tuple(transforms)
+        # parse coordinate systems and transforms
+        self.coordinate_systems = self._parse_coordinate_systems(self.coordinate_systems)
+        self.coordinate_transformations = self._parse_transforms(self.coordinate_transformations)
 
         self.metadata = SceneAttrs(
             coordinateSystems=self.coordinate_systems,
@@ -110,7 +94,7 @@ class NgffScene:
 
         """
         import shutil
-
+        import tqdm
         from ..utils import _recursive_pop_nones
 
         if overwrite and os.path.exists(str(store)):
@@ -122,7 +106,7 @@ class NgffScene:
         zarr_group = zarr.open(store, mode=mode)
 
         # Create a subgroup for each image using its name
-        for img in self.images:
+        for img in tqdm.tqdm(self.images, desc="Writing images"):
             img_name = str(img.metadata.name)
 
             # Skip if already written (incremental mode)
@@ -184,12 +168,80 @@ class NgffScene:
         else:
             coordinate_systems = None
 
-        scene = cls(
-            images=images,
-            coordinate_transformations=transformations,
-            coordinate_systems=coordinate_systems,
-        )
-        # Mark all existing images as already written
-        scene._written_image_names = {img.metadata.name for img in images}
+        # Use object.__new__ to create instance without triggering __init__ and __setattr__
+        scene = object.__new__(cls)
+        
+        # Set fields directly using object.__setattr__ to bypass custom __setattr__
+        object.__setattr__(scene, 'images', images)
+        object.__setattr__(scene, 'coordinate_transformations', tuple(transformations))
+        object.__setattr__(scene, 'coordinate_systems', tuple(coordinate_systems) if coordinate_systems else None)
+        object.__setattr__(scene, '_written_image_names', {img.metadata.name for img in images})
+        
+        # Now set metadata
+        object.__setattr__(scene, 'metadata', SceneAttrs(
+            coordinateSystems=scene.coordinate_systems,
+            coordinateTransformations=scene.coordinate_transformations,
+        ))
 
         return scene
+    
+    def __setattr__(self, name: str, value: Any) -> None:
+        if name == "coordinate_transformations":
+            # Update metadata when coordinate transformations are set
+            parsed_transforms = self._parse_transforms(value)
+            super().__setattr__(name, parsed_transforms)
+            # Only update metadata if it exists (not during initial construction)
+            if hasattr(self, 'metadata') and self.metadata is not None:
+                self.metadata = self.metadata.model_copy(update={"coordinateTransformations": parsed_transforms})
+
+        elif name == "coordinate_systems":
+            # Update metadata when coordinate systems are set
+            parsed_coordinate_systems = self._parse_coordinate_systems(value)
+            super().__setattr__(name, parsed_coordinate_systems)
+            # Only update metadata if it exists (not during initial construction)
+            if hasattr(self, 'metadata') and self.metadata is not None:
+                self.metadata = self.metadata.model_copy(update={"coordinateSystems": parsed_coordinate_systems})
+
+        else:
+            # Default behavior for all other attributes
+            super().__setattr__(name, value)
+
+    @staticmethod
+    def _parse_transforms(transforms: Sequence[AnyTransform] | list[dict[str, Any]]) -> tuple[AnyTransform, ...]:
+        """
+        Helper method to parse a sequence of coordinate transformations that may be provided as either
+        AnyTransform instances or dictionaries.
+        This ensures that all transformations are stored as AnyTransform objects in the scene metadata.
+        """
+        tf_adapter = TypeAdapter(AnyTransform)
+        parsed_transforms = []
+
+        for tf in transforms:
+            if isinstance(tf, dict):
+                parsed_transforms.append(tf_adapter.validate_python(tf))
+            else:
+                parsed_transforms.append(tf)
+
+        return tuple(parsed_transforms)
+    
+    @staticmethod
+    def _parse_coordinate_systems(
+        coordinate_systems: Sequence[CoordinateSystem] | Sequence[dict[str, Any]] | None
+        ) -> tuple[CoordinateSystem, ...] | None:
+        """
+        Helper method to parse a sequence of coordinate systems that may be provided as either
+        CoordinateSystem instances or dictionaries.
+        This ensures that all coordinate systems are stored as CoordinateSystem objects in the scene metadata.
+        If coordinate_systems is None, it will be returned as None.
+        """
+        if coordinate_systems is None:
+            return None
+
+        parsed_coordinate_systems = []
+        for cs in coordinate_systems:
+            if isinstance(cs, dict):
+                parsed_coordinate_systems.append(CoordinateSystem.model_validate(cs))
+            elif isinstance(cs, CoordinateSystem):
+                parsed_coordinate_systems.append(cs)
+
+        return tuple(parsed_coordinate_systems)
