@@ -20,7 +20,12 @@ from skimage.data import binary_blobs
 from zarr.abc.codec import BytesBytesCodec
 from zarr.codecs import BloscCodec
 
-from ome_zarr import USE_DASK_ARRAY_KWARGS, OMEZarrImage, OMEZarrMultiscale, OMEZarrLabels
+from ome_zarr import (
+    USE_DASK_ARRAY_KWARGS,
+    OMEZarrImage,
+    OMEZarrLabels,
+    OMEZarrMultiscale,
+)
 from ome_zarr.format import (
     CurrentFormat,
     FormatV03,
@@ -162,7 +167,7 @@ class TestWriter:
             data=data,
             axes=axes,
             scale=dict(zip(axes, TRANSFORMATIONS[0][0]["scale"])),
-            channel_names=channel_names
+            channel_names=channel_names,
         )
         labels = OMEZarrImage(
             data=data_labels,
@@ -171,9 +176,7 @@ class TestWriter:
             name=labels_name,
         )
 
-        labels_multiscales = OMEZarrLabels(
-            image=labels, scale_factors=scale_factors
-        )
+        labels_multiscales = OMEZarrLabels(image=labels, scale_factors=scale_factors)
 
         image_multiscales = OMEZarrMultiscale(
             image=image,
@@ -186,7 +189,7 @@ class TestWriter:
             group=str(grp_path),
             version=version.version,
             storage_options=storage_options,
-            overwrite=True
+            overwrite=True,
         )
 
         # Verify image data
