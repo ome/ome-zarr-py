@@ -729,9 +729,7 @@ def write_image(
         else:
             method = Methods.RESIZE
 
-    omero = None
-    if "omero" in metadata:
-        omero = metadata["omero"]
+    omero = metadata.get("omero", None)
 
     ngff_image = OMEZarrImage(
         data=image, scale=scale, axes=dims, name=name, axes_units=axes_units
@@ -741,6 +739,7 @@ def write_image(
         scale_factors=scale_factors,
         method=method,
     )
+    ngff_multiscales.omero = omero
 
     dask_delayed_jobs = ngff_multiscales.to_ome_zarr(
         group=group,
@@ -1295,9 +1294,7 @@ def write_labels(
     if method is None:
         method = Methods.NEAREST
 
-    image_label = None
-    if "image-label" in metadata:
-        image_label = metadata["image-label"]
+    image_label = metadata.get("image-label", None)
 
     if scaler is not None:
         msg = """
@@ -1325,8 +1322,8 @@ def write_labels(
         image=ngff_image,
         scale_factors=scale_factors,
         method=method,
-        #image_label=image_label,
     )
+    ngff_multiscales.image_label = image_label
     dask_delayed_jobs = ngff_multiscales.to_ome_zarr(
         group=sub_group,
         storage_options=storage_options,
