@@ -731,17 +731,17 @@ def write_image(
 
     omero = metadata.get("omero", None)
 
-    ngff_image = OMEZarrImage(
+    singlescale = OMEZarrImage(
         data=image, scale=scale, axes=dims, name=name, axes_units=axes_units
     )
-    ngff_multiscales = OMEZarrMultiscale(
-        image=ngff_image,
+    multiscale = OMEZarrMultiscale(
+        image=singlescale,
         scale_factors=scale_factors,
         method=method,
     )
-    ngff_multiscales.omero = omero
+    multiscale.omero = omero
 
-    dask_delayed_jobs = ngff_multiscales.to_ome_zarr(
+    dask_delayed_jobs = multiscale.to_ome_zarr(
         group=group,
         storage_options=storage_options,
         version=fmt.version,
@@ -1315,16 +1315,16 @@ def write_labels(
         )
         warnings.warn(msg, DeprecationWarning)
 
-    ngff_image = OMEZarrImage(
+    singlescale = OMEZarrImage(
         data=labels, axes=dims, name=name, scale=scale, axes_units=axes_units
     )
-    ngff_multiscales = OMEZarrLabels(
-        image=ngff_image,
+    multiscales = OMEZarrLabels(
+        image=singlescale,
         scale_factors=scale_factors,
         method=method,
     )
-    ngff_multiscales.image_label = image_label
-    dask_delayed_jobs = ngff_multiscales.to_ome_zarr(
+    multiscales.image_label = image_label
+    dask_delayed_jobs = multiscales.to_ome_zarr(
         group=sub_group,
         storage_options=storage_options,
         version=fmt.version,

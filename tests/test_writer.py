@@ -2179,21 +2179,21 @@ class TestLabelWriter:
         label_data3 = np.random.randint(0, 1000, size=(1, 2, 1, 128, 128))
 
         # create single-scale objects
-        ngff_image = OMEZarrImage(data=image_data, axes="tczyx")
-        ngff_labels = OMEZarrImage(data=label_data1, axes="tczyx")
-        ngff_labels2 = OMEZarrImage(data=label_data2, axes="tczyx")
-        ngff_labels3 = OMEZarrImage(data=label_data3, axes="tczyx")
+        singlescale = OMEZarrImage(data=image_data, axes="tczyx")
+        singlescale_labels = OMEZarrImage(data=label_data1, axes="tczyx")
+        singlescale_labels2 = OMEZarrImage(data=label_data2, axes="tczyx")
+        singlescale_labels3 = OMEZarrImage(data=label_data3, axes="tczyx")
 
         # create multiscale objects
-        ngff_ms_labels = OMEZarrMultiscale(image=ngff_labels, method="nearest")
-        ngff_ms_labels2 = OMEZarrMultiscale(image=ngff_labels2, method="nearest")
-        ngff_ms_labels3 = OMEZarrMultiscale(image=ngff_labels3, method="nearest")
-        ngff_ms = OMEZarrMultiscale(
-            image=ngff_image, labels={"first_labels": ngff_ms_labels}
+        ms_labels = OMEZarrMultiscale(image=singlescale_labels, method="nearest")
+        ms_labels2 = OMEZarrMultiscale(image=singlescale_labels2, method="nearest")
+        ms_labels3 = OMEZarrMultiscale(image=singlescale_labels3, method="nearest")
+        ms = OMEZarrMultiscale(
+            image=singlescale, labels={"first_labels": ms_labels}
         )
 
         # write to zarr
-        ngff_ms.to_ome_zarr(group, version=fmt.version, overwrite=True)
+        ms.to_ome_zarr(group, version=fmt.version, overwrite=True)
 
         # now check that the respective groups and metadata exist and is correct
         label_group = zarr.open(f"{img_path}/labels", mode="r")
@@ -2206,12 +2206,12 @@ class TestLabelWriter:
         assert "first_labels" in label_attrs["labels"]
 
         # read from group and make sure the written labels are in the .labels attribute
-        ngff_ms_test = OMEZarrMultiscale.from_ome_zarr(group)
-        assert "first_labels" in ngff_ms_test.labels
+        ms_test = OMEZarrMultiscale.from_ome_zarr(group)
+        assert "first_labels" in ms_test.labels
 
         # now we add the other labels to that attribute
-        ngff_ms_test.labels["second_labels"] = ngff_ms_labels2
-        ngff_ms_test.to_ome_zarr(group, version=fmt.version, overwrite=False)
+        ms_test.labels["second_labels"] = ms_labels2
+        ms_test.to_ome_zarr(group, version=fmt.version, overwrite=False)
 
         # now check that we still have both labels in the metadata
         label_group = zarr.open(f"{img_path}/labels", mode="r")
@@ -2225,8 +2225,8 @@ class TestLabelWriter:
         assert "second_labels" in label_attrs["labels"]
 
         # Lastly, we check that the overwrite for labels works as intended:
-        ngff_ms.labels = {"third_labels": ngff_ms_labels3}
-        ngff_ms.to_ome_zarr(group, version=fmt.version, overwrite=True)
+        ms.labels = {"third_labels": ms_labels3}
+        ms.to_ome_zarr(group, version=fmt.version, overwrite=True)
 
         # Now, only the third label should be present in the metadata and as a zarr group,
         # but the first and second labels should be gone
@@ -2244,8 +2244,5 @@ class TestLabelWriter:
         assert "second_labels" not in label_group
         assert "third_labels" in label_group
 
-        ngff_ms_test = OMEZarrMultiscale.from_ome_zarr(group)
-        assert "third_labels" in ngff_ms_test.labels
-
-if __name__ == "__main__":
-    pytest.main([__file__])
+        ms_test = OMEZarrMultiscale.from_ome_zarr(group)
+        assert "third_labels" in ms_test.labels

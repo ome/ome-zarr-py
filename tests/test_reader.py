@@ -58,19 +58,19 @@ def test_class_reader_legacy(url, has_omero, has_labels):
         assert image.labels != []
         assert image.labels is not None
         # image.labels must be one of:
-        # - NGffMultiscales
-        # - list[NgffMultiscales]
-        # - dict(str, Multiscales)
+        # - OMEZarrLabels
+        # - list[OMEZarrLabels]
+        # - dict(str, OMEZarrLabels)
         if isinstance(image.labels, dict):
             for label in image.labels.values():
-                assert isinstance(label, OMEZarrMultiscale)
+                assert isinstance(label, OMEZarrLabels)
 
         elif isinstance(image.labels, list):
             for label in image.labels:
-                assert isinstance(label, OMEZarrMultiscale)
+                assert isinstance(label, OMEZarrLabels)
 
         else:
-            assert isinstance(image.labels, OMEZarrMultiscale)
+            assert isinstance(image.labels, OMEZarrLabels)
 
 
 class TestReader:
@@ -263,3 +263,6 @@ def test_class_reader():
     label_image = image.labels["0"]
     assert isinstance(label_image, OMEZarrLabels)
     assert label_image.image_label is not None
+
+if __name__ == "__main__":
+    pytest.main([__file__])
