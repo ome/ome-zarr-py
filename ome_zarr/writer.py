@@ -729,7 +729,7 @@ def write_image(
         else:
             method = Methods.RESIZE
 
-    omero = metadata.get("omero", None)
+    omero = metadata.get("omero")
 
     singlescale = OMEZarrImage(
         data=image, scale=scale, axes=dims, name=name, axes_units=axes_units
@@ -1294,7 +1294,7 @@ def write_labels(
     if method is None:
         method = Methods.NEAREST
 
-    image_label = metadata.get("image-label", None)
+    image_label = metadata.get("image-label")
 
     if scaler is not None:
         msg = """
