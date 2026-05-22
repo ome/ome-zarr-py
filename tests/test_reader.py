@@ -264,5 +264,6 @@ def test_class_reader():
     assert isinstance(label_image, OMEZarrLabels)
     assert label_image.image_label is not None
 
+
 if __name__ == "__main__":
     pytest.main([__file__])

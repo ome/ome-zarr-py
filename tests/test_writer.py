@@ -2191,9 +2191,7 @@ class TestLabelWriter:
         ms_labels = OMEZarrMultiscale(image=singlescale_labels, method="nearest")
         ms_labels2 = OMEZarrMultiscale(image=singlescale_labels2, method="nearest")
         ms_labels3 = OMEZarrMultiscale(image=singlescale_labels3, method="nearest")
-        ms = OMEZarrMultiscale(
-            image=singlescale, labels={"first_labels": ms_labels}
-        )
+        ms = OMEZarrMultiscale(image=singlescale, labels={"first_labels": ms_labels})
 
         # write to zarr
         ms.to_ome_zarr(group, version=fmt.version, overwrite=True)
