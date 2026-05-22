@@ -667,7 +667,7 @@ def write_image(
     The `scaler` argument is deprecated and will be removed in a future version. Use
     `scale_factors` and `method` for all new code.
     """
-    from .classes import NgffImage, NgffMultiscales
+    from .classes import OMEZarrImage, OMEZarrMultiscale
 
     if method is None:
         method = Methods.RESIZE
@@ -733,14 +733,13 @@ def write_image(
     if "omero" in metadata:
         omero = metadata["omero"]
 
-    ngff_image = NgffImage(
+    ngff_image = OMEZarrImage(
         data=image, scale=scale, axes=dims, name=name, axes_units=axes_units
     )
-    ngff_multiscales = NgffMultiscales(
+    ngff_multiscales = OMEZarrMultiscale(
         image=ngff_image,
         scale_factors=scale_factors,
         method=method,
-        omero=omero,
     )
 
     dask_delayed_jobs = ngff_multiscales.to_ome_zarr(
@@ -748,6 +747,7 @@ def write_image(
         storage_options=storage_options,
         version=fmt.version,
         compute=compute,
+        overwrite=True,
     )
 
     return dask_delayed_jobs
@@ -1276,7 +1276,7 @@ def write_labels(
     `scale_factors` and `method` for all new code. Labels downsampling should avoid interpolation;
     nearest-neighbor is recommended.
     """
-    from .classes import NgffImage, NgffMultiscales
+    from .classes import OMEZarrImage, OMEZarrLabels
 
     group, fmt = check_group_fmt(group, fmt)
     sub_group = group.require_group(f"labels/{name}")
@@ -1318,20 +1318,21 @@ def write_labels(
         )
         warnings.warn(msg, DeprecationWarning)
 
-    ngff_image = NgffImage(
+    ngff_image = OMEZarrImage(
         data=labels, axes=dims, name=name, scale=scale, axes_units=axes_units
     )
-    ngff_multiscales = NgffMultiscales(
+    ngff_multiscales = OMEZarrLabels(
         image=ngff_image,
         scale_factors=scale_factors,
         method=method,
-        image_label=image_label,
+        #image_label=image_label,
     )
     dask_delayed_jobs = ngff_multiscales.to_ome_zarr(
         group=sub_group,
         storage_options=storage_options,
         version=fmt.version,
         compute=compute,
+        overwrite=True,
     )
 
     write_label_metadata(

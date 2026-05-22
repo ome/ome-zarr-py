@@ -20,7 +20,7 @@ from skimage.data import binary_blobs
 from zarr.abc.codec import BytesBytesCodec
 from zarr.codecs import BloscCodec
 
-from ome_zarr import USE_DASK_ARRAY_KWARGS, NgffImage, NgffMultiscales
+from ome_zarr import USE_DASK_ARRAY_KWARGS, OMEZarrImage, OMEZarrMultiscale, OMEZarrLabels
 from ome_zarr.format import (
     CurrentFormat,
     FormatV03,
@@ -145,76 +145,40 @@ class TestWriter:
         ]
 
         # make sure default is set correctly when not providing scale
-        image = NgffImage(
+        image = OMEZarrImage(
             data=data,
             axes=axes,
         )
         assert all(image.scale[d] == 1.0 for d in axes)
 
+        if "c" in axes:
+            channel_names = [f"Channel {i}" for i in range(shape[axes.index("c")])]
+        else:
+            channel_names = None
+
         # convert to image classes
         labels_name = "test_labels"
-        image = NgffImage(
-            data=data, axes=axes, scale=dict(zip(axes, TRANSFORMATIONS[0][0]["scale"]))
+        image = OMEZarrImage(
+            data=data,
+            axes=axes,
+            scale=dict(zip(axes, TRANSFORMATIONS[0][0]["scale"])),
+            channel_names=channel_names
         )
-        labels = NgffImage(
+        labels = OMEZarrImage(
             data=data_labels,
             axes=axes,
             scale=dict(zip(axes, TRANSFORMATIONS[0][0]["scale"])),
             name=labels_name,
         )
 
-        image_labels = None
-        if "c" in axes:
-            image_labels = {
-                "colors": [
-                    {
-                        "label-value": 0,
-                        "rgba": [0, 0, 0, 255],
-                    },
-                    {
-                        "label-value": 1,
-                        "rgba": [255, 255, 255, 255],
-                    },
-                ],
-            }
-
-        labels_multiscales = NgffMultiscales(
-            image=labels, scale_factors=scale_factors, image_label=image_labels
+        labels_multiscales = OMEZarrLabels(
+            image=labels, scale_factors=scale_factors
         )
 
-        omero = None
-        if "c" in axes:
-            omero = {
-                "channels": [
-                    {
-                        "label": "Channel 0",
-                        "color": "#FF0000",
-                        "window": {
-                            "start": 10,
-                            "end": 230,
-                            "min": 0,
-                            "max": 255,
-                        },
-                    },
-                    {
-                        "label": "Channel 1",
-                        "color": "#00FF00",
-                        "window": {
-                            "start": 10,
-                            "end": 255,
-                            "min": 0,
-                            "max": 255,
-                        },
-                    },
-                ],
-                "id": 12345,
-            }
-
-        image_multiscales = NgffMultiscales(
+        image_multiscales = OMEZarrMultiscale(
             image=image,
             scale_factors=scale_factors,
             labels=labels_multiscales,
-            omero=omero,
         )
 
         # write image and labels to disk
@@ -222,6 +186,7 @@ class TestWriter:
             group=str(grp_path),
             version=version.version,
             storage_options=storage_options,
+            overwrite=True
         )
 
         # Verify image data
@@ -298,7 +263,7 @@ class TestWriter:
         assert labels_name in label_group_attrs["labels"]
 
         # read data back in
-        image = NgffMultiscales.from_ome_zarr(str(grp_path))
+        image = OMEZarrMultiscale.from_ome_zarr(str(grp_path))
 
         assert labels_name in list(image.labels.keys())
 
@@ -309,10 +274,9 @@ class TestWriter:
             Models05Image.from_zarr(out)
 
         # verify omero and image-labels metadata
-        if omero is not None:
+        if "c" in axes:
             assert image.omero is not None
-        if image_labels is not None:
-            assert image.labels["test_labels"].image_label is not None
+        assert image.labels["test_labels"].image_label is not None
 
     @pytest.mark.parametrize("storage_options_list", [True, False])
     def test_writer(
@@ -2199,7 +2163,7 @@ class TestLabelWriter:
         (pytest.param(FormatV04(), id="V04"), pytest.param(FormatV05(), id="V05")),
     )
     def write_labels_class_API(self, fmt):
-        from ome_zarr import NgffImage, NgffMultiscales
+        from ome_zarr import OMEZarrImage, OMEZarrMultiscale
 
         if fmt.version == "0.5":
             img_path = self.path_v3
@@ -2215,21 +2179,21 @@ class TestLabelWriter:
         label_data3 = np.random.randint(0, 1000, size=(1, 2, 1, 128, 128))
 
         # create single-scale objects
-        ngff_image = NgffImage(data=image_data, axes="tczyx")
-        ngff_labels = NgffImage(data=label_data1, axes="tczyx")
-        ngff_labels2 = NgffImage(data=label_data2, axes="tczyx")
-        ngff_labels3 = NgffImage(data=label_data3, axes="tczyx")
+        ngff_image = OMEZarrImage(data=image_data, axes="tczyx")
+        ngff_labels = OMEZarrImage(data=label_data1, axes="tczyx")
+        ngff_labels2 = OMEZarrImage(data=label_data2, axes="tczyx")
+        ngff_labels3 = OMEZarrImage(data=label_data3, axes="tczyx")
 
         # create multiscale objects
-        ngff_ms_labels = NgffMultiscales(image=ngff_labels, method="nearest")
-        ngff_ms_labels2 = NgffMultiscales(image=ngff_labels2, method="nearest")
-        ngff_ms_labels3 = NgffMultiscales(image=ngff_labels3, method="nearest")
-        ngff_ms = NgffMultiscales(
+        ngff_ms_labels = OMEZarrMultiscale(image=ngff_labels, method="nearest")
+        ngff_ms_labels2 = OMEZarrMultiscale(image=ngff_labels2, method="nearest")
+        ngff_ms_labels3 = OMEZarrMultiscale(image=ngff_labels3, method="nearest")
+        ngff_ms = OMEZarrMultiscale(
             image=ngff_image, labels={"first_labels": ngff_ms_labels}
         )
 
         # write to zarr
-        ngff_ms.to_ome_zarr(group, version=fmt.version)
+        ngff_ms.to_ome_zarr(group, version=fmt.version, overwrite=True)
 
         # now check that the respective groups and metadata exist and is correct
         label_group = zarr.open(f"{img_path}/labels", mode="r")
@@ -2242,7 +2206,7 @@ class TestLabelWriter:
         assert "first_labels" in label_attrs["labels"]
 
         # read from group and make sure the written labels are in the .labels attribute
-        ngff_ms_test = NgffMultiscales.from_ome_zarr(group)
+        ngff_ms_test = OMEZarrMultiscale.from_ome_zarr(group)
         assert "first_labels" in ngff_ms_test.labels
 
         # now we add the other labels to that attribute
@@ -2280,5 +2244,8 @@ class TestLabelWriter:
         assert "second_labels" not in label_group
         assert "third_labels" in label_group
 
-        ngff_ms_test = NgffMultiscales.from_ome_zarr(group)
+        ngff_ms_test = OMEZarrMultiscale.from_ome_zarr(group)
         assert "third_labels" in ngff_ms_test.labels
+
+if __name__ == "__main__":
+    pytest.main([__file__])
