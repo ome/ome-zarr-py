@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import warnings
 from collections.abc import Sequence
-from dataclasses import InitVar, dataclass, field
-from typing import Any, cast, Literal
+from dataclasses import dataclass
+from typing import Any, Literal, cast
 
 import dask.array as da
 import numpy as np
@@ -45,6 +45,7 @@ DEFAULT_COLORS = [
     "#800080",  # purple
     "#008000",  # dark green
 ]
+
 
 @dataclass
 class OMEZarrImage:
@@ -89,7 +90,7 @@ class OMEZarrImage:
     axes_units: dict[str, str] | None = None
     name: str = "image"
     channel_names: list[str] | None = None
-    channel_colors: list[list[int]] | list[str] |None = None
+    channel_colors: list[list[int]] | list[str] | None = None
     contrast_limits: list[tuple[float, float]] | None = None
 
     def __post_init__(self):
@@ -120,22 +121,23 @@ class OMEZarrImage:
                 f"Number of dimensions in data ({len(self.data.shape)}) "
                 f"does not match number of dims ({len(self.axes)})"
             )
-        
+
         if self.channel_names is not None:
-            if len(self.channel_names) > 0 and 'c' not in self.axes:
+            if len(self.channel_names) > 0 and "c" not in self.axes:
                 raise ValueError(
                     f"Channel names provided but 'c' axis not found in axes {self.axes}"
                 )
         if self.channel_colors is not None:
-            if len(self.channel_colors) > 0 and 'c' not in self.axes:
+            if len(self.channel_colors) > 0 and "c" not in self.axes:
                 raise ValueError(
                     f"Channel colors provided but 'c' axis not found in axes {self.axes}"
                 )
         if self.contrast_limits is not None:
-            if len(self.contrast_limits) > 0 and 'c' not in self.axes:
+            if len(self.contrast_limits) > 0 and "c" not in self.axes:
                 raise ValueError(
                     f"Contrast limits provided but 'c' axis not found in axes {self.axes}"
                 )
+
 
 class OMEZarrMultiscaleBase:
     """
@@ -143,15 +145,16 @@ class OMEZarrMultiscaleBase:
 
     Parameters
     """
+
     name: str
 
     def __init__(
-            self,
-            image: OMEZarrImage,
-            scale_factors: list[int] | tuple[int, ...] | list[dict[str, int]] | None = None,
-            method: str | Methods | None = Methods.RESIZE,
-            coordinateTransformations: list[Scale | Translation | Identity] | None = None,
-            ):
+        self,
+        image: OMEZarrImage,
+        scale_factors: list[int] | tuple[int, ...] | list[dict[str, int]] | None = None,
+        method: str | Methods | None = Methods.RESIZE,
+        coordinateTransformations: list[Scale | Translation | Identity] | None = None,
+    ):
         from ome_zarr.scale import _build_pyramid
 
         if scale_factors is None:
@@ -250,7 +253,7 @@ class OMEZarrMultiscaleBase:
         compute: bool = True,
         overwrite: bool = False,
     ) -> list:
-        
+
         import os
         import shutil
 
@@ -302,7 +305,6 @@ class OMEZarrMultiscaleBase:
                 name=self.name,
             )
 
-
         # write the metadata to disk
         if isinstance(group, str):
             group = zarr.open(group, mode="r+")
@@ -347,7 +349,6 @@ class OMEZarrMultiscaleBase:
         )
 
         return delayed
-
 
     @classmethod
     def from_ome_zarr(
@@ -429,7 +430,11 @@ class OMEZarrMultiscaleBase:
                 OMEZarrImage(
                     data=data,
                     axes=axes_names,
-                    scale={str(ax.name): s for ax, s in zip(metadata.axes, scale) if ax.name is not None},
+                    scale={
+                        str(ax.name): s
+                        for ax, s in zip(metadata.axes, scale)
+                        if ax.name is not None
+                    },
                     axes_units=axes_units,
                     name=str(metadata.name) if metadata.name else "image",
                 )
@@ -439,7 +444,7 @@ class OMEZarrMultiscaleBase:
             cls = OMEZarrLabels
         else:
             cls = OMEZarrMultiscale
-        
+
         # Create instance without calling __init__
         instance = cls.__new__(cls)
         instance._images = images
@@ -457,32 +462,31 @@ class OMEZarrMultiscaleBase:
         List of images at each pyramid level.
         """
         return self._images
-    
+
     def _write_additional_meta_data(
-            self,
-            group: zarr.Group,
-            version: Literal["0.5", "0.4"] = "0.5",
-            storage_options: list[dict[str, Any]] | dict[str, Any] | None = None,
-            compute: bool = True,
-            overwrite: bool = False,
+        self,
+        group: zarr.Group,
+        version: Literal["0.5", "0.4"] = "0.5",
+        storage_options: list[dict[str, Any]] | dict[str, Any] | None = None,
+        compute: bool = True,
+        overwrite: bool = False,
     ) -> list:
         """
         Hook for derived classes to write additional metadata fields
         (e.g. labels, omero, image-label) to the OME-Zarr attributes after writing the main image data.
-        
+
         Returns
         -------
         list
             List of delayed objects if compute=False, otherwise empty list.
         """
         return []
-    
+
     def _parse_additional_metadata(self):
         """
         Hook for derived classes to parse additional metadata fields on initialization
         (e.g. labels, omero, image-label) from the base class after initialization.
         """
-        pass
 
     @staticmethod
     def _read_legacy_metadata(group, version: str) -> MultiscaleV05:
@@ -517,7 +521,7 @@ class OMEZarrMultiscaleBase:
         datasets = []
         for idx, ds in enumerate(metadata_json.get("datasets", [])):
             scale_level = [
-                2.0**idx if s.name in ("z", "y", "x") else 1.0 for s in axes
+                2.0 ** idx if s.name in ("z", "y", "x") else 1.0 for s in axes
             ]
 
             if idx == 0:
@@ -563,7 +567,6 @@ class OMEZarrMultiscaleBase:
 
         Called by `from_ome_zarr` after basic loading is complete.
         """
-        pass
 
 
 class OMEZarrMultiscale(OMEZarrMultiscaleBase):
@@ -602,10 +605,10 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
             Write the multiscale image pyramid and metadata to an OME-Zarr group.
         from_ome_zarr(group)
             Load a multiscale image pyramid and metadata from an OME-Zarr group.
-    
+
     """
 
-    _labels: dict[str, "OMEZarrLabels"] | None
+    _labels: dict[str, OMEZarrLabels] | None
     _omero: Omero | None
 
     def __init__(
@@ -614,7 +617,9 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
         scale_factors: list[int] | tuple[int, ...] | list[dict[str, int]] | None = None,
         method: str | Methods | None = Methods.RESIZE,
         coordinateTransformations: list[Scale | Translation | Identity] | None = None,
-        labels: "OMEZarrLabels | list[OMEZarrLabels] | dict[str, OMEZarrLabels] | None" = None,
+        labels: (
+            OMEZarrLabels | list[OMEZarrLabels] | dict[str, OMEZarrLabels] | None
+        ) = None,
     ):
         # Normalize labels to dict format
         self._labels = self._parse_labels(labels)
@@ -627,21 +632,22 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
         )
 
     def _write_additional_meta_data(
-            self,
-            group: zarr.Group,
-            version: Literal["0.5", "0.4"] = "0.5",
-            storage_options: list[dict[str, Any]] | dict[str, Any] | None = None,
-            compute: bool = True,
-            overwrite: bool = False,
+        self,
+        group: zarr.Group,
+        version: Literal["0.5", "0.4"] = "0.5",
+        storage_options: list[dict[str, Any]] | dict[str, Any] | None = None,
+        compute: bool = True,
+        overwrite: bool = False,
     ) -> list:
         from ome_zarr.utils import _recursive_pop_nones
+
         delayed: list = []
-        
+
         # Write omero metadata
         if self._omero and isinstance(self._omero, Omero):
             omero_dict = _recursive_pop_nones(self._omero.model_dump(by_alias=True))
             omero_dict["version"] = version
-            
+
             if version == "0.4":
                 group.attrs["omero"] = omero_dict
             elif version == "0.5":
@@ -701,22 +707,26 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
 
         # omero first
         self._omero = None
-        if not "c" in self._images[0].axes:
+        if "c" not in self._images[0].axes:
             return
-        
+
         # make sure channel_names, display_colors and contrast_limits are lists of the same length if provided
         if self._images[0].channel_names is not None:
             if self._images[0].channel_colors is not None:
-                if len(self._images[0].channel_names) != len(self._images[0].channel_colors):
+                if len(self._images[0].channel_names) != len(
+                    self._images[0].channel_colors
+                ):
                     raise ValueError(
                         f"Length of channel_names ({len(self._images[0].channel_names)}) does not match length of channel_colors ({len(self._images[0].channel_colors)})"
                     )
             if self._images[0].contrast_limits is not None:
-                if len(self._images[0].channel_names) != len(self._images[0].contrast_limits):
+                if len(self._images[0].channel_names) != len(
+                    self._images[0].contrast_limits
+                ):
                     raise ValueError(
                         f"Length of channel_names ({len(self._images[0].channel_names)}) does not match length of contrast_limits ({len(self._images[0].contrast_limits)})"
                     )
-                
+
         # make default values and then replace with provided values
         channel_axis = self._images[0].axes.index("c")
         n_channels = self._images[0].data.shape[channel_axis]
@@ -726,14 +736,14 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
             if self._images[0].channel_names is not None:
                 name = self._images[0].channel_names[i]
             else:
-                name = f"Channel {i}"    
-            
+                name = f"Channel {i}"
+
             if self._images[0].channel_colors is not None:
                 color = self._images[0].channel_colors[i]
                 # Coerce RGBA/RGB list values to hex strings
                 if isinstance(color, (list, tuple)):
                     # Convert RGB/RGBA to hex, taking first 3 values and ignoring alpha
-                    color = "#{:02x}{:02x}{:02x}".format(color[0], color[1], color[2])
+                    color = f"#{color[0]:02x}{color[1]:02x}{color[2]:02x}"
             else:
                 color = DEFAULT_COLORS[i % len(DEFAULT_COLORS)]
 
@@ -741,38 +751,44 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
             if self._images[0].contrast_limits is not None:
                 contrast_limits = self._images[0].contrast_limits[i]
             else:
-                contrast_limits = (0, dtype_max)  # TODO: Check to see if this is the best way to get max value from dtype
+                contrast_limits = (
+                    0,
+                    dtype_max,
+                )  # TODO: Check to see if this is the best way to get max value from dtype
 
-            channel_metadata.append({
-                "label": name,
-                "color": color,
-                "window": {
-                    "min": 0,
-                    "start": contrast_limits[0],
-                    "max": dtype_max,
-                    "end": contrast_limits[1],
+            channel_metadata.append(
+                {
+                    "label": name,
+                    "color": color,
+                    "window": {
+                        "min": 0,
+                        "start": contrast_limits[0],
+                        "max": dtype_max,
+                        "end": contrast_limits[1],
+                    },
                 }
-            })
+            )
 
         try:
-            self._omero = Omero.model_validate({
-                    "channels": channel_metadata
-                })
+            self._omero = Omero.model_validate({"channels": channel_metadata})
         except Exception as e:
             warnings.warn(f"Failed to validate Omero metadata: {e}")
 
     @property
-    def labels(self) -> dict[str, "OMEZarrLabels"] | None:
+    def labels(self) -> dict[str, OMEZarrLabels] | None:
         return self._labels
-    
+
     @labels.setter
-    def labels(self, value: "OMEZarrLabels" | list["OMEZarrLabels"] | dict[str, "OMEZarrLabels"] | None):
+    def labels(
+        self,
+        value: OMEZarrLabels | list[OMEZarrLabels] | dict[str, OMEZarrLabels] | None,
+    ):
         self._labels = self._parse_labels(value)
 
     @property
     def omero(self) -> Omero | None:
         return self._omero
-    
+
     @omero.setter
     def omero(self, value: Omero | dict[str, Any] | None):
         if isinstance(value, dict):
@@ -782,8 +798,8 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
 
     @staticmethod
     def _parse_labels(
-        labels: "OMEZarrLabels" | list["OMEZarrLabels"] | dict[str, "OMEZarrLabels"] | None
-        ) -> dict[str, "OMEZarrLabels"] | None:
+        labels: OMEZarrLabels | list[OMEZarrLabels] | dict[str, OMEZarrLabels] | None,
+    ) -> dict[str, OMEZarrLabels] | None:
         if labels is None:
             return None
         elif isinstance(labels, OMEZarrLabels):
@@ -831,10 +847,16 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
         if version in ("0.1", "0.2", "0.3", "0.4"):
             if "labels" in group:
                 labels_json = group["labels"].attrs.get("labels", [])
-                list_of_labels = cast(list[str], labels_json) if isinstance(labels_json, list) else []
+                list_of_labels = (
+                    cast(list[str], labels_json)
+                    if isinstance(labels_json, list)
+                    else []
+                )
         elif version == "0.5":
             if "labels" in group:
-                labels_ome_attrs = cast(dict[str, Any], group["labels"].attrs.get("ome", {}))
+                labels_ome_attrs = cast(
+                    dict[str, Any], group["labels"].attrs.get("ome", {})
+                )
                 list_of_labels = cast(list[str], labels_ome_attrs.get("labels", []))
 
         # Load labels if they exist
@@ -906,7 +928,7 @@ class OMEZarrLabels(OMEZarrMultiscaleBase):
     @property
     def image_label(self) -> Label | None:
         return self._image_label
-    
+
     @image_label.setter
     def image_label(self, value: Label | dict[str, Any] | None):
         if isinstance(value, dict):
@@ -934,23 +956,27 @@ class OMEZarrLabels(OMEZarrMultiscaleBase):
             )
 
     def _write_additional_meta_data(
-            self,
-            group: zarr.Group,
-            version: Literal['0.5'] | Literal['0.4'] = "0.5",
-            storage_options: list[dict[str, Any]] | dict[str, Any] | None = None,
-            compute: bool = True,
-            overwrite: bool = False,
+        self,
+        group: zarr.Group,
+        version: Literal["0.5", "0.4"] = "0.5",
+        storage_options: list[dict[str, Any]] | dict[str, Any] | None = None,
+        compute: bool = True,
+        overwrite: bool = False,
     ) -> list:
         from ome_zarr.utils import _recursive_pop_nones
 
         if self._image_label is not None and isinstance(self._image_label, Label):
             if version == "0.4":
-                group.attrs["image-label"] = _recursive_pop_nones(self._image_label.model_dump(by_alias=True))
+                group.attrs["image-label"] = _recursive_pop_nones(
+                    self._image_label.model_dump(by_alias=True)
+                )
             elif version == "0.5":
                 ome = cast(dict, group.attrs.get("ome", {}))
-                ome["image-label"] = _recursive_pop_nones(self._image_label.model_dump(by_alias=True))
+                ome["image-label"] = _recursive_pop_nones(
+                    self._image_label.model_dump(by_alias=True)
+                )
                 group.attrs["ome"] = ome
-        
+
         return []
 
     def _read_additional_metadata(
@@ -966,17 +992,22 @@ class OMEZarrLabels(OMEZarrMultiscaleBase):
 
         if version in ("0.1", "0.2", "0.3", "0.4"):
             if "image-label" in group.attrs:
-                image_label_dict = cast(dict[str, Any] | None, group.attrs.get("image-label", None))
+                image_label_dict = cast(
+                    dict[str, Any] | None, group.attrs.get("image-label", None)
+                )
         elif version == "0.5":
             ome_attrs = cast(dict[str, Any], group.attrs.get("ome", {}))
             if "image-label" in ome_attrs:
-                image_label_dict = cast(dict[str, Any] | None, ome_attrs.get("image-label", None))
+                image_label_dict = cast(
+                    dict[str, Any] | None, ome_attrs.get("image-label", None)
+                )
 
         if image_label_dict is not None:
             try:
                 self._image_label = Label.model_validate(image_label_dict)
             except ValidationError as e:
                 warnings.warn(f"Invalid image-label metadata: {e}")
+
 
 # @dataclass
 # class OMEZarrMultiscale:
@@ -1051,7 +1082,7 @@ class OMEZarrLabels(OMEZarrMultiscaleBase):
 #         scale_factors: list[int] | tuple[int, ...] | list[dict[str, int]] | None,
 #         coordinateTransformations: list[Scale | Translation | Identity] | None,
 #     ):
-        
+
 
 #         if scale_factors is None:
 #             scale_factors = (2, 4, 8, 16)

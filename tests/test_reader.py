@@ -4,7 +4,7 @@ import pytest
 import zarr
 from numpy import ones, zeros
 
-from ome_zarr import OMEZarrMultiscale, OMEZarrLabels
+from ome_zarr import OMEZarrLabels, OMEZarrMultiscale
 from ome_zarr.data import create_zarr
 from ome_zarr.format import FormatV04
 from ome_zarr.io import parse_url

@@ -1,10 +1,7 @@
-from .image import (
-  OMEZarrImage,
-  OMEZarrMultiscale,
-  OMEZarrLabels
-)
+from .image import OMEZarrImage, OMEZarrLabels, OMEZarrMultiscale
 
 __all__ = [
-  "OMEZarrImage",
-  "OMEZarrMultiscale",
-  "OMEZarrLabels"]
+    "OMEZarrImage",
+    "OMEZarrLabels",
+    "OMEZarrMultiscale",
+]

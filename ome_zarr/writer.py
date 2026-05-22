@@ -1325,7 +1325,7 @@ def write_labels(
         image=ngff_image,
         scale_factors=scale_factors,
         method=method,
-        #image_label=image_label,
+        # image_label=image_label,
     )
     dask_delayed_jobs = ngff_multiscales.to_ome_zarr(
         group=sub_group,
