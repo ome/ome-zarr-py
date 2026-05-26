@@ -123,24 +123,30 @@ class OMEZarrImage:
             )
 
         has_axis = "c" in self.axes
-        if self.channel_names is not None \
-            and len(self.channel_names) > 0 \
-            and not has_axis:
+        if (
+            self.channel_names is not None
+            and len(self.channel_names) > 0
+            and not has_axis
+        ):
             raise ValueError(
                 f"Channel names provided but 'c' axis not found in axes {self.axes}"
             )
-        if self.channel_colors is not None \
-            and len(self.channel_colors) > 0 \
-            and not has_axis: 
+        if (
+            self.channel_colors is not None
+            and len(self.channel_colors) > 0
+            and not has_axis
+        ):
             raise ValueError(
                 f"Channel colors provided but 'c' axis not found in axes {self.axes}"
             )
-        if self.contrast_limits is not None \
-            and len(self.contrast_limits) > 0 \
-            and not has_axis:
-                raise ValueError(
-                    f"Contrast limits provided but 'c' axis not found in axes {self.axes}"
-                )
+        if (
+            self.contrast_limits is not None
+            and len(self.contrast_limits) > 0
+            and not has_axis
+        ):
+            raise ValueError(
+                f"Contrast limits provided but 'c' axis not found in axes {self.axes}"
+            )
 
 
 class OMEZarrMultiscaleBase:
