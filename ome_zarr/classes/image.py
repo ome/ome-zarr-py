@@ -122,18 +122,22 @@ class OMEZarrImage:
                 f"does not match number of dims ({len(self.axes)})"
             )
 
-        if self.channel_names is not None:
-            if len(self.channel_names) > 0 and "c" not in self.axes:
-                raise ValueError(
-                    f"Channel names provided but 'c' axis not found in axes {self.axes}"
-                )
-        if self.channel_colors is not None:
-            if len(self.channel_colors) > 0 and "c" not in self.axes:
-                raise ValueError(
-                    f"Channel colors provided but 'c' axis not found in axes {self.axes}"
-                )
-        if self.contrast_limits is not None:
-            if len(self.contrast_limits) > 0 and "c" not in self.axes:
+        has_axis = "c" in self.axes
+        if self.channel_names is not None \
+            and len(self.channel_names) > 0 \
+            and not has_axis:
+            raise ValueError(
+                f"Channel names provided but 'c' axis not found in axes {self.axes}"
+            )
+        if self.channel_colors is not None \
+            and len(self.channel_colors) > 0 \
+            and not has_axis: 
+            raise ValueError(
+                f"Channel colors provided but 'c' axis not found in axes {self.axes}"
+            )
+        if self.contrast_limits is not None \
+            and len(self.contrast_limits) > 0 \
+            and not has_axis:
                 raise ValueError(
                     f"Contrast limits provided but 'c' axis not found in axes {self.axes}"
                 )
@@ -352,7 +356,7 @@ class OMEZarrMultiscaleBase:
 
     @classmethod
     def from_ome_zarr(
-        return_cls,
+        cls,
         group: zarr.Group | str,
     ) -> OMEZarrMultiscale | OMEZarrLabels:
         """
