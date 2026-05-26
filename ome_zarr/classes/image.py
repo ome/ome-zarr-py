@@ -720,11 +720,13 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
         if channel_names is not None and channel_colors is not None:
             if len(channel_names) != len(channel_colors):
                 raise ValueError(
-                        f"Length of channel_names ({len(channel_names)}) "
-                        f"does not match length of channel_colors "
-                        f"({len(channel_colors)})"
-                    )
-            if contrast_limits is not None and len(channel_names) != len(contrast_limits):
+                    f"Length of channel_names ({len(channel_names)}) "
+                    f"does not match length of channel_colors "
+                    f"({len(channel_colors)})"
+                )
+            if contrast_limits is not None and len(channel_names) != len(
+                contrast_limits
+            ):
                 raise ValueError(
                     f"Length of channel_names ({len(channel_names)}) "
                     f"does not match length of contrast_limits "
@@ -746,7 +748,7 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
                 color = self._images[0].channel_colors[i]
                 # Coerce RGBA/RGB list values to hex strings
                 if isinstance(color, (list, tuple)):
-                    # Convert RGB/RGBA to hex, taking first 
+                    # Convert RGB/RGBA to hex, taking first
                     # 3 values and ignoring alpha
                     color = f"#{color[0]:02x}{color[1]:02x}{color[2]:02x}"
             else:
@@ -851,9 +853,7 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
         if version in ("0.1", "0.2", "0.3", "0.4") and "labels" in group:
             labels_json = group["labels"].attrs.get("labels", [])
             list_of_labels = (
-                cast(list[str], labels_json)
-                if isinstance(labels_json, list)
-                else []
+                cast(list[str], labels_json) if isinstance(labels_json, list) else []
             )
         elif version == "0.5" and "labels" in group:
             labels_ome_attrs = cast(
