@@ -452,6 +452,7 @@ class OMEZarrMultiscaleBase:
                 )
             )
 
+        return_cls: type[OMEZarrLabels] | type[OMEZarrMultiscale]
         if is_label:
             return_cls = OMEZarrLabels
         else:
@@ -788,7 +789,7 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
 
         try:
             self._omero = Omero.model_validate({"channels": channel_metadata})
-        except Exception as e:
+        except ValidationError as e:
             warnings.warn(f"Failed to validate Omero metadata: {e}")
 
     @property
