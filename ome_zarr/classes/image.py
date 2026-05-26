@@ -452,7 +452,7 @@ class OMEZarrMultiscaleBase:
                 )
             )
 
-        return_cls: type[OMEZarrLabels] | type[OMEZarrMultiscale]
+        return_cls: type[OMEZarrLabels | OMEZarrMultiscale]
         if is_label:
             return_cls = OMEZarrLabels
         else:
