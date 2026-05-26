@@ -167,7 +167,6 @@ class TestWriter:
             data=data,
             axes=axes,
             scale=dict(zip(axes, TRANSFORMATIONS[0][0]["scale"])),
-            channel_names=channel_names,
         )
         labels = OMEZarrImage(
             data=data_labels,
@@ -182,6 +181,7 @@ class TestWriter:
             image=image,
             scale_factors=scale_factors,
             labels=labels_multiscales,
+            channel_names=channel_names,
         )
 
         # write image and labels to disk

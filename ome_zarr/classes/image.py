@@ -67,21 +67,6 @@ class OMEZarrImage:
         Default is None (no units).
     name : str, optional
         Name of the image. Default is "image".
-    channel_names : list of str, optional
-        List of channel names corresponding to the 'c' axis, e.g. ['DAPI', 'GFP', 'RFP'].
-        Default is None (no channel names).
-        Only relevant for intensity images (i.e., no label images.)
-    channel_colors : list of list of int or list of str, optional
-        List of colors for each channel corresponding to the 'c' axis.
-        Can be passed as a list of RGB values (i.e., [[255, 0, 0], [0, 255, 0], ...])
-        or as hex strings (i.e., ['#FF0000', '#00FF00', '#0000FF']).
-        Default is None (no channel colors).
-        Only relevant for intensity images (i.e., no label images.)
-    contrast_limits : list of tuple of float, optional
-        List of contrast limits for each channel corresponding to the 'c' axis,
-        e.g. [(0, 255), (0, 1000), ...].
-        Default is None (no contrast limits).
-        Only relevant for intensity images (i.e., no label images.)
     """
 
     data: da.Array | np.ndarray
@@ -89,9 +74,6 @@ class OMEZarrImage:
     scale: Sequence[float] | dict[str, float] | None = None
     axes_units: dict[str, str] | None = None
     name: str = "image"
-    channel_names: list[str] | None = None
-    channel_colors: list[list[int]] | list[str] | None = None
-    contrast_limits: list[tuple[float, float]] | None = None
 
     def __post_init__(self):
         # set default scale if unset
@@ -120,32 +102,6 @@ class OMEZarrImage:
             raise ValueError(
                 f"Number of dimensions in data ({len(self.data.shape)}) "
                 f"does not match number of dims ({len(self.axes)})"
-            )
-
-        has_axis = "c" in self.axes
-        if (
-            self.channel_names is not None
-            and len(self.channel_names) > 0
-            and not has_axis
-        ):
-            raise ValueError(
-                f"Channel names provided but 'c' axis not found in axes {self.axes}"
-            )
-        if (
-            self.channel_colors is not None
-            and len(self.channel_colors) > 0
-            and not has_axis
-        ):
-            raise ValueError(
-                f"Channel colors provided but 'c' axis not found in axes {self.axes}"
-            )
-        if (
-            self.contrast_limits is not None
-            and len(self.contrast_limits) > 0
-            and not has_axis
-        ):
-            raise ValueError(
-                f"Contrast limits provided but 'c' axis not found in axes {self.axes}"
             )
 
 
@@ -212,9 +168,6 @@ class OMEZarrMultiscaleBase:
                     scale=level_scale,
                     axes_units=image.axes_units,
                     name=image.name,
-                    channel_names=image.channel_names,
-                    channel_colors=image.channel_colors,
-                    contrast_limits=image.contrast_limits,
                 )
             )
             datasets.append(
@@ -252,8 +205,6 @@ class OMEZarrMultiscaleBase:
             name=image.name,
             coordinateTransformations=coordinateTransformations,
         )
-
-        self._parse_additional_metadata()
 
     def to_ome_zarr(
         self,
@@ -495,12 +446,6 @@ class OMEZarrMultiscaleBase:
         """
         return []
 
-    def _parse_additional_metadata(self):
-        """
-        Hook for derived classes to parse additional metadata fields on initialization
-        (e.g. labels, omero, image-label) from the base class after initialization.
-        """
-
     @staticmethod
     def _read_legacy_metadata(group, version: str) -> MultiscaleV05:
         """Read metadata from legacy OME-Zarr versions (0.1, 0.2, 0.3)."""
@@ -604,6 +549,18 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
     labels : OMEZarrLabels | list[OMEZarrLabels] | dict[str, OMEZarrLabels] | None, optional
         Labels associated with the image. Can be a single OMEZarrLabels instance, a list of them,
         or a dict mapping label names to OMEZarrLabels instances. Default is None (no labels).
+    channel_names : list of str, optional
+        List of channel names corresponding to the 'c' axis, e.g. ['DAPI', 'GFP', 'RFP'].
+        Default is None (no channel names).
+    channel_colors : list of list of int or list of str, optional
+        List of colors for each channel corresponding to the 'c' axis.
+        Can be passed as a list of RGB values (i.e., [[255, 0, 0], [0, 255, 0], ...])
+        or as hex strings (i.e., ['#FF0000', '#00FF00', '#0000FF']).
+        Default is None (no channel colors).
+    contrast_limits : list of tuple of float, optional
+        List of contrast limits for each channel corresponding to the 'c' axis,
+        e.g. [(0, 255), (0, 1000), ...].
+        Default is None (no contrast limits).
 
     Attributes
     ----------
@@ -633,16 +590,23 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
         labels: (
             OMEZarrLabels | list[OMEZarrLabels] | dict[str, OMEZarrLabels] | None
         ) = None,
+        channel_names: list[str] | None = None,
+        channel_colors: list[list[int]] | list[str] | None = None,
+        contrast_limits: list[tuple[float, float]] | None = None,
     ):
-        # Normalize labels to dict format
-        self._labels = self._parse_labels(labels)
-
         super().__init__(
             image=image,
             scale_factors=scale_factors,
             method=method,
             coordinateTransformations=coordinateTransformations,
         )
+
+        # Normalize labels to dict format
+        self._labels = self._parse_labels(labels)
+
+        # Parse omero metadata from channel parameters
+        self._omero = None
+        self._parse_omero_metadata(channel_names, channel_colors, contrast_limits)
 
     def _write_additional_meta_data(
         self,
@@ -712,22 +676,20 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
 
         return delayed
 
-    def _parse_additional_metadata(self):
+    def _parse_omero_metadata(
+        self,
+        channel_names: list[str] | None,
+        channel_colors: list[list[int]] | list[str] | None,
+        contrast_limits: list[tuple[float, float]] | None,
+    ) -> None:
         """
-        Helper function to parse metadata fields that are specific
-        for images (as opposed to labels), i.e., omero metadata
+        Build omero metadata from channel parameters.
         """
-
-        # omero first
-        self._omero = None
         if "c" not in self._images[0].axes:
             return
 
-        # make sure channel_names, display_colors and
+        # Validate that channel_names, channel_colors and
         # contrast_limits are lists of the same length if provided
-        channel_names = self._images[0].channel_names
-        channel_colors = self._images[0].channel_colors
-        contrast_limits = self._images[0].contrast_limits
         if channel_names is not None and channel_colors is not None:
             if len(channel_names) != len(channel_colors):
                 raise ValueError(
@@ -744,19 +706,19 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
                     f"({len(contrast_limits)})"
                 )
 
-        # make default values and then replace with provided values
+        # Make default values and then replace with provided values
         channel_axis = self._images[0].axes.index("c")
         n_channels = self._images[0].data.shape[channel_axis]
 
         channel_metadata = []
         for i in range(n_channels):
-            if self._images[0].channel_names is not None:
-                name = self._images[0].channel_names[i]
+            if channel_names is not None:
+                name = channel_names[i]
             else:
                 name = f"Channel {i}"
 
-            if self._images[0].channel_colors is not None:
-                color = self._images[0].channel_colors[i]
+            if channel_colors is not None:
+                color = channel_colors[i]
                 # Coerce RGBA/RGB list values to hex strings
                 if isinstance(color, (list, tuple)):
                     # Convert RGB/RGBA to hex, taking first
@@ -766,10 +728,10 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
                 color = DEFAULT_COLORS[i % len(DEFAULT_COLORS)]
 
             dtype_max = self._images[0].data.dtype.itemsize * 255
-            if self._images[0].contrast_limits is not None:
-                contrast_limits = self._images[0].contrast_limits[i]
+            if contrast_limits is not None:
+                channel_contrast = contrast_limits[i]
             else:
-                contrast_limits = (
+                channel_contrast = (
                     0,
                     dtype_max,
                 )  # TODO: best way to get max value from dtype?
@@ -780,9 +742,9 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
                     "color": color,
                     "window": {
                         "min": 0,
-                        "start": contrast_limits[0],
+                        "start": channel_contrast[0],
                         "max": dtype_max,
-                        "end": contrast_limits[1],
+                        "end": channel_contrast[1],
                     },
                 }
             )
@@ -929,13 +891,35 @@ class OMEZarrLabels(OMEZarrMultiscaleBase):
         method: str | Methods | None = Methods.NEAREST,
         auto_parse_labels: bool = True,
     ):
-        self._image_label = None
-        self._auto_parse_labels = auto_parse_labels
         super().__init__(
             image=image,
             scale_factors=scale_factors,
             method=method,
             coordinateTransformations=None,
+        )
+
+        # Build image-label metadata if auto_parse_labels is enabled
+        self._image_label = None
+        if auto_parse_labels:
+            self._parse_image_label_metadata()
+
+    def _parse_image_label_metadata(self) -> None:
+        """Build image-label metadata by inspecting unique label values."""
+        label_values = da.unique(self._images[0].data).compute().tolist()
+        colors = [
+            {
+                "label-value": label,
+                "rgba": [np.random.randint(0, 255) for _ in range(3)] + [255],
+            }
+            for label in label_values
+        ]
+
+        self._image_label = Label.model_validate(
+            {
+                "colors": colors,
+                "source": {"image": "../.."},
+                "properties": [{"label-value": i} for i in label_values],
+            }
         )
 
     @property
@@ -948,25 +932,6 @@ class OMEZarrLabels(OMEZarrMultiscaleBase):
             self._image_label = Label.model_validate(value)
         else:
             self._image_label = value
-
-    def _parse_additional_metadata(self):
-        if self._auto_parse_labels:
-            label_values = da.unique(self._images[0].data).compute().tolist()
-            colors = [
-                {
-                    "label-value": label,
-                    "rgba": [np.random.randint(0, 255) for _ in range(3)] + [255],
-                }
-                for label in label_values
-            ]
-
-            self._image_label = Label.model_validate(
-                {
-                    "colors": colors,
-                    "source": {"image": "../.."},
-                    "properties": [{"label-value": i} for i in label_values],
-                }
-            )
 
     def _write_additional_meta_data(
         self,
