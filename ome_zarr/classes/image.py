@@ -352,7 +352,7 @@ class OMEZarrMultiscaleBase:
 
     @classmethod
     def from_ome_zarr(
-        cls,
+        return_cls,
         group: zarr.Group | str,
     ) -> OMEZarrMultiscale | OMEZarrLabels:
         """
@@ -386,7 +386,7 @@ class OMEZarrMultiscaleBase:
 
         # Handle loading based on version
         if version in ("0.1", "0.2", "0.3"):
-            metadata = cls._read_legacy_metadata(group, version)
+            metadata = return_cls._read_legacy_metadata(group, version)
             if "image-label" in group.attrs:
                 is_label = True
 
@@ -443,12 +443,12 @@ class OMEZarrMultiscaleBase:
             )
 
         if is_label:
-            cls = OMEZarrLabels
+            return_cls = OMEZarrLabels
         else:
-            cls = OMEZarrMultiscale
+            return_cls = OMEZarrMultiscale
 
         # Create instance without calling __init__
-        instance = cls.__new__(cls)
+        instance = return_cls.__new__(return_cls)
         instance._images = images
         instance.metadata = metadata
         instance.name = str(metadata.name) if metadata.name else "image"
@@ -712,22 +712,24 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
         if "c" not in self._images[0].axes:
             return
 
-        # make sure channel_names, display_colors and contrast_limits are lists of the same length if provided
-        if self._images[0].channel_names is not None:
-            if self._images[0].channel_colors is not None:
-                if len(self._images[0].channel_names) != len(
-                    self._images[0].channel_colors
-                ):
-                    raise ValueError(
-                        f"Length of channel_names ({len(self._images[0].channel_names)}) does not match length of channel_colors ({len(self._images[0].channel_colors)})"
+        # make sure channel_names, display_colors and
+        # contrast_limits are lists of the same length if provided
+        channel_names = self._images[0].channel_names
+        channel_colors = self._images[0].channel_colors
+        contrast_limits = self._images[0].contrast_limits
+        if channel_names is not None and channel_colors is not None:
+            if len(channel_names) != len(channel_colors):
+                raise ValueError(
+                        f"Length of channel_names ({len(channel_names)}) "
+                        f"does not match length of channel_colors "
+                        f"({len(channel_colors)})"
                     )
-            if self._images[0].contrast_limits is not None:
-                if len(self._images[0].channel_names) != len(
-                    self._images[0].contrast_limits
-                ):
-                    raise ValueError(
-                        f"Length of channel_names ({len(self._images[0].channel_names)}) does not match length of contrast_limits ({len(self._images[0].contrast_limits)})"
-                    )
+            if contrast_limits is not None and len(channel_names) != len(contrast_limits):
+                raise ValueError(
+                    f"Length of channel_names ({len(channel_names)}) "
+                    f"does not match length of contrast_limits "
+                    f"({len(contrast_limits)})"
+                )
 
         # make default values and then replace with provided values
         channel_axis = self._images[0].axes.index("c")
@@ -744,7 +746,8 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
                 color = self._images[0].channel_colors[i]
                 # Coerce RGBA/RGB list values to hex strings
                 if isinstance(color, (list, tuple)):
-                    # Convert RGB/RGBA to hex, taking first 3 values and ignoring alpha
+                    # Convert RGB/RGBA to hex, taking first 
+                    # 3 values and ignoring alpha
                     color = f"#{color[0]:02x}{color[1]:02x}{color[2]:02x}"
             else:
                 color = DEFAULT_COLORS[i % len(DEFAULT_COLORS)]
@@ -756,7 +759,7 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
                 contrast_limits = (
                     0,
                     dtype_max,
-                )  # TODO: Check to see if this is the best way to get max value from dtype
+                )  # TODO: best way to get max value from dtype?
 
             channel_metadata.append(
                 {
@@ -829,9 +832,8 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
         # Read omero metadata
         omero_dict: dict[str, Any] | None = None
 
-        if version in ("0.1", "0.2", "0.3", "0.4"):
-            if "omero" in group.attrs:
-                omero_dict = cast(dict[str, Any] | None, group.attrs.get("omero", None))
+        if version in ("0.1", "0.2", "0.3", "0.4") and "omero" in group.attrs:
+            omero_dict = cast(dict[str, Any] | None, group.attrs.get("omero", None))
         elif version == "0.5":
             ome_attrs = cast(dict[str, Any], group.attrs.get("ome", {}))
             if "omero" in ome_attrs:
@@ -846,20 +848,18 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
         # Read labels list
         list_of_labels: list[str] = []
 
-        if version in ("0.1", "0.2", "0.3", "0.4"):
-            if "labels" in group:
-                labels_json = group["labels"].attrs.get("labels", [])
-                list_of_labels = (
-                    cast(list[str], labels_json)
-                    if isinstance(labels_json, list)
-                    else []
-                )
-        elif version == "0.5":
-            if "labels" in group:
-                labels_ome_attrs = cast(
-                    dict[str, Any], group["labels"].attrs.get("ome", {})
-                )
-                list_of_labels = cast(list[str], labels_ome_attrs.get("labels", []))
+        if version in ("0.1", "0.2", "0.3", "0.4") and "labels" in group:
+            labels_json = group["labels"].attrs.get("labels", [])
+            list_of_labels = (
+                cast(list[str], labels_json)
+                if isinstance(labels_json, list)
+                else []
+            )
+        elif version == "0.5" and "labels" in group:
+            labels_ome_attrs = cast(
+                dict[str, Any], group["labels"].attrs.get("ome", {})
+            )
+            list_of_labels = cast(list[str], labels_ome_attrs.get("labels", []))
 
         # Load labels if they exist
         if list_of_labels:

@@ -570,7 +570,7 @@ def write_image(
         8,
         16,
     ),
-    name: str | None = "image",
+    name: str = "image",
     method: Methods | None = Methods.RESIZE,
     scaler: Scaler | None = None,
     fmt: Format | None = None,
@@ -744,7 +744,7 @@ def write_image(
     dask_delayed_jobs = multiscale.to_ome_zarr(
         group=group,
         storage_options=storage_options,
-        version=fmt.version,
+        version=fmt.version,  # type: ignore[arg-type]
         compute=compute,
         overwrite=True,
     )
@@ -1171,7 +1171,7 @@ def write_multiscale_labels(
 def write_labels(
     labels: np.ndarray | da.Array,
     group: zarr.Group | str,
-    name: str,
+    name: str = "labels",
     scaler: Scaler | None = Scaler(order=0),
     scale_factors: list[int] | tuple[int, ...] | list[dict[str, int]] = (2, 4, 8, 16),
     method: Methods = Methods.NEAREST,
@@ -1327,7 +1327,7 @@ def write_labels(
     dask_delayed_jobs = multiscales.to_ome_zarr(
         group=sub_group,
         storage_options=storage_options,
-        version=fmt.version,
+        version=fmt.version,  # type: ignore[arg-type]
         compute=compute,
         overwrite=True,
     )
