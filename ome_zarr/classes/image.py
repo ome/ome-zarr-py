@@ -52,26 +52,48 @@ class OMEZarrImage:
     """
     Single-scale image representation with metadata.
 
+    This class serves as the entrypoint to creating ome-zarr
+    images on disk. The :py:class:`OMEZarrMultiscale` class and
+    :py:class:`OMEZarrLabels` multi-resolution representations of
+    ome-zarr images can be created from instances of this class.
+
     Parameters
     ----------
     data : dask.array.Array or numpy.ndarray
-        The image data array.
-    axes : sequence of str or str
-        The axis names corresponding to the data array axes, i.e. ('c', 'z', 'y', 'x').
-    scale : sequence of float or dict of str to float, optional
-        The physical scale for each axis. If a sequence is provided, it should
-        match the order of `axes`. If a dict is provided, keys should be axis names,
-        e.g. {'x': 0.1, 'y': 0.1, 'z': 0.5}. Default is None, which sets all scales to 1.0.
-    axes_units : dict of str to str, optional
+        The image data array. Can be a NumPy array or a Dask array.
+        If a NumPy array is provided, it will be converted to a
+        Dask array internally.
+    axes : Sequence[str] or str
+        The axis names corresponding to the data array axes,
+        i.e. ('c', 'z', 'y', 'x').
+    scale : dict[str, float] | None
+        The physical scale for each axis, with keys as axis names,
+        e.g. {'x': 0.1, 'y': 0.1, 'z': 0.5}. Missing axes are auto-set to 1.0
+        with a warning. Default is None, which sets all scales to 1.0.
+    axes_units : dict[str, str] | None
         Units for each axis, e.g. {'x': 'micrometer', 'y': 'micrometer'}.
         Default is None (no units).
-    name : str, optional
+    name : str
         Name of the image. Default is "image".
+
+    Example
+    -------
+    .. code-block:: python
+
+        import numpy as np
+        data = np.random.poisson(lam=10, size=(2, 10, 128, 128)).astype(np.uint8)
+        image = OMEZarrImage(
+            data=data,
+            axes="czyx",
+            scale={"c": 1.0, "z": 0.5, "y": 0.1, "x": 0.1},
+            axes_units={"c": None, "z": "micrometer", "y": "micrometer", "x": "micrometer"},
+            name="my_image",
+        )
     """
 
     data: da.Array | np.ndarray
     axes: Sequence[str] | str
-    scale: Sequence[float] | dict[str, float] | None = None
+    scale: dict[str, float] | None = None
     axes_units: dict[str, str] | None = None
     name: str = "image"
 
@@ -537,33 +559,41 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
     """
     Container for multiscale image pyramid with OME-Zarr metadata.
 
-    This class extends OMEZarrMultiscaleBase and implements
-    handling of additional metadata fields such as labels, omero, and image-label.
+    If built from an instance of :py:class:`OMEZarrImage`, the instantiation
+    of this class handles the construction of the ome-zarr multi-resolution scheme
+    as delayed dask arrays.
+    It can be used to write such arrays and associated metadata to disk and read
+    from local and remote storages.
+
+    This class implements convenient handling of additional subgroups
+    (i.e., labels) or metadata fields (i.e., the omero metadata field
+    for display settings).
 
     Parameters
     ----------
     image : OMEZarrImage
-    scale_factors : list[int] | tuple[int, ...] | list[dict[str, int]] | None, optional
+        The OMEZarrImage instance from which to build the multi-resolution levels.
+    scale_factors : list[int] | tuple[int, ...] | list[dict[str, int]] | None
         Scale factors for each pyramid level. If a list of ints or tuple is provided,
         it is applied uniformly across all spatial axes. If a list of dicts is provided,
         each dict should specify scale factors for each axis, e.g. {'x': 2, 'y': 2, 'z': 1}.
         Default is (2, 4, 8, 16).
-    method : str | Methods, optional
+    method : ome_zarr.scale.Methods | str | None
         Rescaling method to use when generating pyramid levels. Default is Methods.RESIZE.
-    coordinateTransformations : list[Scale | Translation | Identity], optional
+    coordinateTransformations :
         Additional coordinate transformations to include in the metadata for each level.
-    labels : OMEZarrLabels | list[OMEZarrLabels] | dict[str, OMEZarrLabels] | None, optional
+    labels : OMEZarrLabels | list[OMEZarrLabels] | dict[str, OMEZarrLabels] | None
         Labels associated with the image. Can be a single OMEZarrLabels instance, a list of them,
         or a dict mapping label names to OMEZarrLabels instances. Default is None (no labels).
-    channel_names : list of str, optional
+    channel_names : list[str] | None
         List of channel names corresponding to the 'c' axis, e.g. ['DAPI', 'GFP', 'RFP'].
         Default is None (no channel names).
-    channel_colors : list of list of int or list of str, optional
+    channel_colors : list[list[int]] | list[str] | None
         List of colors for each channel corresponding to the 'c' axis.
         Can be passed as a list of RGB values (i.e., [[255, 0, 0], [0, 255, 0], ...])
         or as hex strings (i.e., ['#FF0000', '#00FF00', '#0000FF']).
         Default is None (no channel colors).
-    contrast_limits : list of tuple of float, optional
+    contrast_limits : list[tuple[float, float]] | None
         List of contrast limits for each channel corresponding to the 'c' axis,
         e.g. [(0, 255), (0, 1000), ...].
         Default is None (no contrast limits).
@@ -582,10 +612,23 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
         from_ome_zarr(group)
             Load a multiscale image pyramid and metadata from an OME-Zarr group.
 
-    """
+    Examples
+    --------
+    .. code-block:: python
 
-    _labels: dict[str, OMEZarrLabels] | None
-    _omero: Omero | None
+        import numpy as np
+        from ome_zarr import OMEZarrImage, OMEZarrMultiscale
+        data = np.random.poisson(lam=10, size=(2, 10, 128, 128)).astype(np.uint8)
+        image = OMEZarrImage(
+            data=data,
+            axes="czyx",
+        )
+        multiscale = OMEZarrMultiscale(
+            image=image,
+            scale_factors=[2, 4, 8, 16],
+            channel_names=["DAPI", "GFP"]
+        )
+    """
 
     def __init__(
         self,
@@ -871,7 +914,7 @@ class OMEZarrLabels(OMEZarrMultiscaleBase):
         it is applied uniformly across all spatial axes. If a list of dicts is provided,
         each dict should specify scale factors for each axis, e.g. {'x': 2, 'y': 2, 'z': 1}.
         Default is (2, 4, 8, 16).
-    method : str | Methods, optional
+    method : str | ome_zarr.scale.Methods, optional
         Rescaling method to use when generating pyramid levels. Default is Methods.NEAREST,
         since these are labels.
     auto_parse_labels : bool, optional
