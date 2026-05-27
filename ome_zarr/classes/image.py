@@ -76,26 +76,9 @@ class OMEZarrImage:
     name: str = "image"
 
     def __post_init__(self):
-        # set default scale if unset
-        if self.scale is None:
-            self.scale = tuple(1.0 for _ in range(len(self.axes)))
-
         # coerce axes to list
         if isinstance(self.axes, str):
             self.axes = list(self.axes)
-
-        # coerce scale to dict if it's a sequence
-        if isinstance(self.scale, Sequence):
-            if len(self.scale) != len(self.axes):
-                raise ValueError(
-                    f"Number of scale values ({len(self.scale)}) "
-                    f"does not match number of axes ({len(self.axes)})"
-                )
-            self.scale = dict(zip(self.axes, self.scale))
-
-        # coerce data to dask array
-        if not isinstance(self.data, da.Array):
-            self.data = da.from_array(self.data)
 
         # validate dimensions match data shape
         if len(self.axes) != len(self.data.shape):
@@ -104,13 +87,36 @@ class OMEZarrImage:
                 f"does not match number of dims ({len(self.axes)})"
             )
 
+        # set default scale if unset
+        if self.scale is None:
+            self.scale = {axis: 1.0 for axis in self.axes}
+
+        # validate and normalize scale dict
+        for d in self.scale.keys():
+            if d not in self.axes:
+                raise ValueError(
+                    f"Scale contains invalid axis: {d}. "
+                    f"Valid axes are: {self.axes}"
+                )
+
+        # warn about missing axes
+        for d in self.axes:
+            if d not in self.scale:
+                warnings.warn(
+                    f"Scale value not provided for axis '{d}'. "
+                    f"Using default scale of 1.0.",
+                    stacklevel=2,
+                )
+
+        # rebuild scale dict with defaults for missing axes
+        self.scale = {d: self.scale.get(d, 1.0) for d in self.axes}
+
+        # coerce data to dask array
+        if not isinstance(self.data, da.Array):
+            self.data = da.from_array(self.data)
+
 
 class OMEZarrMultiscaleBase:
-    """
-    Base class for multiscale image pyramid with OME-Zarr metadata.
-
-    Parameters
-    """
 
     name: str
 
