@@ -4,7 +4,7 @@ import pytest
 import zarr
 from numpy import ones, zeros
 
-from ome_zarr import NgffMultiscales
+from ome_zarr import OMEZarrLabels, OMEZarrMultiscale
 from ome_zarr.data import create_zarr
 from ome_zarr.format import FormatV04
 from ome_zarr.io import parse_url
@@ -48,29 +48,29 @@ from ome_zarr.writer import (
     ],
 )
 def test_class_reader_legacy(url, has_omero, has_labels):
-    image = NgffMultiscales.from_ome_zarr(next(iter(url.values())))
+    image = OMEZarrMultiscale.from_ome_zarr(next(iter(url.values())))
 
     if has_omero:
-        assert image.omero is not None
-        assert hasattr(image.omero, "channels")
+        assert image._omero is not None
+        assert hasattr(image._omero, "channels")
 
     if has_labels:
         assert image.labels != []
         assert image.labels is not None
         # image.labels must be one of:
-        # - NGffMultiscales
-        # - list[NgffMultiscales]
-        # - dict(str, Multiscales)
+        # - OMEZarrLabels
+        # - list[OMEZarrLabels]
+        # - dict(str, OMEZarrLabels)
         if isinstance(image.labels, dict):
             for label in image.labels.values():
-                assert isinstance(label, NgffMultiscales)
+                assert isinstance(label, OMEZarrLabels)
 
         elif isinstance(image.labels, list):
             for label in image.labels:
-                assert isinstance(label, NgffMultiscales)
+                assert isinstance(label, OMEZarrLabels)
 
         else:
-            assert isinstance(image.labels, NgffMultiscales)
+            assert isinstance(image.labels, OMEZarrLabels)
 
 
 class TestReader:
@@ -144,7 +144,7 @@ class TestReader:
         assert np.allclose(data, image_node.data[0])
 
         # now the same with the class-based API for v0.5
-        ms = NgffMultiscales.from_ome_zarr(img_path)
+        ms = OMEZarrMultiscale.from_ome_zarr(img_path)
 
         assert len(ms.images) == 1
 
@@ -249,7 +249,7 @@ def test_class_reader():
     from ome_zarr_models.common.omero import Omero
 
     url = "https://livingobjects.ebi.ac.uk/idr/zarr/v0.5/idr0062A/6001240_labels.zarr"
-    image = NgffMultiscales.from_ome_zarr(url)
+    image = OMEZarrMultiscale.from_ome_zarr(url)
 
     # image is known to have "omero" metadata with "channels" key
     assert image.omero is not None
@@ -261,5 +261,5 @@ def test_class_reader():
     assert "0" in image.labels
 
     label_image = image.labels["0"]
-    assert isinstance(label_image, NgffMultiscales)
+    assert isinstance(label_image, OMEZarrLabels)
     assert label_image.image_label is not None
