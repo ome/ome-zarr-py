@@ -132,7 +132,7 @@ class TestWriter:
             # more scale values than data dims
             OMEZarrImage(
                 data=data,
-                axes="zyx",  
+                axes="zyx",
                 scale={"c": 1.0, "z": 0.5, "y": 0.5, "x": 0.5},
             )
 
@@ -149,7 +149,7 @@ class TestWriter:
 
         # less channel_names than channel_colors
         with pytest.raises(ValueError):
-             multiscales = OMEZarrMultiscale(
+            multiscales = OMEZarrMultiscale(
                 image=image,
                 channel_names=["Channel 0", "Channel 1"],
                 channel_colors=["#ff0000"],
@@ -163,7 +163,6 @@ class TestWriter:
                 contrast_limits=[(0, 255)],
             )
 
-
         multiscales = OMEZarrMultiscale(
             image=image,
             scale_factors=None,
@@ -171,13 +170,10 @@ class TestWriter:
             channel_names=["Channel 0", "Channel 1"],
             channel_colors=[[255, 0, 0], [0, 255, 0]],
             contrast_limits=[(0, 255), (0, 255)],
-            )
+        )
         assert len(multiscales.images) == 5
 
-        multiscales.to_ome_zarr(
-            self.path / "test_bad_args.zarr",
-            version="0.5.5"
-        )
+        multiscales.to_ome_zarr(self.path / "test_bad_args.zarr", version="0.5.5")
 
     @pytest.mark.parametrize("storage_options_list", [True, False])
     def test_image_class_writer(
