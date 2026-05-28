@@ -117,7 +117,7 @@ class OMEZarrImage:
         for d in self.scale:
             if d not in self.axes:
                 raise ValueError(
-                    f"Scale contains invalid axis: {d}. " f"Valid axes are: {self.axes}"
+                    f"Scale contains invalid axis: {d}. Valid axes are: {self.axes}"
                 )
 
         # warn about missing axes
