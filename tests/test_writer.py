@@ -122,6 +122,63 @@ class TestWriter:
     def shape(self, request):
         return request.param
 
+    def test_image_class_bad_args(self):
+        data = self.create_data((2, 128, 128))
+
+        with pytest.raises(ValueError):
+            OMEZarrImage(data=data, axes="czyx")  # more axes than data dims
+
+        with pytest.raises(ValueError):
+            # more scale values than data dims
+            OMEZarrImage(
+                data=data,
+                axes="zyx",  
+                scale={"c": 1.0, "z": 0.5, "y": 0.5, "x": 0.5},
+            )
+
+        # unset axes must default to 1.0
+        image = OMEZarrImage(data=data, axes="cyx", scale={"y": 0.5, "x": 0.5})
+        assert image.scale["c"] == 1.0
+
+        # less channels then dims in channel axis
+        with pytest.raises(ValueError):
+            multiscales = OMEZarrMultiscale(
+                image=image,
+                channel_names=["Channel 0"],
+            )
+
+        # less channel_names than channel_colors
+        with pytest.raises(ValueError):
+             multiscales = OMEZarrMultiscale(
+                image=image,
+                channel_names=["Channel 0", "Channel 1"],
+                channel_colors=["#ff0000"],
+            )
+
+        # less channel_names than contrast limits
+        with pytest.raises(ValueError):
+            multiscales = OMEZarrMultiscale(
+                image=image,
+                channel_names=["Channel 0", "Channel 1"],
+                contrast_limits=[(0, 255)],
+            )
+
+
+        multiscales = OMEZarrMultiscale(
+            image=image,
+            scale_factors=None,
+            method=None,
+            channel_names=["Channel 0", "Channel 1"],
+            channel_colors=[[255, 0, 0], [0, 255, 0]],
+            contrast_limits=[(0, 255), (0, 255)],
+            )
+        assert len(multiscales.images) == 5
+
+        multiscales.to_ome_zarr(
+            self.path / "test_bad_args.zarr",
+            version="0.5.5"
+        )
+
     @pytest.mark.parametrize("storage_options_list", [True, False])
     def test_image_class_writer(
         self, shape, format_version_all, array_constructor, storage_options_list
@@ -2247,3 +2304,7 @@ class TestLabelWriter:
 
         ms_test = OMEZarrMultiscale.from_ome_zarr(group)
         assert "third_labels" in ms_test.labels
+
+
+if __name__ == "__main__":
+    pytest.main([__file__])
