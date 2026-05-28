@@ -114,7 +114,7 @@ class OMEZarrImage:
             self.scale = dict.fromkeys(self.axes, 1.0)
 
         # validate and normalize scale dict
-        for d in self.scale.keys():
+        for d in self.scale:
             if d not in self.axes:
                 raise ValueError(
                     f"Scale contains invalid axis: {d}. " f"Valid axes are: {self.axes}"
