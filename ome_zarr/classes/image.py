@@ -119,7 +119,7 @@ class OMEZarrImage:
         for d in self.scale:
             if d not in self.axes:
                 raise ValueError(
-                    f"Scale contains invalid axis: {d}. " f"Valid axes are: {self.axes}"
+                    f"Scale contains invalid axis: {d}. Valid axes are: {self.axes}"
                 )
 
         # warn about missing axes
@@ -494,6 +494,7 @@ class OMEZarrMultiscaleBase:
 
         elif "0.6" in version:
             from ome_zarr_models.v06.multiscales import Multiscale as Multiscalev06
+
             ome_attrs = cast(dict[str, Any], group.attrs.get("ome", {}))
             metadata_json = ome_attrs.get("multiscales", [None])[0]
             metadata = Multiscalev06.model_validate(metadata_json)
