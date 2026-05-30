@@ -736,24 +736,6 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
         if "c" not in self._images[0].axes:
             return
 
-        # Validate that channel_names, channel_colors and
-        # contrast_limits are lists of the same length if provided
-        if channel_names is not None and channel_colors is not None:
-            if len(channel_names) != len(channel_colors):
-                raise ValueError(
-                    f"Length of channel_names ({len(channel_names)}) "
-                    f"does not match length of channel_colors "
-                    f"({len(channel_colors)})"
-                )
-            if contrast_limits is not None and len(channel_names) != len(
-                contrast_limits
-            ):
-                raise ValueError(
-                    f"Length of channel_names ({len(channel_names)}) "
-                    f"does not match length of contrast_limits "
-                    f"({len(contrast_limits)})"
-                )
-
         # Make default values and then replace with provided values
         channel_axis = self._images[0].axes.index("c")
         n_channels = self._images[0].data.shape[channel_axis]
