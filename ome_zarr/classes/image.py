@@ -795,6 +795,7 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
             channel_metadata.append(
                 {
                     "label": name,
+                    "active": True,
                     "color": color,
                     "window": {
                         "min": 0,
