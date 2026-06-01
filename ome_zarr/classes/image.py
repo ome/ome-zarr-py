@@ -590,7 +590,7 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
     channel_colors : list[list[int]] | list[str] | None
         List of colors for each channel corresponding to the 'c' axis.
         Can be passed as a list of RGB values (i.e., [[255, 0, 0], [0, 255, 0], ...])
-        or as hex strings (i.e., ['#FF0000', '#00FF00', '#0000FF']).
+        or as hex strings (i.e., ['FF0000', '00FF00', '0000FF']).
         Default is None (no channel colors).
     contrast_limits : list[tuple[float, float]] | None
         List of contrast limits for each channel corresponding to the 'c' axis,
@@ -761,9 +761,11 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
                 if isinstance(color, (list, tuple)):
                     # Convert RGB/RGBA to hex, taking first
                     # 3 values and ignoring alpha
-                    color = f"#{color[0]:02x}{color[1]:02x}{color[2]:02x}"
+                    color = f"{color[0]:02x}{color[1]:02x}{color[2]:02x}"
             else:
-                color = DEFAULT_COLORS[i % len(DEFAULT_COLORS)]
+                color = DEFAULT_COLORS[
+                    i % len(DEFAULT_COLORS)
+                    ].replace("#", "")
 
             dtype_max = self._images[0].data.dtype.itemsize * 255
             if contrast_limits is not None:
