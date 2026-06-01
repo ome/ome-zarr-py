@@ -570,7 +570,7 @@ def write_image(
         8,
         16,
     ),
-    name: str | None = "image",
+    name: str = "image",
     method: Methods | None = Methods.RESIZE,
     scaler: Scaler | None = None,
     fmt: Format | None = None,
@@ -667,7 +667,7 @@ def write_image(
     The `scaler` argument is deprecated and will be removed in a future version. Use
     `scale_factors` and `method` for all new code.
     """
-    from .classes import NgffImage, NgffMultiscales
+    from .classes import OMEZarrImage, OMEZarrMultiscale
 
     if method is None:
         method = Methods.RESIZE
@@ -729,25 +729,24 @@ def write_image(
         else:
             method = Methods.RESIZE
 
-    omero = None
-    if "omero" in metadata:
-        omero = metadata["omero"]
+    omero = metadata.get("omero")
 
-    ngff_image = NgffImage(
+    singlescale = OMEZarrImage(
         data=image, scale=scale, axes=dims, name=name, axes_units=axes_units
     )
-    ngff_multiscales = NgffMultiscales(
-        image=ngff_image,
+    multiscale = OMEZarrMultiscale(
+        image=singlescale,
         scale_factors=scale_factors,
         method=method,
-        omero=omero,
     )
+    multiscale.omero = omero
 
-    dask_delayed_jobs = ngff_multiscales.to_ome_zarr(
+    dask_delayed_jobs = multiscale.to_ome_zarr(
         group=group,
         storage_options=storage_options,
-        version=fmt.version,
+        version=fmt.version,  # type: ignore[arg-type]
         compute=compute,
+        overwrite=True,
     )
 
     return dask_delayed_jobs
@@ -1169,7 +1168,7 @@ def write_multiscale_labels(
 def write_labels(
     labels: np.ndarray | da.Array,
     group: zarr.Group | str,
-    name: str,
+    name: str = "labels",
     scaler: Scaler | None = Scaler(order=0),
     scale_factors: list[int] | tuple[int, ...] | list[dict[str, int]] = (2, 4, 8, 16),
     method: Methods = Methods.NEAREST,
@@ -1273,7 +1272,7 @@ def write_labels(
     `scale_factors` and `method` for all new code. Labels downsampling should avoid interpolation;
     nearest-neighbor is recommended.
     """
-    from .classes import NgffImage, NgffMultiscales
+    from .classes import OMEZarrImage, OMEZarrLabels
 
     group, fmt = check_group_fmt(group, fmt)
     sub_group = group.require_group(f"labels/{name}")
@@ -1292,9 +1291,7 @@ def write_labels(
     if method is None:
         method = Methods.NEAREST
 
-    image_label = None
-    if "image-label" in metadata:
-        image_label = metadata["image-label"]
+    image_label = metadata.get("image-label")
 
     if scaler is not None:
         msg = """
@@ -1315,20 +1312,21 @@ def write_labels(
         )
         warnings.warn(msg, DeprecationWarning)
 
-    ngff_image = NgffImage(
+    singlescale = OMEZarrImage(
         data=labels, axes=dims, name=name, scale=scale, axes_units=axes_units
     )
-    ngff_multiscales = NgffMultiscales(
-        image=ngff_image,
+    multiscales = OMEZarrLabels(
+        image=singlescale,
         scale_factors=scale_factors,
         method=method,
-        image_label=image_label,
     )
-    dask_delayed_jobs = ngff_multiscales.to_ome_zarr(
+    multiscales.image_label = image_label
+    dask_delayed_jobs = multiscales.to_ome_zarr(
         group=sub_group,
         storage_options=storage_options,
-        version=fmt.version,
+        version=fmt.version,  # type: ignore[arg-type]
         compute=compute,
+        overwrite=True,
     )
 
     write_label_metadata(
