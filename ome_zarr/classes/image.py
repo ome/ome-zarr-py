@@ -750,11 +750,11 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
         Build omero metadata from channel parameters.
         """
         if "c" not in self._images[0].axes:
-            return
-
-        # Make default values and then replace with provided values
-        channel_axis = self._images[0].axes.index("c")
-        n_channels = self._images[0].data.shape[channel_axis]
+            n_channels = 1
+        else:
+            # Make default values and then replace with provided values
+            channel_axis = self._images[0].axes.index("c")
+            n_channels = self._images[0].data.shape[channel_axis]
 
         # Make sure that all channel descriptors line up with the data dimensions
         for param in [channel_names, channel_colors, contrast_limits]:
