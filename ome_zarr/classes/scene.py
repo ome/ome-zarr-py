@@ -3,6 +3,7 @@ import os
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any
+import networkx as nx
 
 import zarr
 from ome_zarr_models.v06.coordinate_transforms import (
@@ -18,7 +19,7 @@ from .image import OMEZarrMultiscale
 
 # the class exposed to the user
 @dataclass(kw_only=True)
-class NgffScene:
+class OMEZarrScene:
     images: list[OMEZarrMultiscale]
     metadata: SceneAttrs = field(init=False, default=None)
     coordinate_transformations: Sequence[AnyTransform] | list[dict[str, Any]]
@@ -42,47 +43,49 @@ class NgffScene:
             coordinateTransformations=self.coordinate_transformations,
         )
 
-        # self._graph = nx.DiGraph()
 
-        # if self.coordinate_systems is not None:
-        #     for cs in self.coordinate_systems:
-        #         if hasattr(cs, "path") and cs.path is None:
-        #             self._graph.add_node((None, cs.name))
+    def _build_graph(self):
+        self._graph = nx.DiGraph()
 
-        # for img in self.images:
-        #     # add all coordinate systems as nodes
-        #     for cs in img.metadata.coordinateSystems:
-        #         node_id = (img.metadata.name, cs.name)
-        #         self._graph.add_node(node_id)
+        if self.coordinate_systems is not None:
+            for cs in self.coordinate_systems:
+                if hasattr(cs, "path") and cs.path is None:
+                    self._graph.add_node((None, cs.name))
 
-        #     for ds in img.metadata.datasets:
-        #         # add all datasets as nodes
-        #         node_id = (img.metadata.name, ds.path)
-        #         self._graph.add_node(node_id)
+        for img in self.images:
+            # add all coordinate systems as nodes
+            for cs in img.metadata.coordinateSystems:
+                node_id = (img.metadata.name, cs.name)
+                self._graph.add_node(node_id)
 
-        #         # add scale transformations from dataset as edges
-        #         transform = ds.coordinateTransformations
-        #         self._graph.add_edge(
-        #             (img.metadata.name, ds.path),
-        #             (img.metadata.name, ds.coordinateTransformations[0].output),
-        #             transform=transform,
-        #         )
+            for ds in img.metadata.datasets:
+                # add all datasets as nodes
+                node_id = (img.metadata.name, ds.path)
+                self._graph.add_node(node_id)
 
-        #     # add additional transformations from image metadata as edges
-        #     if img.metadata.coordinateTransformations:
-        #         for tf in img.metadata.coordinateTransformations:
-        #             self._graph.add_edge(
-        #                 (img.metadata.name, tf.input),
-        #                 (img.metadata.name, tf.output),
-        #                 transform=tf,
-        #             )
+                # add scale transformations from dataset as edges
+                transform = ds.coordinateTransformations
+                self._graph.add_edge(
+                    (img.metadata.name, ds.path),
+                    (img.metadata.name, ds.coordinateTransformations[0].output),
+                    transform=transform,
+                )
 
-        # # add scene-level transformations as edges between coordinate systems of different images
-        # for tf in self.transformations:
-        #     self._graph.add_edge(
-        #         (tf.input.path, tf.input.name),
-        #         (tf.output.path, tf.output.name),
-        #         transform=tf)
+            # add additional transformations from image metadata as edges
+            if img.metadata.coordinateTransformations:
+                for tf in img.metadata.coordinateTransformations:
+                    self._graph.add_edge(
+                        (img.metadata.name, tf.input),
+                        (img.metadata.name, tf.output),
+                        transform=tf,
+                    )
+
+        # add scene-level transformations as edges between coordinate systems of different images
+        for tf in self.coordinate_transformations:
+            self._graph.add_edge(
+                (tf.input.path, tf.input.name),
+                (tf.output.path, tf.output.name),
+                transform=tf)
 
     def to_ome_zarr(self, store: StoreLike, overwrite: bool = False):
         """
@@ -121,7 +124,7 @@ class NgffScene:
 
             # Write the image
             subgroup = zarr_group.create_group(img_name, overwrite=not overwrite)
-            img.to_ome_zarr(subgroup, overwrite=overwrite)
+            img.to_ome_zarr(subgroup, overwrite=overwrite, version="0.6.dev4")
             self._written_image_names.add(img_name)
 
         # Always update scene metadata
