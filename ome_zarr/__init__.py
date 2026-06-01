@@ -1,7 +1,7 @@
 from dask import __version__ as dask_version
 from packaging.version import Version
 
-from .classes import OMEZarrImage, OMEZarrLabels, OMEZarrMultiscale, NgffScene
+from .classes import NgffScene, OMEZarrImage, OMEZarrLabels, OMEZarrMultiscale
 
 # Expose __version__ and fallback when _version.py doesn't exist.
 try:
