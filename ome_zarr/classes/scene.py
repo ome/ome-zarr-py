@@ -3,8 +3,8 @@ import os
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any
-import networkx as nx
 
+import networkx as nx
 import zarr
 from ome_zarr_models.v06.coordinate_transforms import (
     AnyTransform,
@@ -42,7 +42,6 @@ class OMEZarrScene:
             coordinateSystems=self.coordinate_systems,
             coordinateTransformations=self.coordinate_transformations,
         )
-
 
     def _build_graph(self):
         self._graph = nx.DiGraph()
@@ -85,7 +84,8 @@ class OMEZarrScene:
             self._graph.add_edge(
                 (tf.input.path, tf.input.name),
                 (tf.output.path, tf.output.name),
-                transform=tf)
+                transform=tf,
+            )
 
     def to_ome_zarr(self, store: StoreLike, overwrite: bool = False):
         """
