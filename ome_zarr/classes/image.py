@@ -382,6 +382,14 @@ class OMEZarrMultiscaleBase:
             from ome_zarr_models.v04.multiscales import Multiscale as Multiscalev04
 
             metadata_json = cast(dict, group.attrs.get("multiscales", [None])[0])
+
+            if metadata_json is None:
+                raise ValueError(
+                    "Multiscales metadata not found in group attributes. "
+                    "Opening groups other than multiscales (i.e., HCS, Plates, Wells) "
+                    "is currently not supported."
+                )
+
             metadata = Multiscalev04.model_validate(metadata_json).to_version("0.5")
 
             if "image-label" in group.attrs:
@@ -392,6 +400,14 @@ class OMEZarrMultiscaleBase:
 
             ome_attrs = cast(dict[str, Any], group.attrs.get("ome", {}))
             metadata_json = ome_attrs.get("multiscales", [None])[0]
+
+            if metadata_json is None:
+                raise ValueError(
+                    "Multiscales metadata not found in group attributes. "
+                    "Opening groups other than multiscales (i.e., HCS, Plates, Wells) "
+                    "is currently not supported."
+                )
+
             metadata = Multiscalev05.model_validate(metadata_json)
 
             if "image-label" in ome_attrs:
