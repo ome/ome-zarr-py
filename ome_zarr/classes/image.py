@@ -671,7 +671,6 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
         # Write omero metadata
         if self._omero and isinstance(self._omero, Omero):
             omero_dict = _recursive_pop_nones(self._omero.model_dump(by_alias=True))
-            omero_dict["version"] = version
 
             if version == "0.4":
                 group.attrs["omero"] = omero_dict
@@ -679,6 +678,7 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
                 if "ome" not in group.attrs:
                     raise ValueError("OME-Zarr attributes not found in group")
                 ome = cast(dict, group.attrs["ome"])
+                omero_dict["version"] = version
                 ome["omero"] = omero_dict
                 group.attrs["ome"] = ome
 
