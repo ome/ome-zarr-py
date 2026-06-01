@@ -5,21 +5,21 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import zarr
-from ome_zarr_models._v06.coordinate_transforms import (
+from ome_zarr_models.v06.coordinate_transforms import (
     AnyTransform,
     CoordinateSystem,
 )
-from ome_zarr_models._v06.scene import SceneAttrs
+from ome_zarr_models.v06.scene import SceneAttrs
 from pydantic import TypeAdapter
 from zarr.storage import StoreLike
 
-from .image import NgffMultiscales
+from .image import OMEZarrMultiscale
 
 
 # the class exposed to the user
 @dataclass(kw_only=True)
 class NgffScene:
-    images: list[NgffMultiscales]
+    images: list[OMEZarrMultiscale]
     metadata: SceneAttrs = field(init=False, default=None)
     coordinate_transformations: Sequence[AnyTransform] | list[dict[str, Any]]
     coordinate_systems: Sequence[CoordinateSystem] | Sequence[dict[str, Any]] | None = (
@@ -121,7 +121,7 @@ class NgffScene:
 
             # Write the image
             subgroup = zarr_group.create_group(img_name, overwrite=not overwrite)
-            img.to_ome_zarr(subgroup)
+            img.to_ome_zarr(subgroup, overwrite=overwrite)
             self._written_image_names.add(img_name)
 
         # Always update scene metadata
@@ -150,8 +150,8 @@ class NgffScene:
         for img_name in zarr_group.group_keys():
             img_group = zarr_group[img_name]
             # Assume images have their own to_ome_zarr-like interface
-            # You may need to adapt based on your NgffMultiscales.from_ome_zarr implementation
-            img = NgffMultiscales.from_ome_zarr(img_group)
+            # You may need to adapt based on your OMEZarrMultiscale.from_ome_zarr implementation
+            img = OMEZarrMultiscale.from_ome_zarr(img_group)
             images.append(img)
 
         # Load scene metadata
