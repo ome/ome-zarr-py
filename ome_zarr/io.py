@@ -9,7 +9,8 @@ from urllib.parse import urljoin
 
 import dask.array as da
 import zarr
-from zarr.storage import FsspecStore, LocalStore, StoreLike
+from zarr.core.group import Group as ZarrGroup
+from zarr.storage import FsspecStore, LocalStore, StoreLike, ZipStore
 
 from .format import CurrentFormat, Format, detect_format
 from .types import JSONDict
@@ -43,17 +44,32 @@ class ZarrLocation:
             self.__path = path.path
         elif isinstance(path, LocalStore):
             self.__path = str(path.root)
+        elif isinstance(path, ZipStore):
+            self.__path = str(path.path)
+            self.__live_store = path
+        elif isinstance(path, ZarrGroup):
+            if isinstance(path.store, zarr.storage.ZipStore):
+                self.__live_store = path.store
+                self.internal_subpath = path.path
+                self.__path = f"{path.store.path}/{path.path}"
+            else:
+                self.__path = path.path
         else:
             raise TypeError(f"not expecting: {type(path)}")
 
         loader = fmt
         if loader is None:
             loader = CurrentFormat()
-        self.__store: FsspecStore = (
-            path
-            if isinstance(path, (FsspecStore, LocalStore))
-            else loader.init_store(self.__path, mode)
-        )
+        if isinstance(path, ZarrGroup):
+            self.__store = path.store
+        else:
+            self.__store = (
+                path
+                if isinstance(path, (FsspecStore, LocalStore, ZipStore))
+                else loader.init_store(self.__path, mode)
+            )
+
+
         self.__init_metadata()
         detected = detect_format(self.__metadata, loader)
         LOGGER.debug("ZarrLocation.__init__ %s detected: %s", path, detected)
@@ -76,12 +92,16 @@ class ZarrLocation:
         # If we want to *create* a new zarr v2 group, we need to specify
         # zarr_format. This is not needed for reading.
         zarr_format = None
+
+        # fix to be able to read zipstores
+        target_path = getattr(self, "internal_subpath", "/")
+
         try:
             # this group is used to get zgroup metadata
             # used for info, download, Spec.match() via root_attrs() etc.
             # and to check if the group exists for reading. Only need "r" mode for this.
             group = zarr.open_group(
-                store=self.__store, path="/", mode="r", zarr_format=zarr_format
+                store=self.__store, path=target_path, mode="r", zarr_format=zarr_format
             )
             self.zgroup = group.attrs.asdict()
             # For zarr v3, everything is under the "ome" namespace
@@ -142,7 +162,11 @@ class ZarrLocation:
 
     def load(self, subpath: str = "") -> da.core.Array:
         """Use dask.array.from_zarr to load the subpath."""
-        return da.from_zarr(self.__store, subpath)
+        # fix for zipstores
+        target_component = subpath
+        if getattr(self, "internal_subpath", "/").strip("/"):
+            target_component = f"{self.internal_subpath.strip('/')}/{subpath.lstrip('/')}"
+        return da.from_zarr(self.__store, target_component)
 
     def __eq__(self, rhs: object) -> bool:
         if type(self) is not type(rhs):
@@ -169,7 +193,17 @@ class ZarrLocation:
         """Create a new Zarr location for the given path."""
         subpath = self.subpath(path)
         LOGGER.debug("open(%s(%s))", self.__class__.__name__, subpath)
-        return self.__class__(subpath, mode=self.__mode, fmt=self.__fmt)
+
+        # fix for zipstore:
+        if getattr(self, "__live_store", None) is not None:
+            new_loc = self.__class__(path=self.__live_store, mode=self.__mode, fmt=self.__fmt)
+            current_sub = getattr(self, "internal_subpath", "/")
+            new_loc.internal_subpath = f"{current_sub.strip('/')}/{path.lstrip('/')}"
+            store_base = getattr(self.__live_store, "root", getattr(self.__live_store, "path", ""))
+            setattr(new_loc, "_ZarrLocation__path", f"{store_base}/{new_loc.internal_subpath}")
+            return new_loc
+
+        return self.__class__(path=subpath, mode=self.__mode, fmt=self.__fmt)
 
     def parts(self) -> list[str]:
         if self._isfile():
@@ -178,7 +212,10 @@ class ZarrLocation:
             return self.__path.split("/")
 
     def subpath(self, subpath: str = "") -> str:
-        if self._isfile():
+        if isinstance(self.__store, ZipStore):
+            base = self.__path.rstrip("/")
+            return f"{base}/{subpath}" if subpath else base
+        elif self._isfile():
             filename = Path(self.__path) / subpath
             filename = filename.resolve()
             return str(filename)
@@ -205,6 +242,9 @@ class ZarrLocation:
         Return whether the current underlying implementation
         points to a URL
         """
+        fs = getattr(self.__store, "fs", None)
+        if fs is None:
+            return False
         if isinstance(self.__store.fs.protocol, tuple):
             return any(proto in ["http", "https"] for proto in self.__store.fs.protocol)
         return self.__store.fs.protocol in ["http", "https"]
