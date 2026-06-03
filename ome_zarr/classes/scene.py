@@ -2,8 +2,8 @@
 import os
 from collections.abc import Sequence
 from typing import Any
-import transformnd as tnd
 
+import transformnd as tnd
 import zarr
 from ome_zarr_models.v06.coordinate_transforms import (
     AnyTransform,
@@ -18,18 +18,18 @@ from .image import OMEZarrMultiscale
 
 class OMEZarrScene:
     def __init__(
-            self,
-            images: list[OMEZarrMultiscale],
-            coordinate_transformations: Sequence[AnyTransform] | list[dict[str, Any]],
-            coordinate_systems: Sequence[CoordinateSystem] | Sequence[dict[str, Any]] | None = None
-            ):
+        self,
+        images: list[OMEZarrMultiscale],
+        coordinate_transformations: Sequence[AnyTransform] | list[dict[str, Any]],
+        coordinate_systems: (
+            Sequence[CoordinateSystem] | Sequence[dict[str, Any]] | None
+        ) = None,
+    ):
 
         self.images = images
 
         # parse coordinate systems and transforms
-        self.coordinate_systems = self._parse_coordinate_systems(
-            coordinate_systems
-        )
+        self.coordinate_systems = self._parse_coordinate_systems(coordinate_systems)
         self.coordinate_transformations = self._parse_transforms(
             coordinate_transformations
         )
@@ -42,11 +42,10 @@ class OMEZarrScene:
         self._build_graph()
         self._written_image_names = set()
 
-
     def _build_graph(self):
         self._graph = tnd.graph.TransformGraph()
 
-        for img in self.images:            
+        for img in self.images:
 
             # add additional transformations from image metadata as edges
             if img.metadata.coordinateTransformations:
@@ -60,7 +59,6 @@ class OMEZarrScene:
         # add scene-level transformations as edges between coordinate systems of different images
         for tf in self.coordinate_transformations:
             self._graph.add_transforms([_ozmp_tf_to_tnd(tf)])
-                
 
     def to_ome_zarr(self, store: StoreLike, overwrite: bool = False):
         """
@@ -160,7 +158,7 @@ class OMEZarrScene:
         scene = OMEZarrScene(
             images=images,
             coordinate_transformations=transformations,
-            coordinate_systems=coordinate_systems
+            coordinate_systems=coordinate_systems,
         )
 
         return scene
@@ -260,7 +258,7 @@ def _ozmp_tf_to_tnd(transform: AnyTransform) -> tnd.base.Transform:
         output_path = transform.output.path if transform.output.path is not None else ""
         tnd_transform.spaces = tnd.Spaces(
             f"{input_path}:{transform.input.name}",
-            f"{output_path}:{transform.output.name}"
-            )
-        
+            f"{output_path}:{transform.output.name}",
+        )
+
     return tnd_transform
