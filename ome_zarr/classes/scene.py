@@ -46,33 +46,16 @@ class OMEZarrScene:
     def _build_graph(self):
         self._graph = tnd.graph.TransformGraph()
 
-        # for img in self.images:
-        #     # add all coordinate systems as nodes
-        #     for cs in img.metadata.coordinateSystems:
-        #         node_id = (img.metadata.name, cs.name)
-        #         self._graph.add_node(node_id)
+        for img in self.images:            
 
-        #     for ds in img.metadata.datasets:
-        #         # add all datasets as nodes
-        #         node_id = (img.metadata.name, ds.path)
-        #         self._graph.add_node(node_id)
-
-        #         # add scale transformations from dataset as edges
-        #         transform = ds.coordinateTransformations
-        #         self._graph.add_edge(
-        #             (img.metadata.name, ds.path),
-        #             (img.metadata.name, ds.coordinateTransformations[0].output),
-        #             transform=transform,
-        #         )
-
-        #     # add additional transformations from image metadata as edges
-        #     if img.metadata.coordinateTransformations:
-        #         for tf in img.metadata.coordinateTransformations:
-        #             self._graph.add_edge(
-        #                 (img.metadata.name, tf.input),
-        #                 (img.metadata.name, tf.output),
-        #                 transform=tf,
-        #             )
+            # add additional transformations from image metadata as edges
+            if img.metadata.coordinateTransformations:
+                for tf in img.metadata.coordinateTransformations:
+                    self._graph.add_edge(
+                        (img.metadata.name, tf.input),
+                        (img.metadata.name, tf.output),
+                        transform=tf,
+                    )
 
         # add scene-level transformations as edges between coordinate systems of different images
         for tf in self.coordinate_transformations:
