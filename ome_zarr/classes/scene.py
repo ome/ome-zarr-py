@@ -1,9 +1,8 @@
 # the class for storage representation, not exposed to the user
 import os
 from collections.abc import Sequence
-from dataclasses import dataclass, field
 from typing import Any
-import networkx as nx
+import transformnd as tnd
 
 import zarr
 from ome_zarr_models.v06.coordinate_transforms import (
@@ -17,25 +16,22 @@ from zarr.storage import StoreLike
 from .image import OMEZarrMultiscale
 
 
-# the class exposed to the user
-@dataclass(kw_only=True)
 class OMEZarrScene:
-    images: list[OMEZarrMultiscale]
-    metadata: SceneAttrs = field(init=False, default=None)
-    coordinate_transformations: Sequence[AnyTransform] | list[dict[str, Any]]
-    coordinate_systems: Sequence[CoordinateSystem] | Sequence[dict[str, Any]] | None = (
-        None
-    )
-    _written_image_names: set[str] = field(default_factory=set, init=False)
+    def __init__(
+            self,
+            images: list[OMEZarrMultiscale],
+            coordinate_transformations: Sequence[AnyTransform] | list[dict[str, Any]],
+            coordinate_systems: Sequence[CoordinateSystem] | Sequence[dict[str, Any]] | None = None
+            ):
 
-    def __post_init__(self):
+        self.images = images
 
         # parse coordinate systems and transforms
         self.coordinate_systems = self._parse_coordinate_systems(
-            self.coordinate_systems
+            coordinate_systems
         )
         self.coordinate_transformations = self._parse_transforms(
-            self.coordinate_transformations
+            coordinate_transformations
         )
 
         self.metadata = SceneAttrs(
@@ -43,49 +39,45 @@ class OMEZarrScene:
             coordinateTransformations=self.coordinate_transformations,
         )
 
+        self._build_graph()
+        self._written_image_names = set()
+
 
     def _build_graph(self):
-        self._graph = nx.DiGraph()
+        self._graph = tnd.graph.TransformGraph()
 
-        if self.coordinate_systems is not None:
-            for cs in self.coordinate_systems:
-                if hasattr(cs, "path") and cs.path is None:
-                    self._graph.add_node((None, cs.name))
+        # for img in self.images:
+        #     # add all coordinate systems as nodes
+        #     for cs in img.metadata.coordinateSystems:
+        #         node_id = (img.metadata.name, cs.name)
+        #         self._graph.add_node(node_id)
 
-        for img in self.images:
-            # add all coordinate systems as nodes
-            for cs in img.metadata.coordinateSystems:
-                node_id = (img.metadata.name, cs.name)
-                self._graph.add_node(node_id)
+        #     for ds in img.metadata.datasets:
+        #         # add all datasets as nodes
+        #         node_id = (img.metadata.name, ds.path)
+        #         self._graph.add_node(node_id)
 
-            for ds in img.metadata.datasets:
-                # add all datasets as nodes
-                node_id = (img.metadata.name, ds.path)
-                self._graph.add_node(node_id)
+        #         # add scale transformations from dataset as edges
+        #         transform = ds.coordinateTransformations
+        #         self._graph.add_edge(
+        #             (img.metadata.name, ds.path),
+        #             (img.metadata.name, ds.coordinateTransformations[0].output),
+        #             transform=transform,
+        #         )
 
-                # add scale transformations from dataset as edges
-                transform = ds.coordinateTransformations
-                self._graph.add_edge(
-                    (img.metadata.name, ds.path),
-                    (img.metadata.name, ds.coordinateTransformations[0].output),
-                    transform=transform,
-                )
-
-            # add additional transformations from image metadata as edges
-            if img.metadata.coordinateTransformations:
-                for tf in img.metadata.coordinateTransformations:
-                    self._graph.add_edge(
-                        (img.metadata.name, tf.input),
-                        (img.metadata.name, tf.output),
-                        transform=tf,
-                    )
+        #     # add additional transformations from image metadata as edges
+        #     if img.metadata.coordinateTransformations:
+        #         for tf in img.metadata.coordinateTransformations:
+        #             self._graph.add_edge(
+        #                 (img.metadata.name, tf.input),
+        #                 (img.metadata.name, tf.output),
+        #                 transform=tf,
+        #             )
 
         # add scene-level transformations as edges between coordinate systems of different images
         for tf in self.coordinate_transformations:
-            self._graph.add_edge(
-                (tf.input.path, tf.input.name),
-                (tf.output.path, tf.output.name),
-                transform=tf)
+            self._graph.add_transforms([_ozmp_tf_to_tnd(tf)])
+                
 
     def to_ome_zarr(self, store: StoreLike, overwrite: bool = False):
         """
@@ -146,7 +138,11 @@ class OMEZarrScene:
         """
         tf_adapter = TypeAdapter(AnyTransform)
 
-        zarr_group = zarr.open(store, mode="r")
+        # Handle both StoreLike (string, dict, etc.) and zarr.Group objects
+        if isinstance(store, zarr.Group):
+            zarr_group = store
+        else:
+            zarr_group = zarr.open(store, mode="r")
 
         # Load all image subgroups
         images = []
@@ -178,28 +174,10 @@ class OMEZarrScene:
             coordinate_systems = None
 
         # Use object.__new__ to create instance without triggering __init__ and __setattr__
-        scene = object.__new__(cls)
-
-        # Set fields directly using object.__setattr__ to bypass custom __setattr__
-        object.__setattr__(scene, "images", images)
-        object.__setattr__(scene, "coordinate_transformations", tuple(transformations))
-        object.__setattr__(
-            scene,
-            "coordinate_systems",
-            tuple(coordinate_systems) if coordinate_systems else None,
-        )
-        object.__setattr__(
-            scene, "_written_image_names", {img.metadata.name for img in images}
-        )
-
-        # Now set metadata
-        object.__setattr__(
-            scene,
-            "metadata",
-            SceneAttrs(
-                coordinateSystems=scene.coordinate_systems,
-                coordinateTransformations=scene.coordinate_transformations,
-            ),
+        scene = OMEZarrScene(
+            images=images,
+            coordinate_transformations=transformations,
+            coordinate_systems=coordinate_systems
         )
 
         return scene
@@ -272,3 +250,34 @@ class OMEZarrScene:
                 parsed_coordinate_systems.append(cs)
 
         return tuple(parsed_coordinate_systems)
+
+
+def _ozmp_tf_to_tnd(transform: AnyTransform) -> tnd.base.Transform:
+    """
+    Convert an OME-Zarr coordinate transformation to a transformnd Transform object.
+    This is a placeholder function and will need to be implemented based on the specific types of transformations you expect to encounter in OME-Zarr metadata.
+    """
+    tnd_transform = None
+    # Example for an affine transformation (this will depend on the actual structure of AnyTransform)
+    if transform.type == "affine":
+        tnd_transform = tnd.transforms.Affine.from_linear_map(transform.affine)
+    elif transform.type == "scale":
+        tnd_transform = tnd.transforms.Scale(transform.scale)
+    elif transform.type == "translation":
+        tnd_transform = tnd.transforms.Translate(transform.translation)
+    elif transform.type == "rotation":
+        tnd_transform = tnd.transforms.Affine.from_linear_map(transform.rotation)
+    elif transform.type == "sequence":
+        sub_transformations = transform.transformations
+        tnd_sub_transforms = [_ozmp_tf_to_tnd(sub_tf) for sub_tf in sub_transformations]
+        tnd_transform = tnd.base.TransformSequence(tnd_sub_transforms)
+
+    if transform.input is not None and tnd_transform is not None:
+        input_path = transform.input.path if transform.input.path is not None else ""
+        output_path = transform.output.path if transform.output.path is not None else ""
+        tnd_transform.spaces = tnd.Spaces(
+            f"{input_path}:{transform.input.name}",
+            f"{output_path}:{transform.output.name}"
+            )
+        
+    return tnd_transform
