@@ -69,7 +69,6 @@ class ZarrLocation:
                 else loader.init_store(self.__path, mode)
             )
 
-
         self.__init_metadata()
         detected = detect_format(self.__metadata, loader)
         LOGGER.debug("ZarrLocation.__init__ %s detected: %s", path, detected)
@@ -165,7 +164,9 @@ class ZarrLocation:
         # fix for zipstores
         target_component = subpath
         if getattr(self, "internal_subpath", "/").strip("/"):
-            target_component = f"{self.internal_subpath.strip('/')}/{subpath.lstrip('/')}"
+            target_component = (
+                f"{self.internal_subpath.strip('/')}/{subpath.lstrip('/')}"
+            )
         return da.from_zarr(self.__store, target_component)
 
     def __eq__(self, rhs: object) -> bool:
@@ -193,15 +194,6 @@ class ZarrLocation:
         """Create a new Zarr location for the given path."""
         subpath = self.subpath(path)
         LOGGER.debug("open(%s(%s))", self.__class__.__name__, subpath)
-
-        # fix for zipstore:
-        if getattr(self, "__live_store", None) is not None:
-            new_loc = self.__class__(path=self.__live_store, mode=self.__mode, fmt=self.__fmt)
-            current_sub = getattr(self, "internal_subpath", "/")
-            new_loc.internal_subpath = f"{current_sub.strip('/')}/{path.lstrip('/')}"
-            store_base = getattr(self.__live_store, "root", getattr(self.__live_store, "path", ""))
-            setattr(new_loc, "_ZarrLocation__path", f"{store_base}/{new_loc.internal_subpath}")
-            return new_loc
 
         return self.__class__(path=subpath, mode=self.__mode, fmt=self.__fmt)
 
