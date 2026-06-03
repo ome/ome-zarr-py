@@ -2,8 +2,8 @@
 import os
 from collections.abc import Sequence
 from typing import Any
-import transformnd as tnd
 
+import transformnd as tnd
 import zarr
 from ome_zarr_models.v06.coordinate_transforms import (
     AnyTransform,
@@ -18,16 +18,18 @@ from .image import OMEZarrMultiscale
 
 class OMEZarrScene:
     def __init__(
-            self,
-            images: list[OMEZarrMultiscale] | dict[str, OMEZarrMultiscale],
-            coordinate_transformations: Sequence[AnyTransform] | list[dict[str, Any]],
-            coordinate_systems: Sequence[CoordinateSystem] | Sequence[dict[str, Any]] | None = None
-            ):
+        self,
+        images: list[OMEZarrMultiscale] | dict[str, OMEZarrMultiscale],
+        coordinate_transformations: Sequence[AnyTransform] | list[dict[str, Any]],
+        coordinate_systems: (
+            Sequence[CoordinateSystem] | Sequence[dict[str, Any]] | None
+        ) = None,
+    ):
         """
         Parameters
         ----------
         images : list[OMEZarrMultiscale] | dict[str, OMEZarrMultiscale]
-            Either a list of images (keyed internally by metadata.name) or a dict 
+            Either a list of images (keyed internally by metadata.name) or a dict
             mapping zarr group paths to images. The dict form gives explicit control
             over the paths where images will be stored in the zarr hierarchy.
         """
@@ -38,9 +40,7 @@ class OMEZarrScene:
             self.images = images
 
         # parse coordinate systems and transforms
-        self.coordinate_systems = self._parse_coordinate_systems(
-            coordinate_systems
-        )
+        self.coordinate_systems = self._parse_coordinate_systems(coordinate_systems)
         self.coordinate_transformations = self._parse_transforms(
             coordinate_transformations
         )
@@ -52,7 +52,6 @@ class OMEZarrScene:
 
         self._build_graph()
         self._written_image_names = set()
-
 
     def _build_graph(self):
         self._graph = tnd.graph.TransformGraph()
@@ -80,7 +79,6 @@ class OMEZarrScene:
                     for img_tf in img.metadata.coordinateTransformations:
                         ind_transform = _ozmp_tf_to_tnd(img_tf, zarr_context=subgroup)
                         self._graph.add_transforms([ind_transform])
-
 
     def to_ome_zarr(self, store: StoreLike, overwrite: bool = False):
         """
@@ -176,7 +174,7 @@ class OMEZarrScene:
         scene = OMEZarrScene(
             images=images,
             coordinate_transformations=transformations,
-            coordinate_systems=coordinate_systems
+            coordinate_systems=coordinate_systems,
         )
 
         return scene
@@ -251,7 +249,9 @@ class OMEZarrScene:
         return tuple(parsed_coordinate_systems)
 
 
-def _ozmp_tf_to_tnd(transform: AnyTransform, zarr_context: str ="") -> tnd.base.Transform:
+def _ozmp_tf_to_tnd(
+    transform: AnyTransform, zarr_context: str = ""
+) -> tnd.base.Transform:
     """
     Convert an OME-Zarr coordinate transformation to a transformnd Transform object.
     This is a placeholder function and will need to be implemented based on the specific types of transformations you expect to encounter in OME-Zarr metadata.
@@ -268,7 +268,9 @@ def _ozmp_tf_to_tnd(transform: AnyTransform, zarr_context: str ="") -> tnd.base.
         tnd_transform = tnd.transforms.Affine.from_linear_map(transform.rotation)
     elif transform.type == "sequence":
         sub_transformations = transform.transformations
-        tnd_sub_transforms = [_ozmp_tf_to_tnd(sub_tf, zarr_context) for sub_tf in sub_transformations]
+        tnd_sub_transforms = [
+            _ozmp_tf_to_tnd(sub_tf, zarr_context) for sub_tf in sub_transformations
+        ]
         tnd_transform = tnd.base.TransformSequence(tnd_sub_transforms)
 
     if transform.input is not None and tnd_transform is not None:
@@ -289,7 +291,7 @@ def _ozmp_tf_to_tnd(transform: AnyTransform, zarr_context: str ="") -> tnd.base.
 
         tnd_transform.spaces = tnd.Spaces(
             f"{input_path}:{transform.input.name}",
-            f"{output_path}:{transform.output.name}"
-            )
-        
+            f"{output_path}:{transform.output.name}",
+        )
+
     return tnd_transform
