@@ -779,7 +779,9 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
                     # 3 values and ignoring alpha
                     color = f"{color[0]:02x}{color[1]:02x}{color[2]:02x}"
             else:
-                color = DEFAULT_COLORS[i % len(DEFAULT_COLORS)].replace("#", "")
+                color = DEFAULT_COLORS[i % len(DEFAULT_COLORS)]
+
+            color = color.lstrip("#")  # Remove # if present
 
             dtype_max = self._images[0].data.dtype.itemsize * 255
             if contrast_limits is not None:
