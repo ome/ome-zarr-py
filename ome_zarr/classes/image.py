@@ -34,16 +34,16 @@ from ome_zarr.scale import Methods
 
 SPATIAL_DIMS = ["z", "y", "x"]
 DEFAULT_COLORS = [
-    "#00FFFF",  # cyan
-    "#FF00FF",  # magenta
-    "#FFFF00",  # yellow
-    "#FF0000",  # red
-    "#00FF00",  # green
-    "#0000FF",  # blue
-    "#FFFFFF",  # white
-    "#FFA500",  # orange
-    "#800080",  # purple
-    "#008000",  # dark green
+    "00FFFF",  # cyan
+    "FF00FF",  # magenta
+    "FFFF00",  # yellow
+    "FF0000",  # red
+    "00FF00",  # green
+    "0000FF",  # blue
+    "FFFFFF",  # white
+    "FFA500",  # orange
+    "800080",  # purple
+    "008000",  # dark green
 ]
 
 
