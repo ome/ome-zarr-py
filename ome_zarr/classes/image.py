@@ -21,7 +21,6 @@ from ome_zarr_models.v06.coordinate_transforms import (
     Identity,
     Scale,
     Translation,
-    Sequence as TransformSequence,
 )
 from ome_zarr_models.v06.coordinate_transforms import (
     Sequence as TransformSequence,
@@ -636,10 +635,12 @@ class OMEZarrMultiscaleBase:
             path = ds.get("path", f"s{idx}")
             if idx == 0:
                 transforms: tuple[Scale | Translation, ...] = (
-                    Scale(type="scale", scale=scale_level,
-                          input=CoordinateSystemIdentifier(path=path),
-                          output=CoordinateSystemIdentifier(name="physical")
-                          ),
+                    Scale(
+                        type="scale",
+                        scale=scale_level,
+                        input=CoordinateSystemIdentifier(path=path),
+                        output=CoordinateSystemIdentifier(name="physical"),
+                    ),
                 )
             else:
                 translate = [
@@ -653,7 +654,7 @@ class OMEZarrMultiscaleBase:
                             Translation(type="translation", translation=translate),
                         ),
                         input=CoordinateSystemIdentifier(path=path),
-                        output=CoordinateSystemIdentifier(name="physical")
+                        output=CoordinateSystemIdentifier(name="physical"),
                     ),
                 )
 
@@ -665,7 +666,11 @@ class OMEZarrMultiscaleBase:
             )
 
         metadata = MultiscaleV06(
-            coordinateSystems=tuple([cs,]),
+            coordinateSystems=tuple(
+                [
+                    cs,
+                ]
+            ),
             datasets=tuple(datasets),
             type=metadata_json.get("type", None),
             metadata=metadata_json.get("metadata", None),
