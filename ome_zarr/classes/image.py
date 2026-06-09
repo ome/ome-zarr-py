@@ -20,6 +20,8 @@ from ome_zarr_models.v06.coordinate_transforms import (
     CoordinateSystemIdentifier,
     Identity,
     Scale,
+    Translation,
+    Sequence as TransformSequence,
 )
 from ome_zarr_models.v06.coordinate_transforms import (
     Sequence as TransformSequence,
@@ -545,7 +547,7 @@ class OMEZarrMultiscaleBase:
             }
             if not axes_units:
                 axes_units = None
-            axes_names = [str(ax.name) for ax in metadata.axes if ax.name is not None]
+
             images.append(
                 OMEZarrImage(
                     data=data,
@@ -602,20 +604,15 @@ class OMEZarrMultiscaleBase:
     @staticmethod
     def _read_legacy_metadata(group, version: str) -> MultiscaleV05:
         """Read metadata from legacy OME-Zarr versions (0.1, 0.2, 0.3)."""
-        from ome_zarr_models.v05.axes import Axis as AxisV05
-        from ome_zarr_models.v05.coordinate_transformations import (
-            VectorScale,
-            VectorTranslation,
-        )
 
         metadata_json = cast(dict[str, Any], group.attrs.get("multiscales", [None])[0])
 
         axes_map = {
-            "t": AxisV05(name="t", type="time"),
-            "c": AxisV05(name="c", type="channel"),
-            "z": AxisV05(name="z", type="space"),
-            "y": AxisV05(name="y", type="space"),
-            "x": AxisV05(name="x", type="space"),
+            "t": Axis(name="t", type="time"),
+            "c": Axis(name="c", type="channel"),
+            "z": Axis(name="z", type="space"),
+            "y": Axis(name="y", type="space"),
+            "x": Axis(name="x", type="space"),
         }
 
         axes_order: list[str] = ["t", "c", "z", "y", "x"]
@@ -628,6 +625,7 @@ class OMEZarrMultiscaleBase:
             axes_order = cast(list[str], axes_order_value)
 
         axes = [axes_map[ax] for ax in axes_order]
+        cs = CoordinateSystem(axes=tuple(axes), name="physical")
 
         datasets = []
         for idx, ds in enumerate(metadata_json.get("datasets", [])):
@@ -635,9 +633,13 @@ class OMEZarrMultiscaleBase:
                 2.0 ** idx if s.name in ("z", "y", "x") else 1.0 for s in axes
             ]
 
+            path = ds.get("path", f"s{idx}")
             if idx == 0:
-                transforms: tuple[VectorScale | VectorTranslation, ...] = (
-                    VectorScale(type="scale", scale=scale_level),
+                transforms: tuple[Scale | Translation, ...] = (
+                    Scale(type="scale", scale=scale_level,
+                          input=CoordinateSystemIdentifier(path=path),
+                          output=CoordinateSystemIdentifier(name="physical")
+                          ),
                 )
             else:
                 translate = [
@@ -645,19 +647,25 @@ class OMEZarrMultiscaleBase:
                     for s in axes
                 ]
                 transforms = (
-                    VectorScale(type="scale", scale=scale_level),
-                    VectorTranslation(type="translation", translation=translate),
+                    TransformSequence(
+                        transformations=(
+                            Scale(type="scale", scale=scale_level),
+                            Translation(type="translation", translation=translate),
+                        ),
+                        input=CoordinateSystemIdentifier(path=path),
+                        output=CoordinateSystemIdentifier(name="physical")
+                    ),
                 )
 
             datasets.append(
                 Dataset(
-                    path=ds.get("path", f"s{idx}"),
+                    path=path,
                     coordinateTransformations=transforms,
                 )
             )
 
-        metadata = MultiscaleV05(
-            axes=axes,
+        metadata = MultiscaleV06(
+            coordinateSystems=tuple([cs,]),
             datasets=tuple(datasets),
             type=metadata_json.get("type", None),
             metadata=metadata_json.get("metadata", None),
