@@ -374,7 +374,7 @@ def write_multiscale(
         group,
         fmt=fmt,
         scale=scale,
-        axes=axes,
+        axes=[ax["name"] for ax in axes],
         axes_units=axes_units,
         coordinate_transformations=coordinate_transformations,
         storage_options=storage_options,
