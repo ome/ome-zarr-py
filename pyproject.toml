@@ -14,7 +14,7 @@ description="Implementation of images in Zarr files."
 license = "BSD-2-Clause"
 license-files = ["LICENSE"]
 
-requires-python = ">3.10"
+requires-python = ">3.11"
 
 dependencies = [
     "numpy",
