@@ -259,7 +259,9 @@ def _ozmp_tf_to_tnd(
     tnd_transform = None
     # Example for an affine transformation (this will depend on the actual structure of AnyTransform)
     if transform.type == "affine":
-        tnd_transform = tnd.transforms.Affine.from_linear_map(transform.affine)
+        tnd_transform = tnd.transforms.Affine(transform.affine)
+    elif transform.type == "mapAxis":
+        tnd_transform = tnd.transforms.MapAxis(list(transform.mapAxis))
     elif transform.type == "scale":
         tnd_transform = tnd.transforms.Scale(transform.scale)
     elif transform.type == "translation":
