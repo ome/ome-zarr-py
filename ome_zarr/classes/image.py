@@ -114,20 +114,17 @@ class OMEZarrImage:
             self.scale = dict.fromkeys(self.axes, 1.0)
 
         # validate and normalize scale dict
-        for d in self.scale:
-            if d not in self.axes:
+        if (scale_set := set(self.scale)) != (axes_set := set(self.axes)):
+            if diff := scale_set.difference(axes_set):
                 raise ValueError(
-                    f"Scale contains invalid axis: {d}. Valid axes are: {self.axes}"
+                    f"Scale contains invalid ax(i)(e)s: {diff}. Valid axes are: {axes_set}"
                 )
-
-        # warn about missing axes
-        for d in self.axes:
-            if d not in self.scale:
-                warnings.warn(
-                    f"Scale value not provided for axis '{d}'. "
-                    f"Using default scale of 1.0.",
-                    stacklevel=2,
-                )
+            
+            warnings.warn(
+                f"Scale value not provided for ax(i)(e)s '{axes_set.difference(scale_set)}'. "
+                f"Using default scale of 1.0.",
+                stacklevel=2,
+            )             
 
         # rebuild scale dict with defaults for missing axes
         self.scale = {d: self.scale.get(d, 1.0) for d in self.axes}
