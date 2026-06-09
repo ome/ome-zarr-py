@@ -36,16 +36,16 @@ from ome_zarr.scale import Methods
 
 SPATIAL_DIMS = ["z", "y", "x"]
 DEFAULT_COLORS = [
-    "#00FFFF",  # cyan
-    "#FF00FF",  # magenta
-    "#FFFF00",  # yellow
-    "#FF0000",  # red
-    "#00FF00",  # green
-    "#0000FF",  # blue
-    "#FFFFFF",  # white
-    "#FFA500",  # orange
-    "#800080",  # purple
-    "#008000",  # dark green
+    "00FFFF",  # cyan
+    "FF00FF",  # magenta
+    "FFFF00",  # yellow
+    "FF0000",  # red
+    "00FF00",  # green
+    "0000FF",  # blue
+    "FFFFFF",  # white
+    "FFA500",  # orange
+    "800080",  # purple
+    "008000",  # dark green
 ]
 
 
@@ -116,20 +116,17 @@ class OMEZarrImage:
             self.scale = dict.fromkeys(self.axes, 1.0)
 
         # validate and normalize scale dict
-        for d in self.scale:
-            if d not in self.axes:
+        if (scale_set := set(self.scale)) != (axes_set := set(self.axes)):
+            if diff := scale_set.difference(axes_set):
                 raise ValueError(
-                    f"Scale contains invalid axis: {d}. Valid axes are: {self.axes}"
+                    f"Scale contains invalid ax(i)(e)s: {diff}. Valid axes are: {axes_set}"
                 )
 
-        # warn about missing axes
-        for d in self.axes:
-            if d not in self.scale:
-                warnings.warn(
-                    f"Scale value not provided for axis '{d}'. "
-                    f"Using default scale of 1.0.",
-                    stacklevel=2,
-                )
+            warnings.warn(
+                f"Scale value not provided for ax(i)(e)s '{axes_set.difference(scale_set)}'. "
+                f"Using default scale of 1.0.",
+                stacklevel=2,
+            )
 
         # rebuild scale dict with defaults for missing axes
         self.scale = {d: self.scale.get(d, 1.0) for d in self.axes}
@@ -477,6 +474,13 @@ class OMEZarrMultiscaleBase:
             from ome_zarr_models.v04.multiscales import Multiscale as Multiscalev04
 
             metadata_json = cast(dict, group.attrs.get("multiscales", [None])[0])
+            if metadata_json is None:
+                raise ValueError(
+                    "Multiscales metadata not found in group attributes. "
+                    "Opening groups other than multiscales (i.e., HCS, Plates, Wells) "
+                    "is currently not supported."
+                )
+
             metadata = Multiscalev04.model_validate(metadata_json).to_version("0.6")
 
             if "image-label" in group.attrs:
@@ -487,6 +491,14 @@ class OMEZarrMultiscaleBase:
 
             ome_attrs = cast(dict[str, Any], group.attrs.get("ome", {}))
             metadata_json = ome_attrs.get("multiscales", [None])[0]
+
+            if metadata_json is None:
+                raise ValueError(
+                    "Multiscales metadata not found in group attributes. "
+                    "Opening groups other than multiscales (i.e., HCS, Plates, Wells) "
+                    "is currently not supported."
+                )
+
             metadata = Multiscalev05.model_validate(metadata_json).to_version("0.6")
 
             if "image-label" in ome_attrs:
@@ -497,6 +509,14 @@ class OMEZarrMultiscaleBase:
 
             ome_attrs = cast(dict[str, Any], group.attrs.get("ome", {}))
             metadata_json = ome_attrs.get("multiscales", [None])[0]
+
+            if metadata_json is None:
+                raise ValueError(
+                    "Multiscales metadata not found in group attributes. "
+                    "Opening groups other than multiscales (i.e., HCS, Plates, Wells) "
+                    "is currently not supported."
+                )
+
             metadata = Multiscalev06.model_validate(metadata_json)
 
             if "image-label" in ome_attrs:
@@ -696,7 +716,7 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
     channel_colors : list[list[int]] | list[str] | None
         List of colors for each channel corresponding to the 'c' axis.
         Can be passed as a list of RGB values (i.e., [[255, 0, 0], [0, 255, 0], ...])
-        or as hex strings (i.e., ['#FF0000', '#00FF00', '#0000FF']).
+        or as hex strings (i.e., ['FF0000', '00FF00', '0000FF']).
         Default is None (no channel colors).
     contrast_limits : list[tuple[float, float]] | None
         List of contrast limits for each channel corresponding to the 'c' axis,
@@ -777,7 +797,6 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
         # Write omero metadata
         if self._omero and isinstance(self._omero, Omero):
             omero_dict = _recursive_pop_nones(self._omero.model_dump(by_alias=True))
-            omero_dict["version"] = version
 
             if version == "0.4":
                 group.attrs["omero"] = omero_dict
@@ -785,6 +804,7 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
                 if "ome" not in group.attrs:
                     raise ValueError("OME-Zarr attributes not found in group")
                 ome = cast(dict, group.attrs["ome"])
+                omero_dict["version"] = version
                 ome["omero"] = omero_dict
                 group.attrs["ome"] = ome
 
@@ -840,29 +860,19 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
         Build omero metadata from channel parameters.
         """
         if "c" not in self._images[0].axes:
-            return
+            n_channels = 1
+        else:
+            # Make default values and then replace with provided values
+            channel_axis = self._images[0].axes.index("c")
+            n_channels = self._images[0].data.shape[channel_axis]
 
-        # Validate that channel_names, channel_colors and
-        # contrast_limits are lists of the same length if provided
-        if channel_names is not None and channel_colors is not None:
-            if len(channel_names) != len(channel_colors):
+        # Make sure that all channel descriptors line up with the data dimensions
+        for param in [channel_names, channel_colors, contrast_limits]:
+            if param is not None and len(param) != n_channels:
                 raise ValueError(
-                    f"Length of channel_names ({len(channel_names)}) "
-                    f"does not match length of channel_colors "
-                    f"({len(channel_colors)})"
+                    f"Length of {param} ({len(param)}) does not match "
+                    f"number of channels ({n_channels})"
                 )
-            if contrast_limits is not None and len(channel_names) != len(
-                contrast_limits
-            ):
-                raise ValueError(
-                    f"Length of channel_names ({len(channel_names)}) "
-                    f"does not match length of contrast_limits "
-                    f"({len(contrast_limits)})"
-                )
-
-        # Make default values and then replace with provided values
-        channel_axis = self._images[0].axes.index("c")
-        n_channels = self._images[0].data.shape[channel_axis]
 
         channel_metadata = []
         for i in range(n_channels):
@@ -877,9 +887,11 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
                 if isinstance(color, (list, tuple)):
                     # Convert RGB/RGBA to hex, taking first
                     # 3 values and ignoring alpha
-                    color = f"#{color[0]:02x}{color[1]:02x}{color[2]:02x}"
+                    color = f"{color[0]:02x}{color[1]:02x}{color[2]:02x}"
             else:
                 color = DEFAULT_COLORS[i % len(DEFAULT_COLORS)]
+
+            color = color.lstrip("#")  # Remove # if present
 
             dtype_max = self._images[0].data.dtype.itemsize * 255
             if contrast_limits is not None:
@@ -893,6 +905,7 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
             channel_metadata.append(
                 {
                     "label": name,
+                    "active": True,
                     "color": color,
                     "window": {
                         "min": 0,

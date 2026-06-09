@@ -49,7 +49,6 @@ ome_zarr = "ome_zarr.cli:main"
 [dependency-groups]
 tests = [
     "pytest",
-    "ome-zarr-models"
 ]
 
 [project.urls]
