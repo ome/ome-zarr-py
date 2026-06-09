@@ -26,7 +26,7 @@ dependencies = [
     "scikit-image>=0.19.0",
     "toolz",
     "rangehttpserver",
-    git+"https://hithub.com/ome-zarr-models/ome-zarr-models-py.git",
+    "git+https://github.com/ome-zarr-models/ome-zarr-models-py.git@main",
     "Deprecated",
 ]
 classifiers = [

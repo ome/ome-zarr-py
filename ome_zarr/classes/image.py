@@ -8,7 +8,7 @@ from typing import Any, Literal, cast
 import dask.array as da
 import numpy as np
 import zarr
-from ome_zarr_models._v06.coordinate_transforms import (
+from ome_zarr_models.v06.coordinate_transforms import (
     AnyTransform,
     Axis,
     CoordinateSystem,
@@ -16,13 +16,13 @@ from ome_zarr_models._v06.coordinate_transforms import (
     Identity,
     Scale,
 )
-from ome_zarr_models._v06.coordinate_transforms import (
+from ome_zarr_models.v06.coordinate_transforms import (
     Sequence as TransformSequence,
 )
-from ome_zarr_models._v06.multiscales import (
+from ome_zarr_models.v06.multiscales import (
     Dataset,
 )
-from ome_zarr_models._v06.multiscales import (
+from ome_zarr_models.v06.multiscales import (
     Multiscale as MultiscaleV06,
 )
 from ome_zarr_models.common.image_label_types import LabelBase as Label
