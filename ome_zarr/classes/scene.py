@@ -53,6 +53,37 @@ class OMEZarrScene:
         self._build_graph()
         self._written_image_names = set()
 
+    def get_coordinate_system(self, name: str, path: str | None = None) -> CoordinateSystem | None:
+        """
+        Retrieve a coordinate system by name and optional path.
+
+        Parameters
+        ----------
+        name: str
+            The name of the coordinate system to retrieve.
+        path: str | None
+            Optional path to disambiguate coordinate systems with the same name. If None, will return the first match with the given name.
+
+        Returns
+        -------
+        CoordinateSystem or None
+            The matching CoordinateSystem object, or None if no match is found.
+        """
+        if path is None:
+            # coordinate system can only be in top-level
+            possible_coordinate_systems = self.coordinate_systems or []
+
+            return next((cs for cs in possible_coordinate_systems if cs.name == name), None)
+
+        possible_coordinate_systems = []
+        for group in self.images.keys():
+            if group == path:
+                img = self.images[group]
+                for cs in img.metadata.coordinateSystems:
+                    if cs.name == name:
+                        return cs
+        return None
+
     def _build_graph(self):
         self._graph = tnd.graph.TransformGraph()
         # Add scene-level transformations (empty context = root level)
