@@ -1,5 +1,5 @@
-OMEZarrImage (``ome_zarr.classes``)
-===================================
+OMEZarr classes (``ome_zarr.classes``)
+======================================
 
 .. autoclass:: ome_zarr.classes.image.OMEZarrImage
    :members:
