@@ -182,6 +182,11 @@ class OMEZarrMultiscaleBase:
                 }
             )
 
+        translations = [
+            {d: (scale[d] / 2) - (scales[0][d] / 2) for d in image.axes}
+            for scale in scales
+        ]
+
         # Create Image instances for each pyramid level
         images = []
         datasets = []
@@ -203,6 +208,10 @@ class OMEZarrMultiscaleBase:
                         Scale(
                             type="scale",
                             scale=list(level_scale.values()),
+                        ),
+                        Translation(
+                            type="translation",
+                            translation=list(translations[idx].values()),
                         ),
                     ),
                 )
