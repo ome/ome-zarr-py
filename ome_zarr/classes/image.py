@@ -176,7 +176,9 @@ class OMEZarrMultiscaleBase:
         scales = []
         # image.scale is guaranteed to be a dict after NgffImage.__post_init__
         image_scale = image.scale
-        assert isinstance(image_scale, dict)
+        if not isinstance(image_scale, dict):
+            raise ValueError("Expected image.scale to be a dict after initialization")
+
         for shape in [d.shape for d in pyramid]:
             scale = [full / level for full, level in zip(image.data.shape, shape)]
             scales.append(
@@ -742,6 +744,10 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
         List of images at each pyramid level.
     labels : dict[str, OMEZarrLabels] | None
         Dictionary mapping label names to OMEZarrLabels instances, or None if no labels are associated.
+    metadata : ome_zarr_models.v05.multiscales.Multiscale
+        The OME-Zarr metadata associated with this multiscale image,
+        stored as a Pydantic model instance.
+        Automatically created upon instantiation of the class.
 
     Methods
     -------
@@ -1059,7 +1065,10 @@ class OMEZarrLabels(OMEZarrMultiscaleBase):
         List of label images at each pyramid level.
     image_label : Label | None
         Optional image-label metadata for rendering label images, or None if not provided.
-
+    metadata : ome_zarr_models.v05.multiscales.Multiscale
+        The OME-Zarr metadata associated with this multiscale image,
+        stored as a Pydantic model instance.
+        Automatically created upon instantiation of the class.
     """
 
     _image_label: Label | None
