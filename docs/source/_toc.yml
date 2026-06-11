@@ -16,6 +16,12 @@ parts:
 
   - caption: Advanced
     chapters:
+    - file: advanced/labels/index
+      sections:
+      - file: advanced/labels/adding_labels
+      - file: advanced/labels/labels_metadata
+      - file: advanced/create_scenes
+
     - file: advanced/sharding
     - file: advanced/build_custom_pyramid
     - file: advanced/write_hcs_plate
@@ -30,6 +36,7 @@ parts:
     chapters:
     - file: api
       sections:
+      - file: api/image
       - file: api/writer
       - file: api/reader
       - file: api/io
