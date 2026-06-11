@@ -170,7 +170,9 @@ class OMEZarrMultiscaleBase:
         scales = []
         # image.scale is guaranteed to be a dict after NgffImage.__post_init__
         image_scale = image.scale
-        assert isinstance(image_scale, dict)
+        if not isinstance(image_scale, dict):
+            raise ValueError("Expected image.scale to be a dict after initialization")
+
         for shape in [d.shape for d in pyramid]:
             scale = [full / level for full, level in zip(image.data.shape, shape)]
             scales.append(
