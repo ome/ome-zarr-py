@@ -298,7 +298,7 @@ class TestWriter:
             cts = node_metadata["multiscales"][0]["datasets"][level][
                 "coordinateTransformations"
             ]
-            assert len(cts) == 1
+            assert len(cts) == 2
             transf = cts[0]
             assert transf["type"] == "scale"
             for d in axes:
@@ -358,11 +358,17 @@ class TestWriter:
                 axes_units[ax] = "micrometer"
 
         transformations = []
+        scale0 = TRANSFORMATIONS[0][0]["scale"][-len(shape) :]
         for dataset_transfs in TRANSFORMATIONS:
             transf = dataset_transfs[0]
             # e.g. slice [1, 1, z, x, y] -> [z, x, y] for 3D
+            sc = transf["scale"][-len(shape) :]
+            tl = [s / 2 - s0 / 2 for s, s0 in zip(sc, scale0)]
             transformations.append(
-                [{"type": "scale", "scale": transf["scale"][-len(shape) :]}]
+                [
+                    {"type": "scale", "scale": sc},
+                    {"type": "translation", "translation": tl},
+                ]
             )
 
         storage_options = _make_storage_options(fmt, shape, axes)
@@ -572,7 +578,7 @@ class TestWriter:
             for d in node_metadata["multiscales"][0]["datasets"]
         ]
         for level, transfs in enumerate(cts):
-            assert len(transfs) == 1
+            assert len(transfs) == 2
             assert transfs[0]["type"] == "scale"
             assert len(transfs[0]["scale"]) == len(shape)
 
@@ -673,7 +679,7 @@ class TestWriter:
             for d in node_metadata["multiscales"][0]["datasets"]
         ]
         for level, transfs in enumerate(cts):
-            assert len(transfs) == 1
+            assert len(transfs) == 2
             assert transfs[0]["type"] == "scale"
             assert len(transfs[0]["scale"]) == len(shape)
 
@@ -1747,7 +1753,7 @@ class TestLabelWriter:
 
         axes = list(scale.keys())
         for level, transfs in enumerate(cts):
-            assert len(transfs) == 1
+            assert len(transfs) == 2
             assert transfs[0]["type"] == "scale"
             assert len(transfs[0]["scale"]) == len(shape)
 
@@ -1973,11 +1979,17 @@ class TestLabelWriter:
             group = self.root
         axes = "tczyx"[-len(shape) :]
         transformations = []
+        scale0 = TRANSFORMATIONS[0][0]["scale"][-len(shape) :]
         for dataset_transfs in TRANSFORMATIONS:
             transf = dataset_transfs[0]
             # e.g. slice [1, 1, z, x, y] -> [z, x, y] for 3D
+            scale = transf["scale"][-len(shape) :]
+            trans = [s / 2 - s0 / 2 for s, s0 in zip(scale, scale0)]
             transformations.append(
-                [{"type": "scale", "scale": transf["scale"][-len(shape) :]}]
+                [
+                    {"type": "scale", "scale": scale},
+                    {"type": "translation", "translation": trans},
+                ]
             )
 
         # create the actual label data
@@ -2037,10 +2049,16 @@ class TestLabelWriter:
             group = self.root
         axes = "tczyx"[-len(shape) :]
         transformations = []
+        scale0 = TRANSFORMATIONS[0][0]["scale"][-len(shape) :]
         for dataset_transfs in TRANSFORMATIONS:
             transf = dataset_transfs[0]
+            scale = transf["scale"][-len(shape) :]
+            trans = [s / 2 - s0 / 2 for s, s0 in zip(scale, scale0)]
             transformations.append(
-                [{"type": "scale", "scale": transf["scale"][-len(shape) :]}]
+                [
+                    {"type": "scale", "scale": scale},
+                    {"type": "translation", "translation": trans},
+                ]
             )
 
         label_data = np.random.randint(0, 1000, size=shape)
@@ -2163,9 +2181,17 @@ class TestLabelWriter:
             group = self.root
         axes = "tczyx"
         transformations = []
+        scale0 = TRANSFORMATIONS[0][0]["scale"]
         for dataset_transfs in TRANSFORMATIONS:
             transf = dataset_transfs[0]
-            transformations.append([{"type": "scale", "scale": transf["scale"]}])
+            scale = transf["scale"]
+            trans = [s / 2 - s0 / 2 for s, s0 in zip(scale, scale0)]
+            transformations.append(
+                [
+                    {"type": "scale", "scale": scale},
+                    {"type": "translation", "translation": trans},
+                ]
+            )
 
         # create the root level image data
         shape = (1, 2, 1, 256, 256)
