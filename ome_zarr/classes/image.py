@@ -220,24 +220,20 @@ class OMEZarrMultiscaleBase:
                     name=image.name,
                 )
             )
-            datasets.append(
-                Dataset(
-                    path=f"s{idx}",
-                    coordinateTransformations=(
-                        Scale(
-                            type="scale",
-                            scale=tuple(level_scale.values()),
-                            input=CoordinateSystemIdentifier(path=f"s{idx}"),
-                            output=CoordinateSystemIdentifier(
-                                name=self.default_coordinate_system_name
-                            ),
-                        ),
-                        Translation(
-                            type="translation",
-                            translation=list(translations[idx].values()),
-                        ),
+
+            transforms = TransformSequence(
+                transformations=(
+                    Scale(type="scale", scale=tuple(level_scale.values())),
+                    Translation(
+                        type="translation",
+                        translation=tuple(translations[idx].values()),
                     ),
-                )
+                ),
+                input=CoordinateSystemIdentifier(path=f"s{idx}"),
+                output=CoordinateSystemIdentifier(name=default_coordinate_system_name),
+            )
+            datasets.append(
+                Dataset(path=f"s{idx}", coordinateTransformations=(transforms,)),
             )
 
         self._images = images
@@ -291,10 +287,10 @@ class OMEZarrMultiscaleBase:
                     )
 
                 # now check that either input or output name matches the default coordinate system name
-                if (
-                    tf.input.name != self.default_coordinate_system_name
-                    and tf.output.name != self.default_coordinate_system_name
-                ):
+                if default_coordinate_system_name not in {
+                    tf.input.name,
+                    tf.output.name,
+                }:
                     raise ValueError(
                         f"Coordinate transformation at index {idx} must have either "
                         f"input or output coordinate system name matching the default "
@@ -302,7 +298,7 @@ class OMEZarrMultiscaleBase:
                     )
 
         self.metadata = MultiscaleV06(
-            coordinateSystems=tuple([coordinate_system]),
+            coordinateSystems=(coordinate_system,),
             datasets=tuple(datasets),
             name=image.name,
             coordinateTransformations=transforms,
@@ -341,7 +337,7 @@ class OMEZarrMultiscaleBase:
                 shutil.rmtree(group)
 
             fmt: Format | None = None
-            if version == "0.5" or version == "0.6":
+            if version in {"0.5", "0.6", "0.6.dev4"}:
                 fmt = FormatV05()
             elif version == "0.4":
                 fmt = FormatV04()
@@ -629,7 +625,7 @@ class OMEZarrMultiscaleBase:
     def _write_additional_meta_data(
         self,
         group: zarr.Group,
-        version: Literal["0.5", "0.4"] = "0.5",
+        version: Literal["0.6.dev4", "0.5", "0.4"] = "0.5",
         storage_options: list[dict[str, Any]] | dict[str, Any] | None = None,
         compute: bool = True,
         overwrite: bool = False,
@@ -711,11 +707,7 @@ class OMEZarrMultiscaleBase:
             )
 
         metadata = MultiscaleV06(
-            coordinateSystems=tuple(
-                [
-                    cs,
-                ]
-            ),
+            coordinateSystems=(cs,),
             datasets=tuple(datasets),
             type=metadata_json.get("type", None),
             metadata=metadata_json.get("metadata", None),
@@ -847,7 +839,7 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
     def _write_additional_meta_data(
         self,
         group: zarr.Group,
-        version: Literal["0.5", "0.4"] = "0.5",
+        version: Literal["0.6.dev4", "0.5", "0.4"] = "0.5",
         storage_options: list[dict[str, Any]] | dict[str, Any] | None = None,
         compute: bool = True,
         overwrite: bool = False,
@@ -1168,7 +1160,7 @@ class OMEZarrLabels(OMEZarrMultiscaleBase):
     def _write_additional_meta_data(
         self,
         group: zarr.Group,
-        version: Literal["0.5", "0.4"] = "0.5",
+        version: Literal["0.6.dev4", "0.5", "0.4"] = "0.5",
         storage_options: list[dict[str, Any]] | dict[str, Any] | None = None,
         compute: bool = True,
         overwrite: bool = False,
