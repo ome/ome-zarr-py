@@ -138,6 +138,28 @@ class OMEZarrMultiscaleBase:
 
     name: str
 
+    @staticmethod
+    def _make_dataset(
+        path: str,
+        scale_transform: Any,
+        translation_transform: Any | None = None,
+    ) -> Dataset:
+        transforms = (
+            (scale_transform,)
+            if translation_transform is None
+            else (scale_transform, translation_transform)
+        )
+        try:
+            return Dataset(path=path, coordinateTransformations=transforms)
+        except ValidationError as exc:
+            if translation_transform is not None and any(
+                err.get("loc") == ("coordinateTransformations",)
+                and err.get("type") == "too_long"
+                for err in exc.errors()
+            ):
+                return Dataset(path=path, coordinateTransformations=(scale_transform,))
+            raise
+
     def __init__(
         self,
         image: OMEZarrImage,
@@ -202,17 +224,15 @@ class OMEZarrMultiscaleBase:
                 )
             )
             datasets.append(
-                Dataset(
+                self._make_dataset(
                     path=f"s{idx}",
-                    coordinateTransformations=(
-                        Scale(
-                            type="scale",
-                            scale=list(level_scale.values()),
-                        ),
-                        Translation(
-                            type="translation",
-                            translation=list(translations[idx].values()),
-                        ),
+                    scale_transform=Scale(
+                        type="scale",
+                        scale=list(level_scale.values()),
+                    ),
+                    translation_transform=Translation(
+                        type="translation",
+                        translation=list(translations[idx].values()),
                     ),
                 )
             )
@@ -534,25 +554,26 @@ class OMEZarrMultiscaleBase:
             ]
 
             if idx == 0:
-                transforms: tuple[VectorScale | VectorTranslation, ...] = (
-                    VectorScale(type="scale", scale=scale_level),
+                datasets.append(
+                    OMEZarrMultiscaleBase._make_dataset(
+                        path=ds.get("path", f"s{idx}"),
+                        scale_transform=VectorScale(type="scale", scale=scale_level),
+                    )
                 )
             else:
                 translate = [
                     2.0 ** (idx - 1) - 0.5 if s.name in ("z", "y", "x") else 0.0
                     for s in axes
                 ]
-                transforms = (
-                    VectorScale(type="scale", scale=scale_level),
-                    VectorTranslation(type="translation", translation=translate),
+                datasets.append(
+                    OMEZarrMultiscaleBase._make_dataset(
+                        path=ds.get("path", f"s{idx}"),
+                        scale_transform=VectorScale(type="scale", scale=scale_level),
+                        translation_transform=VectorTranslation(
+                            type="translation", translation=translate
+                        ),
+                    )
                 )
-
-            datasets.append(
-                Dataset(
-                    path=ds.get("path", f"s{idx}"),
-                    coordinateTransformations=transforms,
-                )
-            )
 
         metadata = MultiscaleV05(
             axes=axes,

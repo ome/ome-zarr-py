@@ -26,6 +26,7 @@ from ome_zarr import (
     OMEZarrLabels,
     OMEZarrMultiscale,
 )
+from ome_zarr.classes.image import OMEZarrMultiscaleBase
 from ome_zarr.format import (
     CurrentFormat,
     FormatV03,
@@ -92,6 +93,28 @@ def _make_storage_options(fmt, shape, axes):
         "order": "C",
     }
     return {k: v for k, v in options.items() if v is not None}
+
+
+def test_make_dataset_falls_back_to_scale_only_on_tuple_length_validation_error(
+    monkeypatch,
+):
+    from pydantic import BaseModel
+
+    from ome_zarr.classes import image as image_module
+
+    class StrictDataset(BaseModel):
+        path: str
+        coordinateTransformations: tuple[dict[str, Any]]
+
+    monkeypatch.setattr(image_module, "Dataset", StrictDataset)
+    dataset = OMEZarrMultiscaleBase._make_dataset(
+        path="s0",
+        scale_transform={"type": "scale", "scale": [1.0, 1.0]},
+        translation_transform={"type": "translation", "translation": [0.0, 0.0]},
+    )
+
+    assert len(dataset.coordinateTransformations) == 1
+    assert dataset.coordinateTransformations[0]["type"] == "scale"
 
 
 class TestWriter:
