@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import warnings
 from collections.abc import Sequence
-from dataclasses import InitVar, dataclass, field
-from typing import Any, cast
+from dataclasses import dataclass
+from typing import Any, Literal, cast
 
 import dask.array as da
 import numpy as np
@@ -120,7 +120,7 @@ class OMEZarrImage:
         if (scale_set := set(self.scale)) != (axes_set := set(self.axes)):
             if diff := scale_set.difference(axes_set):
                 raise ValueError(
-                    f"Scale contains invalid axis: {d}. Valid axes are: {self.axes}"
+                    f"Scale contains invalid ax(i)(e)s: {diff}. Valid axes are: {axes_set}"
                 )
 
             warnings.warn(
@@ -136,21 +136,6 @@ class OMEZarrImage:
         if not isinstance(self.data, da.Array):
             self.data = da.from_array(self.data)
 
-    # InitVars for parameters passed by the user
-    image: InitVar[NgffImage]
-    scale_factors: InitVar[
-        list[int] | tuple[int, ...] | list[dict[str, int]] | None
-    ] = None
-    method: str | Methods | None = Methods.RESIZE
-    coordinateTransformations: InitVar[
-        tuple[AnyTransform, ...] | list[dict[str, Any]] | None
-    ] = None
-    labels: (
-        NgffMultiscales | list[NgffMultiscales] | dict[str, NgffMultiscales] | None
-    ) = None
-    omero: dict[str, Any] | Omero | None = None
-    image_label: dict[str, Any] | Label | None = None
-    default_coordinate_system_name: str = "physical"
 
 class OMEZarrMultiscaleBase:
 
@@ -158,8 +143,8 @@ class OMEZarrMultiscaleBase:
 
     def __init__(
         self,
-        image: NgffImage,
-        scale_factors: list[int] | tuple[int, ...] | list[dict[str, int]] | None,
+        image: OMEZarrImage,
+        scale_factors: list[int] | tuple[int, ...] | list[dict[str, int]] | None = None,
         coordinateTransformations: (
             tuple[AnyTransform, ...] | list[dict[str, Any]] | None
         ) = None,
@@ -314,7 +299,7 @@ class OMEZarrMultiscaleBase:
                     raise ValueError(
                         f"Coordinate transformation at index {idx} must have either "
                         f"input or output coordinate system name matching the default "
-                        f"coordinate system name '{self.default_coordinate_system_name}': {tf}"
+                        f"coordinate system name '{default_coordinate_system_name}': {tf}"
                     )
 
                 cs_names = [
@@ -340,7 +325,7 @@ class OMEZarrMultiscaleBase:
         self,
         group: zarr.Group | str,
         storage_options: list[dict[str, Any]] | dict[str, Any] | None = None,
-        version: str | None = "0.6",
+        version: Literal["0.6.dev4", "0.5", "0.4"] = "0.6.dev4",
         compute: bool = True,
         overwrite: bool = False,
     ) -> list:
@@ -384,16 +369,10 @@ class OMEZarrMultiscaleBase:
                 for img in self.images
             ]
 
-            default_cs = [
-                next(
-                    cs
-                    for cs in self.metadata.coordinateSystems
-                    if cs.name == self.default_coordinate_system_name
-                )
-            ][0]
+            default_cs = self.metadata.intrinsic_coordinate_system
 
             # write the actual image to disk
-            delayed = _write_pyramid_to_zarr(
+            delayed += _write_pyramid_to_zarr(
                 pyramid=pyramid,
                 group=group,
                 fmt=fmt,
@@ -441,17 +420,13 @@ class OMEZarrMultiscaleBase:
 
                 group.attrs["ome"] = metadata_dict
 
-            elif version == "0.6":
+            elif version == "0.6.dev4":
                 metadata_dict = {
                     "version": version,
                     "multiscales": [
                         _recursive_pop_nones(write_metadata.model_dump(by_alias=True))
                     ],
                 }
-                if self.omero and isinstance(self.omero, Omero):
-                    omero_dict = self.omero.model_dump(by_alias=True)
-                    omero_dict["version"] = version
-                    metadata_dict["omero"] = omero_dict
 
         delayed += self._write_additional_meta_data(
             group=group,
@@ -507,7 +482,6 @@ class OMEZarrMultiscaleBase:
             from ome_zarr_models.v04.multiscales import Multiscale as Multiscalev04
 
             metadata_json = cast(dict, group.attrs.get("multiscales", [None])[0])
-
             if metadata_json is None:
                 raise ValueError(
                     "Multiscales metadata not found in group attributes. "
@@ -515,10 +489,10 @@ class OMEZarrMultiscaleBase:
                     "is currently not supported."
                 )
 
-            metadata = Multiscalev04.model_validate(metadata_json).to_version("0.5")
+            metadata = Multiscalev04.model_validate(metadata_json).to_version("0.6")
 
             if "image-label" in group.attrs:
-                image_label_dict = group.attrs.get("image-label", None)
+                is_label = True
 
         elif version == "0.5":
             from ome_zarr_models.v05.multiscales import Multiscale as Multiscalev05
@@ -533,30 +507,27 @@ class OMEZarrMultiscaleBase:
                     "is currently not supported."
                 )
 
-            metadata = Multiscalev05.model_validate(metadata_json)
+            metadata = Multiscalev05.model_validate(metadata_json).to_version("0.6")
 
-            if "labels" in group:
-                labels_ome_attrs = group["labels"].attrs.get("ome", {})
-                list_of_labels = labels_ome_attrs.get("labels", [])
-            if "omero" in ome_attrs:
-                omero_dict = ome_attrs.get("omero", None)
             if "image-label" in ome_attrs:
-                image_label_dict = ome_attrs.get("image-label", None)
+                is_label = True
 
         elif "0.6" in version:
-            from ome_zarr_models.v06.multiscales import Multiscale as Multiscalev06
 
             ome_attrs = cast(dict[str, Any], group.attrs.get("ome", {}))
             metadata_json = ome_attrs.get("multiscales", [None])[0]
+
+            if metadata_json is None:
+                raise ValueError(
+                    "Multiscales metadata not found in group attributes. "
+                    "Opening groups other than multiscales (i.e., HCS, Plates, Wells) "
+                    "is currently not supported."
+                )
+
             metadata = MultiscaleV06.model_validate(metadata_json)
 
-            if "labels" in group:
-                labels_json = group["labels"].attrs.get("labels", [])
-                list_of_labels = labels_json if isinstance(labels_json, list) else []
-            if "omero" in group.attrs:
-                omero_dict = group.attrs.get("omero", None)
-            if "image-label" in group.attrs:
-                image_label_dict = group.attrs.get("image-label", None)
+            if "image-label" in ome_attrs:
+                is_label = True
 
         else:
             raise ValueError(f"Unsupported OME-Zarr version: {version}")
@@ -567,13 +538,7 @@ class OMEZarrMultiscaleBase:
             data = da.from_zarr(group[ds.path])
             transform = ds.coordinateTransformations[0]
 
-            cs = [
-                next(
-                    cs
-                    for cs in metadata.coordinateSystems
-                    if cs.name == transform.output.name
-                )
-            ][0]
+            cs = metadata.intrinsic_coordinate_system
 
             if isinstance(transform, Scale):
                 scale = transform.scale
