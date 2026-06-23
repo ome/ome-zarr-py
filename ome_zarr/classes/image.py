@@ -162,7 +162,10 @@ class OMEZarrMultiscaleBase:
         scale_factors: list[int] | tuple[int, ...] | list[dict[str, int]] | None,
         coordinateTransformations: (
             tuple[AnyTransform, ...] | list[dict[str, Any]] | None
-        ),
+        ) = None,
+        coordinate_systems: list[CoordinateSystem] | list[dict[str, Any]] | None = None,
+        method: str | Methods | None = Methods.RESIZE,
+        default_coordinate_system_name: str = "physical",
     ):
         from ome_zarr.scale import _build_pyramid
 
@@ -253,10 +256,27 @@ class OMEZarrMultiscaleBase:
             else:
                 axes.append(Axis(name=d, type="custom", unit=image.axes_units.get(d)))
 
-        coordinate_system = CoordinateSystem(
-            axes=tuple(axes),
-            name=self.default_coordinate_system_name,
-        )
+        # parse additional coordinate systems, if passed
+        additional_cs = []
+        if coordinate_systems is not None:
+            # coerce coordinate_systems to ozmp object if passed as dict
+            additional_cs = []
+            for idx, cs in enumerate(coordinate_systems):
+                if isinstance(cs, dict):
+                    additional_cs.append(TypeAdapter(CoordinateSystem).validate_python(cs))
+                elif isinstance(cs, CoordinateSystem):
+                    additional_cs.append(cs)
+                else:
+                    raise ValueError(
+                        f"Invalid coordinate system at index {idx}: {cs}"
+                    )
+
+        coordinate_systems = [
+            CoordinateSystem(
+                axes=tuple(axes),
+                name=default_coordinate_system_name,
+            ),
+        ] + additional_cs
 
         # coerce coordinateTransformations to ozmp object if passed as dict
         transforms = None
@@ -296,9 +316,17 @@ class OMEZarrMultiscaleBase:
                         f"input or output coordinate system name matching the default "
                         f"coordinate system name '{self.default_coordinate_system_name}': {tf}"
                     )
+                
+                cs_names = [cs.name for cs in coordinate_systems]
+                if tf.input.name not in cs_names or tf.output.name not in cs_names:
+                    raise ValueError(
+                        f"Coordinate transformation {tf} has input coordinate system name '{tf.input.name}' "
+                        f"or output coordinate system name '{tf.output.name}' "
+                        f"which does not match any of the defined coordinate systems: {cs_names}"
+                    )
 
         self.metadata = MultiscaleV06(
-            coordinateSystems=(coordinate_system,),
+            coordinateSystems=tuple(coordinate_systems),
             datasets=tuple(datasets),
             name=image.name,
             coordinateTransformations=transforms,
@@ -723,8 +751,13 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
         Default is (2, 4, 8, 16).
     method : ome_zarr.scale.Methods | str | None
         Rescaling method to use when generating pyramid levels. Default is Methods.RESIZE.
-    coordinateTransformations :
+    coordinateTransformations : list[ome_zarr_models.v05.multiscales.AnyTransform] | list[dict[str, Any]] | None
         Additional coordinate transformations to include in the metadata for each level.
+    coordinate_systems : list[ome_zarr_models.v05.multiscales.CoordinateSystem] | list[dict[str, Any]] | None
+        Additional coordinate systems to include in the metadata. Each coordinate system
+        can be passed as a CoordinateSystem instance or as a dict with the appropriate fields.
+    default_coordinate_system_name : str
+        Name of the default coordinate system to use for the multiscale image. Default is "physical".
     labels : OMEZarrLabels | list[OMEZarrLabels] | dict[str, OMEZarrLabels] | None
         Labels associated with the image. Can be a single OMEZarrLabels instance, a list of them,
         or a dict mapping label names to OMEZarrLabels instances. Default is None (no labels).
@@ -782,7 +815,11 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
         image: OMEZarrImage,
         scale_factors: list[int] | tuple[int, ...] | list[dict[str, int]] | None = None,
         method: str | Methods | None = Methods.RESIZE,
-        coordinateTransformations: list[Scale | Translation | Identity] | None = None,
+        coordinateTransformations: (
+            tuple[AnyTransform, ...] | list[dict[str, Any]] | None
+        ) = None,
+        coordinate_systems: list[CoordinateSystem] | list[dict[str, Any]] | None = None,
+        default_coordinate_system_name: str = "physical",
         labels: (
             OMEZarrLabels | list[OMEZarrLabels] | dict[str, OMEZarrLabels] | None
         ) = None,
@@ -795,6 +832,8 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
             scale_factors=scale_factors,
             method=method,
             coordinateTransformations=coordinateTransformations,
+            coordinate_systems=coordinate_systems,
+            default_coordinate_system_name=default_coordinate_system_name,
         )
 
         # Normalize labels to dict format
