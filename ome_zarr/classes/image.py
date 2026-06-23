@@ -257,19 +257,19 @@ class OMEZarrMultiscaleBase:
                 axes.append(Axis(name=d, type="custom", unit=image.axes_units.get(d)))
 
         # parse additional coordinate systems, if passed
-        additional_cs = []
+        additional_cs: list[CoordinateSystem] = []
         if coordinate_systems is not None:
             # coerce coordinate_systems to ozmp object if passed as dict
             additional_cs = []
             for idx, cs in enumerate(coordinate_systems):
                 if isinstance(cs, dict):
-                    additional_cs.append(TypeAdapter(CoordinateSystem).validate_python(cs))
+                    additional_cs.append(
+                        TypeAdapter(CoordinateSystem).validate_python(cs)
+                    )
                 elif isinstance(cs, CoordinateSystem):
                     additional_cs.append(cs)
                 else:
-                    raise ValueError(
-                        f"Invalid coordinate system at index {idx}: {cs}"
-                    )
+                    raise ValueError(f"Invalid coordinate system at index {idx}: {cs}")
 
         coordinate_systems = [
             CoordinateSystem(
@@ -316,8 +316,12 @@ class OMEZarrMultiscaleBase:
                         f"input or output coordinate system name matching the default "
                         f"coordinate system name '{self.default_coordinate_system_name}': {tf}"
                     )
-                
-                cs_names = [cs.name for cs in coordinate_systems]
+
+                cs_names = [
+                    cs.name
+                    for cs in coordinate_systems
+                    if hasattr(cs, "name") and cs.name is not None
+                ]
                 if tf.input.name not in cs_names or tf.output.name not in cs_names:
                     raise ValueError(
                         f"Coordinate transformation {tf} has input coordinate system name '{tf.input.name}' "

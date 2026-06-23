@@ -139,7 +139,7 @@ class TestWriter:
                 {
                     "type": "translation",
                     "translation": [0.0, 10.0, 10.0],
-                }
+                },
             ],
         }
 
@@ -150,7 +150,7 @@ class TestWriter:
                     {"name": "c", "type": "channel", "unit": "none"},
                     {"name": "y", "type": "space", "unit": "micrometer"},
                     {"name": "x", "type": "space", "unit": "micrometer"},
-                ]
+                ],
             }
         ]
 
@@ -161,17 +161,22 @@ class TestWriter:
                 image=image,
                 scale_factors=None,
                 method=None,
-                coordinateTransformations=[additional_transforms,],
+                coordinateTransformations=[
+                    additional_transforms,
+                ],
             )
 
         ms = OMEZarrMultiscale(
             image=image,
             scale_factors=None,
             method=None,
-            coordinateTransformations=[additional_transforms,],
+            coordinateTransformations=[
+                additional_transforms,
+            ],
             coordinate_systems=additional_cs,
-            default_coordinate_system_name="physical"
+            default_coordinate_system_name="physical",
         )
+        ms.to_ome_zarr(self.path / "test_transforms.zarr", version="0.6.dev4")
 
         # make transform go bad
         additional_transforms["output"]["name"] = "nonexistent"
@@ -180,9 +185,11 @@ class TestWriter:
                 image=image,
                 scale_factors=None,
                 method=None,
-                coordinateTransformations=[additional_transforms,],
+                coordinateTransformations=[
+                    additional_transforms,
+                ],
                 coordinate_systems=additional_cs,
-                default_coordinate_system_name="physical"
+                default_coordinate_system_name="physical",
             )
 
     def test_image_class_bad_args(self):
