@@ -179,7 +179,8 @@ class TestWriter:
         ms.to_ome_zarr(
             zarr.open(self.path / "test_transforms.zarr", mode="w"),
             version="0.6.dev4",
-            overwrite=True)
+            overwrite=True,
+        )
 
         # make transform go bad
         additional_transforms["output"]["name"] = "nonexistent"
@@ -209,26 +210,22 @@ class TestWriter:
                 self.path / f"test_versions_{version}.zarr",
                 mode="w",
                 zarr_format=2,
-                )
+            )
         else:
             grp = zarr.open(
                 self.path / f"test_versions_{version}.zarr",
                 mode="w",
                 zarr_format=3,
-                )
-        ms.to_ome_zarr(
-            grp,
-            overwrite=True,
-            version=version
             )
-        
+        ms.to_ome_zarr(grp, overwrite=True, version=version)
+
         # open the written zarr and check the version
         out = zarr.open_group(self.path / f"test_versions_{version}.zarr")
         if version == "0.4":
             metadata = out.attrs["multiscales"][0]
         else:
             metadata = out.attrs.get("ome", {})
-        
+
         assert metadata["version"] == version
 
     def test_image_class_bad_args(self):
