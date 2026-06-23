@@ -372,12 +372,12 @@ class OMEZarrMultiscaleBase:
         is_label = False
 
         # Handle loading based on version
-        if version in ("0.1", "0.2", "0.3"):
+        if version.startswith(("0.1", "0.2", "0.3")):
             metadata = cls._read_legacy_metadata(group, version)
             if "image-label" in group.attrs:
                 is_label = True
 
-        elif version == "0.4":
+        elif version.startswith("0.4"):
             from ome_zarr_models.v04.multiscales import Multiscale as Multiscalev04
 
             metadata_json = cast(dict, group.attrs.get("multiscales", [None])[0])
@@ -394,7 +394,7 @@ class OMEZarrMultiscaleBase:
             if "image-label" in group.attrs:
                 is_label = True
 
-        elif version == "0.5":
+        elif version.startswith("0.5"):
             from ome_zarr_models.v05.multiscales import Multiscale as Multiscalev05
 
             ome_attrs = cast(dict[str, Any], group.attrs.get("ome", {}))
@@ -408,51 +408,6 @@ class OMEZarrMultiscaleBase:
                 )
 
             metadata = Multiscalev05.model_validate(metadata_json)
-
-            if "image-label" in ome_attrs:
-                is_label = True
-        elif version == "0.5-dev-spatialdata":
-            from ome_zarr_models.v05.multiscales import Multiscale as Multiscalev05
-
-            ome_attrs = cast(dict[str, Any], group.attrs.get("ome", {}))
-            metadata_json = ome_attrs.get("multiscales", [None])[0]
-
-            if metadata_json is None:
-                raise ValueError(
-                    "Multiscales metadata not found in group attributes. "
-                    "Opening groups other than multiscales (i.e., HCS, Plates, Wells) "
-                    "is currently not supported."
-                )
-
-            if "coordinateTransformations" in metadata_json:
-                metadata_json["spatialdata_transforms"] = metadata_json[
-                    "coordinateTransformations"
-                ]
-                scale_transform = next(
-                    (
-                        t
-                        for t in metadata_json["coordinateTransformations"]
-                        if t.get("type") == "scale"
-                    ),
-                    None,
-                )
-                if scale_transform:
-                    # Strip non-standard keys ('input', 'output') so Pydantic doesn't throw validation faults
-                    compliant_scale = {
-                        "type": "scale",
-                        "scale": scale_transform["scale"],
-                    }
-                    metadata_json["coordinateTransformations"] = [compliant_scale]
-
-            metadata = Multiscalev05.model_validate(metadata_json)
-
-            if (
-                hasattr(metadata_json, "get")
-                and "spatialdata_transforms" in metadata_json
-            ):
-                metadata.__dict__["spatialdata_transforms"] = metadata_json[
-                    "spatialdata_transforms"
-                ]
 
             if "image-label" in ome_attrs:
                 is_label = True
