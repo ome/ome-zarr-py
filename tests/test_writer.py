@@ -122,6 +122,69 @@ class TestWriter:
     def shape(self, request):
         return request.param
 
+    def test_additional_transforms(self):
+        data = self.create_data((2, 128, 128))
+
+        image = OMEZarrImage(data=data, axes="cyx", scale={"y": 0.5, "x": 0.5})
+
+        additional_transforms = {
+            "type": "sequence",
+            "input": {"name": "physical"},
+            "output": {"name": "world"},
+            "transformations": [
+                {
+                    "type": "scale",
+                    "scale": [1.0, 0.5, 0.5],
+                },
+                {
+                    "type": "translation",
+                    "translation": [0.0, 10.0, 10.0],
+                }
+            ],
+        }
+
+        additional_cs = [
+            {
+                "name": "world",
+                "axes": [
+                    {"name": "c", "type": "channel", "unit": "none"},
+                    {"name": "y", "type": "space", "unit": "micrometer"},
+                    {"name": "x", "type": "space", "unit": "micrometer"},
+                ]
+            }
+        ]
+
+        # this call lacks the coordinate system "world"
+        # needed as output for the additional transforms
+        with pytest.raises(ValueError):
+            OMEZarrMultiscale(
+                image=image,
+                scale_factors=None,
+                method=None,
+                coordinateTransformations=[additional_transforms,],
+            )
+
+        ms = OMEZarrMultiscale(
+            image=image,
+            scale_factors=None,
+            method=None,
+            coordinateTransformations=[additional_transforms,],
+            coordinate_systems=additional_cs,
+            default_coordinate_system_name="physical"
+        )
+
+        # make transform go bad
+        additional_transforms["output"]["name"] = "nonexistent"
+        with pytest.raises(ValueError):
+            OMEZarrMultiscale(
+                image=image,
+                scale_factors=None,
+                method=None,
+                coordinateTransformations=[additional_transforms,],
+                coordinate_systems=additional_cs,
+                default_coordinate_system_name="physical"
+            )
+
     def test_image_class_bad_args(self):
         data = self.create_data((2, 128, 128))
 
