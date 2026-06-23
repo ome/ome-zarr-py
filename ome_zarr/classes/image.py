@@ -427,6 +427,7 @@ class OMEZarrMultiscaleBase:
                         _recursive_pop_nones(write_metadata.model_dump(by_alias=True))
                     ],
                 }
+                group.attrs["ome"] = metadata_dict
 
         delayed += self._write_additional_meta_data(
             group=group,
