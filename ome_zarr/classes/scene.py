@@ -114,7 +114,9 @@ class OMEZarrScene:
                     continue
                 if img.metadata.coordinateTransformations:
                     for img_tf in img.metadata.coordinateTransformations:
-                        ind_transform = self._ozmp_tf_to_tnd(img_tf, zarr_context=subgroup)
+                        ind_transform = self._ozmp_tf_to_tnd(
+                            img_tf, zarr_context=subgroup
+                        )
                         self._graph.add_transform(ind_transform)
 
     def to_ome_zarr(self, store: StoreLike, overwrite: bool = False):
@@ -154,7 +156,7 @@ class OMEZarrScene:
             subgroup = zarr_group.create_group(img_path, overwrite=not overwrite)
             img.to_ome_zarr(subgroup, overwrite=overwrite, version="0.6.dev4")
             self._written_image_names.add(img_path)
-        
+
         for disp_path, disp_img in (self.coordinates_displacements or {}).items():
             # Skip if already written (incremental mode)
             if not overwrite and disp_path in self._written_image_names:
@@ -295,39 +297,41 @@ class OMEZarrScene:
 
         return tuple(parsed_coordinate_systems)
 
-
     def _ozmp_tf_to_tnd(
-            self,
-            transform: AnyTransform,
-            zarr_context: str = "",
+        self,
+        transform: AnyTransform,
+        zarr_context: str = "",
     ) -> tnd.base.Transform:
         """
         Convert an OME-Zarr coordinate transformation to a transformnd Transform object.
         This is a placeholder function and will need to be implemented based on the specific types of transformations you expect to encounter in OME-Zarr metadata.
         """
         import numpy as np
+
         tnd_transform = None
         # Example for an affine transformation (this will depend on the actual structure of AnyTransform)
-        if transform.type == "affine":#
+        if transform.type == "affine":
             aff = np.asarray(transform.affine)
             if aff.shape[0] == aff.shape[1]:
                 tnd_transform = tnd.transforms.Affine(transform.affine)
             else:
                 aff = np.eye(max(aff.shape))
-                aff[:aff.shape[0], :aff.shape[1]] = aff
+                aff[: aff.shape[0], : aff.shape[1]] = aff
                 tnd_transform = tnd.transforms.Affine(aff)
 
         elif transform.type == "displacements":
             path_to_dfield = transform.path if transform.path is not None else ""
             if zarr_context != "" and path_to_dfield != "":
                 path_to_dfield = f"{zarr_context}/{path_to_dfield}"
-            
+
             dfield = self.coordinates_displacements.get(path_to_dfield)
             tnd_transform = tnd.transforms.Displacements(
                 dfield.images[0].data,
-                index_transform = tnd.transforms.Scale(list(dfield.images[0].scale.values())[1:]),
+                index_transform=tnd.transforms.Scale(
+                    list(dfield.images[0].scale.values())[1:]
+                ),
                 vector_axis=0,
-                )
+            )
         elif transform.type == "mapAxis":
             tnd_transform = tnd.transforms.MapAxis(list(transform.mapAxis))
 
@@ -346,23 +350,28 @@ class OMEZarrScene:
                 tnd.transforms.by_dimension.SubTransform(
                     transform=self._ozmp_tf_to_tnd(sub_tf.transformation),
                     input_axes=sub_tf.input_axes,
-                    output_axes=sub_tf.output_axes
-                ) for sub_tf in sub_transformations
+                    output_axes=sub_tf.output_axes,
+                )
+                for sub_tf in sub_transformations
             ]
             tnd_transform = tnd.transforms.ByDimension(
-                subtransforms=tnd_sub_transforms,
-                fill_identity=0
-                )
+                subtransforms=tnd_sub_transforms, fill_identity=0
+            )
         elif transform.type == "sequence":
             sub_transformations = transform.transformations
             tnd_sub_transforms = [
-                self._ozmp_tf_to_tnd(sub_tf, zarr_context) for sub_tf in sub_transformations
+                self._ozmp_tf_to_tnd(sub_tf, zarr_context)
+                for sub_tf in sub_transformations
             ]
             tnd_transform = tnd.base.TransformSequence(tnd_sub_transforms)
 
         if transform.input is not None and tnd_transform is not None:
-            input_path = transform.input.path if transform.input.path is not None else ""
-            output_path = transform.output.path if transform.output.path is not None else ""
+            input_path = (
+                transform.input.path if transform.input.path is not None else ""
+            )
+            output_path = (
+                transform.output.path if transform.output.path is not None else ""
+            )
 
             # zarr_context prepends path with relative path from root
             # to keep track of global location of coordinate systems in the zarr store
