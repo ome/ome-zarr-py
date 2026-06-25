@@ -145,7 +145,7 @@ class OMEZarrMultiscaleBase:
         self,
         image: OMEZarrImage,
         scale_factors: list[int] | tuple[int, ...] | list[dict[str, int]] | None = None,
-        coordinateTransformations: (
+        coordinate_transformations: (
             tuple[AnyTransform, ...] | list[dict[str, Any]] | None
         ) = None,
         coordinate_systems: list[CoordinateSystem] | list[dict[str, Any]] | None = None,
@@ -263,11 +263,11 @@ class OMEZarrMultiscaleBase:
             ),
         ] + additional_cs
 
-        # coerce coordinateTransformations to ozmp object if passed as dict
+        # coerce coordinate_transformations to ozmp object if passed as dict
         transforms = None
-        if coordinateTransformations is not None:
+        if coordinate_transformations is not None:
             transforms = []
-            for idx, tf in enumerate(coordinateTransformations):
+            for idx, tf in enumerate(coordinate_transformations):
                 if isinstance(tf, dict):
                     transforms.append(TypeAdapter(AnyTransform).validate_python(tf))
                 elif tf is AnyTransform:
@@ -721,7 +721,7 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
         Default is (2, 4, 8, 16).
     method : ome_zarr.scale.Methods | str | None
         Rescaling method to use when generating pyramid levels. Default is Methods.RESIZE.
-    coordinateTransformations : list[ome_zarr_models.v05.multiscales.AnyTransform] | list[dict[str, Any]] | None
+    coordinate_transformations : list[ome_zarr_models.v05.multiscales.AnyTransform] | list[dict[str, Any]] | None
         Additional coordinate transformations to include in the metadata for each level.
     coordinate_systems : list[ome_zarr_models.v05.multiscales.CoordinateSystem] | list[dict[str, Any]] | None
         Additional coordinate systems to include in the metadata. Each coordinate system
@@ -785,7 +785,7 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
         image: OMEZarrImage,
         scale_factors: list[int] | tuple[int, ...] | list[dict[str, int]] | None = None,
         method: str | Methods | None = Methods.RESIZE,
-        coordinateTransformations: (
+        coordinate_transformations: (
             tuple[AnyTransform, ...] | list[dict[str, Any]] | None
         ) = None,
         coordinate_systems: list[CoordinateSystem] | list[dict[str, Any]] | None = None,
@@ -801,7 +801,7 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
             image=image,
             scale_factors=scale_factors,
             method=method,
-            coordinateTransformations=coordinateTransformations,
+            coordinate_transformations=coordinate_transformations,
             coordinate_systems=coordinate_systems,
             default_coordinate_system_name=default_coordinate_system_name,
         )
@@ -1096,7 +1096,7 @@ class OMEZarrLabels(OMEZarrMultiscaleBase):
             image=image,
             scale_factors=scale_factors,
             method=method,
-            coordinateTransformations=None,
+            coordinate_transformations=None,
         )
 
         # Build image-label metadata if auto_parse_labels is enabled

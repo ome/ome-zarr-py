@@ -161,7 +161,7 @@ class TestWriter:
                 image=image,
                 scale_factors=None,
                 method=None,
-                coordinateTransformations=[
+                coordinate_transformations=[
                     additional_transforms,
                 ],
             )
@@ -170,7 +170,7 @@ class TestWriter:
             image=image,
             scale_factors=None,
             method=None,
-            coordinateTransformations=[
+            coordinate_transformations=[
                 additional_transforms,
             ],
             coordinate_systems=additional_cs,
@@ -189,7 +189,7 @@ class TestWriter:
                 image=image,
                 scale_factors=None,
                 method=None,
-                coordinateTransformations=[
+                coordinate_transformations=[
                     additional_transforms,
                 ],
                 coordinate_systems=additional_cs,
