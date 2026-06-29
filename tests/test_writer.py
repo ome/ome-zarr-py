@@ -200,6 +200,7 @@ class TestWriter:
         "version", ("0.4", "0.5", "0.6.dev4"), ids=["V04", "V05", "V06"]
     )
     def test_image_class_versions(self, version):
+        from ome_zarr_models.v06.multiscales import Multiscale as Multiscale_V06
         data = self.create_data((2, 128, 128))
         image = OMEZarrImage(data=data, axes="cyx", scale={"y": 0.5, "x": 0.5})
         ms = OMEZarrMultiscale(
@@ -229,6 +230,7 @@ class TestWriter:
         assert metadata["version"] == version
 
         ms_read = OMEZarrMultiscale.from_ome_zarr(grp)
+        assert isinstance(ms_read.metadata, Multiscale_V06)
 
     def test_image_class_bad_args(self):
         data = self.create_data((2, 128, 128))
