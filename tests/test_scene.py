@@ -1,9 +1,11 @@
-import numpy as np
-from ome_zarr import OMEZarrImage, OMEZarrMultiscale, OMEZarrScene
-import pytest
 import pathlib
+
+import numpy as np
+import pytest
 import zarr
-import transformnd as tnd
+
+from ome_zarr import OMEZarrImage, OMEZarrMultiscale, OMEZarrScene
+
 
 class TestScene:
     TRANSFORMS = [
@@ -11,8 +13,9 @@ class TestScene:
         {"type": "translation", "translation": [0.0, 0.0]},
         {"type": "rotation", "rotation": [[0.0, -1.0], [1.0, 0.0]]},
         {"type": "affine", "affine": [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]},
-        {"type": "mapAxis", "mapAxis": [1, 0]}
+        {"type": "mapAxis", "mapAxis": [1, 0]},
     ]
+
     @pytest.fixture(autouse=True)
     def initdir(self, tmpdir):
         self.path = pathlib.Path(tmpdir.mkdir("data"))
@@ -60,7 +63,9 @@ class TestScene:
         assert len(scene._graph.graph.nodes) == 2
 
         # traverse graph
-        tf = scene._graph.get_sequence(f"{img_a.name}:physical", f"{img_b.name}:physical")
+        tf = scene._graph.get_sequence(
+            f"{img_a.name}:physical", f"{img_b.name}:physical"
+        )
         assert tf is not None
 
         # write to disk and read back
@@ -104,8 +109,18 @@ class TestScene:
         img_a_ms = OMEZarrMultiscale(image=img_a)
         img_b_ms = OMEZarrMultiscale(image=img_b)
 
-        world1_cs = {"name": "world", "axes": [ax.model_dump() for ax in img_a_ms.metadata.coordinateSystems[0].axes]}
-        world2_cs = {"name": "world2", "axes": [ax.model_dump() for ax in img_b_ms.metadata.coordinateSystems[0].axes]}
+        world1_cs = {
+            "name": "world",
+            "axes": [
+                ax.model_dump() for ax in img_a_ms.metadata.coordinateSystems[0].axes
+            ],
+        }
+        world2_cs = {
+            "name": "world2",
+            "axes": [
+                ax.model_dump() for ax in img_b_ms.metadata.coordinateSystems[0].axes
+            ],
+        }
 
         transform1 = transform.copy()
         transform1["input"] = {"name": "physical", "path": "imageA"}
@@ -122,20 +137,24 @@ class TestScene:
         scene = OMEZarrScene(
             images=[img_a_ms, img_b_ms],
             coordinate_transformations=[transform1, transform2, transform3],
-            coordinate_systems=[world1_cs, world2_cs]
+            coordinate_systems=[world1_cs, world2_cs],
         )
 
         assert scene._graph is not None
         assert len(scene._graph.graph.nodes) == 4
 
         scene.to_ome_zarr(str(self.path / "test_scene_with_cs.zarr"), overwrite=True)
-        scene_read = OMEZarrScene.from_ome_zarr(str(self.path / "test_scene_with_cs.zarr"))
+        scene_read = OMEZarrScene.from_ome_zarr(
+            str(self.path / "test_scene_with_cs.zarr")
+        )
 
         assert scene_read._graph is not None
         assert len(scene_read._graph.graph.nodes) == 4
 
         # open zarr group and check metadata
-        zarr_group = zarr.open_group(str(self.path / "test_scene_with_cs.zarr"), mode="r")
+        zarr_group = zarr.open_group(
+            str(self.path / "test_scene_with_cs.zarr"), mode="r"
+        )
         assert "ome" in zarr_group.attrs
         ome_metadata = zarr_group.attrs["ome"]
         assert "scene" in ome_metadata
@@ -143,6 +162,8 @@ class TestScene:
         assert "coordinateSystems" in ome_metadata["scene"]
         assert len(ome_metadata["scene"]["coordinateSystems"]) == 2
 
+
 if __name__ == "__main__":
     import pytest
+
     pytest.main([__file__])
