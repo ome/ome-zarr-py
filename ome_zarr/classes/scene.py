@@ -171,7 +171,7 @@ class OMEZarrScene:
         metadata_dict = self.metadata.model_dump()
         metadata_dict = _recursive_pop_nones(metadata_dict)
 
-        zarr_group.attrs["ome"] = {"scene": metadata_dict, "version": "0.6"}
+        zarr_group.attrs["ome"] = {"scene": metadata_dict, "version": "0.6.dev4"}
 
     @classmethod
     def from_ome_zarr(cls, store: StoreLike):
