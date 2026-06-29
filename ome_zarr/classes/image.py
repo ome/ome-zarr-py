@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import warnings
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Literal, cast
 
 import dask.array as da
@@ -35,7 +35,7 @@ from pydantic import TypeAdapter, ValidationError
 
 from ome_zarr.scale import Methods
 
-SPATIAL_DIMS = ["z", "y", "x"]
+DISCRETE_DIMS = ["coordinate", "displacement", "channel"]
 DEFAULT_COLORS = [
     "00FFFF",  # cyan
     "FF00FF",  # magenta
@@ -76,6 +76,9 @@ class OMEZarrImage:
     axes_units : dict[str, str] | None
         Units for each axis, e.g. {'x': 'micrometer', 'y': 'micrometer'}.
         Default is None (no units).
+    axes_types : dict[str, str | None] | None
+        Axis types for each axis, e.g. {'c': 'channel', 'x': 'space', 'y': 'space', 'z': 'space'}.
+        Type should be one of ["space", "time", "channel", "custom", "coordinate", "displacement"].
     name : str
         Name of the image. Default is "image".
 
@@ -98,6 +101,7 @@ class OMEZarrImage:
     axes: Sequence[str] | str
     scale: dict[str, float] | None = None
     axes_units: dict[str, str] | None = None
+    axes_types: dict[str, str | None] = field(default_factory=dict)
     name: str = "image"
 
     def __post_init__(self):
@@ -132,6 +136,17 @@ class OMEZarrImage:
         # rebuild scale dict with defaults for missing axes
         self.scale = {d: self.scale.get(d, 1.0) for d in self.axes}
 
+        if not self.axes_types:
+            type_mapping = {
+                "t": "time",
+                "c": "channel",
+                "z": "space",
+                "y": "space",
+                "x": "space",
+            }
+            self.axes_types = {
+                d: type_mapping.get(d, None) for d in self.axes
+            }
         # coerce data to dask array
         if not isinstance(self.data, da.Array):
             self.data = da.from_array(self.data)
@@ -145,7 +160,7 @@ class OMEZarrMultiscaleBase:
         self,
         image: OMEZarrImage,
         scale_factors: list[int] | tuple[int, ...] | list[dict[str, int]] | None = None,
-        coordinateTransformations: (
+        coordinate_transformations: (
             tuple[AnyTransform, ...] | list[dict[str, Any]] | None
         ) = None,
         coordinate_systems: list[CoordinateSystem] | list[dict[str, Any]] | None = None,
@@ -206,6 +221,7 @@ class OMEZarrMultiscaleBase:
                     scale=level_scale,
                     axes_units=image.axes_units,
                     name=image.name,
+                    axes_types=image.axes_types
                 )
             )
 
@@ -232,14 +248,18 @@ class OMEZarrMultiscaleBase:
 
         axes = []
         for d in image.axes:
-            if d in SPATIAL_DIMS:
-                axes.append(Axis(name=d, type="space", unit=image.axes_units.get(d)))
-            elif d == "t":
-                axes.append(Axis(name=d, type="time", unit=image.axes_units.get(d)))
-            elif d == "c":
-                axes.append(Axis(name=d, type="channel", unit=image.axes_units.get(d)))
+            if image.axes_types.get(d) in DISCRETE_DIMS:
+                discrete = True
             else:
-                axes.append(Axis(name=d, type="custom", unit=image.axes_units.get(d)))
+                discrete = False
+            axes.append(
+                Axis(
+                    name=d,
+                    type=image.axes_types.get(d),
+                    unit=image.axes_units.get(d),
+                    discrete=discrete
+                )
+            )
 
         # parse additional coordinate systems, if passed
         additional_cs: list[CoordinateSystem] = []
@@ -263,11 +283,11 @@ class OMEZarrMultiscaleBase:
             ),
         ] + additional_cs
 
-        # coerce coordinateTransformations to ozmp object if passed as dict
+        # coerce coordinate_transformations to ozmp object if passed as dict
         transforms = None
-        if coordinateTransformations is not None:
+        if coordinate_transformations is not None:
             transforms = []
-            for idx, tf in enumerate(coordinateTransformations):
+            for idx, tf in enumerate(coordinate_transformations):
                 if isinstance(tf, dict):
                     transforms.append(TypeAdapter(AnyTransform).validate_python(tf))
                 elif tf is AnyTransform:
@@ -547,18 +567,27 @@ class OMEZarrMultiscaleBase:
                 scale = tuple(1.0 for _ in cs.axes)
             elif isinstance(transform, TransformSequence):
                 scale = transform.transformations[0].scale
+
             # Filter out axes with no unit, and set to None if empty
             axes_units: dict[str, str] | None = {
-                ax.name: ax.unit for ax in cs.axes if ax.unit is not None
+                str(ax.name): str(ax.unit) for ax in cs.axes if ax.unit is not None
             }
             if not axes_units:
                 axes_units = None
+            
+            axes_types: dict[str, str | None] | None = {
+                str(ax.name): ax.type for ax in cs.axes if ax.type is not None
+            }
+            if not axes_types:
+                axes_types = None
+
             images.append(
                 OMEZarrImage(
                     data=data,
-                    axes=[ax.name for ax in cs.axes],
-                    scale={d.name: s for d, s in zip(cs.axes, scale)},
+                    axes=[str(ax.name) for ax in cs.axes],
+                    scale={str(d.name): s for d, s in zip(cs.axes, scale)},
                     axes_units=axes_units,
+                    axes_types=axes_types,
                     name=str(metadata.name) if metadata.name else "image",
                 )
             )
@@ -720,7 +749,7 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
         Default is (2, 4, 8, 16).
     method : ome_zarr.scale.Methods | str | None
         Rescaling method to use when generating pyramid levels. Default is Methods.RESIZE.
-    coordinateTransformations : list[ome_zarr_models.v05.multiscales.AnyTransform] | list[dict[str, Any]] | None
+    coordinate_transformations : list[ome_zarr_models.v05.multiscales.AnyTransform] | list[dict[str, Any]] | None
         Additional coordinate transformations to include in the metadata for each level.
     coordinate_systems : list[ome_zarr_models.v05.multiscales.CoordinateSystem] | list[dict[str, Any]] | None
         Additional coordinate systems to include in the metadata. Each coordinate system
@@ -784,7 +813,7 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
         image: OMEZarrImage,
         scale_factors: list[int] | tuple[int, ...] | list[dict[str, int]] | None = None,
         method: str | Methods | None = Methods.RESIZE,
-        coordinateTransformations: (
+        coordinate_transformations: (
             tuple[AnyTransform, ...] | list[dict[str, Any]] | None
         ) = None,
         coordinate_systems: list[CoordinateSystem] | list[dict[str, Any]] | None = None,
@@ -800,7 +829,7 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
             image=image,
             scale_factors=scale_factors,
             method=method,
-            coordinateTransformations=coordinateTransformations,
+            coordinate_transformations=coordinate_transformations,
             coordinate_systems=coordinate_systems,
             default_coordinate_system_name=default_coordinate_system_name,
         )
@@ -1095,7 +1124,7 @@ class OMEZarrLabels(OMEZarrMultiscaleBase):
             image=image,
             scale_factors=scale_factors,
             method=method,
-            coordinateTransformations=None,
+            coordinate_transformations=None,
         )
 
         # Build image-label metadata if auto_parse_labels is enabled
