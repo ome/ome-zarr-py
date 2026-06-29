@@ -572,12 +572,10 @@ class OMEZarrMultiscaleBase:
             }
             if not axes_units:
                 axes_units = None
-
-            axes_types: dict[str, str | None] | None = {
+            
+            axes_types: dict[str, str | None] = {
                 str(ax.name): ax.type for ax in cs.axes if ax.type is not None
             }
-            if not axes_types:
-                axes_types = None
 
             images.append(
                 OMEZarrImage(
