@@ -564,9 +564,10 @@ class OMEZarrMultiscaleBase:
                 scale = tuple(1.0 for _ in cs.axes)
             elif isinstance(transform, TransformSequence):
                 scale = transform.transformations[0].scale
+
             # Filter out axes with no unit, and set to None if empty
             axes_units: dict[str, str] | None = {
-                ax.name: ax.unit for ax in cs.axes if ax.unit is not None
+                str(ax.name): str(ax.unit) for ax in cs.axes if ax.unit is not None
             }
             if not axes_units:
                 axes_units = None
@@ -580,8 +581,8 @@ class OMEZarrMultiscaleBase:
             images.append(
                 OMEZarrImage(
                     data=data,
-                    axes=[ax.name for ax in cs.axes],
-                    scale={d.name: s for d, s in zip(cs.axes, scale)},
+                    axes=[str(ax.name) for ax in cs.axes],
+                    scale={str(d.name): s for d, s in zip(cs.axes, scale)},
                     axes_units=axes_units,
                     axes_types=axes_types,
                     name=str(metadata.name) if metadata.name else "image",
