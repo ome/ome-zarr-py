@@ -228,6 +228,8 @@ class TestWriter:
 
         assert metadata["version"] == version
 
+        ms_read = OMEZarrMultiscale.from_ome_zarr(grp)
+
     def test_image_class_bad_args(self):
         data = self.create_data((2, 128, 128))
 
