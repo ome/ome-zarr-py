@@ -201,6 +201,7 @@ class TestWriter:
     )
     def test_image_class_versions(self, version):
         from ome_zarr_models.v06.multiscales import Multiscale as Multiscale_V06
+
         data = self.create_data((2, 128, 128))
         image = OMEZarrImage(data=data, axes="cyx", scale={"y": 0.5, "x": 0.5})
         ms = OMEZarrMultiscale(
