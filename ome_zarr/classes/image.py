@@ -76,6 +76,9 @@ class OMEZarrImage:
     axes_units : dict[str, str] | None
         Units for each axis, e.g. {'x': 'micrometer', 'y': 'micrometer'}.
         Default is None (no units).
+    axes_types : dict[str, str | None] | None
+        Axis types for each axis, e.g. {'c': 'channel', 'x': 'space', 'y': 'space', 'z': 'space'}.
+        Type should be one of ["space", "time", "channel", "custom", "coordinate", "displacement"].
     name : str
         Name of the image. Default is "image".
 
@@ -98,6 +101,7 @@ class OMEZarrImage:
     axes: Sequence[str] | str
     scale: dict[str, float] | None = None
     axes_units: dict[str, str] | None = None
+    axes_types: dict[str, str | None] | None = None
     name: str = "image"
 
     def __post_init__(self):
@@ -132,6 +136,18 @@ class OMEZarrImage:
         # rebuild scale dict with defaults for missing axes
         self.scale = {d: self.scale.get(d, 1.0) for d in self.axes}
 
+        if self.axes_types is None:
+            type_mapping = {
+                "t": "time",
+                "c": "channel",
+                "z": "space",
+                "y": "space",
+                "x": "space",
+            }
+            self.axes_types = {
+                d: type_mapping.get(d, None) for d in self.axes
+            }
+        
         # coerce data to dask array
         if not isinstance(self.data, da.Array):
             self.data = da.from_array(self.data)
@@ -206,6 +222,7 @@ class OMEZarrMultiscaleBase:
                     scale=level_scale,
                     axes_units=image.axes_units,
                     name=image.name,
+                    axes_types=image.axes_types
                 )
             )
 
@@ -553,6 +570,12 @@ class OMEZarrMultiscaleBase:
             }
             if not axes_units:
                 axes_units = None
+            
+            axes_types: dict[str, str | None] | None = {
+                str(ax.name): ax.type for ax in cs.axes if ax.type is not None
+            }
+            if not axes_types:
+                axes_types = None
 
             images.append(
                 OMEZarrImage(
@@ -560,6 +583,7 @@ class OMEZarrMultiscaleBase:
                     axes=[ax.name for ax in cs.axes],
                     scale={d.name: s for d, s in zip(cs.axes, scale)},
                     axes_units=axes_units,
+                    axes_types=axes_types,
                     name=str(metadata.name) if metadata.name else "image",
                 )
             )
