@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import warnings
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Literal, cast
 
 import dask.array as da
@@ -35,7 +35,7 @@ from pydantic import TypeAdapter, ValidationError
 
 from ome_zarr.scale import Methods
 
-SPATIAL_DIMS = ["z", "y", "x"]
+DISCRETE_DIMS = ["coordinate", "displacement", "channel"]
 DEFAULT_COLORS = [
     "00FFFF",  # cyan
     "FF00FF",  # magenta
@@ -101,7 +101,7 @@ class OMEZarrImage:
     axes: Sequence[str] | str
     scale: dict[str, float] | None = None
     axes_units: dict[str, str] | None = None
-    axes_types: dict[str, str | None] | None = None
+    axes_types: dict[str, str | None] = field(default_factory=dict)
     name: str = "image"
 
     def __post_init__(self):
@@ -136,7 +136,7 @@ class OMEZarrImage:
         # rebuild scale dict with defaults for missing axes
         self.scale = {d: self.scale.get(d, 1.0) for d in self.axes}
 
-        if self.axes_types is None:
+        if not self.axes_types:
             type_mapping = {
                 "t": "time",
                 "c": "channel",
@@ -147,7 +147,6 @@ class OMEZarrImage:
             self.axes_types = {
                 d: type_mapping.get(d, None) for d in self.axes
             }
-        
         # coerce data to dask array
         if not isinstance(self.data, da.Array):
             self.data = da.from_array(self.data)
@@ -249,14 +248,18 @@ class OMEZarrMultiscaleBase:
 
         axes = []
         for d in image.axes:
-            if d in SPATIAL_DIMS:
-                axes.append(Axis(name=d, type="space", unit=image.axes_units.get(d)))
-            elif d == "t":
-                axes.append(Axis(name=d, type="time", unit=image.axes_units.get(d)))
-            elif d == "c":
-                axes.append(Axis(name=d, type="channel", unit=image.axes_units.get(d)))
+            if image.axes_types.get(d) in DISCRETE_DIMS:
+                discrete = True
             else:
-                axes.append(Axis(name=d, type="custom", unit=image.axes_units.get(d)))
+                discrete = False
+            axes.append(
+                Axis(
+                    name=d,
+                    type=image.axes_types.get(d),
+                    unit=image.axes_units.get(d),
+                    discrete=discrete
+                )
+            )
 
         # parse additional coordinate systems, if passed
         additional_cs: list[CoordinateSystem] = []
