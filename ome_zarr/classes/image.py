@@ -144,9 +144,7 @@ class OMEZarrImage:
                 "y": "space",
                 "x": "space",
             }
-            self.axes_types = {
-                d: type_mapping.get(d, None) for d in self.axes
-            }
+            self.axes_types = {d: type_mapping.get(d) for d in self.axes}
         # coerce data to dask array
         if not isinstance(self.data, da.Array):
             self.data = da.from_array(self.data)
@@ -221,7 +219,7 @@ class OMEZarrMultiscaleBase:
                     scale=level_scale,
                     axes_units=image.axes_units,
                     name=image.name,
-                    axes_types=image.axes_types
+                    axes_types=image.axes_types,
                 )
             )
 
@@ -257,7 +255,7 @@ class OMEZarrMultiscaleBase:
                     name=d,
                     type=image.axes_types.get(d),
                     unit=image.axes_units.get(d),
-                    discrete=discrete
+                    discrete=discrete,
                 )
             )
 
@@ -574,7 +572,7 @@ class OMEZarrMultiscaleBase:
             }
             if not axes_units:
                 axes_units = None
-            
+
             axes_types: dict[str, str | None] | None = {
                 str(ax.name): ax.type for ax in cs.axes if ax.type is not None
             }
