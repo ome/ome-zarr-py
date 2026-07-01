@@ -29,6 +29,7 @@ dependencies = [
     "transformnd >= 0.6.0",
     "ome-zarr-models==1.8.0rc0",
     "Deprecated",
+    "tqdm",
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
