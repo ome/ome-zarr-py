@@ -133,7 +133,9 @@ class OMEZarrScene:
 
         """
         import shutil
+
         import tqdm
+
         from ..utils import _recursive_pop_nones
 
         if overwrite and os.path.exists(str(store)):
