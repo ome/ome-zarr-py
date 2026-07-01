@@ -343,7 +343,7 @@ class OMEZarrMultiscaleBase:
         self,
         group: zarr.Group | str,
         storage_options: list[dict[str, Any]] | dict[str, Any] | None = None,
-        version: Literal["0.6.dev4", "0.5", "0.4"] = "0.6.dev4",
+        version: Literal["0.6.dev4", "0.5", "0.4"] = "0.5",
         compute: bool = True,
         overwrite: bool = False,
     ) -> list:
