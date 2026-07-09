@@ -100,7 +100,7 @@ class Node:
                 node.visible = visibility
         return old
 
-    def load(self, spec_type: type["Spec"]) -> Optional["Spec"]:
+    def load[S: Spec](self, spec_type: type[S]) -> Optional[S]:
         for spec in self.specs:
             if isinstance(spec, spec_type):
                 return spec
