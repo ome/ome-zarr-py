@@ -343,7 +343,7 @@ class OMEZarrMultiscaleBase:
         self,
         group: zarr.Group | str,
         storage_options: list[dict[str, Any]] | dict[str, Any] | None = None,
-        version: Literal["0.6.dev4", "0.5", "0.4"] = "0.6.dev4",
+        version: Literal["0.6.dev4", "0.5", "0.4"] = "0.5",
         compute: bool = True,
         overwrite: bool = False,
     ) -> list:
@@ -573,11 +573,9 @@ class OMEZarrMultiscaleBase:
             if not axes_units:
                 axes_units = None
 
-            axes_types: dict[str, str | None] | None = {
+            axes_types: dict[str, str | None] = {
                 str(ax.name): ax.type for ax in cs.axes if ax.type is not None
             }
-            if not axes_types:
-                axes_types = None
 
             images.append(
                 OMEZarrImage(
