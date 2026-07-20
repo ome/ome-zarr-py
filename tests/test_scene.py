@@ -14,6 +14,7 @@ class TestScene:
     attribute which is a temporary directory,
     which is automatically created and destroyed for each test.
     """
+
     TRANSFORMS = [
         {"type": "scale", "scale": [1.0, 1.0]},
         {"type": "translation", "translation": [0.0, 0.0]},
