@@ -8,6 +8,12 @@ from ome_zarr import OMEZarrImage, OMEZarrMultiscale, OMEZarrScene
 
 
 class TestScene:
+    """
+    Wrapper class for testing ome zarr scene functionality.
+    Every test in this class can make use of the `self.path`
+    attribute which is a temporary directory,
+    which is automatically created and destroyed for each test.
+    """
     TRANSFORMS = [
         {"type": "scale", "scale": [1.0, 1.0]},
         {"type": "translation", "translation": [0.0, 0.0]},
@@ -26,11 +32,17 @@ class TestScene:
         self.group_v3 = root_v3.create_group("test")
 
     def create_data(self, shape, dtype=np.uint8, mean_val=10):
+        """create some dummy testing data of defined shape and type,
+        with a given mean value"""
         rng = np.random.default_rng(0)
         return rng.poisson(mean_val, size=shape).astype(dtype)
 
     @pytest.mark.parametrize("transform", TRANSFORMS)
     def test_create_scene_without_coordinate_systems(self, transform):
+        """
+        Create a scene with two images and a single coordinate transformation
+        between them. The data is saved and loaded back in the test.
+        """
         shape = (64, 64)
         img_a = OMEZarrImage(
             data=self.create_data(shape),
@@ -59,23 +71,31 @@ class TestScene:
 
         scene.to_ome_zarr("test_scene.zarr", overwrite=True)
 
+        # check that the graph is created correctly
         assert scene._graph is not None
+
+        # check that the graph has the correct number of nodes
+        # (aka coordinate systems)
         assert len(scene._graph.graph.nodes) == 2
 
         # traverse graph
         tf = scene._graph.get_sequence(
             f"{img_a.name}:physical", f"{img_b.name}:physical"
         )
+
+        # check that the transform graph can be traversed (i.e. transform is not None)
         assert tf is not None
 
         # write to disk and read back
         scene.to_ome_zarr(str(self.path / "test_scene.zarr"), overwrite=True)
         scene_read = OMEZarrScene.from_ome_zarr(str(self.path / "test_scene.zarr"))
 
+        # check that the graph is created correctly on read
         assert scene_read._graph is not None
         assert len(scene_read._graph.graph.nodes) == 2
 
         # open the zarr group and check the metadata
+        # and check that the correct metadata fields are present in the store
         zarr_group = zarr.open_group(str(self.path / "test_scene.zarr"), mode="r")
         assert "ome" in zarr_group.attrs
         ome_metadata = zarr_group.attrs["ome"]
@@ -87,10 +107,16 @@ class TestScene:
         assert len(ome_metadata["scene"]["coordinateTransformations"]) == 1
 
         transform_md = ome_metadata["scene"]["coordinateTransformations"][0]
+
+        # make sure that the loaded transform is the same as the original
         assert transform_md == transform
 
     @pytest.mark.parametrize("transform", TRANSFORMS)
     def test_create_scene_with_coordinate_systems(self, transform):
+        """
+        Create a scene with two images and three coordinate transformations
+        between them. The data is saved and loaded back in the test.
+        """
         shape = (64, 64)
         img_a = OMEZarrImage(
             data=self.create_data(shape),
@@ -140,6 +166,8 @@ class TestScene:
             coordinate_systems=[world1_cs, world2_cs],
         )
 
+        # check that the graph is created correctly
+        # and has the correct number of nodes (coordinate systems)
         assert scene._graph is not None
         assert len(scene._graph.graph.nodes) == 4
 
@@ -148,6 +176,8 @@ class TestScene:
             str(self.path / "test_scene_with_cs.zarr")
         )
 
+        # check that the graph is created correctly on read
+        # and has the correct number of nodes (coordinate systems)
         assert scene_read._graph is not None
         assert len(scene_read._graph.graph.nodes) == 4
 
@@ -155,6 +185,8 @@ class TestScene:
         zarr_group = zarr.open_group(
             str(self.path / "test_scene_with_cs.zarr"), mode="r"
         )
+
+        # make sure that the correct metadata fields are present in the store
         assert "ome" in zarr_group.attrs
         ome_metadata = zarr_group.attrs["ome"]
         assert "scene" in ome_metadata
