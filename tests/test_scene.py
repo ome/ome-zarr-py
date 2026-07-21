@@ -1,5 +1,3 @@
-import pathlib
-
 import numpy as np
 import pytest
 import zarr
@@ -7,198 +5,190 @@ import zarr
 from ome_zarr import OMEZarrImage, OMEZarrMultiscale, OMEZarrScene
 
 
-class TestScene:
+TRANSFORMS = [
+    {"type": "scale", "scale": [1.0, 1.0]},
+    {"type": "translation", "translation": [0.0, 0.0]},
+    {"type": "rotation", "rotation": [[0.0, -1.0], [1.0, 0.0]]},
+    {"type": "affine", "affine": [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]},
+    {"type": "mapAxis", "mapAxis": [1, 0]},
+]
+
+
+@pytest.fixture
+def test_data_dir(tmp_path):
+    """Create a temporary directory with zarr v3 group for testing."""
+    path = tmp_path / "data" / "v3"
+    root_v3 = zarr.open_group(path, mode="w", zarr_format=3)
+    root_v3.create_group("test")
+    return path
+
+
+def create_data(shape, dtype=np.uint8, mean_val=10):
+    """Create dummy testing data of defined shape and type,
+    with a given mean value."""
+    rng = np.random.default_rng(0)
+    return rng.poisson(mean_val, size=shape).astype(dtype)
+
+
+@pytest.mark.parametrize("transform", TRANSFORMS)
+def test_create_scene_without_coordinate_systems(test_data_dir, transform):
     """
-    Wrapper class for testing ome zarr scene functionality.
-    Every test in this class can make use of the `self.path`
-    attribute which is a temporary directory,
-    which is automatically created and destroyed for each test.
+    Create a scene with two images and a single coordinate transformation
+    between them. The data is saved and loaded back in the test.
     """
+    shape = (64, 64)
+    img_a = OMEZarrImage(
+        data=create_data(shape),
+        name="imageA",
+        axes=["y", "x"],
+        scale={"y": 1.0, "x": 1.0},
+    )
 
-    TRANSFORMS = [
-        {"type": "scale", "scale": [1.0, 1.0]},
-        {"type": "translation", "translation": [0.0, 0.0]},
-        {"type": "rotation", "rotation": [[0.0, -1.0], [1.0, 0.0]]},
-        {"type": "affine", "affine": [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]},
-        {"type": "mapAxis", "mapAxis": [1, 0]},
-    ]
+    img_b = OMEZarrImage(
+        data=create_data(shape),
+        name="imageB",
+        axes=["y", "x"],
+        scale={"y": 1.0, "x": 1.0},
+    )
 
-    @pytest.fixture(autouse=True)
-    def initdir(self, tmpdir):
-        self.path = pathlib.Path(tmpdir.mkdir("data"))
+    img_a_ms = OMEZarrMultiscale(image=img_a)
+    img_b_ms = OMEZarrMultiscale(image=img_b)
 
-        # let's create zarr v3 group too...
-        self.path = self.path / "v3"
-        root_v3 = zarr.open_group(self.path, mode="w", zarr_format=3)
-        self.group_v3 = root_v3.create_group("test")
+    # avoid leaking transform mutations into other tests
+    transform = transform.copy()
+    transform["input"] = {"name": "physical", "path": "imageA"}
+    transform["output"] = {"name": "physical", "path": "imageB"}
 
-    def create_data(self, shape, dtype=np.uint8, mean_val=10):
-        """create some dummy testing data of defined shape and type,
-        with a given mean value"""
-        rng = np.random.default_rng(0)
-        return rng.poisson(mean_val, size=shape).astype(dtype)
+    scene = OMEZarrScene(
+        images=[img_a_ms, img_b_ms],
+        coordinate_transformations=[transform],
+    )
 
-    @pytest.mark.parametrize("transform", TRANSFORMS)
-    def test_create_scene_without_coordinate_systems(self, transform):
-        """
-        Create a scene with two images and a single coordinate transformation
-        between them. The data is saved and loaded back in the test.
-        """
-        shape = (64, 64)
-        img_a = OMEZarrImage(
-            data=self.create_data(shape),
-            name="imageA",
-            axes=["y", "x"],
-            scale={"y": 1.0, "x": 1.0},
-        )
+    scene.to_ome_zarr("test_scene.zarr", overwrite=True)
 
-        img_b = OMEZarrImage(
-            data=self.create_data(shape),
-            name="imageB",
-            axes=["y", "x"],
-            scale={"y": 1.0, "x": 1.0},
-        )
+    # check that the graph is created correctly
+    assert scene._graph is not None
 
-        img_a_ms = OMEZarrMultiscale(image=img_a)
-        img_b_ms = OMEZarrMultiscale(image=img_b)
+    # check that the graph has the correct number of nodes
+    # (aka coordinate systems)
+    assert len(scene._graph.graph.nodes) == 2
 
-        # avoid leaking transform mutations into other tests
-        transform = transform.copy()
-        transform["input"] = {"name": "physical", "path": "imageA"}
-        transform["output"] = {"name": "physical", "path": "imageB"}
+    # traverse graph
+    tf = scene._graph.get_sequence(
+        f"{img_a.name}:physical", f"{img_b.name}:physical"
+    )
 
-        scene = OMEZarrScene(
-            images=[img_a_ms, img_b_ms],
-            coordinate_transformations=[transform],
-        )
+    # check that the transform graph can be traversed (i.e. transform is not None)
+    assert tf is not None
 
-        scene.to_ome_zarr("test_scene.zarr", overwrite=True)
+    # write to disk and read back
+    scene.to_ome_zarr(str(test_data_dir / "test_scene.zarr"), overwrite=True)
+    scene_read = OMEZarrScene.from_ome_zarr(str(test_data_dir / "test_scene.zarr"))
 
-        # check that the graph is created correctly
-        assert scene._graph is not None
+    # check that the graph is created correctly on read
+    assert scene_read._graph is not None
+    assert len(scene_read._graph.graph.nodes) == 2
 
-        # check that the graph has the correct number of nodes
-        # (aka coordinate systems)
-        assert len(scene._graph.graph.nodes) == 2
+    # open the zarr group and check the metadata
+    # and check that the correct metadata fields are present in the store
+    zarr_group = zarr.open_group(str(test_data_dir / "test_scene.zarr"), mode="r")
+    assert "ome" in zarr_group.attrs
+    ome_metadata = zarr_group.attrs["ome"]
+    assert "scene" in ome_metadata
+    assert "version" in ome_metadata and ome_metadata["version"] == "0.6.dev4"
 
-        # traverse graph
-        tf = scene._graph.get_sequence(
-            f"{img_a.name}:physical", f"{img_b.name}:physical"
-        )
+    # check transforms
+    assert "coordinateTransformations" in ome_metadata["scene"]
+    assert len(ome_metadata["scene"]["coordinateTransformations"]) == 1
 
-        # check that the transform graph can be traversed (i.e. transform is not None)
-        assert tf is not None
+    transform_md = ome_metadata["scene"]["coordinateTransformations"][0]
 
-        # write to disk and read back
-        scene.to_ome_zarr(str(self.path / "test_scene.zarr"), overwrite=True)
-        scene_read = OMEZarrScene.from_ome_zarr(str(self.path / "test_scene.zarr"))
+    # make sure that the loaded transform is the same as the original
+    assert transform_md == transform
 
-        # check that the graph is created correctly on read
-        assert scene_read._graph is not None
-        assert len(scene_read._graph.graph.nodes) == 2
+@pytest.mark.parametrize("transform", TRANSFORMS)
+def test_create_scene_with_coordinate_systems(test_data_dir, transform):
+    """
+    Create a scene with two images and three coordinate transformations
+    between them. The data is saved and loaded back in the test.
+    """
+    shape = (64, 64)
+    img_a = OMEZarrImage(
+        data=create_data(shape),
+        name="imageA",
+        axes=["y", "x"],
+        scale={"y": 1.0, "x": 1.0},
+    )
 
-        # open the zarr group and check the metadata
-        # and check that the correct metadata fields are present in the store
-        zarr_group = zarr.open_group(str(self.path / "test_scene.zarr"), mode="r")
-        assert "ome" in zarr_group.attrs
-        ome_metadata = zarr_group.attrs["ome"]
-        assert "scene" in ome_metadata
-        assert "version" in ome_metadata and ome_metadata["version"] == "0.6.dev4"
+    img_b = OMEZarrImage(
+        data=create_data(shape),
+        name="imageB",
+        axes=["y", "x"],
+        scale={"y": 1.0, "x": 1.0},
+    )
 
-        # check transforms
-        assert "coordinateTransformations" in ome_metadata["scene"]
-        assert len(ome_metadata["scene"]["coordinateTransformations"]) == 1
+    img_a_ms = OMEZarrMultiscale(image=img_a)
+    img_b_ms = OMEZarrMultiscale(image=img_b)
 
-        transform_md = ome_metadata["scene"]["coordinateTransformations"][0]
+    world1_cs = {
+        "name": "world",
+        "axes": [
+            ax.model_dump() for ax in img_a_ms.metadata.coordinateSystems[0].axes
+        ],
+    }
+    world2_cs = {
+        "name": "world2",
+        "axes": [
+            ax.model_dump() for ax in img_b_ms.metadata.coordinateSystems[0].axes
+        ],
+    }
 
-        # make sure that the loaded transform is the same as the original
-        assert transform_md == transform
+    transform1 = transform.copy()
+    transform1["input"] = {"name": "physical", "path": "imageA"}
+    transform1["output"] = {"name": "world"}
 
-    @pytest.mark.parametrize("transform", TRANSFORMS)
-    def test_create_scene_with_coordinate_systems(self, transform):
-        """
-        Create a scene with two images and three coordinate transformations
-        between them. The data is saved and loaded back in the test.
-        """
-        shape = (64, 64)
-        img_a = OMEZarrImage(
-            data=self.create_data(shape),
-            name="imageA",
-            axes=["y", "x"],
-            scale={"y": 1.0, "x": 1.0},
-        )
+    transform2 = transform.copy()
+    transform2["input"] = {"name": "world"}
+    transform2["output"] = {"name": "world2"}
 
-        img_b = OMEZarrImage(
-            data=self.create_data(shape),
-            name="imageB",
-            axes=["y", "x"],
-            scale={"y": 1.0, "x": 1.0},
-        )
+    transform3 = transform.copy()
+    transform3["input"] = {"name": "world2"}
+    transform3["output"] = {"name": "physical", "path": "imageB"}
 
-        img_a_ms = OMEZarrMultiscale(image=img_a)
-        img_b_ms = OMEZarrMultiscale(image=img_b)
+    scene = OMEZarrScene(
+        images=[img_a_ms, img_b_ms],
+        coordinate_transformations=[transform1, transform2, transform3],
+        coordinate_systems=[world1_cs, world2_cs],
+    )
 
-        world1_cs = {
-            "name": "world",
-            "axes": [
-                ax.model_dump() for ax in img_a_ms.metadata.coordinateSystems[0].axes
-            ],
-        }
-        world2_cs = {
-            "name": "world2",
-            "axes": [
-                ax.model_dump() for ax in img_b_ms.metadata.coordinateSystems[0].axes
-            ],
-        }
+    # check that the graph is created correctly
+    # and has the correct number of nodes (coordinate systems)
+    assert scene._graph is not None
+    assert len(scene._graph.graph.nodes) == 4
 
-        transform1 = transform.copy()
-        transform1["input"] = {"name": "physical", "path": "imageA"}
-        transform1["output"] = {"name": "world"}
+    scene.to_ome_zarr(str(test_data_dir / "test_scene_with_cs.zarr"), overwrite=True)
+    scene_read = OMEZarrScene.from_ome_zarr(
+        str(test_data_dir / "test_scene_with_cs.zarr")
+    )
 
-        transform2 = transform.copy()
-        transform2["input"] = {"name": "world"}
-        transform2["output"] = {"name": "world2"}
+    # check that the graph is created correctly on read
+    # and has the correct number of nodes (coordinate systems)
+    assert scene_read._graph is not None
+    assert len(scene_read._graph.graph.nodes) == 4
 
-        transform3 = transform.copy()
-        transform3["input"] = {"name": "world2"}
-        transform3["output"] = {"name": "physical", "path": "imageB"}
+    # open zarr group and check metadata
+    zarr_group = zarr.open_group(
+        str(test_data_dir / "test_scene_with_cs.zarr"), mode="r"
+    )
 
-        scene = OMEZarrScene(
-            images=[img_a_ms, img_b_ms],
-            coordinate_transformations=[transform1, transform2, transform3],
-            coordinate_systems=[world1_cs, world2_cs],
-        )
-
-        # check that the graph is created correctly
-        # and has the correct number of nodes (coordinate systems)
-        assert scene._graph is not None
-        assert len(scene._graph.graph.nodes) == 4
-
-        scene.to_ome_zarr(str(self.path / "test_scene_with_cs.zarr"), overwrite=True)
-        scene_read = OMEZarrScene.from_ome_zarr(
-            str(self.path / "test_scene_with_cs.zarr")
-        )
-
-        # check that the graph is created correctly on read
-        # and has the correct number of nodes (coordinate systems)
-        assert scene_read._graph is not None
-        assert len(scene_read._graph.graph.nodes) == 4
-
-        # open zarr group and check metadata
-        zarr_group = zarr.open_group(
-            str(self.path / "test_scene_with_cs.zarr"), mode="r"
-        )
-
-        # make sure that the correct metadata fields are present in the store
-        assert "ome" in zarr_group.attrs
-        ome_metadata = zarr_group.attrs["ome"]
-        assert "scene" in ome_metadata
-        assert "version" in ome_metadata and ome_metadata["version"] == "0.6.dev4"
-        assert "coordinateSystems" in ome_metadata["scene"]
-        assert len(ome_metadata["scene"]["coordinateSystems"]) == 2
+    # make sure that the correct metadata fields are present in the store
+    assert "ome" in zarr_group.attrs
+    ome_metadata = zarr_group.attrs["ome"]
+    assert "scene" in ome_metadata
+    assert "version" in ome_metadata and ome_metadata["version"] == "0.6.dev4"
+    assert "coordinateSystems" in ome_metadata["scene"]
+    assert len(ome_metadata["scene"]["coordinateSystems"]) == 2
 
 
 if __name__ == "__main__":
-    import pytest
-
     pytest.main([__file__])
