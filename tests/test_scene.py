@@ -4,7 +4,6 @@ import zarr
 
 from ome_zarr import OMEZarrImage, OMEZarrMultiscale, OMEZarrScene
 
-
 TRANSFORMS = [
     {"type": "scale", "scale": [1.0, 1.0]},
     {"type": "translation", "translation": [0.0, 0.0]},
@@ -74,9 +73,7 @@ def test_create_scene_without_coordinate_systems(test_data_dir, transform):
     assert len(scene._graph.graph.nodes) == 2
 
     # traverse graph
-    tf = scene._graph.get_sequence(
-        f"{img_a.name}:physical", f"{img_b.name}:physical"
-    )
+    tf = scene._graph.get_sequence(f"{img_a.name}:physical", f"{img_b.name}:physical")
 
     # check that the transform graph can be traversed (i.e. transform is not None)
     assert tf is not None
@@ -106,6 +103,7 @@ def test_create_scene_without_coordinate_systems(test_data_dir, transform):
     # make sure that the loaded transform is the same as the original
     assert transform_md == transform
 
+
 @pytest.mark.parametrize("transform", TRANSFORMS)
 def test_create_scene_with_coordinate_systems(test_data_dir, transform):
     """
@@ -132,15 +130,11 @@ def test_create_scene_with_coordinate_systems(test_data_dir, transform):
 
     world1_cs = {
         "name": "world",
-        "axes": [
-            ax.model_dump() for ax in img_a_ms.metadata.coordinateSystems[0].axes
-        ],
+        "axes": [ax.model_dump() for ax in img_a_ms.metadata.coordinateSystems[0].axes],
     }
     world2_cs = {
         "name": "world2",
-        "axes": [
-            ax.model_dump() for ax in img_b_ms.metadata.coordinateSystems[0].axes
-        ],
+        "axes": [ax.model_dump() for ax in img_b_ms.metadata.coordinateSystems[0].axes],
     }
 
     transform1 = transform.copy()
