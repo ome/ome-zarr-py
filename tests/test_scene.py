@@ -190,5 +190,114 @@ def test_create_scene_with_coordinate_systems(test_data_dir, transform):
     assert len(ome_metadata["scene"]["coordinateSystems"]) == 2
 
 
+def test_appending_scene(test_data_dir):
+    """
+    Create a scene with two images and a single coordinate transformation
+    between them. The data is saved and loaded back.
+    We then append a third image to the scene and make sure the graph is updated.
+    We then save the scene again and ensure that we are writing only what's new
+    (new data and metadata)
+    """
+    img_a = OMEZarrImage(
+        data=create_data((64, 64)),
+        name="imageA",
+        axes=["y", "x"],
+        scale={"y": 1.0, "x": 1.0},
+    )
+    img_b = OMEZarrImage(
+        data=create_data((64, 64)),
+        name="imageB",
+        axes=["y", "x"],
+        scale={"y": 1.0, "x": 1.0},
+    )
+    img_c = OMEZarrImage(
+        data=create_data((64, 64)),
+        name="imageC",
+        axes=["y", "x"],
+        scale={"y": 1.0, "x": 1.0},
+    )
+
+    img_a_ms = OMEZarrMultiscale(image=img_a)
+    img_b_ms = OMEZarrMultiscale(image=img_b)
+    img_c_ms = OMEZarrMultiscale(image=img_c)
+
+    world_cs = {
+        "name": "world",
+        "axes": [
+            ax.model_dump() for ax in img_a_ms.metadata.coordinateSystems[0].axes
+        ],
+    }
+
+    tf1 = {
+        "type": "scale",
+        "scale": [1.0, 1.0],
+        "input": {"name": "physical", "path": "imageA"},
+        "output": {"name": "world"},
+    }
+
+    tf2 = {
+        "type": "scale",
+        "scale": [1.0, 1.0],
+        "input": {"name": "world"},
+        "output": {"name": "physical", "path": "imageB"},
+    }
+
+    tf3 = {
+        "type": "scale",
+        "scale": [1.0, 1.0],
+        "input": {"name": "world"},
+        "output": {"name": "physical", "path": "imageC"},
+    }
+
+    scene = OMEZarrScene(
+        images=[img_a_ms, img_b_ms],
+        coordinate_transformations=[tf1, tf2],
+        coordinate_systems=[world_cs],
+    )
+
+    scene.to_ome_zarr(
+        str(test_data_dir / "test_scene_append.zarr"),
+        overwrite=True
+        )
+    
+    # now we load the scene and append a new image to it
+    scene_read = OMEZarrScene.from_ome_zarr(
+        str(test_data_dir / "test_scene_append.zarr")
+    )
+
+    
+    new_scene = OMEZarrScene(
+        images=list(scene_read.images.values()) + [img_c_ms],
+        coordinate_transformations=list(scene_read.coordinate_transformations) + [tf3],
+        coordinate_systems=[world_cs],
+    )
+
+    new_scene.to_ome_zarr(
+        str(test_data_dir / "test_scene_append.zarr"),
+        overwrite=False
+    )
+
+    # check that the graph is built correctly
+    assert new_scene._graph is not None
+    assert len(new_scene._graph.graph.nodes) == 3
+
+    # check that the data is written and not empty
+    zarr_group = zarr.open_group(
+        str(test_data_dir / "test_scene_append.zarr"), mode="r"
+    )
+    assert "imageA" in zarr_group and "s0" in zarr_group["imageA"]
+    assert "imageB" in zarr_group and "s0" in zarr_group["imageB"]
+    assert "imageC" in zarr_group and "s0" in zarr_group["imageC"]
+
+    # check that the metadata is written and correct
+    assert "ome" in zarr_group.attrs
+    ome_metadata = zarr_group.attrs["ome"]
+    assert "scene" in ome_metadata
+    scene_metadata = ome_metadata["scene"]
+    assert "coordinateTransformations" in scene_metadata
+    assert "coordinateSystems" in scene_metadata
+    assert len(scene_metadata["coordinateTransformations"]) == 3
+    assert len(scene_metadata["coordinateSystems"]) == 1
+
 if __name__ == "__main__":
     pytest.main([__file__])
