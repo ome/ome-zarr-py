@@ -217,9 +217,7 @@ def test_appending_scene(test_data_dir):
 
     world_cs = {
         "name": "world",
-        "axes": [
-            ax.model_dump() for ax in img_a_ms.metadata.coordinateSystems[0].axes
-        ],
+        "axes": [ax.model_dump() for ax in img_a_ms.metadata.coordinateSystems[0].axes],
     }
 
     tf1 = {
@@ -249,17 +247,13 @@ def test_appending_scene(test_data_dir):
         coordinate_systems=[world_cs],
     )
 
-    scene.to_ome_zarr(
-        str(test_data_dir / "test_scene_append.zarr"),
-        overwrite=True
-        )
-    
+    scene.to_ome_zarr(str(test_data_dir / "test_scene_append.zarr"), overwrite=True)
+
     # now we load the scene and append a new image to it
     scene_read = OMEZarrScene.from_ome_zarr(
         str(test_data_dir / "test_scene_append.zarr")
     )
 
-    
     new_scene = OMEZarrScene(
         images=list(scene_read.images.values()) + [img_c_ms],
         coordinate_transformations=list(scene_read.coordinate_transformations) + [tf3],
@@ -267,8 +261,7 @@ def test_appending_scene(test_data_dir):
     )
 
     new_scene.to_ome_zarr(
-        str(test_data_dir / "test_scene_append.zarr"),
-        overwrite=False
+        str(test_data_dir / "test_scene_append.zarr"), overwrite=False
     )
 
     # check that the graph is built correctly
@@ -292,6 +285,7 @@ def test_appending_scene(test_data_dir):
     assert "coordinateSystems" in scene_metadata
     assert len(scene_metadata["coordinateTransformations"]) == 3
     assert len(scene_metadata["coordinateSystems"]) == 1
+
 
 if __name__ == "__main__":
     pytest.main([__file__])
