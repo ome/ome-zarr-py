@@ -273,7 +273,7 @@ def test_appending_scene(test_data_dir):
 
     # check that the graph is built correctly
     assert new_scene._graph is not None
-    assert len(new_scene._graph.graph.nodes) == 3
+    assert len(new_scene._graph.graph.nodes) == 4
 
     # check that the data is written and not empty
     zarr_group = zarr.open_group(
