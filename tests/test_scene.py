@@ -62,6 +62,8 @@ class TestScene:
         img_a_ms = OMEZarrMultiscale(image=img_a)
         img_b_ms = OMEZarrMultiscale(image=img_b)
 
+        # avoid leaking transform mutations into other tests
+        transform = transform.copy()
         transform["input"] = {"name": "physical", "path": "imageA"}
         transform["output"] = {"name": "physical", "path": "imageB"}
 
