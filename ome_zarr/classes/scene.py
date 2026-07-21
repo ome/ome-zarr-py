@@ -53,7 +53,6 @@ class OMEZarrScene:
         )
 
         self._build_graph()
-        self._written_image_names = set()
 
     def get_coordinate_system(
         self, name: str, path: str | None = None
@@ -143,29 +142,27 @@ class OMEZarrScene:
             shutil.rmtree(str(store))
 
         # Open or create zarr group
-        mode = "a" if overwrite else "w"
+        mode = "w" if overwrite else "a"
         zarr_group = zarr.open(store, mode=mode)
 
         # Create a subgroup for each image using its path key
         for img_path, img in tqdm.tqdm(self.images.items(), desc="Writing images"):
             # Skip if already written (incremental mode)
-            if not overwrite and img_path in self._written_image_names:
+            if not overwrite and img_path in zarr_group:
                 continue
 
             # Write the image
-            subgroup = zarr_group.create_group(img_path, overwrite=not overwrite)
-            img.to_ome_zarr(subgroup, overwrite=overwrite, version="0.6.dev4")
-            self._written_image_names.add(img_path)
+            subgroup = zarr_group.create_group(img_path, overwrite=overwrite)
+            img.to_ome_zarr(subgroup, overwrite=True, version="0.6.dev4")
 
         for disp_path, disp_img in (self.coordinates_displacements or {}).items():
             # Skip if already written (incremental mode)
-            if not overwrite and disp_path in self._written_image_names:
+            if not overwrite and disp_path in zarr_group:
                 continue
 
             # Write the displacement image
-            subgroup = zarr_group.create_group(disp_path, overwrite=not overwrite)
-            disp_img.to_ome_zarr(subgroup, overwrite=overwrite, version="0.6.dev4")
-            self._written_image_names.add(disp_path)
+            subgroup = zarr_group.create_group(disp_path, overwrite=overwrite)
+            disp_img.to_ome_zarr(subgroup, overwrite=True, version="0.6.dev4")
 
         # Always update scene metadata
         metadata_dict = self.metadata.model_dump()
