@@ -337,11 +337,15 @@ class OMEZarrScene:
         if transform.type == "affine":
             aff = np.asarray(transform.affine)
             if aff.shape[0] == aff.shape[1]:
-                tnd_transform = tnd.transforms.Affine(transform.affine)
+                tnd_transform = tnd.transforms.Affine(
+                    transform.affine,
+                    spaces=spaces,
+                    )
             else:
                 aff = np.eye(max(aff.shape))
                 aff[: aff.shape[0], : aff.shape[1]] = aff
-                tnd_transform = tnd.transforms.Affine(aff)
+                tnd_transform = tnd.transforms.Affine(
+                    aff, spaces=spaces)
 
         elif transform.type == "displacements":
             path_to_dfield = transform.path if transform.path is not None else ""
@@ -355,18 +359,29 @@ class OMEZarrScene:
                     list(dfield.images[0].scale.values())[1:]
                 ),
                 vector_axis=0,
+                spaces=spaces,
             )
         elif transform.type == "mapAxis":
-            tnd_transform = tnd.transforms.MapAxis(list(transform.mapAxis))
+            tnd_transform = tnd.transforms.MapAxis(
+                list(transform.mapAxis),
+                spaces=spaces,
+            )
+
 
         elif transform.type == "scale":
-            tnd_transform = tnd.transforms.Scale(transform.scale)
+            tnd_transform = tnd.transforms.Scale(
+                transform.scale, spaces=spaces
+            )
 
         elif transform.type == "translation":
-            tnd_transform = tnd.transforms.Translate(transform.translation)
+            tnd_transform = tnd.transforms.Translate(
+                transform.translation, spaces=spaces
+                )
 
         elif transform.type == "rotation":
-            tnd_transform = tnd.transforms.Affine.from_linear_map(transform.rotation)
+            tnd_transform = tnd.transforms.Affine.from_linear_map(
+                transform.rotation, spaces=spaces
+            )
 
         elif transform.type == "byDimension":
             sub_transformations = transform.transformations
@@ -379,7 +394,9 @@ class OMEZarrScene:
                 for sub_tf in sub_transformations
             ]
             tnd_transform = tnd.transforms.ByDimension(
-                subtransforms=tnd_sub_transforms, fill_identity=0
+                subtransforms=tnd_sub_transforms,
+                fill_identity=0,
+                spaces=spaces,
             )
         elif transform.type == "sequence":
             sub_transformations = transform.transformations
