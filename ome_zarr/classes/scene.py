@@ -305,6 +305,33 @@ class OMEZarrScene:
         """
         import numpy as np
 
+        if transform.input is not None:
+            input_path = (
+                transform.input.path if transform.input.path is not None else ""
+            )
+            output_path = (
+                transform.output.path if transform.output.path is not None else ""
+            )
+
+            # zarr_context prepends path with relative path from root
+            # to keep track of global location of coordinate systems in the zarr store
+            if zarr_context != "" and input_path != "":
+                input_path = f"{zarr_context}/{input_path}"
+            elif zarr_context != "":
+                input_path = zarr_context
+
+            if zarr_context != "" and output_path != "":
+                output_path = f"{zarr_context}/{output_path}"
+            elif zarr_context != "":
+                output_path = zarr_context
+
+            spaces = tnd.Spaces(
+                f"{input_path}:{transform.input.name}",
+                f"{output_path}:{transform.output.name}",
+            )
+        else:
+            spaces = tnd.Spaces(None, None)
+
         tnd_transform = None
         # Example for an affine transformation (this will depend on the actual structure of AnyTransform)
         if transform.type == "affine":
@@ -360,31 +387,8 @@ class OMEZarrScene:
                 self._ozmp_tf_to_tnd(sub_tf, zarr_context)
                 for sub_tf in sub_transformations
             ]
-            tnd_transform = tnd.base.TransformSequence(tnd_sub_transforms)
-
-        if transform.input is not None and tnd_transform is not None:
-            input_path = (
-                transform.input.path if transform.input.path is not None else ""
-            )
-            output_path = (
-                transform.output.path if transform.output.path is not None else ""
-            )
-
-            # zarr_context prepends path with relative path from root
-            # to keep track of global location of coordinate systems in the zarr store
-            if zarr_context != "" and input_path != "":
-                input_path = f"{zarr_context}/{input_path}"
-            elif zarr_context != "":
-                input_path = zarr_context
-
-            if zarr_context != "" and output_path != "":
-                output_path = f"{zarr_context}/{output_path}"
-            elif zarr_context != "":
-                output_path = zarr_context
-
-            tnd_transform.spaces = tnd.Spaces(
-                f"{input_path}:{transform.input.name}",
-                f"{output_path}:{transform.output.name}",
-            )
+            tnd_transform = tnd.base.TransformSequence(
+                tnd_sub_transforms,
+                spaces=spaces,)
 
         return tnd_transform
