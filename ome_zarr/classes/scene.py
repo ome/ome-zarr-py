@@ -94,9 +94,21 @@ class OMEZarrScene:
         # Add scene-level transformations (empty context = root level)
         for tf in self.coordinate_transformations:
             if tf.type == "sequence":
-                tnd_transform = self._ozmp_tf_to_tnd(tf).simplify()
+                source_cs = self.get_coordinate_system(
+                    tf.input.name, tf.input.path
+                    )
+                target_cs = self.get_coordinate_system(
+                    tf.output.name, tf.output.path
+                    )
+                tnd_transform = self._ozmp_tf_to_tnd(
+                    tf, zarr_context="",
+                    source_cs=source_cs,
+                    target_cs=target_cs,
+                ).simplify()
             else:
-                tnd_transform = self._ozmp_tf_to_tnd(tf)
+                tnd_transform = self._ozmp_tf_to_tnd(
+                    tf, zarr_context="",
+                    source_cs=None, target_cs=None)
             self._graph.add_transform(tnd_transform)
 
             # check if input/output are defined
@@ -298,6 +310,8 @@ class OMEZarrScene:
         self,
         transform: AnyTransform,
         zarr_context: str = "",
+        source_cs: CoordinateSystem | None = None,
+        target_cs: CoordinateSystem | None = None,
     ) -> tnd.base.Transform:
         """
         Convert an OME-Zarr coordinate transformation to a transformnd Transform object.
@@ -367,6 +381,14 @@ class OMEZarrScene:
                 spaces=spaces,
             )
 
+        elif transform.type == "projectAxis":
+            tnd_transform = tnd.transforms.ProjectAxis(
+                created=transform.createdOutputs,
+                dropped=transform.droppedInputs,
+                spaces=spaces,
+                source_ndim=len(source_cs.axes) if source_cs is not None else None,
+                target_ndim=len(target_cs.axes) if target_cs is not None else None,
+            )
 
         elif transform.type == "scale":
             tnd_transform = tnd.transforms.Scale(
@@ -401,7 +423,7 @@ class OMEZarrScene:
         elif transform.type == "sequence":
             sub_transformations = transform.transformations
             tnd_sub_transforms = [
-                self._ozmp_tf_to_tnd(sub_tf, zarr_context)
+                self._ozmp_tf_to_tnd(sub_tf, zarr_context, source_cs, target_cs)
                 for sub_tf in sub_transformations
             ]
             tnd_transform = tnd.base.TransformSequence(
