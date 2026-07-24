@@ -372,7 +372,7 @@ class OMEZarrMultiscaleBase:
         is_label = False
 
         # Handle loading based on version
-        if version.startswith(("0.1", "0.2", "0.3")):
+        if version in ("0.1", "0.2", "0.3"):
             metadata = cls._read_legacy_metadata(group, version)
             if "image-label" in group.attrs:
                 is_label = True
