@@ -853,13 +853,17 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
         if self._omero and isinstance(self._omero, Omero):
             omero_dict = _recursive_pop_nones(self._omero.model_dump(by_alias=True))
 
+            # in 0.4, omero metadata goes in group attrs
             if version == "0.4":
                 group.attrs["omero"] = omero_dict
-            elif version == "0.5":
+
+            # in >=0.5, omero metadata goes in the ome attr
+            elif version == "0.5" or version.startswith("0.6"):
                 if "ome" not in group.attrs:
                     raise ValueError("OME-Zarr attributes not found in group")
                 ome = cast(dict, group.attrs["ome"])
-                omero_dict["version"] = version
+                if version == "0.5":
+                    omero_dict["version"] = version
                 ome["omero"] = omero_dict
                 group.attrs["ome"] = ome
 
@@ -897,7 +901,7 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
             # Update labels list in metadata
             if version == "0.4":
                 label_group.attrs["labels"] = list_of_labels
-            elif version == "0.5":
+            elif version == "0.5" or version.startswith("0.6"):
                 label_group.attrs["ome"] = {
                     "version": version,
                     "labels": list_of_labels,
@@ -1031,7 +1035,7 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
 
         if version in ("0.1", "0.2", "0.3", "0.4") and "omero" in group.attrs:
             omero_dict = cast(dict[str, Any] | None, group.attrs.get("omero", None))
-        elif version == "0.5":
+        elif version == "0.5" or version.startswith("0.6"):
             ome_attrs = cast(dict[str, Any], group.attrs.get("ome", {}))
             if "omero" in ome_attrs:
                 omero_dict = cast(dict[str, Any] | None, ome_attrs.get("omero", None))
@@ -1050,7 +1054,7 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
             list_of_labels = (
                 cast(list[str], labels_json) if isinstance(labels_json, list) else []
             )
-        elif version == "0.5" and "labels" in group:
+        elif (version == "0.5" or version.startswith("0.6")) and "labels" in group:
             labels_ome_attrs = cast(
                 dict[str, Any], group["labels"].attrs.get("ome", {})
             )
@@ -1173,7 +1177,7 @@ class OMEZarrLabels(OMEZarrMultiscaleBase):
                 group.attrs["image-label"] = _recursive_pop_nones(
                     self._image_label.model_dump(by_alias=True)
                 )
-            elif version == "0.5":
+            elif version == "0.5" or version.startswith("0.6"):
                 ome = cast(dict, group.attrs.get("ome", {}))
                 ome["image-label"] = _recursive_pop_nones(
                     self._image_label.model_dump(by_alias=True)
@@ -1198,7 +1202,7 @@ class OMEZarrLabels(OMEZarrMultiscaleBase):
                 image_label_dict = cast(
                     dict[str, Any] | None, group.attrs.get("image-label", None)
                 )
-        elif version == "0.5":
+        elif version == "0.5" or version.startswith("0.6"):
             ome_attrs = cast(dict[str, Any], group.attrs.get("ome", {}))
             if "image-label" in ome_attrs:
                 image_label_dict = cast(
