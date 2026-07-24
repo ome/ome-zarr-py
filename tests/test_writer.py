@@ -178,7 +178,7 @@ class TestWriter:
         )
         ms.to_ome_zarr(
             zarr.open(self.path / "test_transforms.zarr", mode="w"),
-            version="0.6.dev4",
+            version="0.6",
             overwrite=True,
         )
 
@@ -197,7 +197,7 @@ class TestWriter:
             )
 
     @pytest.mark.parametrize(
-        "version", ("0.4", "0.5", "0.6.dev4"), ids=["V04", "V05", "V06"]
+        "version", ("0.4", "0.5", "0.6"), ids=["V04", "V05", "V06"]
     )
     def test_image_class_versions(self, version):
         from ome_zarr_models.v06.multiscales import Multiscale as Multiscale_V06

@@ -343,7 +343,7 @@ class OMEZarrMultiscaleBase:
         self,
         group: zarr.Group | str,
         storage_options: list[dict[str, Any]] | dict[str, Any] | None = None,
-        version: Literal["0.6.dev4", "0.5", "0.4"] = "0.5",
+        version: Literal["0.6", "0.5", "0.4"] = "0.5",
         compute: bool = True,
         overwrite: bool = False,
     ) -> list:
@@ -372,7 +372,7 @@ class OMEZarrMultiscaleBase:
                 shutil.rmtree(group)
 
             fmt: Format | None = None
-            if version in {"0.5", "0.6", "0.6.dev4"}:
+            if version in {"0.5", "0.6", "0.6"}:
                 fmt = FormatV05()
             elif version == "0.4":
                 fmt = FormatV04()
@@ -438,7 +438,7 @@ class OMEZarrMultiscaleBase:
 
                 group.attrs["ome"] = metadata_dict
 
-            elif version == "0.6.dev4":
+            elif version == "0.6":
                 metadata_dict = {
                     "version": version,
                     "multiscales": [
@@ -615,7 +615,7 @@ class OMEZarrMultiscaleBase:
     def _write_additional_meta_data(
         self,
         group: zarr.Group,
-        version: Literal["0.6.dev4", "0.5", "0.4"] = "0.5",
+        version: Literal["0.6", "0.5", "0.4"] = "0.5",
         storage_options: list[dict[str, Any]] | dict[str, Any] | None = None,
         compute: bool = True,
         overwrite: bool = False,
@@ -840,7 +840,7 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
     def _write_additional_meta_data(
         self,
         group: zarr.Group,
-        version: Literal["0.6.dev4", "0.5", "0.4"] = "0.5",
+        version: Literal["0.6", "0.5", "0.4"] = "0.5",
         storage_options: list[dict[str, Any]] | dict[str, Any] | None = None,
         compute: bool = True,
         overwrite: bool = False,
