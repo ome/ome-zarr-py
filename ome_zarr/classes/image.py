@@ -1161,7 +1161,7 @@ class OMEZarrLabels(OMEZarrMultiscaleBase):
     def _write_additional_meta_data(
         self,
         group: zarr.Group,
-        version: Literal["0.6.dev4", "0.5", "0.4"] = "0.5",
+        version: Literal["0.6", "0.5", "0.4"] = "0.5",
         storage_options: list[dict[str, Any]] | dict[str, Any] | None = None,
         compute: bool = True,
         overwrite: bool = False,
