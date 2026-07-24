@@ -372,7 +372,7 @@ class OMEZarrMultiscaleBase:
                 shutil.rmtree(group)
 
             fmt: Format | None = None
-            if version in {"0.5", "0.6", "0.6"}:
+            if version in {"0.5", "0.6"}:
                 fmt = FormatV05()
             elif version == "0.4":
                 fmt = FormatV04()

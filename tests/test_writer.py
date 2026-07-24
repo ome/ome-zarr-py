@@ -15,7 +15,6 @@ from ome_zarr_models.v04 import Labels as Models04Labels
 from ome_zarr_models.v04 import Well as Models04Well
 from ome_zarr_models.v05.hcs import HCS as Models05HCS
 from ome_zarr_models.v05.image import Image as Models05Image
-from ome_zarr_models.v06.image import Image as Models06Image
 from ome_zarr_models.v05.well import Well as Models05Well
 from skimage.data import binary_blobs
 from zarr.abc.codec import BytesBytesCodec
@@ -299,7 +298,8 @@ class TestWriter:
 
     @pytest.mark.parametrize("storage_options_list", [True, False])
     @pytest.mark.parametrize(
-        "version", ["0.4", "0.5", "0.6"],
+        "version",
+        ["0.4", "0.5", "0.6"],
         ids=["V04", "V05", "V06"],
     )
     def test_image_class_writer(
