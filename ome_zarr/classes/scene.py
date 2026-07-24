@@ -94,21 +94,18 @@ class OMEZarrScene:
         # Add scene-level transformations (empty context = root level)
         for tf in self.coordinate_transformations:
             if tf.type == "sequence":
-                source_cs = self.get_coordinate_system(
-                    tf.input.name, tf.input.path
-                    )
-                target_cs = self.get_coordinate_system(
-                    tf.output.name, tf.output.path
-                    )
+                source_cs = self.get_coordinate_system(tf.input.name, tf.input.path)
+                target_cs = self.get_coordinate_system(tf.output.name, tf.output.path)
                 tnd_transform = self._ozmp_tf_to_tnd(
-                    tf, zarr_context="",
+                    tf,
+                    zarr_context="",
                     source_cs=source_cs,
                     target_cs=target_cs,
                 ).simplify()
             else:
                 tnd_transform = self._ozmp_tf_to_tnd(
-                    tf, zarr_context="",
-                    source_cs=None, target_cs=None)
+                    tf, zarr_context="", source_cs=None, target_cs=None
+                )
             self._graph.add_transform(tnd_transform)
 
             # check if input/output are defined
@@ -354,12 +351,11 @@ class OMEZarrScene:
                 tnd_transform = tnd.transforms.Affine(
                     transform.affine,
                     spaces=spaces,
-                    )
+                )
             else:
                 aff = np.eye(max(aff.shape))
                 aff[: aff.shape[0], : aff.shape[1]] = aff
-                tnd_transform = tnd.transforms.Affine(
-                    aff, spaces=spaces)
+                tnd_transform = tnd.transforms.Affine(aff, spaces=spaces)
 
         elif transform.type == "displacements":
             path_to_dfield = transform.path if transform.path is not None else ""
@@ -391,14 +387,12 @@ class OMEZarrScene:
             )
 
         elif transform.type == "scale":
-            tnd_transform = tnd.transforms.Scale(
-                transform.scale, spaces=spaces
-            )
+            tnd_transform = tnd.transforms.Scale(transform.scale, spaces=spaces)
 
         elif transform.type == "translation":
             tnd_transform = tnd.transforms.Translate(
                 transform.translation, spaces=spaces
-                )
+            )
 
         elif transform.type == "rotation":
             tnd_transform = tnd.transforms.Affine.from_linear_map(
@@ -428,6 +422,7 @@ class OMEZarrScene:
             ]
             tnd_transform = tnd.base.TransformSequence(
                 tnd_sub_transforms,
-                spaces=spaces,)
+                spaces=spaces,
+            )
 
         return tnd_transform
