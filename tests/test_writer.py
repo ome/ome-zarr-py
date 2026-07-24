@@ -385,15 +385,22 @@ class TestWriter:
 
         # check written coordinatetransormations match relative factors between array sizes
         for level, nd_array in enumerate(node_data):
+            ds = node_metadata["multiscales"][0]["datasets"][level]
             if level == 0:
                 # check first written scale values explicitly match those in TRANSFORMATIONS
                 for d in axes:
-                    assert (
-                        node_metadata["multiscales"][0]["datasets"][level][
-                            "coordinateTransformations"
-                        ][0]["scale"][axes.index(d)]
-                        == TRANSFORMATIONS[0][0]["scale"][axes.index(d)]
-                    )
+                    if version.startswith(("0.4", "0.5")):
+                        tf = ds["coordinateTransformations"][0]
+                        assert (
+                            tf["scale"][axes.index(d)]
+                            == TRANSFORMATIONS[0][0]["scale"][axes.index(d)]
+                        )
+                    elif version.startswith("0.6"):
+                        tf = ds["coordinateTransformations"][0]["transformations"][0]
+                        assert (
+                            tf["scale"][axes.index(d)]
+                            == TRANSFORMATIONS[0][0]["scale"][axes.index(d)]
+                        )
                 continue
 
             # first calculate relative factors between this and previous level
@@ -418,9 +425,10 @@ class TestWriter:
                 assert relative_factors["z"] == 1.0
 
             # retrieve written scale factors from metadata and check they match expected
-            cts = node_metadata["multiscales"][0]["datasets"][level][
-                "coordinateTransformations"
-            ]
+            if version.startswith(("0.4", "0.5")):
+                cts = ds["coordinateTransformations"]
+            elif version.startswith("0.6"):
+                cts = ds["coordinateTransformations"][0]["transformations"]
             assert len(cts) == 2
             transf = cts[0]
             assert transf["type"] == "scale"
