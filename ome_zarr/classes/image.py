@@ -1047,13 +1047,21 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
                         for i, ch in enumerate(self._omero.channels)
                     ]
                     channel_colors = [
-                        ch.color if ch.color is not None else DEFAULT_COLORS[i % len(DEFAULT_COLORS)]
+                        (
+                            ch.color
+                            if ch.color is not None
+                            else DEFAULT_COLORS[i % len(DEFAULT_COLORS)]
+                        )
                         for i, ch in enumerate(self._omero.channels)
                     ]
                     contrast_limits = [
                         (
                             ch.window.start if ch.window.start is not None else 0,
-                            ch.window.end if ch.window.end is not None else self._images[0].data.dtype.itemsize * 255,
+                            (
+                                ch.window.end
+                                if ch.window.end is not None
+                                else self._images[0].data.dtype.itemsize * 255
+                            ),
                         )
                         for i, ch in enumerate(self._omero.channels)
                     ]
