@@ -1045,7 +1045,11 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
                 channel_colors: list[str] = []
                 contrast_limits: list[tuple[float, float]] = []
 
-                if self._omero.channels is not None and len(self._omero.channels) > 0:
+                if (
+                    self._omero is not None
+                    and self._omero.channels is not None
+                    and len(self._omero.channels) > 0
+                ):
                     for i, ch in enumerate(self._omero.channels):
                         channel_names.append(getattr(ch, "label", f"Channel {i}"))
 
