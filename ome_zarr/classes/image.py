@@ -1057,7 +1057,9 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
                         if ch_color is not None:
                             channel_colors.append(ch_color)
                         else:
-                            channel_colors.append(DEFAULT_COLORS[i % len(DEFAULT_COLORS)])
+                            channel_colors.append(
+                                DEFAULT_COLORS[i % len(DEFAULT_COLORS)]
+                            )
 
                         ch_window = getattr(ch, "window", None)
                         if ch_window is not None:
