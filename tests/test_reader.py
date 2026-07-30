@@ -266,7 +266,7 @@ def test_class_reader():
     assert image.channel_colors == ["0000FF", "FFFF00"]
     assert hasattr(image, "contrast_limits")
     assert len(image.contrast_limits) == 2
-    assert image.contrast_limits == [(0., 1500.), (0., 1500.)]
+    assert image.contrast_limits == [(0.0, 1500.0), (0.0, 1500.0)]
 
     # image is known to have one labels image of name "0"
     assert len(image.labels) == 1
