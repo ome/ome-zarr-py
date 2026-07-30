@@ -1041,35 +1041,37 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
                 self._omero = Omero.model_validate(omero_dict)
 
                 # reverse-populate channel_names, channel_colors, contrast_limits from omero metadata
-                if self._omero.channels is not None:
-                    channel_names = [
-                        ch.label if ch.label is not None else f"Channel {i}"
-                        for i, ch in enumerate(self._omero.channels)
-                    ]
-                    channel_colors = [
-                        (
-                            ch.color
-                            if ch.color is not None
-                            else DEFAULT_COLORS[i % len(DEFAULT_COLORS)]
-                        )
-                        for i, ch in enumerate(self._omero.channels)
-                    ]
-                    contrast_limits = [
-                        (
-                            ch.window.start if ch.window.start is not None else 0,
-                            (
-                                ch.window.end
-                                if ch.window.end is not None
-                                else self._images[0].data.dtype.itemsize * 255
-                            ),
-                        )
-                        for i, ch in enumerate(self._omero.channels)
-                    ]
+                channel_names: list[str] = []
+                channel_colors: list[str] = []
+                contrast_limits: list[tuple[float, float]] = []
 
-                    for img in self._images:
-                        img.channel_names = channel_names
-                        img.channel_colors = channel_colors
-                        img.contrast_limits = contrast_limits
+                if self._omero.channels is not None and len(self._omero.channels) > 0:
+                    for i, ch in enumerate(self._omero.channels):
+                        channel_names.append(getattr(ch, "label", f"Channel {i}"))
+
+                        ch_color = getattr(ch, "color", None)
+                        if ch_color is not None:
+                            channel_colors.append(ch_color)
+                        else:
+                            channel_colors.append(DEFAULT_COLORS[i % len(DEFAULT_COLORS)])
+
+                        ch_window = getattr(ch, "window", None)
+                        if ch_window is not None:
+                            start = getattr(ch_window, "start", 0)
+                            end = getattr(
+                                ch_window,
+                                "end",
+                                self._images[0].data.dtype.itemsize * 255,
+                            )
+                            contrast_limits.append((start, end))
+                        else:
+                            contrast_limits.append(
+                                (0, self._images[0].data.dtype.itemsize * 255)
+                            )
+
+                self.channel_names = channel_names
+                self.channel_colors = channel_colors
+                self.contrast_limits = contrast_limits
             except ValidationError as e:
                 warnings.warn(f"Invalid Omero metadata: {e}")
 
