@@ -16,6 +16,9 @@ from ome_zarr_models.v04 import Well as Models04Well
 from ome_zarr_models.v05.hcs import HCS as Models05HCS
 from ome_zarr_models.v05.image import Image as Models05Image
 from ome_zarr_models.v05.well import Well as Models05Well
+from ome_zarr_models.v06.image import Image as Models06Image
+from ome_zarr_models.v06.hcs import HCS as Models06HCS
+from ome_zarr_models.v06.well import Well as Models06Well
 from skimage.data import binary_blobs
 from zarr.abc.codec import BytesBytesCodec
 from zarr.codecs import BloscCodec
@@ -31,6 +34,7 @@ from ome_zarr.format import (
     FormatV03,
     FormatV04,
     FormatV05,
+    FormatV06,
     format_from_version,
 )
 from ome_zarr.scale import _build_pyramid
@@ -58,6 +62,7 @@ TRANSFORMATIONS = [
 FORMAT_VERSIONS = [
     pytest.param(FormatV04, id="V04"),
     pytest.param(FormatV05, id="V05"),
+    pytest.param(FormatV06, id="V06")
 ]
 
 ARRAY_CONSTRUCTORS = [np.array, da.from_array]
@@ -84,11 +89,11 @@ def _make_storage_options(fmt, shape, axes):
     )
     options = {
         "chunks": (16, 16),
-        "shards": (32, 32) if fmt.version == "0.5" else None,
+        "shards": (32, 32) if fmt.version in ("0.5", "0.6") else None,
         "compressors": compressor,
-        "serializer": BytesCodec(endian="little") if fmt.version == "0.5" else None,
+        "serializer": BytesCodec(endian="little") if fmt.version in ("0.5", "0.6") else None,
         "fill_value": 0,
-        "dimension_names": list(axes) if fmt.version == "0.5" else None,
+        "dimension_names": list(axes) if fmt.version in ("0.5", "0.6") else None,
         "order": "C",
     }
     return {k: v for k, v in options.items() if v is not None}
@@ -455,7 +460,7 @@ class TestWriter:
     ):
         fmt = format_version_all()
 
-        if fmt.version == "0.5":
+        if fmt.version in ("0.5", "0.6"):
             grp_path = self.path_v3 / "test"
         else:
             grp_path = self.path / "test"
@@ -487,7 +492,7 @@ class TestWriter:
             )
 
         storage_options = _make_storage_options(fmt, shape, axes)
-        if fmt.version != "0.5":
+        if fmt.version not in ("0.5", "0.6"):
             chunks = [(128, 128), (50, 50), (25, 25), (25, 25), (25, 25), (25, 25)]
 
             if storage_options_list:
@@ -526,16 +531,30 @@ class TestWriter:
         else:
             assert node_data[0].shape == shape
 
-        for ax in node_metadata["multiscales"][0].get("axes"):
+        if fmt.version == "0.4":
+            axes_md = node_metadata["multiscales"][0].get("axes")
+        elif fmt.version == "0.5":
+            axes_md = node_metadata["multiscales"][0].get("axes")
+        elif fmt.version == "0.6":
+            axes_md = node_metadata["multiscales"][0]["coordinateSystems"][0].get(
+                "axes"
+            )
+        for ax in axes_md:
             if ax["name"] in axes_units:
                 assert ax.get("unit") == axes_units[ax["name"]]
 
         print("node.metadata", node_metadata)
         if fmt.version not in ("0.1", "0.2", "0.3"):
-            cts = [
-                d["coordinateTransformations"]
-                for d in node_metadata["multiscales"][0]["datasets"]
-            ]
+            if fmt.version in ("0.4", "0.5"):
+                cts = [
+                    d["coordinateTransformations"]
+                    for d in node_metadata["multiscales"][0]["datasets"]
+                ]
+            elif fmt.version == "0.6":
+                cts = [
+                    d["coordinateTransformations"][0]["transformations"]
+                    for d in node_metadata["multiscales"][0]["datasets"]
+                ]
             for transf, expected in zip(cts, transformations):
                 assert transf == expected
             assert len(cts) == len(node_data)
@@ -552,6 +571,8 @@ class TestWriter:
             Models04Image.from_zarr(out)
         elif fmt.version == "0.5":
             Models05Image.from_zarr(out)
+        elif fmt.version == "0.6":
+            Models06Image.from_zarr(out)
 
     @pytest.mark.parametrize(
         "format_version",
@@ -571,7 +592,7 @@ class TestWriter:
         """
         version = format_version()
 
-        if version.version == "0.5":
+        if version.version in ("0.5", "0.6"):
             grp_path = self.path_v3 / "test"
         else:
             grp_path = self.path / "test"
@@ -623,6 +644,8 @@ class TestWriter:
             Models04Image.from_zarr(out)
         elif version.version == "0.5":
             Models05Image.from_zarr(out)
+        elif version.version == "0.6":
+            Models06Image.from_zarr(out)
 
     def test_mix_zarr_formats(self):
         # check group zarr v2 and v3 matches fmt
@@ -688,10 +711,21 @@ class TestWriter:
         node_metadata = out.attrs
         if "ome" in node_metadata:
             node_metadata = node_metadata["ome"]
-        cts = [
-            d["coordinateTransformations"]
-            for d in node_metadata["multiscales"][0]["datasets"]
-        ]
+            version = node_metadata.get("version")
+            assert version in ("0.5", "0.6")
+        else:
+            version = "0.4"
+
+        if version in ("0.4", "0.5"):
+            cts = [
+                d["coordinateTransformations"]
+                for d in node_metadata["multiscales"][0]["datasets"]
+            ]
+        elif version == "0.6":
+            cts = [
+                d["coordinateTransformations"][0]["transformations"]
+                for d in node_metadata["multiscales"][0]["datasets"]
+            ]
         for level, transfs in enumerate(cts):
             assert len(transfs) == 2
             assert transfs[0]["type"] == "scale"
@@ -784,15 +818,25 @@ class TestWriter:
         node_metadata = out.attrs
         if "ome" in node_metadata:
             node_metadata = node_metadata["ome"]
+            version = node_metadata.get("version", "0.6")
+
+        else:
+            version = node_metadata.get("version", "0.4")
         paths = [d["path"] for d in node_metadata["multiscales"][0]["datasets"]]
         image_node_data = [da.from_zarr(out[path]) for path in paths]
         first_chunk = [c[0] for c in image_node_data[0].chunks]
         assert tuple(first_chunk) == _retuple(chunks, image_node_data[0].shape)
 
-        cts = [
-            d["coordinateTransformations"]
-            for d in node_metadata["multiscales"][0]["datasets"]
-        ]
+        if version in ("0.4", "0.5"):
+            cts = [
+                d["coordinateTransformations"]
+                for d in node_metadata["multiscales"][0]["datasets"]
+            ]
+        else:
+            cts = [
+                d["coordinateTransformations"][0]["transformations"]
+                for d in node_metadata["multiscales"][0]["datasets"]
+            ]
         for level, transfs in enumerate(cts):
             assert len(transfs) == 2
             assert transfs[0]["type"] == "scale"
@@ -841,6 +885,8 @@ class TestWriter:
             Models04Image.from_zarr(group)
         elif fmt.version == "0.5":
             Models05Image.from_zarr(group)
+        elif fmt.version == "0.6":
+            Models06Image.from_zarr(group)
 
     def test_write_image_scalar_chunks(self):
         """
@@ -864,6 +910,7 @@ class TestWriter:
         (
             pytest.param(FormatV04, id="V04"),
             pytest.param(FormatV05, id="V05"),
+            pytest.param(FormatV06, id="V06")
         ),
     )
     def test_write_image_compressed(self, array_constructor, format_version):
@@ -921,17 +968,20 @@ class TestWriter:
                     "shuffle": Blosc.SHUFFLE,
                     "blocksize": 0,
                 }
-        assert format_version().version in ("0.4", "0.5")
+        assert format_version().version in ("0.4", "0.5", "0.6")
         if format_version().version == "0.4":
             Models04Image.from_zarr(group)
         elif format_version().version == "0.5":
             Models05Image.from_zarr(group)
+        elif format_version().version == "0.6":
+            Models06Image.from_zarr(group)
 
     @pytest.mark.parametrize(
         "format_version",
         (
             pytest.param(FormatV04, id="V04"),
             pytest.param(FormatV05, id="V05"),
+            pytest.param(FormatV06, id="V06"),
         ),
     )
     def test_default_compression(self, array_constructor, format_version):
@@ -1116,19 +1166,25 @@ class TestMultiscalesMetadata:
         self.path_v3 = self.path / "v3"
         self.root_v3 = zarr.open_group(self.path_v3, mode="w", zarr_format=3)
 
-    @pytest.mark.parametrize("fmt", (FormatV04(), FormatV05()))
+    @pytest.mark.parametrize(
+        "fmt", (
+            FormatV04(),
+            FormatV05(),
+            FormatV06()
+            )
+    )
     def test_multi_levels_transformations(self, fmt):
         datasets = []
         for level, transf in enumerate(TRANSFORMATIONS):
             datasets.append({"path": str(level), "coordinateTransformations": transf})
-        if fmt.version == "0.5":
+        if fmt.version in ("0.5", "0.6"):
             path = self.path_v3
         else:
             path = self.path
         write_multiscales_metadata(str(path), datasets, axes="tczyx", fmt=fmt)
         # we want to be sure this is zarr v2 / v3
         attrs = zarr.open_group(path).attrs
-        if fmt.version == "0.5":
+        if fmt.version in ("0.5", "0.6"):
             attrs = attrs.get("ome")
             assert "version" in attrs
             json_text = (self.path_v3 / "zarr.json").read_text(encoding="utf-8")
@@ -1150,8 +1206,10 @@ class TestMultiscalesMetadata:
             out = zarr.open_group(path)
             if fmt.version == "0.4":
                 Models04Image.from_zarr(out)
-            if fmt.version == "0.5":
+            elif fmt.version == "0.5":
                 Models05Image.from_zarr(out)
+            elif fmt.version == "0.6":
+                Models06Image.from_zarr(out)
 
     @pytest.mark.parametrize(
         "axes",
@@ -1405,9 +1463,12 @@ class TestPlateMetadata:
         assert fmt.version in ("0.4", "0.5")
         if fmt.version == "0.4":
             Models04HCS.from_zarr(group)
-        elif fmt.version == "0.5":
+        elif fmt.version in ("0.5", "0.6"):
             # https://github.com/ome-zarr-models/ome-zarr-models-py/issues/218
-            Models05HCS.from_zarr(group)
+            if fmt.version == "0.5":
+                Models05HCS.from_zarr(group)
+            elif fmt.version == "0.6":
+                Models06HCS.from_zarr(group)
 
     @pytest.mark.parametrize("fmt", (FormatV04(), FormatV05()))
     def test_12wells_plate(self, fmt):
@@ -1470,6 +1531,8 @@ class TestPlateMetadata:
             Models04HCS.from_zarr(group)
         elif fmt.version == "0.5":
             Models05HCS.from_zarr(group)
+        elif fmt.version == "0.6":
+            Models06HCS.from_zarr(group)
 
     @pytest.mark.parametrize("fmt", (FormatV04(), FormatV05()))
     def test_sparse_plate(self, fmt):
@@ -1514,6 +1577,8 @@ class TestPlateMetadata:
             Models04HCS.from_zarr(group)
         elif fmt.version == "0.5":
             Models05HCS.from_zarr(group)
+        elif fmt.version == "0.6":
+            Models06HCS.from_zarr(group)
 
     def test_plate_name(self):
         # We don't need to test v04 and v05 for all tests since
@@ -1728,14 +1793,14 @@ class TestWellMetadata:
     @pytest.mark.parametrize("fmt", (FormatV04(), FormatV05()))
     @pytest.mark.parametrize("images", (["0"], [{"path": "0"}]))
     def test_minimal_well(self, images, fmt):
-        if fmt.version == "0.5":
+        if fmt.version in ("0.5", "0.6"):
             group = self.root_v3
         else:
             group = self.root
         write_well_metadata(group, images)
         # we want to be sure this is zarr v2 / v3, so we load json manually too
         attrs = group.attrs
-        if fmt.version == "0.5":
+        if fmt.version in ("0.5", "0.6"):
             attrs = attrs.get("ome")
             assert attrs["version"] == fmt.version
             json_text = (self.path_v3 / "zarr.json").read_text(encoding="utf-8")
@@ -1751,6 +1816,8 @@ class TestWellMetadata:
             Models04Well.from_zarr(group)
         elif fmt.version == "0.5":
             Models05Well.from_zarr(group)
+        elif fmt.version == "0.6":
+            Models06Well.from_zarr(group)
 
     @pytest.mark.parametrize(
         "images",
@@ -1892,14 +1959,14 @@ class TestLabelWriter:
         # Verify label metadata
         label_root = zarr.open(f"{img_path}/labels", mode="r")
         label_attrs = label_root.attrs
-        if fmt.version == "0.5":
+        if fmt.version in ("0.5", "0.6"):
             label_attrs = label_attrs["ome"]
         assert "labels" in label_attrs
         assert label_name in label_attrs["labels"]
 
         label_group = zarr.open(f"{img_path}/labels/{label_name}", mode="r")
         imglabel_attrs = label_group.attrs
-        if fmt.version == "0.5":
+        if fmt.version in ("0.5", "0.6"):
             imglabel_attrs = imglabel_attrs["ome"]
             assert imglabel_attrs["version"] == fmt.version
         else:
@@ -1922,7 +1989,7 @@ class TestLabelWriter:
     ):
 
         fmt = format_version_all()
-        if fmt.version == "0.5":
+        if fmt.version in ("0.5", "0.6"):
             img_path = self.path_v3
             group = self.root_v3
         else:
@@ -1990,7 +2057,7 @@ class TestLabelWriter:
         array_constructor,
     ):
         fmt = format_version_all()
-        if fmt.version == "0.5":
+        if fmt.version in ("0.5", "0.6"):
             group = self.root_v3
         else:
             group = self.root
@@ -2050,7 +2117,7 @@ class TestLabelWriter:
             level0.chunks == expected_chunks
         ), f"Expected chunks {expected_chunks}, got {level0.chunks}"
 
-        if USE_DASK_ARRAY_KWARGS and fmt.version == "0.5" and hasattr(level0, "shards"):
+        if USE_DASK_ARRAY_KWARGS and fmt.version in ("0.5", "0.6") and hasattr(level0, "shards"):
             expected_shards = _retuple(storage_options["shards"], level0.shape)
             assert (
                 level0.shards == expected_shards
@@ -2059,7 +2126,7 @@ class TestLabelWriter:
         assert level0.fill_value == 0
 
         if level0.compressors:
-            if fmt.version == "0.5":
+            if fmt.version in ("0.5", "0.6"):
                 if USE_DASK_ARRAY_KWARGS:
                     assert level0.compressors[0].cname.name == "zstd"
                 else:
@@ -2068,7 +2135,7 @@ class TestLabelWriter:
                 assert level0.compressors[0].cname == "zstd"
             if USE_DASK_ARRAY_KWARGS:
                 assert level0.compressors[0].clevel == 3
-                if fmt.version == "0.5" and hasattr(level0, "serializer"):
+                if fmt.version in ("0.5", "0.6") and hasattr(level0, "serializer"):
                     assert (
                         level0.metadata.codecs[0].index_codecs[0].endian.name
                         == "little"
@@ -2076,7 +2143,7 @@ class TestLabelWriter:
             else:
                 assert level0.compressors[0].to_dict()["configuration"]["level"] == 0
 
-        if fmt.version == "0.5" and hasattr(level0, "dimension_names"):
+        if fmt.version in ("0.5", "0.6") and hasattr(level0, "dimension_names"):
             assert level0.dimension_names == tuple(axes)
 
         if fmt.version == "0.4":
@@ -2086,7 +2153,7 @@ class TestLabelWriter:
         self, shape, format_version_all, array_constructor
     ):
         fmt = format_version_all()
-        if fmt.version == "0.5":
+        if fmt.version in ("0.5", "0.6"):
             img_path = self.path_v3
             group = self.root_v3
         else:
@@ -2156,7 +2223,7 @@ class TestLabelWriter:
         self, shape, format_version_all, array_constructor
     ):
         fmt = format_version_all()
-        if fmt.version == "0.5":
+        if fmt.version in ("0.5", "0.6"):
             img_path = self.path_v3
             group = self.root_v3
         else:
@@ -2239,7 +2306,7 @@ class TestLabelWriter:
 
             if (
                 USE_DASK_ARRAY_KWARGS
-                and fmt.version == "0.5"
+                and fmt.version in ("0.5", "0.6")
                 and hasattr(level, "shards")
             ):
                 expected_shards = _retuple(storage_options["shards"], level.shape)
@@ -2252,7 +2319,7 @@ class TestLabelWriter:
             ), f"Level {level_idx}: Expected fill_value 0, got {level.fill_value}"
 
             if level.compressors:
-                if fmt.version == "0.5":
+                if fmt.version in ("0.5", "0.6"):
                     if USE_DASK_ARRAY_KWARGS:
                         assert level.compressors[0].cname.name == "zstd"
                     else:
@@ -2261,7 +2328,7 @@ class TestLabelWriter:
                     assert level.compressors[0].cname == "zstd"
                 if USE_DASK_ARRAY_KWARGS:
                     assert level.compressors[0].clevel == 3
-                    if fmt.version == "0.5" and hasattr(level, "serializer"):
+                    if fmt.version in ("0.5", "0.6") and hasattr(level, "serializer"):
                         assert (
                             level.metadata.codecs[0].index_codecs[0].endian.name
                             == "little"
@@ -2269,7 +2336,7 @@ class TestLabelWriter:
                 else:
                     assert level.compressors[0].to_dict()["configuration"]["level"] == 0
 
-            if fmt.version == "0.5" and hasattr(level, "dimension_names"):
+            if fmt.version in ("0.5", "0.6") and hasattr(level, "dimension_names"):
                 assert level.dimension_names == tuple(
                     axes
                 ), f"Level {level_idx}: Expected dimension names {tuple(axes)}, got {level.dimension_names}"
@@ -2285,10 +2352,13 @@ class TestLabelWriter:
 
     @pytest.mark.parametrize(
         "fmt",
-        (pytest.param(FormatV04(), id="V04"), pytest.param(FormatV05(), id="V05")),
+        (pytest.param(FormatV04(), id="V04"),
+         pytest.param(FormatV05(), id="V05"),
+         pytest.param(FormatV06(), id="V06"),
+        ),
     )
     def test_two_label_images(self, array_constructor, fmt):
-        if fmt.version == "0.5":
+        if fmt.version in ("0.5", "0.6"):
             img_path = self.path_v3
             group = self.root_v3
         else:
@@ -2349,7 +2419,7 @@ class TestLabelWriter:
         # Verify label metadata
         label_root = zarr.open(f"{img_path}/labels", mode="r")
         attrs = label_root.attrs
-        if fmt.version == "0.5":
+        if fmt.version in ("0.5", "0.6"):
             attrs = attrs["ome"]
         assert "labels" in attrs
         assert len(attrs["labels"]) == len(label_names)
@@ -2357,12 +2427,15 @@ class TestLabelWriter:
 
     @pytest.mark.parametrize(
         "fmt",
-        (pytest.param(FormatV04(), id="V04"), pytest.param(FormatV05(), id="V05")),
+        (pytest.param(FormatV04(), id="V04"),
+         pytest.param(FormatV05(), id="V05"),
+         pytest.param(FormatV06(), id="V06")
+        ),
     )
     def write_labels_class_API(self, fmt):
         from ome_zarr import OMEZarrImage, OMEZarrMultiscale
 
-        if fmt.version == "0.5":
+        if fmt.version in ("0.5", "0.6"):
             img_path = self.path_v3
             group = self.root_v3
         else:
@@ -2392,7 +2465,7 @@ class TestLabelWriter:
 
         # now check that the respective groups and metadata exist and is correct
         label_group = zarr.open(f"{img_path}/labels", mode="r")
-        if fmt.version == "0.5":
+        if fmt.version in ("0.5", "0.6"):
             label_attrs = label_group.attrs["ome"]
         elif fmt.version == "0.4":
             label_attrs = label_group.attrs
@@ -2410,7 +2483,7 @@ class TestLabelWriter:
 
         # now check that we still have both labels in the metadata
         label_group = zarr.open(f"{img_path}/labels", mode="r")
-        if fmt.version == "0.5":
+        if fmt.version in ("0.5", "0.6"):
             label_attrs = label_group.attrs["ome"]
         elif fmt.version == "0.4":
             label_attrs = label_group.attrs
@@ -2426,7 +2499,7 @@ class TestLabelWriter:
         # Now, only the third label should be present in the metadata and as a zarr group,
         # but the first and second labels should be gone
         label_group = zarr.open(f"{img_path}/labels", mode="r")
-        if fmt.version == "0.5":
+        if fmt.version in ("0.5", "0.6"):
             label_attrs = label_group.attrs["ome"]
         elif fmt.version == "0.4":
             label_attrs = label_group.attrs
