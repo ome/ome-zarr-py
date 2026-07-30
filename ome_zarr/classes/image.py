@@ -1039,6 +1039,29 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
         if omero_dict is not None:
             try:
                 self._omero = Omero.model_validate(omero_dict)
+
+                # reverse-populate channel_names, channel_colors, contrast_limits from omero metadata
+                if self._omero.channels is not None:
+                    channel_names = [
+                        ch.label if ch.label is not None else f"Channel {i}"
+                        for i, ch in enumerate(self._omero.channels)
+                    ]
+                    channel_colors = [
+                        ch.color if ch.color is not None else DEFAULT_COLORS[i % len(DEFAULT_COLORS)]
+                        for i, ch in enumerate(self._omero.channels)
+                    ]
+                    contrast_limits = [
+                        (
+                            ch.window.start if ch.window.start is not None else 0,
+                            ch.window.end if ch.window.end is not None else self._images[0].data.dtype.itemsize * 255,
+                        )
+                        for i, ch in enumerate(self._omero.channels)
+                    ]
+
+                    for img in self._images:
+                        img.channel_names = channel_names
+                        img.channel_colors = channel_colors
+                        img.contrast_limits = contrast_limits
             except ValidationError as e:
                 warnings.warn(f"Invalid Omero metadata: {e}")
 
