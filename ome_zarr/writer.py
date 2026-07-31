@@ -328,6 +328,9 @@ def write_multiscale(
     if scale is None:
         scale = dict.fromkeys(_extract_dims_from_axes(axes), 1.0)
 
+    if name is None:
+        name = "image"
+
     if coordinate_transformations is not None:
         msg = (
             "The 'coordinate_transformations' argument is deprecated and will "
