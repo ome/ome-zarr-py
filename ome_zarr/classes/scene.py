@@ -74,7 +74,9 @@ class OMEZarrScene:
         """
         if path is None:
             # coordinate system can only be in top-level
-            possible_coordinate_systems: Sequence[CoordinateSystem] = self.coordinate_systems or []
+            possible_coordinate_systems: Sequence[CoordinateSystem] = (
+                self.coordinate_systems or []
+            )
 
             return next(
                 (cs for cs in possible_coordinate_systems if cs.name == name), None
@@ -123,7 +125,10 @@ class OMEZarrScene:
                 if img.metadata.coordinateTransformations:
                     for img_tf in img.metadata.coordinateTransformations:
                         ind_transform = self._ozmp_tf_to_tnd(
-                            img_tf, zarr_context=subgroup, source_cs=None, target_cs=None
+                            img_tf,
+                            zarr_context=subgroup,
+                            source_cs=None,
+                            target_cs=None,
                         )
                         self._graph.add_transform(ind_transform)
 
@@ -141,7 +146,9 @@ class OMEZarrScene:
 
         """
         import shutil
+
         import tqdm
+
         from ome_zarr.utils import _recursive_pop_nones
 
         if overwrite and os.path.exists(str(store)):
