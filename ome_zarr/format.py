@@ -383,7 +383,6 @@ class FormatV05(FormatV04):
         # this is default for Zarr v3. Could return None?
         return {"name": "default", "separator": "/"}
 
-
 class FormatV06(FormatV05):
     """
     Changelog: added FormatV06 (June 2025): writing not supported yet
@@ -396,6 +395,5 @@ class FormatV06(FormatV05):
     @property
     def zarr_format(self) -> int:
         return 3
-
 
 CurrentFormat = FormatV06
