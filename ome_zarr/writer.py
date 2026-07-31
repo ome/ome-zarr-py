@@ -4,7 +4,7 @@ import logging
 import warnings
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, TypeAlias
+from typing import Any, Literal, TypeAlias, cast
 
 import dask.array as da
 import numpy as np
@@ -364,7 +364,7 @@ def write_multiscale(
 
     dask_delayed = ms.to_ome_zarr(
         group,
-        version=fmt.version,
+        version=cast(Literal["0.6.dev4", "0.5", "0.4"], fmt.version),
         compute=compute,
         storage_options=storage_options,
         overwrite=True,
@@ -644,7 +644,7 @@ def write_image(
     dask_delayed_jobs = multiscale.to_ome_zarr(
         group=group,
         storage_options=storage_options,
-        version=fmt.version,  # type: ignore[arg-type]
+        version=cast(Literal["0.6.dev4", "0.5", "0.4"], fmt.version),
         compute=compute,
         overwrite=True,
     )
@@ -970,7 +970,7 @@ def write_multiscale_labels(
     dask_delayed_jobs = ms.to_ome_zarr(
         group=sub_group,
         storage_options=storage_options,
-        version=fmt.version,  # type: ignore[arg-type]
+        version=cast(Literal["0.6.dev4", "0.5", "0.4"], fmt.version),
         compute=compute,
         overwrite=True,
     )
@@ -1121,8 +1121,6 @@ def write_labels(
     if method is None:
         method = Methods.NEAREST
 
-    image_label = metadata.get("image-label")
-
     if scaler is not None:
         msg = """
         The 'scaler' argument is deprecated and will be removed in version 0.13.0.
@@ -1151,13 +1149,14 @@ def write_labels(
         method=method,
     )
 
+    label_metadata = metadata.get("image-label")
     if label_metadata is not None:
         multiscales.image_label = label_metadata
 
     dask_delayed_jobs = multiscales.to_ome_zarr(
         group=sub_group,
         storage_options=storage_options,
-        version=fmt.version,  # type: ignore[arg-type]
+        version=cast(Literal["0.6.dev4", "0.5", "0.4"], fmt.version),
         compute=compute,
         overwrite=True,
     )

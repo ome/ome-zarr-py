@@ -228,20 +228,19 @@ class OMEZarrMultiscaleBase:
         else:
             raise ValueError("Provide 'image' as OMEZarrImage or list[OMEZarrImage]")
 
-        self._images = pyramid_images
-        # translations = [
-        #     {d: (scale[d] / 2) - (scales[0][d] / 2) for d in image.axes}
-        #     for scale in [img.scale for img in self._images]
-        # ]
+        self._images: list[OMEZarrImage] = pyramid_images
 
         # Build datasets for all cases (translation only exists in built case)
         datasets = []
-        for idx, image in enumerate(self._images):
+        for idx, level_image in enumerate(self._images):
+            if level_image.scale is None or self._images[0].scale is None:
+                raise ValueError("Scale must be defined for all images in the pyramid")
             translation = {
-                d: (image.scale[d] - self._images[0].scale[d]) / 2 for d in image.axes
+                d: (level_image.scale[d] - self._images[0].scale[d]) / 2
+                for d in level_image.axes
             }
             tforms = [
-                Scale(scale=tuple(image.scale.values())),
+                Scale(scale=tuple(level_image.scale.values())),
                 Translation(translation=tuple(translation.values())),
             ]
 
@@ -604,6 +603,7 @@ class OMEZarrMultiscaleBase:
                 )
             )
 
+        instance: OMEZarrMultiscale | OMEZarrLabels
         if is_label:
             instance = OMEZarrLabels(image=images)
         else:
