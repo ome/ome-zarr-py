@@ -1,7 +1,8 @@
 """Functions for generating synthetic data."""
 
 from collections.abc import Callable
-from typing import cast, Literal
+from typing import Literal, cast
+
 import dask.array as da
 import numpy as np
 import zarr
