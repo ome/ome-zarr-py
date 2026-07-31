@@ -197,8 +197,6 @@ class OMEZarrScene:
         """
         from ome_zarr_models.v06.scene import BaseSceneAttrs
 
-        tf_adapter = TypeAdapter(AnyTransform)
-
         # Handle both StoreLike (string, dict, etc.) and zarr.Group objects
         if isinstance(store, zarr.Group):
             zarr_group = store
