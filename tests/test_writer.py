@@ -16,8 +16,8 @@ from ome_zarr_models.v04 import Well as Models04Well
 from ome_zarr_models.v05.hcs import HCS as Models05HCS
 from ome_zarr_models.v05.image import Image as Models05Image
 from ome_zarr_models.v05.well import Well as Models05Well
-from ome_zarr_models.v06.hcs import HCS as Models06HCS
 from ome_zarr_models.v06.image import Image as Models06Image
+from ome_zarr_models.v06.hcs import HCS as Models06HCS
 from ome_zarr_models.v06.well import Well as Models06Well
 from skimage.data import binary_blobs
 from zarr.abc.codec import BytesBytesCodec
@@ -62,7 +62,7 @@ TRANSFORMATIONS = [
 FORMAT_VERSIONS = [
     pytest.param(FormatV04, id="V04"),
     pytest.param(FormatV05, id="V05"),
-    pytest.param(FormatV06, id="V06"),
+    pytest.param(FormatV06, id="V06")
 ]
 
 ARRAY_CONSTRUCTORS = [np.array, da.from_array]
@@ -101,9 +101,7 @@ def _make_storage_options(fmt, shape, axes):
         "chunks": (16, 16),
         "shards": (32, 32) if fmt.version in ("0.5", "0.6") else None,
         "compressors": compressor,
-        "serializer": (
-            BytesCodec(endian="little") if fmt.version in ("0.5", "0.6") else None
-        ),
+        "serializer": BytesCodec(endian="little") if fmt.version in ("0.5", "0.6") else None,
         "fill_value": 0,
         "dimension_names": list(axes) if fmt.version in ("0.5", "0.6") else None,
         "order": "C",
@@ -543,7 +541,9 @@ class TestWriter:
         else:
             assert node_data[0].shape == shape
 
-        if fmt.version == "0.4" or fmt.version == "0.5":
+        if fmt.version == "0.4":
+            axes_md = node_metadata["multiscales"][0].get("axes")
+        elif fmt.version == "0.5":
             axes_md = node_metadata["multiscales"][0].get("axes")
         elif fmt.version == "0.6":
             axes_md = node_metadata["multiscales"][0]["coordinateSystems"][0].get(
@@ -920,7 +920,7 @@ class TestWriter:
         (
             pytest.param(FormatV04, id="V04"),
             pytest.param(FormatV05, id="V05"),
-            pytest.param(FormatV06, id="V06"),
+            pytest.param(FormatV06, id="V06")
         ),
     )
     def test_write_image_compressed(self, array_constructor, format_version):
@@ -1176,7 +1176,13 @@ class TestMultiscalesMetadata:
         self.path_v3 = self.path / "v3"
         self.root_v3 = zarr.open_group(self.path_v3, mode="w", zarr_format=3)
 
-    @pytest.mark.parametrize("fmt", (FormatV04(), FormatV05(), FormatV06()))
+    @pytest.mark.parametrize(
+        "fmt", (
+            FormatV04(),
+            FormatV05(),
+            FormatV06()
+            )
+    )
     def test_multi_levels_transformations(self, fmt):
         datasets = []
         for level, transf in enumerate(TRANSFORMATIONS):
@@ -2121,11 +2127,7 @@ class TestLabelWriter:
             level0.chunks == expected_chunks
         ), f"Expected chunks {expected_chunks}, got {level0.chunks}"
 
-        if (
-            USE_DASK_ARRAY_KWARGS
-            and fmt.version in ("0.5", "0.6")
-            and hasattr(level0, "shards")
-        ):
+        if USE_DASK_ARRAY_KWARGS and fmt.version in ("0.5", "0.6") and hasattr(level0, "shards"):
             expected_shards = _retuple(storage_options["shards"], level0.shape)
             assert (
                 level0.shards == expected_shards
@@ -2362,10 +2364,9 @@ class TestLabelWriter:
 
     @pytest.mark.parametrize(
         "fmt",
-        (
-            pytest.param(FormatV04(), id="V04"),
-            pytest.param(FormatV05(), id="V05"),
-            pytest.param(FormatV06(), id="V06"),
+        (pytest.param(FormatV04(), id="V04"),
+         pytest.param(FormatV05(), id="V05"),
+         pytest.param(FormatV06(), id="V06"),
         ),
     )
     def test_two_label_images(self, array_constructor, fmt):
@@ -2438,10 +2439,9 @@ class TestLabelWriter:
 
     @pytest.mark.parametrize(
         "fmt",
-        (
-            pytest.param(FormatV04(), id="V04"),
-            pytest.param(FormatV05(), id="V05"),
-            pytest.param(FormatV06(), id="V06"),
+        (pytest.param(FormatV04(), id="V04"),
+         pytest.param(FormatV05(), id="V05"),
+         pytest.param(FormatV06(), id="V06")
         ),
     )
     def write_labels_class_API(self, fmt):
