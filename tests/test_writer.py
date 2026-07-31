@@ -1,7 +1,5 @@
 import json
 import pathlib
-import re
-from typing import Any
 
 import dask.array as da
 import numpy as np
@@ -28,7 +26,6 @@ from ome_zarr import (
 )
 from ome_zarr.format import (
     CurrentFormat,
-    FormatV03,
     FormatV04,
     FormatV05,
     format_from_version,
@@ -1099,6 +1096,7 @@ class TestWriter:
                 axes="xt",
             )
 
+
 class TestPlateMetadata:
     @pytest.fixture(autouse=True)
     def initdir(self, tmpdir):
@@ -1885,9 +1883,15 @@ class TestLabelWriter:
             scale=scale,
             coordinate_transformations=transformations,
         )
-        
+
         self.verify_label_data(
-            img_path, label_name, label_data, fmt, shape, transformations, scale,
+            img_path,
+            label_name,
+            label_data,
+            fmt,
+            shape,
+            transformations,
+            scale,
         )
 
     def test_write_multiscale_labels_storage_options(

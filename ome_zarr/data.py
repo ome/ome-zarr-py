@@ -1,22 +1,18 @@
 """Functions for generating synthetic data."""
 
 from collections.abc import Callable
-from random import randrange
 
 import dask.array as da
 import numpy as np
 import zarr
-from scipy.ndimage import zoom
 from skimage import data
 from skimage.filters import threshold_otsu
 from skimage.measure import label
 from skimage.segmentation import clear_border
 
-from .format import CurrentFormat, Format
-from .io import parse_url
-from .scale import Scaler
-from .writer import add_metadata, write_multiscale
 from ome_zarr import OMEZarrImage, OMEZarrLabels, OMEZarrMultiscale
+
+from .format import CurrentFormat, Format
 
 CHANNEL_DIMENSION = 1
 
@@ -43,8 +39,12 @@ def coins() -> tuple[OMEZarrMultiscale, OMEZarrLabels]:
     label_image = np.asarray(label(cleared))
     chunks = [s // 8 if s > 8 else 1 for s in image.shape]
 
-    img = OMEZarrImage(data=da.from_array(image, chunks=chunks), axes="yx", name="coins")
-    lbl = OMEZarrImage(data=da.from_array(label_image, chunks=chunks), axes="yx", name="coins")
+    img = OMEZarrImage(
+        data=da.from_array(image, chunks=chunks), axes="yx", name="coins"
+    )
+    lbl = OMEZarrImage(
+        data=da.from_array(label_image, chunks=chunks), axes="yx", name="coins"
+    )
 
     img_ms = OMEZarrMultiscale(
         image=img,
@@ -83,14 +83,21 @@ def astronaut() -> tuple[OMEZarrMultiscale, OMEZarrLabels]:
     chunks = [s // 8 if s > 8 else 1 for s in pixels.shape]
     chunks_labels = [s // 8 if s > 8 else 1 for s in label.shape]
 
-    img = OMEZarrImage(data=da.from_array(pixels, chunks=chunks), axes="cyx", name="astronaut")
-    lbl = OMEZarrImage(data=da.from_array(label, chunks=chunks_labels), axes="yx", name="astronaut_labels")
+    img = OMEZarrImage(
+        data=da.from_array(pixels, chunks=chunks), axes="cyx", name="astronaut"
+    )
+    lbl = OMEZarrImage(
+        data=da.from_array(label, chunks=chunks_labels),
+        axes="yx",
+        name="astronaut_labels",
+    )
 
     img_ms = OMEZarrMultiscale(
         image=img,
         contrast_limits=[(0, 255), (0, 255), (0, 255)],
         channel_colors=["FF0000", "00FF00", "0000FF"],
-        channel_names=["Red", "Green", "Blue"],)
+        channel_names=["Red", "Green", "Blue"],
+    )
     lbl_ms = OMEZarrLabels(image=lbl)
 
     return img_ms, lbl_ms

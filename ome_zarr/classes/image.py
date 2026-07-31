@@ -200,16 +200,17 @@ class OMEZarrMultiscaleBase:
             # image.scale is guaranteed to be a dict after NgffImage.__post_init__
             image_scale = image.scale
             if not isinstance(image_scale, dict):
-                raise ValueError("Expected image.scale to be a dict after initialization")
+                raise ValueError(
+                    "Expected image.scale to be a dict after initialization"
+                )
 
             # Create Image instances for each pyramid level
             pyramid_images = []
             for idx, level_data in enumerate(pyramid):
                 scale = [
                     full / level
-                    for full, level
-                    in zip(pyramid[0].shape, level_data.shape)
-                    ]
+                    for full, level in zip(pyramid[0].shape, level_data.shape)
+                ]
                 level_scale = {
                     d: s * image_scale[d] if d in image_scale else 1.0
                     for d, s in zip(image.axes, scale)
@@ -237,14 +238,13 @@ class OMEZarrMultiscaleBase:
         datasets = []
         for idx, image in enumerate(self._images):
             translation = {
-                d: (image.scale[d] - self._images[0].scale[d]) / 2
-                for d in image.axes
+                d: (image.scale[d] - self._images[0].scale[d]) / 2 for d in image.axes
             }
             tforms = [
                 Scale(scale=tuple(image.scale.values())),
                 Translation(translation=tuple(translation.values())),
-                ]
-            
+            ]
+
             transforms = TransformSequence(
                 transformations=tuple(tforms),
                 input=CoordinateSystemIdentifier(path=f"s{idx}"),
@@ -1184,9 +1184,7 @@ class OMEZarrLabels(OMEZarrMultiscaleBase):
 
         if self._image_label is not None and isinstance(self._image_label, Label):
             if version == "0.4":
-                meta = _recursive_pop_nones(
-                    self._image_label.model_dump(by_alias=True)
-                )
+                meta = _recursive_pop_nones(self._image_label.model_dump(by_alias=True))
                 meta["version"] = version
                 group.attrs["image-label"] = meta
             elif version == "0.5":
