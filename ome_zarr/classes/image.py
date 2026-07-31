@@ -156,7 +156,7 @@ class OMEZarrMultiscaleBase:
 
     def __init__(
         self,
-        image: OMEZarrImage,
+        image: OMEZarrImage | list[OMEZarrImage] | None,
         scale_factors: list[int] | tuple[int, ...] | list[dict[str, int]] | None = None,
         coordinate_transformations: (
             tuple[AnyTransform, ...] | list[dict[str, Any]] | None
@@ -167,70 +167,86 @@ class OMEZarrMultiscaleBase:
     ):
         from ome_zarr.scale import _build_pyramid
 
-        if scale_factors is None:
-            scale_factors = (2, 4, 8, 16)
+        # image param accepts OMEZarrImage (builds pyramid)
+        # or list[OMEZarrImage] (prebuilt)
+        if isinstance(image, list):
+            # Prebuilt pyramid: ignore scale_factors and method
+            if not image:
+                raise ValueError("images list cannot be empty")
+            pyramid_images = image
+            self.name = pyramid_images[0].name
 
-        self.name = image.name
+        # Build pyramid from single image
+        # instead of a list of pre-computed images
+        elif isinstance(image, OMEZarrImage):
+            if scale_factors is None:
+                scale_factors = (2, 4, 8, 16)
 
-        if isinstance(method, Methods):
-            method = str(method.value)
-        elif method is None:
-            method = str(Methods.RESIZE.value)
+            self.name = image.name
 
-        # Build the pyramid data
-        pyramid = _build_pyramid(
-            image=image.data,
-            dims=image.axes,
-            scale_factors=scale_factors,
-            method=method,
-        )
+            if isinstance(method, Methods):
+                method = str(method.value)
+            elif method is None:
+                method = str(Methods.RESIZE.value)
 
-        # build scales for each level based on the original image shape
-        # and the pyramid level shapes
-        scales = []
-        # image.scale is guaranteed to be a dict after NgffImage.__post_init__
-        image_scale = image.scale
-        if not isinstance(image_scale, dict):
-            raise ValueError("Expected image.scale to be a dict after initialization")
+            # Build the pyramid data
+            pyramid = _build_pyramid(
+                image=image.data,
+                dims=image.axes,
+                scale_factors=scale_factors,
+                method=method,
+            )
 
-        for shape in [d.shape for d in pyramid]:
-            scale = [full / level for full, level in zip(image.data.shape, shape)]
-            scales.append(
-                {
+            # image.scale is guaranteed to be a dict after NgffImage.__post_init__
+            image_scale = image.scale
+            if not isinstance(image_scale, dict):
+                raise ValueError("Expected image.scale to be a dict after initialization")
+
+            # Create Image instances for each pyramid level
+            pyramid_images = []
+            for idx, level_data in enumerate(pyramid):
+                scale = [
+                    full / level
+                    for full, level
+                    in zip(pyramid[0].shape, level_data.shape)
+                    ]
+                level_scale = {
                     d: s * image_scale[d] if d in image_scale else 1.0
                     for d, s in zip(image.axes, scale)
                 }
-            )
-
-        translations = [
-            {d: (scale[d] / 2) - (scales[0][d] / 2) for d in image.axes}
-            for scale in scales
-        ]
-
-        # Create Image instances for each pyramid level
-        images = []
-        datasets = []
-        for idx, (level_data, level_scale) in enumerate(zip(pyramid, scales)):
-
-            images.append(
-                OMEZarrImage(
-                    data=level_data,
-                    axes=image.axes,
-                    scale=level_scale,
-                    axes_units=image.axes_units,
-                    name=image.name,
-                    axes_types=image.axes_types,
+                pyramid_images.append(
+                    OMEZarrImage(
+                        data=level_data,
+                        axes=image.axes,
+                        scale=level_scale,
+                        axes_units=image.axes_units,
+                        name=image.name,
+                        axes_types=image.axes_types,
+                    )
                 )
-            )
+        else:
+            raise ValueError("Provide 'image' as OMEZarrImage or list[OMEZarrImage]")
 
+        self._images = pyramid_images
+        # translations = [
+        #     {d: (scale[d] / 2) - (scales[0][d] / 2) for d in image.axes}
+        #     for scale in [img.scale for img in self._images]
+        # ]
+
+        # Build datasets for all cases (translation only exists in built case)
+        datasets = []
+        for idx, image in enumerate(self._images):
+            translation = {
+                d: (image.scale[d] - self._images[0].scale[d]) / 2
+                for d in image.axes
+            }
+            tforms = [
+                Scale(scale=tuple(image.scale.values())),
+                Translation(translation=tuple(translation.values())),
+                ]
+            
             transforms = TransformSequence(
-                transformations=(
-                    Scale(type="scale", scale=tuple(level_scale.values())),
-                    Translation(
-                        type="translation",
-                        translation=tuple(translations[idx].values()),
-                    ),
-                ),
+                transformations=tuple(tforms),
                 input=CoordinateSystemIdentifier(path=f"s{idx}"),
                 output=CoordinateSystemIdentifier(name=default_coordinate_system_name),
             )
@@ -238,23 +254,23 @@ class OMEZarrMultiscaleBase:
                 Dataset(path=f"s{idx}", coordinateTransformations=(transforms,)),
             )
 
-        self._images = images
-
-        # Build axes metadata
-        if image.axes_units is None:
-            image.axes_units = {}
+        # Build axes metadata from first image
+        # (works for both cases, prebuilt and built pyramid)
+        ref_image = self._images[0]
+        if ref_image.axes_units is None:
+            ref_image.axes_units = {}
 
         axes = []
-        for d in image.axes:
-            if image.axes_types.get(d) in DISCRETE_DIMS:
+        for d in ref_image.axes:
+            if ref_image.axes_types.get(d) in DISCRETE_DIMS:
                 discrete = True
             else:
                 discrete = False
             axes.append(
                 Axis(
                     name=d,
-                    type=image.axes_types.get(d),
-                    unit=image.axes_units.get(d),
+                    type=ref_image.axes_types.get(d),
+                    unit=ref_image.axes_units.get(d),
                     discrete=discrete,
                 )
             )
@@ -335,7 +351,7 @@ class OMEZarrMultiscaleBase:
         self.metadata = MultiscaleV06(
             coordinateSystems=tuple(coordinate_systems),
             datasets=tuple(datasets),
-            name=image.name,
+            name=self.name,
             coordinateTransformations=transforms,
         )
 
@@ -588,17 +604,11 @@ class OMEZarrMultiscaleBase:
                 )
             )
 
-        return_cls: type[OMEZarrLabels | OMEZarrMultiscale]
         if is_label:
-            return_cls = OMEZarrLabels
+            instance = OMEZarrLabels(image=images)
         else:
-            return_cls = OMEZarrMultiscale
-
-        # Create instance without calling __init__
-        instance = return_cls.__new__(return_cls)
-        instance._images = images
-        instance.metadata = metadata
-        instance.name = str(metadata.name) if metadata.name else "image"
+            instance = OMEZarrMultiscale(image=images)
+        instance.metadata = cast(MultiscaleV06, metadata)
 
         # Let derived classes read their specific metadata
         instance._read_additional_metadata(group, version)
@@ -736,13 +746,15 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
 
     Parameters
     ----------
-    image : OMEZarrImage
+    image : OMEZarrImage | list[OMEZarrImage]
         The OMEZarrImage instance from which to build the multi-resolution levels.
     scale_factors : list[int] | tuple[int, ...] | list[dict[str, int]] | None
         Scale factors for each pyramid level. If a list of ints or tuple is provided,
         it is applied uniformly across all spatial axes. If a list of dicts is provided,
         each dict should specify scale factors for each axis, e.g. {'x': 2, 'y': 2, 'z': 1}.
         Default is (2, 4, 8, 16).
+        If a list of OMEZarrImage instances is provided for the `image` parameter,
+        this argument is ignored, and the provided images are used as-is for the pyramid levels.
     method : ome_zarr.scale.Methods | str | None
         Rescaling method to use when generating pyramid levels. Default is Methods.RESIZE.
     coordinate_transformations : list[ome_zarr_models.v05.multiscales.AnyTransform] | list[dict[str, Any]] | None
@@ -806,7 +818,7 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
 
     def __init__(
         self,
-        image: OMEZarrImage,
+        image: OMEZarrImage | list[OMEZarrImage] | None,
         scale_factors: list[int] | tuple[int, ...] | list[dict[str, int]] | None = None,
         method: str | Methods | None = Methods.RESIZE,
         coordinate_transformations: (
@@ -1081,12 +1093,14 @@ class OMEZarrLabels(OMEZarrMultiscaleBase):
 
     Parameters
     ----------
-    image : OMEZarrImage
+    image : OMEZarrImage | list[OMEZarrImage]
     scale_factors : list[int] | tuple[int, ...] | list[dict[str, int]] | None, optional
         Scale factors for each pyramid level. If a list of ints or tuple is provided,
         it is applied uniformly across all spatial axes. If a list of dicts is provided,
         each dict should specify scale factors for each axis, e.g. {'x': 2, 'y': 2, 'z': 1}.
         Default is (2, 4, 8, 16).
+        If a list of OMEZarrImage instances is provided for the `image` parameter,
+        this argument is ignored, and the provided images are used as-is for the pyramid levels.
     method : str | ome_zarr.scale.Methods, optional
         Rescaling method to use when generating pyramid levels. Default is Methods.NEAREST,
         since these are labels.
@@ -1111,7 +1125,7 @@ class OMEZarrLabels(OMEZarrMultiscaleBase):
 
     def __init__(
         self,
-        image: OMEZarrImage,
+        image: OMEZarrImage | list[OMEZarrImage] | None,
         scale_factors: list[int] | tuple[int, ...] | list[dict[str, int]] | None = None,
         method: str | Methods | None = Methods.NEAREST,
         auto_parse_labels: bool = True,
