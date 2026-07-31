@@ -332,12 +332,7 @@ def write_multiscale(
         msg = (
             "The 'coordinate_transformations' argument is deprecated and will "
             "be removed in a future version. Please use the `scale` argument "
-            "to specify the physical pixel size for each dimension instead. "
-            "When `coordinate_transformations` is provided, it takes "
-            "precedence over `scale`, so `scale` is not applied. When "
-            "`coordinate_transformations` is not provided, the pixel sizes "
-            "for every resolution level are calculated from `scale` and "
-            "`scale_factors`."
+            "to specify the physical pixel size for each dimension instead."
         )
         warnings.warn(msg, DeprecationWarning)
 
