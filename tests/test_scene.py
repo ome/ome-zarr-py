@@ -286,6 +286,7 @@ def test_appending_scene(test_data_dir):
     assert len(scene_metadata["coordinateTransformations"]) == 3
     assert len(scene_metadata["coordinateSystems"]) == 1
 
+
 def test_scene_with_displacements(test_data_dir):
     """
     Create a scene with two images and a single coordinate transformation

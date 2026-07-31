@@ -175,7 +175,9 @@ class OMEZarrScene:
                 continue
 
             # Write the displacement image
-            subgroup = zarr_group.create_group(f"coordinateTransformations/{disp_path}", overwrite=overwrite)
+            subgroup = zarr_group.create_group(
+                f"coordinateTransformations/{disp_path}", overwrite=overwrite
+            )
             disp_img.to_ome_zarr(subgroup, overwrite=True, version="0.6.dev4")
 
         # Always update scene metadata
@@ -352,7 +354,9 @@ class OMEZarrScene:
                 path_to_dfield = f"{zarr_context}/{path_to_dfield}"
 
             if self.coordinates_displacements is not None:
-                dfield = self.coordinates_displacements.get(path_to_dfield.split("/")[-1])
+                dfield = self.coordinates_displacements.get(
+                    path_to_dfield.split("/")[-1]
+                )
                 if dfield is not None:
                     if dfield.images[0].scale is None:
                         raise ValueError(
