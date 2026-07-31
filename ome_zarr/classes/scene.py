@@ -74,14 +74,14 @@ class OMEZarrScene:
         """
         if path is None:
             # coordinate system can only be in top-level
-            possible_coordinate_systems = self.coordinate_systems or []
+            possible_coordinate_systems: Sequence[CoordinateSystem] = self.coordinate_systems or []
 
             return next(
                 (cs for cs in possible_coordinate_systems if cs.name == name), None
             )
 
         possible_coordinate_systems = []
-        for group in self.images.keys():
+        for group in self.images:
             if group == path:
                 img = self.images[group]
                 for cs in img.metadata.coordinateSystems:
@@ -123,7 +123,7 @@ class OMEZarrScene:
                 if img.metadata.coordinateTransformations:
                     for img_tf in img.metadata.coordinateTransformations:
                         ind_transform = self._ozmp_tf_to_tnd(
-                            img_tf, zarr_context=subgroup
+                            img_tf, zarr_context=subgroup, source_cs=None, target_cs=None
                         )
                         self._graph.add_transform(ind_transform)
 
@@ -141,10 +141,8 @@ class OMEZarrScene:
 
         """
         import shutil
-
         import tqdm
-
-        from ..utils import _recursive_pop_nones
+        from ome_zarr.utils import _recursive_pop_nones
 
         if overwrite and os.path.exists(str(store)):
             # Clear the store if it already exists and we're not doing incremental writes
@@ -199,7 +197,7 @@ class OMEZarrScene:
             zarr_group = zarr.open(store, mode="r")
 
         # Load all image subgroups, keyed by their zarr path
-        images = {}
+        images: dict[str, OMEZarrMultiscale] = {}
         for img_path in zarr_group.group_keys():
             img_group = zarr_group[img_path]
             img = OMEZarrMultiscale.from_ome_zarr(img_group)
@@ -212,9 +210,10 @@ class OMEZarrScene:
         # Note: Reconstructing Transform and CoordinateSystemIdentifier objects from dicts
         # may require additional deserialization logic depending on your models
 
-        transformations = []
-        for tf in scene_metadata.get("coordinateTransformations", []):
-            transformations.append(tf_adapter.validate_python(tf))
+        transformations = [
+            tf_adapter.validate_python(tf)
+            for tf in scene_metadata.get("coordinateTransformations", [])
+        ]
 
         if "coordinateSystems" in scene_metadata:
             coordinate_systems = [
@@ -362,15 +361,17 @@ class OMEZarrScene:
             if zarr_context != "" and path_to_dfield != "":
                 path_to_dfield = f"{zarr_context}/{path_to_dfield}"
 
-            dfield = self.coordinates_displacements.get(path_to_dfield)
-            tnd_transform = tnd.transforms.Displacements(
-                dfield.images[0].data,
-                index_transform=tnd.transforms.Scale(
-                    list(dfield.images[0].scale.values())[1:]
-                ),
-                vector_axis=0,
-                spaces=spaces,
-            )
+            if self.coordinates_displacements is not None:
+                dfield = self.coordinates_displacements.get(path_to_dfield)
+                if dfield is not None:
+                    tnd_transform = tnd.transforms.Displacements(
+                        dfield.images[0].data,
+                        index_transform=tnd.transforms.Scale(
+                            list(dfield.images[0].scale.values())[1:]
+                        ),
+                        vector_axis=0,
+                        spaces=spaces,
+                    )
         elif transform.type == "mapAxis":
             tnd_transform = tnd.transforms.MapAxis(
                 list(transform.mapAxis),

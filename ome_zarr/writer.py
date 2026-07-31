@@ -4,7 +4,7 @@ import logging
 import warnings
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, TypeAlias
+from typing import Any
 
 import dask.array as da
 import numpy as np
@@ -19,10 +19,9 @@ from .types import JSONDict
 
 LOGGER = logging.getLogger("ome_zarr.writer")
 
-ListOfArrayLike = list[da.Array] | list[np.ndarray]
-ArrayLike: TypeAlias = da.Array | np.ndarray
-
-AxesType = str | list[str] | list[dict[str, str]] | None
+type ListOfArrayLike = list[da.Array] | list[np.ndarray]
+type ArrayLike = da.Array | np.ndarray
+type AxesType = str | list[str] | list[dict[str, str]] | None
 
 SPATIAL_DIMS = ("x", "y", "z")
 
