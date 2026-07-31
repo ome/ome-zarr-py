@@ -188,6 +188,7 @@ class OMEZarrScene:
         Returns:
             NgffScene instance with images and metadata loaded from disk
         """
+        from ome_zarr_models.v06.scene import SceneAttrs, BaseSceneAttrs
         tf_adapter = TypeAdapter(AnyTransform)
 
         # Handle both StoreLike (string, dict, etc.) and zarr.Group objects
@@ -204,27 +205,10 @@ class OMEZarrScene:
             images[img_path] = img
 
         # Load scene metadata
-        ome_metadata = zarr_group.attrs.get("ome", {})
-        scene_metadata = ome_metadata.get("scene", {})
+        scene_metadata = BaseSceneAttrs.model_validate(zarr_group.attrs.get("ome", {}))
+        transformations = scene_metadata.scene.coordinateTransformations
+        coordinate_systems = scene_metadata.scene.coordinateSystems
 
-        # Note: Reconstructing Transform and CoordinateSystemIdentifier objects from dicts
-        # may require additional deserialization logic depending on your models
-
-        transformations = [
-            tf_adapter.validate_python(tf)
-            for tf in scene_metadata.get("coordinateTransformations", [])
-        ]
-
-        if "coordinateSystems" in scene_metadata:
-            coordinate_systems = [
-                CoordinateSystem.model_validate(cs)
-                for cs in scene_metadata.get("coordinateSystems", [])
-                if cs
-            ]
-        else:
-            coordinate_systems = None
-
-        # Use object.__new__ to create instance without triggering __init__ and __setattr__
         scene = OMEZarrScene(
             images=images,
             coordinate_transformations=transformations,
@@ -364,6 +348,10 @@ class OMEZarrScene:
             if self.coordinates_displacements is not None:
                 dfield = self.coordinates_displacements.get(path_to_dfield)
                 if dfield is not None:
+                    if dfield.images[0].scale is None:
+                        raise ValueError(
+                            f"Displacement field at {path_to_dfield} is missing scale information."
+                        )
                     tnd_transform = tnd.transforms.Displacements(
                         dfield.images[0].data,
                         index_transform=tnd.transforms.Scale(
