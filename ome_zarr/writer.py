@@ -274,44 +274,23 @@ def write_multiscale(
     axes_units: dict[str, str] | None = None,
 ) -> list:
     """
-    Write a pyramid with multiscale metadata to disk.
+    Write a pyramid with precomputed multiscale resolution levels to disk.
 
-    :type pyramid: list of :class:`numpy.ndarray` or :class:`dask.array.Array`
-    :param pyramid:
+    Parameters
+    ----------
+    pyramid: list of :class:`numpy.ndarray` or :class:`dask.array.Array`
         The image data to save. Largest level first. All image arrays MUST be up to
         5-dimensional with dimensions ordered (t, c, z, y, x)
-    :type group: :class:`zarr.Group`
-    :param group: The group within the zarr store to store the data in
-    :type scale: dict of str to float, optional
-    :param scale:
-        The physical pixel size for each dimension, e.g. {"z": 0.1, "y": 0.1, "x": 0.5}.
-        The pixel sizes for every resolution level are calculated directly from the defined `scale` and
-        `scale_factors` for each level.
-    :type chunks: int or tuple of ints, optional
-    :param chunks:
-        The size of the saved chunks to store the image.
-
-        .. deprecated:: 0.4.0
-            This argument is deprecated and will be removed in a future version.
-            Use :attr:`storage_options` instead.
-    :type fmt: :class:`ome_zarr.format.Format`, optional
-    :param fmt:
+    group: :class:`zarr.Group`
+        The group within the zarr store to store the data in
+    fmt: :class:`ome_zarr.format.Format`, optional
         The format of the ome_zarr data which should be used.
-        Defaults to the most current.
-    :type axes: str list of str or list of dict, optional
-    :param axes:
-        List of axes dicts, or names. Not needed for v0.1 or v0.2 or if 2D. Otherwise
-        this must be provided
-    :param axes_units:
-        The physical units for each dimension, e.g. {"t": "millisecond", "z": "micrometer", "y": "micrometer", "x": "micrometer"}.
-        For a list of recommended units, see [ngff specification](https://ngff.openmicroscopy.org/specifications/0.5/index.html#axes-metadata).
-    :type coordinate_transformations: 2Dlist of dict, optional
-    :param coordinate_transformations:
-        List of transformations for each path.
-        Each list of dicts are added to each datasets in order and must include a
-        'scale' transform.
-    :type storage_options: dict or list of dict, optional
-    :param storage_options:
+        Defaults to the most current (:class:`ome_zarr.format.CurrentFormat`).
+    axes: list of str or list of dict, optional
+        List of axes dicts, or names, i.e. ["t", "c", "z", "y", "x"].
+    coordinate_transformations: list of list of dict, optional
+        [DEPRECATED] For each resolution, a list of transformation dicts (not validated).
+    storage_options: dict or list of dict, optional
         Options to be passed on to the storage backend.
         A list would need to match the number of datasets in a multiresolution pyramid.
         One can provide different chunk size and / or shards for each level of a pyramid using this
@@ -327,22 +306,19 @@ def write_multiscale(
         between dask and zarr chunks, potentially resulting in corrupted data. The default will be that if no sharding
         is specified, that the chunks correspond to the dask chunksize. This is also the case when chunks are provided as
         `None` and no sharding is provided.
-    :param compute:
-        If true compute immediately otherwise a list of :class:`dask.delayed.Delayed`
+    name: str, optional
+        The name of the image, to be included in the metadata. Defaults to "image".
+    compute: bool, optional
+        If true, compute immediately otherwise a list of :class:`dask.delayed.Delayed`
         is returned.
-    :type scale: dict of str to float, optional
-    :param scale:
+    scale: dict of str to float, optional
         The physical pixel size for each dimension, e.g. {"z": 0.1, "y": 0.1, "x": 0.5}.
         For each additional resolution level, the pixel sizes are derived from this
         base `scale` and the relative shapes of the arrays provided in `pyramid`.
-    :type axes_units: dict of str to str, optional
-    :param axes_units:
-        The physical units for each dimension, e.g. {"t": "millisecond", "z": "micrometer", "y": "micrometer", "x": "micrometer"}.
-        For a list of recommended units, see [ngff specification](https://ngff.openmicroscopy.org/specifications/0.5/index.html#axes-metadata).
-    :return:
-        Empty list if the compute flag is True, otherwise it returns a list of
-        :class:`dask.delayed.Delayed` representing the value to be computed by
-        dask.
+        If not provided, defaults to 1.0 for all dimensions.
+    axes_units: dict of str to str, optional
+        The physical units for each dimension,
+        e.g. {"t": "millisecond", "z": "micrometer", "y": "micrometer", "x": "micrometer"}.
     """
     from ome_zarr import OMEZarrImage, OMEZarrMultiscale
     group, fmt = check_group_fmt(group, fmt)
@@ -883,44 +859,36 @@ def write_multiscale_labels(
     compute: bool = True,
 ) -> list:
     """
-    Write pyramidal image labels to disk.
+    Write precomputed pyramidal image labels to disk.
 
-    Including the multiscales and image-label metadata.
-    Creates the label data in the sub-group "labels/{name}"
+    This function writes a multiscale pyramid of label data to a zarr store,
+    along with the appropriate metadata according to the OME-Zarr specification.
+    The label data is saved under a `labels/{name}` subgroup at the specified `group` location.
 
-    :type pyramid: list of :class:`numpy.ndarray`
-    :param pyramid:
-      the image label data to save. Largest level first
-      All image arrays MUST be up to 5-dimensional with dimensions
-      ordered (t, c, z, y, x)
-    :type group: :class:`zarr.Group`
-    :param group: The zarr group or path to write the metadata in.
-    :type name: str, optional
-    :param name: The name of this labels data.
-    :type scale: dict of str to float, optional
-    :param scale:
-        The physical pixel size for each dimension, e.g. {"z": 0.1, "y": 0.1, "x": 0.5}.
-        The pixel sizes for every resolution level are calculated directly from the defined `scale` and
-        `scale_factors` for each level.
-    :type chunks: int or tuple of ints, optional
-    :type fmt: :class:`ome_zarr.format.Format`, optional
-    :param fmt:
-      The format of the ome_zarr data which should be used.
-      Defaults to the most current.
-    :type axes: list of str or list of dicts, optional
-    :param axes:
-      The names of the axes. e.g. ["t", "c", "z", "y", "x"].
-      Ignored for versions 0.1 and 0.2. Required for version 0.3 or greater.
-    :type axes_units: dict of str to str, optional
-    :param axes_units:
-        The physical units for each dimension, e.g. {"t": "millisecond", "z": "micrometer", "y": "micrometer", "x": "micrometer"}.
-        For a list of recommended units, see [ngff specification](https://ngff.openmicroscopy.org/specifications/0.5/index.html#axes-metadata).
-    :type coordinate_transformations: list of dict
-    :param coordinate_transformations:
-      For each resolution, we have a List of transformation Dicts (not validated).
-      Each list of dicts are added to each datasets in order.
-    :type storage_options: dict or list of dict, optional
-    :param storage_options:
+    Parameters
+    ----------
+    pyramid : list of numpy.ndarray
+        The image label data to save. The largest level should be first in the list.
+        All image arrays MUST be up to 5-dimensional with dimensions ordered (t, c,
+        z, y, x).
+    group : zarr.Group or str
+        The zarr group or path to write the data in.
+        The label data will be saved under a `labels/{name}` subgroup.
+    name : str
+        The name of this labels data.
+    fmt : ome_zarr.format.Format, optional
+        The format of the ome_zarr data which should be used.
+        Defaults to the most current.
+    axes : list of str or list of dicts, optional
+        The names of the axes, e.g. ["t", "c", "z", "y", "x"].
+    axes_units : dict of str to str, optional
+        The physical units for each dimension, e.g. {"t": "millisecond", "
+z": "micrometer", "y": "micrometer", "x": "micrometer"}.
+        For a list of recommended units,
+        see [ngff specification](https://ngff.openmicroscopy.org/specifications/0.5/index.html#axes-metadata).
+    coordinate_transformations : list of list of dict, optional
+        [DEPRECATED] For each resolution, a list of transformation dicts (not validated).
+    storage_options : dict or list of dict, optional
         Options to be passed on to the storage backend.
         A list would need to match the number of datasets in a multiresolution pyramid.
         One can provide different chunk size for each level of a pyramid using this
@@ -937,25 +905,18 @@ def write_multiscale_labels(
         between dask and zarr chunks, potentially resulting in corrupted data. The default will be that if no sharding
         is specified, that the chunks correspond to the dask chunksize. This is also the case when chunks are provided as
         `None` and no sharding is provided.
-    :type label_metadata: dict, optional
-    :param label_metadata:
-      Image label metadata. See :meth:`write_label_metadata` for details
-    :param compute:
-        If true compute immediately otherwise a list of :class:`dask.delayed.Delayed`
-        is returned.
-    :type scale: dict of str to float, optional
-    :param scale:
-        The physical pixel size for each dimension at the highest-resolution level,
-        e.g. {"z": 0.1, "y": 0.1, "x": 0.5}. Pixel sizes for lower-resolution
-        levels are inferred from the shapes of the arrays in `pyramid`.
-    :type axes_units: dict of str to str, optional
-    :param axes_units:
-        The physical units for each dimension, e.g. {"t": "millisecond", "z": "micrometer", "y": "micrometer", "x": "micrometer"}.
-        For a list of recommended units, see [ngff specification](https://ngff.openmicroscopy.org/specifications/0.5/index.html#axes-metadata).
-    :return:
-        Empty list if the compute flag is True, otherwise it returns a list of
-        :class:`dask.delayed.Delayed` representing the value to be computed by
-        dask.
+    label_metadata : dict, optional
+        Image label metadata.
+        See [ngff specification](https://ngff.openmicroscopy.org/specifications/0.5/index.html#labels-metadata) for details.
+        If not passed, is computed from the label data and stored in the metadata.
+    scale : dict of str to float, optional
+        The physical pixel size for each dimension, e.g. {"z": 0.1, "y": 0.1, "x": 0.5}.
+        The pixel sizes for every passed resolution level are calculated directly from the defined `scale`
+        for each resolution level. If not passed, defaults to 1.0 for all dimensions.
+    axes_units : dict of str to str, optional
+        The physical units for each axis, e.g. {"z": "micrometer", "y": "micrometer", "x": "micrometer"}.
+    compute : bool, optional
+        If True, compute immediately; otherwise, return a list of dask.delayed.Delayed objects.
     """
     from ome_zarr import OMEZarrImage, OMEZarrLabels
     group, fmt = check_group_fmt(group, fmt)
