@@ -195,7 +195,8 @@ class OMEZarrScene:
         Returns:
             NgffScene instance with images and metadata loaded from disk
         """
-        from ome_zarr_models.v06.scene import SceneAttrs, BaseSceneAttrs
+        from ome_zarr_models.v06.scene import BaseSceneAttrs
+
         tf_adapter = TypeAdapter(AnyTransform)
 
         # Handle both StoreLike (string, dict, etc.) and zarr.Group objects
