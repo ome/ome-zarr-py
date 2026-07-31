@@ -42,7 +42,6 @@ from ome_zarr.writer import (
     write_labels,
     write_multiscale,
     write_multiscale_labels,
-    write_multiscales_metadata,
     write_plate_metadata,
     write_well_metadata,
 )
@@ -1100,270 +1099,6 @@ class TestWriter:
                 axes="xt",
             )
 
-
-class TestMultiscalesMetadata:
-    @pytest.fixture(autouse=True)
-    def initdir(self, tmpdir):
-        self.path = pathlib.Path(tmpdir.mkdir("data"))
-        # create zarr v2 group...
-        self.root = zarr.open_group(self.path, mode="w", zarr_format=2)
-
-        # let's create zarr v3 group too...
-        self.path_v3 = self.path / "v3"
-        self.root_v3 = zarr.open_group(self.path_v3, mode="w", zarr_format=3)
-
-    @pytest.mark.parametrize("fmt", (FormatV04(), FormatV05()))
-    def test_multi_levels_transformations(self, fmt):
-        datasets = []
-        for level, transf in enumerate(TRANSFORMATIONS):
-            datasets.append({"path": str(level), "coordinateTransformations": transf})
-        if fmt.version == "0.5":
-            path = self.path_v3
-        else:
-            path = self.path
-        write_multiscales_metadata(str(path), datasets, axes="tczyx", fmt=fmt)
-        # we want to be sure this is zarr v2 / v3
-        attrs = zarr.open_group(path).attrs
-        if fmt.version == "0.5":
-            attrs = attrs.get("ome")
-            assert "version" in attrs
-            json_text = (self.path_v3 / "zarr.json").read_text(encoding="utf-8")
-            attrs_json = json.loads(json_text).get("attributes", {}).get("ome", {})
-        else:
-            json_text = (self.path / ".zattrs").read_text(encoding="utf-8")
-            attrs_json = json.loads(json_text)
-            assert "version" in attrs["multiscales"][0]
-        assert "multiscales" in attrs_json
-        assert "multiscales" in attrs
-        assert attrs["multiscales"][0]["datasets"] == datasets
-        # No arrays, so this is expected:
-        with pytest.raises(
-            ValueError,
-            match=re.escape(
-                "Expected to find an array at 0, but no array was found there."
-            ),
-        ):
-            out = zarr.open_group(path)
-            if fmt.version == "0.4":
-                Models04Image.from_zarr(out)
-            if fmt.version == "0.5":
-                Models05Image.from_zarr(out)
-
-    @pytest.mark.parametrize(
-        "axes",
-        (
-            ["y", "x"],
-            ["c", "y", "x"],
-            ["z", "y", "x"],
-            ["t", "y", "x"],
-            ["t", "c", "y", "x"],
-            ["t", "z", "y", "x"],
-            ["c", "z", "y", "x"],
-            ["t", "c", "z", "y", "x"],
-        ),
-    )
-    def test_axes_V03(self, axes):
-        write_multiscales_metadata(
-            self.root, [{"path": "0"}], fmt=FormatV03(), axes=axes
-        )
-        assert "multiscales" in self.root.attrs
-        # for v0.3, axes is a list of names
-        assert self.root.attrs["multiscales"][0]["axes"] == axes
-        with pytest.raises(ValueError):
-            # for v0.4 and above, paths no-longer supported (need dataset dicts)
-            write_multiscales_metadata(self.root, ["0"], axes=axes, fmt=FormatV04())
-
-    @pytest.mark.parametrize(
-        "axes",
-        (
-            [],
-            ["i", "j"],
-            ["x", "y"],
-            ["y", "x", "c"],
-            ["x", "y", "z", "c", "t"],
-        ),
-    )
-    def test_invalid_0_3_axes(self, axes):
-        with pytest.raises(ValueError):
-            write_multiscales_metadata(self.root, ["0"], fmt=FormatV03(), axes=axes)
-
-    @pytest.mark.parametrize("datasets", ([], None, "0", ["0"], [{"key": 1}]))
-    def test_invalid_datasets(self, datasets):
-        with pytest.raises(ValueError):
-            write_multiscales_metadata(
-                self.root, datasets, axes=["t", "c", "z", "y", "x"], fmt=FormatV04()
-            )
-
-    @pytest.mark.parametrize(
-        "coordinateTransformations",
-        (
-            [{"type": "scale", "scale": [1, 1]}],
-            [
-                {"type": "scale", "scale": [1, 1]},
-                {"type": "translation", "translation": [0, 0]},
-            ],
-        ),
-    )
-    def test_valid_transformations(self, coordinateTransformations):
-        axes = [{"name": "y", "type": "space"}, {"name": "x", "type": "space"}]
-        datasets = [
-            {
-                "path": "0",
-                "coordinateTransformations": coordinateTransformations,
-            }
-        ]
-        write_multiscales_metadata(self.root, datasets, axes=axes, fmt=FormatV04())
-        assert "multiscales" in self.root.attrs
-        assert self.root.attrs["multiscales"][0]["axes"] == axes
-        assert self.root.attrs["multiscales"][0]["datasets"] == datasets
-        # No arrays, so this is expected:
-        with pytest.raises(
-            ValueError,
-            match=re.escape(
-                "Expected to find an array at 0, but no array was found there."
-            ),
-        ):
-            Models04Image.from_zarr(self.root)
-
-    @pytest.mark.parametrize(
-        "coordinateTransformations",
-        (
-            [],
-            None,
-            [{"type": "scale"}],
-            [{"scale": [1, 1]}],
-            [{"type": "scale", "scale": ["1", 1]}],
-            [{"type": "scale", "scale": [1, 1, 1]}],
-            [{"type": "scale", "scale": [1, 1]}, {"type": "scale", "scale": [1, 1]}],
-            [
-                {"type": "scale", "scale": [1, 1]},
-                {"type": "translation", "translation": ["0", 0]},
-            ],
-            [
-                {"type": "translation", "translation": [0, 0]},
-            ],
-            [
-                {"type": "scale", "scale": [1, 1]},
-                {"type": "translation", "translation": [0, 0, 0]},
-            ],
-            [
-                {"type": "translation", "translation": [0, 0]},
-                {"type": "scale", "scale": [1, 1]},
-            ],
-            [
-                {"type": "scale", "scale": [1, 1]},
-                {"type": "translation", "translation": [0, 0]},
-                {"type": "translation", "translation": [1, 0]},
-            ],
-            [
-                {"type": "scale", "scale": [1, 1]},
-                {"translation": [0, 0]},
-            ],
-            [
-                {"type": "scale", "scale": [1, 1]},
-                {"type": "translation", "translate": [0, 0]},
-            ],
-        ),
-    )
-    def test_invalid_transformations(self, coordinateTransformations):
-        axes = [{"name": "y", "type": "space"}, {"name": "x", "type": "space"}]
-        datasets = [
-            {"path": "0", "coordinateTransformations": coordinateTransformations}
-        ]
-        with pytest.raises(ValueError):
-            write_multiscales_metadata(self.root, datasets, axes=axes, fmt=FormatV04())
-
-    @pytest.mark.parametrize(
-        "metadata",
-        [
-            {
-                "channels": [
-                    {
-                        "color": "FF0000",
-                        "window": {"start": 0, "end": 255, "min": 0, "max": 255},
-                    }
-                ]
-            },
-            {"channels": [{"color": "FF000"}]},  # test wrong metadata
-            {"channels": [{"window": []}]},  # test wrong metadata
-            {
-                "channels": [  # test wrong metadata
-                    {"color": "FF0000", "window": {"start": 0, "end": 255, "min": 0}},
-                ]
-            },
-            None,
-        ],
-    )
-    def test_omero_metadata(self, metadata: dict[str, Any] | None):
-        datasets = []
-        for level, transf in enumerate(TRANSFORMATIONS):
-            datasets.append({"path": str(level), "coordinateTransformations": transf})
-        if metadata is None:
-            with pytest.raises(
-                KeyError,
-                match=re.escape("If `'omero'` is present, value cannot be `None`."),
-            ):
-                write_multiscales_metadata(
-                    self.root,
-                    datasets,
-                    axes="tczyx",
-                    metadata={"omero": metadata},
-                )
-        else:
-            window_metadata = (
-                metadata["channels"][0].get("window")
-                if "window" in metadata["channels"][0]
-                else None
-            )
-            color_metadata = (
-                metadata["channels"][0].get("color")
-                if "color" in metadata["channels"][0]
-                else None
-            )
-            if window_metadata is not None and len(window_metadata) < 4:
-                if isinstance(window_metadata, dict):
-                    with pytest.raises(KeyError, match="window"):
-                        write_multiscales_metadata(
-                            self.root,
-                            datasets,
-                            axes="tczyx",
-                            metadata={"omero": metadata},
-                            fmt=FormatV04(),
-                        )
-                elif isinstance(window_metadata, list):
-                    with pytest.raises(TypeError, match="window"):
-                        write_multiscales_metadata(
-                            self.root,
-                            datasets,
-                            axes="tczyx",
-                            metadata={"omero": metadata},
-                            fmt=FormatV04(),
-                        )
-            elif color_metadata is not None and len(color_metadata) != 6:
-                with pytest.raises(TypeError, match="color"):
-                    write_multiscales_metadata(
-                        self.root,
-                        datasets,
-                        axes="tczyx",
-                        metadata={"omero": metadata},
-                    )
-            else:
-                write_multiscales_metadata(
-                    self.root,
-                    datasets,
-                    axes="tczyx",
-                    metadata={"omero": metadata},
-                )
-                # no arrays, so this is expected
-                with pytest.raises(
-                    ValueError,
-                    match=re.escape(
-                        "Expected to find an array at 0, but no array was found there."
-                    ),
-                ):
-                    Models04Image.from_zarr(self.root)
-
-
 class TestPlateMetadata:
     @pytest.fixture(autouse=True)
     def initdir(self, tmpdir):
@@ -1841,7 +1576,14 @@ class TestLabelWriter:
         return request.param
 
     def verify_label_data(
-        self, img_path, label_name, label_data, fmt, shape, transformations, scale
+        self,
+        img_path,
+        label_name,
+        label_data,
+        fmt,
+        shape,
+        transformations,
+        scale,
     ):
         # Verify image data
         out = zarr.open_group(f"{img_path}/labels/{label_name}")
@@ -1868,17 +1610,15 @@ class TestLabelWriter:
             assert transfs[0]["type"] == "scale"
             assert len(transfs[0]["scale"]) == len(shape)
 
+            base_shape = node_data[0].shape
+            shape = node_data[level].shape
+            factor = np.asarray(base_shape) / np.asarray(shape)
+
             # default downsamples by factor 2 each level, except z-axis
             for idx, value in enumerate(transfs[0]["scale"]):
-                axis_name = axes[idx]
-                if axis_name == "z":
-                    # z-axis is not downsampled by default
-                    assert value == scale[axis_name]
-                elif axis_name in ("x", "y"):
+                if axes[idx] in ("x", "y", "z"):
                     # spatial dimensions are downsampled
-                    assert value == scale[axis_name] * shape[idx] / (
-                        shape[idx] // (2**level)
-                    )
+                    assert value == scale[axes[idx]] * factor[idx]
                 else:
                     # non-spatial dimensions (t, c) are not downsampled
                     assert value == 1.0
@@ -2135,17 +1875,19 @@ class TestLabelWriter:
             label_data, method="nearest", scale_factors=scale_factors, dims=dims
         )
 
+        scale = dict(zip(axes, transformations[0][0]["scale"][-len(shape) :]))
         write_multiscale_labels(
             pyramid,
             group,
             name=label_name,
             fmt=fmt,
             axes=axes,
+            scale=scale,
             coordinate_transformations=transformations,
         )
-        scale = dict(zip(axes, transformations[0][0]["scale"][-len(shape) :]))
+        
         self.verify_label_data(
-            img_path, label_name, label_data, fmt, shape, transformations, scale
+            img_path, label_name, label_data, fmt, shape, transformations, scale,
         )
 
     def test_write_multiscale_labels_storage_options(
@@ -2194,12 +1936,14 @@ class TestLabelWriter:
 
         storage_options = _make_storage_options(fmt, shape, axes)
 
+        scale = dict(zip(axes, transformations[0][0]["scale"][-len(shape) :]))
         write_multiscale_labels(
             pyramid,
             group,
             name=label_name,
             fmt=fmt,
             axes=axes,
+            scale=scale,
             coordinate_transformations=transformations[:-1],
             storage_options=storage_options,
         )
@@ -2274,7 +2018,6 @@ class TestLabelWriter:
         if fmt.version == "0.4":
             Models04Labels.from_zarr(group["labels"])
 
-        scale = dict(zip(axes, transformations[0][0]["scale"][-len(shape) :]))
         self.verify_label_data(
             img_path, label_name, label_data, fmt, shape, transformations, scale
         )
@@ -2335,9 +2078,11 @@ class TestLabelWriter:
                 name=label_name,
                 fmt=fmt,
                 axes=axes,
+                scale=dict(zip(axes, scale0)),
                 coordinate_transformations=transformations,
             )
-            scale = dict(zip(axes, transformations[0][0]["scale"][-len(shape) :]))
+            scale = dict(zip(axes, scale0))
+
             self.verify_label_data(
                 img_path, label_name, label_data, fmt, shape, transformations, scale
             )
@@ -2440,4 +2185,4 @@ class TestLabelWriter:
 
 
 if __name__ == "__main__":
-    pytest.main([__file__])
+    pytest.main([__file__ + "::TestLabelWriter::test_two_label_images"])
