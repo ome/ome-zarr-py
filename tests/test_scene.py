@@ -286,6 +286,65 @@ def test_appending_scene(test_data_dir):
     assert len(scene_metadata["coordinateTransformations"]) == 3
     assert len(scene_metadata["coordinateSystems"]) == 1
 
+def test_scene_with_displacements(test_data_dir):
+    """
+    Create a scene with two images and a single coordinate transformation
+    between them. The data is saved and loaded back in the test.
+    """
+    shape = (64, 64)
+    img_a = OMEZarrImage(
+        data=create_data(shape),
+        name="imageA",
+        axes=["y", "x"],
+        scale={"y": 1.0, "x": 1.0},
+    )
 
-if __name__ == "__main__":
-    pytest.main([__file__])
+    img_b = OMEZarrImage(
+        data=create_data(shape),
+        name="imageB",
+        axes=["y", "x"],
+        scale={"y": 1.0, "x": 1.0},
+    )
+
+    vector_field = np.zeros((2, 64, 64), dtype=np.float32)
+    dfield_img = OMEZarrImage(
+        data=vector_field,
+        name="displacementField",
+        axes=["c", "y", "x"],
+        scale={"y": 1.0, "x": 1.0},
+        axes_types={"c": "displacement", "y": "space", "x": "space"},
+    )
+
+    img_a_ms = OMEZarrMultiscale(image=img_a)
+    img_b_ms = OMEZarrMultiscale(image=img_b)
+    dfield_img_ms = OMEZarrMultiscale(image=dfield_img)
+
+    transform = {
+        "type": "displacements",
+        "input": {"name": "physical", "path": "imageA"},
+        "output": {"name": "physical", "path": "imageB"},
+        "path": "coordinateTransformations/displacementField",
+    }
+
+    scene = OMEZarrScene(
+        images=[img_a_ms, img_b_ms],
+        coordinate_transformations=[transform],
+        coordinates_displacements={"displacementField": dfield_img_ms},
+    )
+
+    save_grp = str(test_data_dir / "test_scene_displacement.zarr")
+    scene.to_ome_zarr(save_grp, overwrite=True)
+
+    # check that all subgroups are there
+    group = zarr.open_group(save_grp, mode="r")
+    assert "coordinateTransformations" in group
+    assert "displacementField" in group["coordinateTransformations"]
+    assert "imageA" in group
+    assert "imageB" in group
+
+    # check that the metadata of the displacement field is correct
+    dfield_attrs = group["coordinateTransformations"]["displacementField"].attrs
+    assert "ome" in dfield_attrs
+    axes_md = dfield_attrs["ome"]["multiscales"][0]["coordinateSystems"][0]["axes"]
+    assert axes_md[0]["type"] == "displacement"
+    assert axes_md[0]["discrete"] == True
