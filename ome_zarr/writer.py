@@ -272,7 +272,6 @@ def write_multiscale(
     compute: bool = True,
     scale: dict[str, float] | None = None,
     axes_units: dict[str, str] | None = None,
-    **metadata: str | JSONDict | list[JSONDict],
 ) -> list:
     """
     Write a pyramid with multiscale metadata to disk.
@@ -345,6 +344,7 @@ def write_multiscale(
         :class:`dask.delayed.Delayed` representing the value to be computed by
         dask.
     """
+    from ome_zarr import OMEZarrImage, OMEZarrMultiscale
     group, fmt = check_group_fmt(group, fmt)
     dims = len(pyramid[0].shape)
     axes = _get_valid_axes(dims, axes, axes_units=axes_units, fmt=fmt)
@@ -365,113 +365,35 @@ def write_multiscale(
         )
         warnings.warn(msg, DeprecationWarning)
 
-    pyramid = [
-        da.from_array(level) if not isinstance(level, da.Array) else level
-        for level in pyramid
-    ]
-    dask_delayed = _write_pyramid_to_zarr(
-        pyramid,
+    images = []
+    for level in pyramid:
+        relative_factor = np.asarray(level.shape) / np.asarray(pyramid[0].shape)
+        level_scale = {d: s * relative_factor[i] for i, (d, s) in enumerate(scale.items())}
+        img = OMEZarrImage(
+            data=level,
+            axes=list(scale.keys()),
+            scale=level_scale,
+            axes_units=axes_units,
+            name=name
+        )
+        images.append(img)
+
+    ms = OMEZarrMultiscale(
+        image=images,
+        )
+
+    if fmt.version not in ("0.4", "0.5", "0.6.dev4"):
+        raise ValueError(f"Unsupported format version: {fmt.version}")
+    
+    dask_delayed = ms.to_ome_zarr(
         group,
-        fmt=fmt,
-        scale=scale,
-        axes=list(scale.keys()),
-        axes_units=axes_units,
-        coordinate_transformations=coordinate_transformations,
-        storage_options=storage_options,
-        name=name,
+        version=fmt.version,
         compute=compute,
-        **metadata,
-    )
+        storage_options=storage_options,
+        overwrite=True,
+        )
 
     return dask_delayed
-
-
-def write_multiscales_metadata(
-    group: zarr.Group | str,
-    datasets: list[dict],
-    fmt: Format | None = None,
-    axes: AxesType = None,
-    axes_units: dict[str, str] | None = None,
-    name: str | None = None,
-    **metadata: str | JSONDict | list[JSONDict],
-) -> None:
-    """
-    Write the multiscales metadata in the group.
-
-    :type group: :class:`zarr.Group`
-    :param group: The zarr group or path.
-    :type datasets: list of dicts
-    :param datasets:
-      The list of datasets (dicts) for this multiscale image.
-      Each dict must include 'path' and a 'coordinateTransformations'
-      list for version 0.4 or later that must include a 'scale' transform.
-    :type fmt: :class:`ome_zarr.format.Format`, optional
-    :param fmt:
-      The format of the ome_zarr data which should be used.
-      Defaults to the most current.
-    :type axes: list of str or list of dicts, optional
-    :param axes:
-      The names of the axes. e.g. ["t", "c", "z", "y", "x"].
-      Ignored for versions 0.1 and 0.2. Required for version 0.3 or greater.
-    :type axes_units: dict of str to str, optional
-    :param axes_units:
-      The physical units for each dimension, e.g. {"t": "millisecond", "z": "micrometer", "y": "micrometer", "x": "micrometer"}.
-      For a list of recommended units, see [ngff specification](https://ngff.openmicroscopy.org/specifications/0.5/index.html#axes-metadata).
-    """
-
-    group, fmt = check_group_fmt(group, fmt)
-    ndim = -1
-    if axes is not None:
-        if fmt.version in ("0.1", "0.2"):
-            LOGGER.info("axes ignored for version 0.1 or 0.2")
-            axes = None
-        else:
-            axes = _get_valid_axes(axes=axes, axes_units=axes_units, fmt=fmt)
-            if axes is not None:
-                ndim = len(axes)
-    if (
-        isinstance(metadata, dict)
-        and metadata.get("metadata")
-        and isinstance(metadata["metadata"], dict)
-        and "omero" in metadata["metadata"]
-    ):
-        omero_metadata = metadata["metadata"].pop("omero")
-        if omero_metadata is None:
-            raise KeyError("If `'omero'` is present, value cannot be `None`.")
-        for c in omero_metadata["channels"]:
-            if "color" in c:  # noqa: SIM102
-                if not isinstance(c["color"], str) or len(c["color"]) != 6:
-                    raise TypeError("`'color'` must be a hex code string.")
-            if "window" in c:
-                if not isinstance(c["window"], dict):
-                    raise TypeError("`'window'` must be a dict.")
-                for p in ["min", "max", "start", "end"]:
-                    if p not in c["window"]:
-                        raise KeyError(f"`'{p}'` not found in `'window'`.")
-                    if not isinstance(c["window"][p], (int, float)):
-                        raise TypeError(f"`'{p}'` must be an int or float.")
-
-        add_metadata(group, {"omero": omero_metadata})
-
-    # note: we construct the multiscale metadata via dict(), rather than {}
-    # to avoid duplication of protected keys like 'version' in **metadata
-    # (for {} this would silently over-write it, with dict() it explicitly fails)
-    multiscales = [
-        dict(datasets=_validate_datasets(datasets, ndim, fmt), name=name or group.name)
-    ]
-    if len(metadata.get("metadata", {})) > 0:
-        multiscales[0]["metadata"] = metadata["metadata"]
-    if axes is not None:
-        multiscales[0]["axes"] = axes
-
-    if fmt.version in ("0.1", "0.2", "0.3", "0.4"):
-        multiscales[0]["version"] = fmt.version
-    else:
-        # Zarr v3 top-level version
-        add_metadata(group, {"version": fmt.version})
-
-    add_metadata(group, {"multiscales": multiscales})
-
 
 def write_plate_metadata(
     group: zarr.Group | str,
@@ -907,85 +829,7 @@ def _write_pyramid_to_zarr(
         da.compute(*delayed)
         delayed = []
 
-    if coordinate_transformations is None:
-        # shapes = [data.shape for data in delayed]
-        coordinate_transformations = fmt.generate_coordinate_transformations(shapes)
-
-        if coordinate_transformations:
-            for transform in coordinate_transformations:
-                transform[0]["scale"] = [
-                    transform[0]["scale"][i] * scale.get(d, 1.0)
-                    for i, d in enumerate(axes)
-                ]
-
-    # we validate again later, but this catches length mismatch before zip(datasets...)
-    fmt.validate_coordinate_transformations(
-        len(pyramid[0].shape), len(datasets), coordinate_transformations
-    )
-    if coordinate_transformations is not None:
-        for dataset, transform in zip(datasets, coordinate_transformations):
-            dataset["coordinateTransformations"] = transform
-
-    write_multiscales_metadata(
-        group,
-        datasets=datasets,
-        fmt=fmt,
-        axes=list(axes),
-        name=name,
-        axes_units=axes_units,
-        **metadata,
-    )
     return delayed
-
-
-def write_label_metadata(
-    group: zarr.Group | str,
-    name: str,
-    colors: list[JSONDict] | None = None,
-    properties: list[JSONDict] | None = None,
-    fmt: Format | None = None,
-    **metadata: list[JSONDict] | JSONDict | str,
-) -> None:
-    """
-    Write image-label metadata to the group.
-
-    The label data must have been written to a sub-group,
-    with the same name as the second argument.
-
-    :type group: :class:`zarr.Group`
-    :param group: The zarr group or path to write the metadata in.
-    :type name: str
-    :param name: The name of the label sub-group.
-    :type colors: list of JSONDict, optional
-    :param colors:
-      Fixed colors for (a subset of) the label values.
-      Each dict specifies the color for one label and must contain the fields
-      "label-value" and "rgba".
-    :type properties: list of JSONDict, optional
-    :param properties:
-      Additional properties for (a subset of) the label values.
-      Each dict specifies additional properties for one label.
-      It must contain the field "label-value"
-      and may contain arbitrary additional properties.
-    :type fmt: :class:`ome_zarr.format.Format`, optional
-    :param fmt:
-      The format of the ome_zarr data which should be used.
-      Defaults to the most current.
-    """
-    group, fmt = check_group_fmt(group, fmt)
-    label_group = group[name]
-    image_label_metadata = {**metadata}
-    if colors is not None:
-        image_label_metadata["colors"] = colors
-    if properties is not None:
-        image_label_metadata["properties"] = properties
-    image_label_metadata["version"] = fmt.version
-
-    label_list = get_metadata(group).get("labels", [])
-    label_list.append(name)
-
-    add_metadata(group, {"labels": label_list}, fmt=fmt)
-    add_metadata(label_group, {"image-label": image_label_metadata}, fmt=fmt)
 
 
 def get_metadata(group: zarr.Group | str) -> dict:
@@ -1037,7 +881,6 @@ def write_multiscale_labels(
     scale: dict[str, float] | None = None,
     axes_units: dict[str, str] | None = None,
     compute: bool = True,
-    **metadata: JSONDict,
 ) -> list:
     """
     Write pyramidal image labels to disk.
@@ -1114,14 +957,10 @@ def write_multiscale_labels(
         :class:`dask.delayed.Delayed` representing the value to be computed by
         dask.
     """
+    from ome_zarr import OMEZarrImage, OMEZarrLabels
     group, fmt = check_group_fmt(group, fmt)
-    sub_group = group.require_group(f"labels/{name}")
-
-    # Ensure pyramid is all dask arrays
-    pyramid = [
-        da.from_array(level) if not isinstance(level, da.Array) else level
-        for level in pyramid
-    ]
+    dims = len(pyramid[0].shape)
+    axes = _get_valid_axes(dims, axes, axes_units=axes_units, fmt=fmt)
 
     if scale is None:
         _axes = _get_valid_axes(
@@ -1142,25 +981,50 @@ def write_multiscale_labels(
         )
         warnings.warn(msg, DeprecationWarning)
 
-    dask_delayed_jobs = _write_pyramid_to_zarr(
-        pyramid,
-        sub_group,
-        fmt=fmt,
-        scale=scale,
-        axes=list(scale.keys()),
-        axes_units=axes_units,
-        coordinate_transformations=coordinate_transformations,
+    sub_group = group.require_group(f"labels/{name}")
+
+    images: list[OMEZarrImage] = []
+    for level in pyramid:
+        relative_factor = np.asarray(level.shape) / np.asarray(pyramid[0].shape)
+        level_scale = {d: s / relative_factor[i] for i, (d, s) in enumerate(scale.items())}
+        images.append(
+            OMEZarrImage(
+                data=level,
+                scale=level_scale,
+                axes=list(scale.keys()),
+                name=name,
+                axes_units=axes_units,
+            )
+        )
+
+    ms = OMEZarrLabels(image=images)
+    if label_metadata is not None:
+        ms.image_label = label_metadata
+
+    dask_delayed_jobs = ms.to_ome_zarr(
+        group=sub_group,
         storage_options=storage_options,
-        name=name,
+        version=fmt.version,  # type: ignore[arg-type]
         compute=compute,
-        **metadata,
+        overwrite=True
     )
-    write_label_metadata(
-        group["labels"],
-        name,
-        fmt=fmt,
-        **({} if label_metadata is None else label_metadata),
-    )
+
+    label_list = []
+    if fmt.version in ("0.1", "0.2", "0.3", "0.4"):
+        node_metadata = group["labels"].attrs
+    else:
+        node_metadata = group["labels"].attrs.get("ome", {})
+
+    label_list = node_metadata.get("labels", [])
+    label_list.append(name)
+
+    if fmt.version in ("0.1", "0.2", "0.3", "0.4"):
+        group["labels"].attrs["labels"] = label_list
+    else:
+        group["labels"].attrs["ome"] = {
+            "version": fmt.version,
+            "labels": label_list,
+        }
 
     return dask_delayed_jobs
 
@@ -1320,7 +1184,10 @@ def write_labels(
         scale_factors=scale_factors,
         method=method,
     )
-    multiscales.image_label = image_label
+
+    if label_metadata is not None:
+        multiscales.image_label = label_metadata
+
     dask_delayed_jobs = multiscales.to_ome_zarr(
         group=sub_group,
         storage_options=storage_options,
@@ -1329,12 +1196,22 @@ def write_labels(
         overwrite=True,
     )
 
-    write_label_metadata(
-        group=group["labels"],
-        name=name,
-        fmt=fmt,
-        **({} if label_metadata is None else label_metadata),
-    )
+    label_list = []
+    if fmt.version in ("0.1", "0.2", "0.3", "0.4"):
+        node_metadata = group["labels"].attrs
+    else:
+        node_metadata = group["labels"].attrs.get("ome", {})
+
+    label_list = node_metadata.get("labels", [])
+    label_list.append(name)
+
+    if fmt.version in ("0.1", "0.2", "0.3", "0.4"):
+        group["labels"].attrs["labels"] = label_list
+    else:
+        group["labels"].attrs["ome"] = {
+            "version": fmt.version,
+            "labels": label_list,
+        }
 
     return dask_delayed_jobs
 
