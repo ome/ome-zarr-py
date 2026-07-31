@@ -1,7 +1,7 @@
 # the class for storage representation, not exposed to the user
 import os
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, cast
 
 import transformnd as tnd
 import zarr
@@ -207,7 +207,7 @@ class OMEZarrScene:
         images: dict[str, OMEZarrMultiscale] = {}
         for img_path in zarr_group.group_keys():
             img_group = zarr_group[img_path]
-            img = OMEZarrMultiscale.from_ome_zarr(img_group)
+            img = cast(OMEZarrMultiscale, OMEZarrMultiscale.from_ome_zarr(img_group))
             images[img_path] = img
 
         # Load scene metadata
