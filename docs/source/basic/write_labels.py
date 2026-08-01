@@ -1,7 +1,7 @@
 # %% [markdown]
 # # Write labels
 # (basic:labels)=
-# 
+#
 # Storing labels data alongside image data is a key application and feature of the ome-zarr file standard.
 # First, let's create some image data:
 
@@ -32,8 +32,8 @@ ngff_multiscales = OMEZarrMultiscale(image=ngff_image)
 
 # %%
 # add labels...
-blobs = binary_blobs(length=size, volume_fraction=0.1, n_dim=3).astype('int8')
-blobs2 = binary_blobs(length=size, volume_fraction=0.1, n_dim=3).astype('int8')
+blobs = binary_blobs(length=size, volume_fraction=0.1, n_dim=3).astype("int8")
+blobs2 = binary_blobs(length=size, volume_fraction=0.1, n_dim=3).astype("int8")
 # blobs will contain values of 1, 2 and 0 (background)
 blobs += 2 * blobs2
 
@@ -60,14 +60,14 @@ labels_multiscales2 = OMEZarrLabels(image=label_ngff2)
 # %%
 ngff_multiscales.labels = {
     "labels1": labels_multiscales1,
-    "labels2": labels_multiscales2
+    "labels2": labels_multiscales2,
 }
 
 ngff_multiscales.to_ome_zarr("ngff_multiscales_with_labels.zarr", overwrite=True)
 
 # %% [markdown]
 # This automatically creates the following file structure on disk:
-# 
+#
 # ```
 # ngff_multiscales_with_labels.zarr
 # ├── zarr.json
@@ -86,6 +86,3 @@ ngff_multiscales.to_ome_zarr("ngff_multiscales_with_labels.zarr", overwrite=True
 # ```
 
 # %%
-
-
-

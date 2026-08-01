@@ -1,7 +1,7 @@
 # %% [markdown]
 # # Read OME-ZARR images
 # (basic:read)=
-# 
+#
 # This sample code reads an image stored on remote s3 server,
 # but the same code can be used to read data on a local file system.
 # In either case, the data is exposed as an instance of the {py:class}`ome_zarr.classes.image.OMEZarrMultiscale` class, which provides access to the multiscale levels and metadata of the OME-ZARR image.
@@ -35,13 +35,13 @@ ngff_image.labels
 
 # %% [markdown]
 # ## Direct read
-# 
+#
 # The code below here demonstrates an alternative, equally functional API for reading OME-ZARR images.
-# 
+#
 # This sample code reads an image stored on remote s3 server,
 # but the same code can be used to read data on a local file system.
 # In either case, the data is exposed as [`dask` arrays](https://docs.dask.org/en/stable/array.html);
-# 
+#
 # You can obtain a list of "nodes" which include all arrays stored in the group:
 
 # %%
@@ -71,6 +71,3 @@ multiscales
 multiscales[0]
 
 # %%
-
-
-
