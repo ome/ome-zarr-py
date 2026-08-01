@@ -1,12 +1,12 @@
 # %% [markdown]
 # # Write HCS Plates
 # (tutorials:write_hcs_plate)=
-# 
+#
 # This tutorial shows how to write a high-content screening (HCS) dataset to OME-NGFF format.
 # HCS datasets represent culture plates with multiple wells, where each well can contain multiple fields of view.
-# 
+#
 # ## Create sample data
-# 
+#
 # First, let's set up some sample data representing a multi-well plate:
 
 # %%
@@ -28,11 +28,13 @@ num_fields = len(field_paths)
 size_xy = 128
 size_z = 10
 rng = np.random.default_rng(0)
-data = rng.poisson(mean_val, size=(num_wells, num_fields, size_z, size_xy, size_xy)).astype(np.uint8)
+data = rng.poisson(
+    mean_val, size=(num_wells, num_fields, size_z, size_xy, size_xy)
+).astype(np.uint8)
 
 # %% [markdown]
 # ## Write plate structure
-# 
+#
 # The plate is written by creating the hierarchical zarr structure with plate and well metadata:
 
 # %%
@@ -48,7 +50,9 @@ for wi, wp in enumerate(well_paths):
     write_well_metadata(well_group, field_paths)
     for fi, field in enumerate(field_paths):
         image_group = well_group.require_group(str(field))
-        write_image(image=data[wi, fi], group=image_group, axes="zyx",
-                    storage_options=dict(chunks=(1, size_xy, size_xy)))
-
-
+        write_image(
+            image=data[wi, fi],
+            group=image_group,
+            axes="zyx",
+            storage_options=dict(chunks=(1, size_xy, size_xy)),
+        )
