@@ -221,7 +221,7 @@ class OMEZarrScene:
                     OMEZarrMultiscale, OMEZarrMultiscale.from_ome_zarr(disp_group)
                 )
                 coordinates_displacements[disp_path] = disp_img
-        else: 
+        else:
             coordinates_displacements = None
 
         # Load scene metadata
@@ -233,7 +233,7 @@ class OMEZarrScene:
             images=images,
             coordinate_transformations=transformations,
             coordinate_systems=coordinate_systems,
-            coordinates_displacements=coordinates_displacements
+            coordinates_displacements=coordinates_displacements,
         )
 
         return scene
