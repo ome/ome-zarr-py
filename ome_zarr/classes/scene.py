@@ -212,6 +212,18 @@ class OMEZarrScene:
             img = cast(OMEZarrMultiscale, OMEZarrMultiscale.from_ome_zarr(img_group))
             images[img_path] = img
 
+        # load coordinateTransformations array data, if it exists
+        if "coordinateTransformations" in zarr_group:
+            coordinates_displacements = {}
+            for disp_path in zarr_group["coordinateTransformations"].group_keys():
+                disp_group = zarr_group["coordinateTransformations"][disp_path]
+                disp_img = cast(
+                    OMEZarrMultiscale, OMEZarrMultiscale.from_ome_zarr(disp_group)
+                )
+                coordinates_displacements[disp_path] = disp_img
+        else: 
+            coordinates_displacements = None
+
         # Load scene metadata
         scene_metadata = BaseSceneAttrs.model_validate(zarr_group.attrs.get("ome", {}))
         transformations = scene_metadata.scene.coordinateTransformations
@@ -221,6 +233,7 @@ class OMEZarrScene:
             images=images,
             coordinate_transformations=transformations,
             coordinate_systems=coordinate_systems,
+            coordinates_displacements=coordinates_displacements
         )
 
         return scene
