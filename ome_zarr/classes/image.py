@@ -396,7 +396,7 @@ class OMEZarrMultiscaleBase:
             if "image-label" in group.attrs:
                 is_label = True
 
-        # allow compatbility with 0.5.dev-spatialdata store
+        # allow compatibility with 0.5.dev-spatialdata store
         # not intended for other/future versions beyond 0.5
         elif version.startswith("0.5"):
             from ome_zarr_models.v05.multiscales import Multiscale as Multiscalev05
