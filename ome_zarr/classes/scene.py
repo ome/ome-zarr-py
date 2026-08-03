@@ -229,18 +229,26 @@ class OMEZarrScene:
                 path = tf.input.path
                 if path is not None and path in zarr_group:
                     img_group = zarr_group[path]
-                    img = cast(OMEZarrMultiscale, OMEZarrMultiscale.from_ome_zarr(img_group))
+                    img = cast(
+                        OMEZarrMultiscale, OMEZarrMultiscale.from_ome_zarr(img_group)
+                    )
                     images[path] = img
                 elif path is not None and path not in zarr_group:
-                    raise ValueError(f"Image specified in metadata at '{path}' not found in zarr group.")
+                    raise ValueError(
+                        f"Image specified in metadata at '{path}' not found in zarr group."
+                    )
             if hasattr(tf, "output"):
                 path = tf.output.path
                 if path is not None and path in zarr_group:
                     img_group = zarr_group[path]
-                    img = cast(OMEZarrMultiscale, OMEZarrMultiscale.from_ome_zarr(img_group))
+                    img = cast(
+                        OMEZarrMultiscale, OMEZarrMultiscale.from_ome_zarr(img_group)
+                    )
                     images[path] = img
                 elif path is not None and path not in zarr_group:
-                    raise ValueError(f"Image specified in metadata at '{path}' not found in zarr group.")
+                    raise ValueError(
+                        f"Image specified in metadata at '{path}' not found in zarr group."
+                    )
 
         scene = OMEZarrScene(
             images=images,

@@ -352,4 +352,3 @@ def test_scene_with_displacements(test_data_dir):
 
     # read displacements back in and check that the data is correct
     scene_read = OMEZarrScene.from_ome_zarr(save_grp)
-
