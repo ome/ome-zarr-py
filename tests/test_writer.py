@@ -66,6 +66,16 @@ def pytest_generate_tests(metafunc):
         metafunc.parametrize("array_constructor", ARRAY_CONSTRUCTORS)
 
 
+def _codec_value(value):
+    """Return the plain value of a codec configuration attribute.
+
+    zarr < 3.3 exposes attributes such as ``BloscCodec.cname`` and
+    ``BytesCodec.endian`` as (non-str) ``Enum`` members, while zarr >= 3.3 uses
+    plain strings.
+    """
+    return getattr(value, "value", value)
+
+
 def _make_storage_options(fmt, shape, axes):
     from numcodecs import Blosc
     from zarr.codecs import (
@@ -1795,7 +1805,7 @@ class TestLabelWriter:
         if level0.compressors:
             if fmt.version == "0.5":
                 if USE_DASK_ARRAY_KWARGS:
-                    assert level0.compressors[0].cname.name == "zstd"
+                    assert _codec_value(level0.compressors[0].cname) == "zstd"
                 else:
                     assert level0.compressors[0].to_dict()["name"] == "zstd"
             else:
@@ -1804,7 +1814,7 @@ class TestLabelWriter:
                 assert level0.compressors[0].clevel == 3
                 if fmt.version == "0.5" and hasattr(level0, "serializer"):
                     assert (
-                        level0.metadata.codecs[0].index_codecs[0].endian.name
+                        _codec_value(level0.metadata.codecs[0].index_codecs[0].endian)
                         == "little"
                     )
             else:
@@ -1998,7 +2008,7 @@ class TestLabelWriter:
             if level.compressors:
                 if fmt.version == "0.5":
                     if USE_DASK_ARRAY_KWARGS:
-                        assert level.compressors[0].cname.name == "zstd"
+                        assert _codec_value(level.compressors[0].cname) == "zstd"
                     else:
                         assert level.compressors[0].to_dict()["name"] == "zstd"
                 else:
@@ -2007,7 +2017,9 @@ class TestLabelWriter:
                     assert level.compressors[0].clevel == 3
                     if fmt.version == "0.5" and hasattr(level, "serializer"):
                         assert (
-                            level.metadata.codecs[0].index_codecs[0].endian.name
+                            _codec_value(
+                                level.metadata.codecs[0].index_codecs[0].endian
+                            )
                             == "little"
                         )
                 else:
