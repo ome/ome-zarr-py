@@ -167,7 +167,7 @@ class OMEZarrScene:
 
             # Write the image
             subgroup = zarr_group.create_group(img_path, overwrite=overwrite)
-            img.to_ome_zarr(subgroup, overwrite=True, version="0.6.dev4")
+            img.to_ome_zarr(subgroup, overwrite=True, version="0.6")
 
         for disp_path, disp_img in (self.coordinates_displacements or {}).items():
             # Skip if already written (incremental mode)
@@ -178,7 +178,7 @@ class OMEZarrScene:
             subgroup = zarr_group.create_group(
                 f"coordinateTransformations/{disp_path}", overwrite=overwrite
             )
-            disp_img.to_ome_zarr(subgroup, overwrite=True, version="0.6.dev4")
+            disp_img.to_ome_zarr(subgroup, overwrite=True, version="0.6")
 
         # Always update scene metadata
         metadata_dict = self.metadata.model_dump()
