@@ -109,6 +109,10 @@ class OMEZarrScene:
                     tf, zarr_context="", source_cs=None, target_cs=None
                 )
             self._graph.add_transform(tnd_transform)
+            # Add inverse edge if transform is invertible
+            inverse = tnd_transform.invert()
+            if inverse is not None:
+                self._graph.add_transform(inverse)
 
             # check if input/output are defined
             subgroups = []
@@ -131,6 +135,10 @@ class OMEZarrScene:
                             target_cs=None,
                         )
                         self._graph.add_transform(ind_transform)
+                        # Add inverse edge if transform is invertible
+                        inverse = ind_transform.invert()
+                        if inverse is not None:
+                            self._graph.add_transform(inverse)
 
     def to_ome_zarr(self, store: StoreLike, overwrite: bool = False):
         """
