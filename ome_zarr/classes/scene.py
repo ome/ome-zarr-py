@@ -31,6 +31,23 @@ class OMEZarrScene:
             Either a list of images (keyed internally by metadata.name) or a dict
             mapping zarr group paths to images. The dict form gives explicit control
             over the paths where images will be stored in the zarr hierarchy.
+        coordinate_transformations : Sequence[ome_zarr_models.v06.coordinate_transforms.AnyTransform] | list[dict[str, Any]]
+            A sequence of coordinate transformations that define how to map between
+            different coordinate systems in the scene.
+            Each transformation can be provided as an AnyTransform instance
+            or as a dictionary that can be validated into an AnyTransform.
+            For more information see [ngff specification](https://ngff.openmicroscopy.org/specifications/dev/index.html#coordinatetransformations-metadata).
+        coordinate_systems : Sequence[ome_zarr_models.v06.coordinate_transforms.CoordinateSystem] | Sequence[dict[str, Any]], optional
+            A sequence of coordinate systems that define the coordinate spaces used
+            in the scene.
+            Each coordinate system can be provided as a CoordinateSystem instance
+            or as a dictionary that can be validated into a CoordinateSystem.
+            For more information see [ngff specification](https://ngff.openmicroscopy.org/specifications/dev/index.html#coordinatesystems-metadata).
+        coordinates_displacements : dict[str, OMEZarrMultiscale] | None, optional
+            A dictionary mapping zarr group paths to displacement field images
+            or coordinate arrays, which are referenced by the [displacements and
+            coordinates transformations](https://ngff.openmicroscopy.org/specifications/dev/index.html#coordinates-and-displacements) in the scene metadata.
+
         """
         # Coerce list to dict keyed by metadata.name
         if isinstance(images, list):
