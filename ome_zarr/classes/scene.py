@@ -38,18 +38,47 @@ class OMEZarrScene:
         else:
             self.images = images
 
-        # parse coordinate systems and transforms
-        self.coordinate_systems = self._parse_coordinate_systems(coordinate_systems)
-        self.coordinate_transformations = self._parse_transforms(
-            coordinate_transformations
-        )
         self.coordinates_displacements = coordinates_displacements
 
-        self.metadata = SceneAttrs(
-            coordinateSystems=self.coordinate_systems,
-            coordinateTransformations=self.coordinate_transformations,
+        # metadata is the single source of truth
+        self._metadata = SceneAttrs(
+            coordinateSystems=self._parse_coordinate_systems(coordinate_systems),
+            coordinateTransformations=self._parse_transforms(
+                coordinate_transformations
+            ),
         )
 
+    @property
+    def coordinate_systems(self) -> tuple[CoordinateSystem, ...]:
+        return tuple(self._metadata.coordinateSystems or ())
+
+    @coordinate_systems.setter
+    def coordinate_systems(
+        self, value: Sequence[CoordinateSystem] | Sequence[dict[str, Any]]
+    ) -> None:
+        self._metadata = self._metadata.model_copy(
+            update={"coordinateSystems": self._parse_coordinate_systems(value)}
+        )
+
+    @property
+    def coordinate_transformations(self) -> tuple[AnyTransform, ...]:
+        return tuple(self._metadata.coordinateTransformations or ())
+
+    @coordinate_transformations.setter
+    def coordinate_transformations(
+        self, value: Sequence[AnyTransform] | list[dict[str, Any]]
+    ) -> None:
+        self._metadata = self._metadata.model_copy(
+            update={"coordinateTransformations": self._parse_transforms(value)}
+        )
+
+    @property
+    def metadata(self) -> SceneAttrs:
+        return self._metadata
+
+    @metadata.setter
+    def metadata(self, value: SceneAttrs) -> None:
+        self._metadata = value
         self._build_graph()
 
     def get_coordinate_system(
@@ -155,8 +184,6 @@ class OMEZarrScene:
 
         import tqdm
 
-        from ome_zarr.utils import _recursive_pop_nones
-
         if overwrite and os.path.exists(str(store)):
             # Clear the store if it already exists and we're not doing incremental writes
             shutil.rmtree(str(store))
@@ -258,36 +285,13 @@ class OMEZarrScene:
         scene = OMEZarrScene(
             images=images,
             coordinate_transformations=transformations,
-            coordinate_systems=coordinate_systems if coordinate_systems is not None else (),
+            coordinate_systems=(
+                coordinate_systems if coordinate_systems is not None else ()
+            ),
             coordinates_displacements=coordinates_displacements,
         )
 
         return scene
-
-    def __setattr__(self, name: str, value: Any) -> None:
-        if name == "coordinate_transformations":
-            # Update metadata when coordinate transformations are set
-            parsed_transforms = self._parse_transforms(value)
-            super().__setattr__(name, parsed_transforms)
-            # Only update metadata if it exists (not during initial construction)
-            if hasattr(self, "metadata") and self.metadata is not None:
-                self.metadata = self.metadata.model_copy(
-                    update={"coordinateTransformations": parsed_transforms}
-                )
-
-        elif name == "coordinate_systems":
-            # Update metadata when coordinate systems are set
-            parsed_coordinate_systems = self._parse_coordinate_systems(value)
-            super().__setattr__(name, parsed_coordinate_systems)
-            # Only update metadata if it exists (not during initial construction)
-            if hasattr(self, "metadata") and self.metadata is not None:
-                self.metadata = self.metadata.model_copy(
-                    update={"coordinateSystems": parsed_coordinate_systems}
-                )
-
-        else:
-            # Default behavior for all other attributes
-            super().__setattr__(name, value)
 
     @staticmethod
     def _parse_transforms(
