@@ -155,6 +155,10 @@ class OMEZarrScene:
         self._graph = tnd.graph.TransformGraph()
         # Add scene-level transformations (empty context = root level)
         for tf in self.coordinate_transformations:
+            if tf.input is None or tf.output is None:
+                raise ValueError(
+                    f"Coordinate transformation {tf} is missing input or output information."
+                )
             if tf.type == "sequence":
                 source_cs = self.get_coordinate_system(tf.input.name, tf.input.path)
                 target_cs = self.get_coordinate_system(tf.output.name, tf.output.path)
