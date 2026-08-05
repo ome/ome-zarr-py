@@ -23,6 +23,12 @@ extensions = [
     "sphinx_jupyterbook_latex",
 ]
 
+# Configure Jupytext for myst_nb to handle Python scripts
+nb_custom_formats = {
+    ".py": ["jupytext.reads", {"fmt": "py:percent"}],
+}
+nb_execution_mode = "force"
+
 myst_enable_extensions = [
     "colon_fence",
     "dollarmath",
