@@ -48,6 +48,17 @@ class OMEZarrScene:
             or coordinate arrays, which are referenced by the [displacements and
             coordinates transformations](https://ngff.openmicroscopy.org/specifications/dev/index.html#coordinates-and-displacements) in the scene metadata.
 
+        Methods
+        -------
+        to_ome_zarr(store: StoreLike, overwrite: bool = False, compute: bool = True)
+            Write the scene to OME-Zarr format in the specified store.
+        from_ome_zarr(store: StoreLike)
+            Load an existing scene from OME-Zarr format in the specified store.
+        get_coordinate_system(name: str | None, path: str | None = None)
+            Retrieve a coordinate system by name or path.
+            If neither is 
+
+
         """
         # Coerce list to dict keyed by metadata.name
         if isinstance(images, list):
