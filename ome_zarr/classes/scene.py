@@ -187,8 +187,7 @@ class OMEZarrScene:
             disp_img.to_ome_zarr(subgroup, overwrite=True, version="0.6")
 
         # Always update scene metadata
-        metadata_dict = self.metadata.model_dump()
-        metadata_dict = _recursive_pop_nones(metadata_dict)
+        metadata_dict = self.metadata.model_dump(exclude_none=True)
 
         zarr_group.attrs["ome"] = {"scene": metadata_dict, "version": "0.6.dev4"}
 
@@ -312,9 +311,7 @@ class OMEZarrScene:
 
     @staticmethod
     def _parse_coordinate_systems(
-        coordinate_systems: (
-            Sequence[CoordinateSystem] | Sequence[dict[str, Any]]
-        ),
+        coordinate_systems: Sequence[CoordinateSystem] | Sequence[dict[str, Any]],
     ) -> tuple[CoordinateSystem, ...]:
         """
         Helper method to parse a sequence of coordinate systems that may be provided as either
