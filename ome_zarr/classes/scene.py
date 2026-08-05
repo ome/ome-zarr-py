@@ -107,41 +107,49 @@ class OMEZarrScene:
         self._build_graph()
 
     def get_coordinate_system(
-        self, name: str, path: str | None = None
-    ) -> CoordinateSystem | None:
+        self, name: str | None = None, path: str | None = None
+    ) -> dict[str, list[CoordinateSystem]]:
         """
         Retrieve a coordinate system by name and optional path.
 
         Parameters
         ----------
-        name: str
-            The name of the coordinate system to retrieve.
+        name: str | None
+            Optional name of the coordinate system to retrieve.
+            If provided, only coordinate systems with this name will be returned.
         path: str | None
-            Optional path to disambiguate coordinate systems with the same name. If None, will return the first match with the given name.
+            Optional path to disambiguate coordinate systems by the zarr path
+            under which they are stored.
+            If provided, only coordinate systems associated with this path will be returned.
 
         Returns
         -------
-        CoordinateSystem or None
-            The matching CoordinateSystem object, or None if no match is found.
+        dict[str, list[CoordinateSystem]]
+            A dictionary of matching CoordinateSystem objects keyed by their context
+            (e.g., "" for top-level, image key for image-level).
+            Empty if no match is found.
         """
-        if path is None:
-            # coordinate system can only be in top-level
-            possible_coordinate_systems: Sequence[CoordinateSystem] = (
-                self.coordinate_systems or []
+        # find top-level matches
+        top_level_matches = {}
+        if len(self.coordinate_systems) > 0:
+            top_level_matches = {"": list(self.coordinate_systems)}
+
+        # find image-level matches
+        image_matches = {}
+        for key, img in self.images.items():
+            image_matches.update(
+                {key: list(img.metadata.coordinateSystems)}
             )
 
-            return next(
-                (cs for cs in possible_coordinate_systems if cs.name == name), None
-            )
+        matches = {**top_level_matches, **image_matches}
 
-        possible_coordinate_systems = []
-        for group in self.images:
-            if group == path:
-                img = self.images[group]
-                for cs in img.metadata.coordinateSystems:
-                    if cs.name == name:
-                        return cs
-        return None
+        if name is not None:
+            matches = {k: [cs for cs in v if cs.name == name] for k, v in matches.items()}
+
+        if path is not None:
+            matches = {k: v for k, v in matches.items() if k == path}
+
+        return matches
 
     def _build_graph(self):
         self._graph = tnd.graph.TransformGraph()
@@ -153,8 +161,8 @@ class OMEZarrScene:
                 tnd_transform = self._ozmp_tf_to_tnd(
                     tf,
                     zarr_context="",
-                    source_cs=source_cs,
-                    target_cs=target_cs,
+                    source_cs=source_cs[tf.input.path or ""][0],
+                    target_cs=target_cs[tf.output.path or ""][0],
                 ).simplify()
             else:
                 tnd_transform = self._ozmp_tf_to_tnd(
