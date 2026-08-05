@@ -21,9 +21,7 @@ class OMEZarrScene:
         self,
         images: list[OMEZarrMultiscale] | dict[str, OMEZarrMultiscale],
         coordinate_transformations: Sequence[AnyTransform] | list[dict[str, Any]],
-        coordinate_systems: (
-            Sequence[CoordinateSystem] | Sequence[dict[str, Any]] | None
-        ) = None,
+        coordinate_systems: Sequence[CoordinateSystem] | Sequence[dict[str, Any]] = (),
         coordinates_displacements: dict[str, OMEZarrMultiscale] | None = None,
     ):
         """
@@ -315,17 +313,15 @@ class OMEZarrScene:
     @staticmethod
     def _parse_coordinate_systems(
         coordinate_systems: (
-            Sequence[CoordinateSystem] | Sequence[dict[str, Any]] | None
+            Sequence[CoordinateSystem] | Sequence[dict[str, Any]]
         ),
-    ) -> tuple[CoordinateSystem, ...] | None:
+    ) -> tuple[CoordinateSystem, ...]:
         """
         Helper method to parse a sequence of coordinate systems that may be provided as either
         CoordinateSystem instances or dictionaries.
         This ensures that all coordinate systems are stored as CoordinateSystem objects in the scene metadata.
         If coordinate_systems is None, it will be returned as None.
         """
-        if coordinate_systems is None:
-            return None
 
         parsed_coordinate_systems = []
         for cs in coordinate_systems:
