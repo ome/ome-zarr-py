@@ -192,7 +192,7 @@ class OMEZarrScene:
                         if inverse is not None:
                             self._graph.add_transform(inverse)
 
-    def to_ome_zarr(self, store: StoreLike, overwrite: bool = False):
+    def to_ome_zarr(self, store: StoreLike, overwrite: bool = False, compute: bool = True) -> list:
         """
         Write scene to OME-Zarr format.
 
@@ -203,6 +203,9 @@ class OMEZarrScene:
         overwrite: bool
             If True, overwrite all images in the store with the current state of the scene.
             If False, only write new images that haven't been written before. Existing images in the store will be left unchanged.
+        compute: bool
+            If True, compute any lazy operations on write of each image.
+            Otherwise return a list of delayed operations that can be computed later.
 
         """
         import shutil
@@ -217,6 +220,8 @@ class OMEZarrScene:
         mode = "w" if overwrite else "a"
         zarr_group = zarr.open(store, mode=mode)
 
+        delayed = []
+
         # Create a subgroup for each image using its path key
         for img_path, img in tqdm.tqdm(self.images.items(), desc="Writing images"):
             # Skip if already written (incremental mode)
@@ -225,7 +230,7 @@ class OMEZarrScene:
 
             # Write the image
             subgroup = zarr_group.create_group(img_path, overwrite=overwrite)
-            img.to_ome_zarr(subgroup, overwrite=True, version="0.6")
+            delayed += img.to_ome_zarr(subgroup, overwrite=True, version="0.6", compute=compute)
 
         for disp_path, disp_img in (self.coordinates_displacements or {}).items():
             # Skip if already written (incremental mode)
@@ -236,12 +241,14 @@ class OMEZarrScene:
             subgroup = zarr_group.create_group(
                 f"coordinateTransformations/{disp_path}", overwrite=overwrite
             )
-            disp_img.to_ome_zarr(subgroup, overwrite=True, version="0.6")
+            delayed += disp_img.to_ome_zarr(subgroup, overwrite=True, version="0.6", compute=compute)
 
         # Always update scene metadata
         metadata_dict = self.metadata.model_dump(exclude_none=True)
 
-        zarr_group.attrs["ome"] = {"scene": metadata_dict, "version": "0.6.dev4"}
+        zarr_group.attrs["ome"] = {"scene": metadata_dict, "version": "0.6"}
+
+        return delayed
 
     @classmethod
     def from_ome_zarr(cls, store: StoreLike):
