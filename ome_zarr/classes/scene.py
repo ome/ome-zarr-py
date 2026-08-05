@@ -74,6 +74,14 @@ class OMEZarrScene:
 
     @property
     def metadata(self) -> SceneAttrs:
+        """
+        Get the scene metadata as a SceneAttrs object.
+
+        Returns
+        -------
+        SceneAttrs: ome_zarr_models.v06.scene.SceneAttrs
+            The scene metadata, including coordinate systems and transformations.
+        """
         return self._metadata
 
     @metadata.setter
