@@ -230,7 +230,7 @@ class OMEZarrScene:
         # Load all image subgroups, keyed by their zarr path
         images = {}
         for tf in transformations:
-            if hasattr(tf, "input"):
+            if tf.input is not None:
                 path = tf.input.path
                 if path is not None and path in zarr_group:
                     img_group = zarr_group[path]
@@ -242,7 +242,7 @@ class OMEZarrScene:
                     raise ValueError(
                         f"Image specified in metadata at '{path}' not found in zarr group."
                     )
-            if hasattr(tf, "output"):
+            if tf.output is not None:
                 path = tf.output.path
                 if path is not None and path in zarr_group:
                     img_group = zarr_group[path]
@@ -258,7 +258,7 @@ class OMEZarrScene:
         scene = OMEZarrScene(
             images=images,
             coordinate_transformations=transformations,
-            coordinate_systems=coordinate_systems,
+            coordinate_systems=coordinate_systems if coordinate_systems is not None else (),
             coordinates_displacements=coordinates_displacements,
         )
 
