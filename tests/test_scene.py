@@ -180,7 +180,7 @@ def test_create_scene_with_coordinate_systems(test_data_dir, transform):
     assert "ome" in zarr_group.attrs
     ome_metadata = zarr_group.attrs["ome"]
     assert "scene" in ome_metadata
-    assert "version" in ome_metadata 
+    assert "version" in ome_metadata
     assert ome_metadata["version"] == "0.6"
     assert "coordinateSystems" in ome_metadata["scene"]
     assert len(ome_metadata["scene"]["coordinateSystems"]) == 2
@@ -351,7 +351,7 @@ def test_scene_with_displacements(test_data_dir):
     assert dfield_attrs["ome"]["version"] == "0.6"
     axes_md = dfield_attrs["ome"]["multiscales"][0]["coordinateSystems"][0]["axes"]
     assert axes_md[0]["type"] == "displacement"
-    assert axes_md[0]["discrete"] == True
+    assert axes_md[0]["discrete"]
 
     # read displacements back in and check that the (meta)data is correct
     scene_read = OMEZarrScene.from_ome_zarr(save_grp)
@@ -360,4 +360,4 @@ def test_scene_with_displacements(test_data_dir):
     dfield_img = scene_read.coordinates_displacements["displacementField"]
     for image in dfield_img.images:
         assert image.axes_types["c"] == "displacement"
-    assert dfield_img.metadata.coordinateSystems[0].axes[0].discrete == True
+    assert dfield_img.metadata.coordinateSystems[0].axes[0].discrete
