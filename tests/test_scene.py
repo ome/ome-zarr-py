@@ -92,7 +92,8 @@ def test_create_scene_without_coordinate_systems(test_data_dir, transform):
     assert "ome" in zarr_group.attrs
     ome_metadata = zarr_group.attrs["ome"]
     assert "scene" in ome_metadata
-    assert "version" in ome_metadata and ome_metadata["version"] == "0.6.dev4"
+    assert "version" in ome_metadata
+    assert ome_metadata["version"] == "0.6"
 
     # check transforms
     assert "coordinateTransformations" in ome_metadata["scene"]
@@ -179,7 +180,8 @@ def test_create_scene_with_coordinate_systems(test_data_dir, transform):
     assert "ome" in zarr_group.attrs
     ome_metadata = zarr_group.attrs["ome"]
     assert "scene" in ome_metadata
-    assert "version" in ome_metadata and ome_metadata["version"] == "0.6.dev4"
+    assert "version" in ome_metadata 
+    assert ome_metadata["version"] == "0.6"
     assert "coordinateSystems" in ome_metadata["scene"]
     assert len(ome_metadata["scene"]["coordinateSystems"]) == 2
 
