@@ -73,7 +73,7 @@ def test_create_scene_without_coordinate_systems(test_data_dir, transform):
     assert len(scene._graph.graph.nodes) == 2
 
     # traverse graph
-    tf = scene._graph.get_sequence(f"{img_a.name}:physical", f"{img_b.name}:physical")
+    tf = scene._graph.get_sequence((img_a.name, "physical"), (img_b.name, "physical"))
 
     # check that the transform graph can be traversed (i.e. transform is not None)
     assert tf is not None

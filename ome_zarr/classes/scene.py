@@ -57,7 +57,7 @@ class OMEZarrScene:
             Load an existing scene from OME-Zarr format in the specified store.
         get_coordinate_system(name: str | None, path: str | None = None)
             Retrieve a coordinate system by name or path.
-            If neither is 
+            If neither is
 
 
         """
@@ -151,14 +151,14 @@ class OMEZarrScene:
         # find image-level matches
         image_matches = {}
         for key, img in self.images.items():
-            image_matches.update(
-                {key: list(img.metadata.coordinateSystems)}
-            )
+            image_matches.update({key: list(img.metadata.coordinateSystems)})
 
         matches = {**top_level_matches, **image_matches}
 
         if name is not None:
-            matches = {k: [cs for cs in v if cs.name == name] for k, v in matches.items()}
+            matches = {
+                k: [cs for cs in v if cs.name == name] for k, v in matches.items()
+            }
 
         if path is not None:
             matches = {k: v for k, v in matches.items() if k == path}
@@ -218,7 +218,9 @@ class OMEZarrScene:
                         if inverse is not None:
                             self._graph.add_transform(inverse)
 
-    def to_ome_zarr(self, store: StoreLike, overwrite: bool = False, compute: bool = True) -> list:
+    def to_ome_zarr(
+        self, store: StoreLike, overwrite: bool = False, compute: bool = True
+    ) -> list:
         """
         Write scene to OME-Zarr format.
 
@@ -256,7 +258,9 @@ class OMEZarrScene:
 
             # Write the image
             subgroup = zarr_group.create_group(img_path, overwrite=overwrite)
-            delayed += img.to_ome_zarr(subgroup, overwrite=True, version="0.6", compute=compute)
+            delayed += img.to_ome_zarr(
+                subgroup, overwrite=True, version="0.6", compute=compute
+            )
 
         for disp_path, disp_img in (self.coordinates_displacements or {}).items():
             # Skip if already written (incremental mode)
@@ -267,7 +271,9 @@ class OMEZarrScene:
             subgroup = zarr_group.create_group(
                 f"coordinateTransformations/{disp_path}", overwrite=overwrite
             )
-            delayed += disp_img.to_ome_zarr(subgroup, overwrite=True, version="0.6", compute=compute)
+            delayed += disp_img.to_ome_zarr(
+                subgroup, overwrite=True, version="0.6", compute=compute
+            )
 
         # Always update scene metadata
         metadata_dict = self.metadata.model_dump(exclude_none=True)
