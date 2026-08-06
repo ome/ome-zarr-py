@@ -77,6 +77,8 @@ class OMEZarrScene:
             ),
         )
 
+        self._build_graph()
+
     @property
     def coordinate_systems(self) -> tuple[CoordinateSystem, ...]:
         return tuple(self._metadata.coordinateSystems or ())
