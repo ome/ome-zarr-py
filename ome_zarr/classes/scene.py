@@ -238,8 +238,6 @@ class OMEZarrScene:
         """
         import shutil
 
-        import tqdm
-
         if overwrite and os.path.exists(str(store)):
             # Clear the store if it already exists and we're not doing incremental writes
             shutil.rmtree(str(store))
@@ -251,7 +249,7 @@ class OMEZarrScene:
         delayed = []
 
         # Create a subgroup for each image using its path key
-        for img_path, img in tqdm.tqdm(self.images.items(), desc="Writing images"):
+        for img_path, img in self.images.items():
             # Skip if already written (incremental mode)
             if not overwrite and img_path in zarr_group:
                 continue
@@ -417,8 +415,16 @@ class OMEZarrScene:
             # zarr_context prepends path with relative path from root
             # to keep track of global location of coordinate systems in the zarr store
             if zarr_context:
-                input_path = posixpath.join(zarr_context, input_path) if input_path else zarr_context
-                output_path = posixpath.join(zarr_context, output_path) if output_path else zarr_context
+                input_path = (
+                    posixpath.join(zarr_context, input_path)
+                    if input_path
+                    else zarr_context
+                )
+                output_path = (
+                    posixpath.join(zarr_context, output_path)
+                    if output_path
+                    else zarr_context
+                )
 
             spaces = tnd.Spaces(
                 (input_path, transform.input.name),
@@ -447,7 +453,9 @@ class OMEZarrScene:
                 path_to_dfield = posixpath.join(zarr_context, path_to_dfield)
 
             if self.coordinates_displacements is not None:
-                dfield = self.coordinates_displacements.get(posixpath.basename(path_to_dfield))
+                dfield = self.coordinates_displacements.get(
+                    posixpath.basename(path_to_dfield)
+                )
                 if dfield is not None:
                     if dfield.images[0].scale is None:
                         raise ValueError(
