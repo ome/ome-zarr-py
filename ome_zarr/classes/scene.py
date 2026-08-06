@@ -1,5 +1,6 @@
 # the class for storage representation, not exposed to the user
 import os
+import posixpath
 from collections.abc import Sequence
 from typing import Any, cast
 
@@ -402,28 +403,18 @@ class OMEZarrScene:
         import numpy as np
 
         if transform.input is not None:
-            input_path = (
-                transform.input.path if transform.input.path is not None else ""
-            )
-            output_path = (
-                transform.output.path if transform.output.path is not None else ""
-            )
+            input_path = transform.input.path or ""
+            output_path = transform.output.path or ""
 
             # zarr_context prepends path with relative path from root
             # to keep track of global location of coordinate systems in the zarr store
-            if zarr_context != "" and input_path != "":
-                input_path = f"{zarr_context}/{input_path}"
-            elif zarr_context != "":
-                input_path = zarr_context
-
-            if zarr_context != "" and output_path != "":
-                output_path = f"{zarr_context}/{output_path}"
-            elif zarr_context != "":
-                output_path = zarr_context
+            if zarr_context:
+                input_path = posixpath.join(zarr_context, input_path) if input_path else zarr_context
+                output_path = posixpath.join(zarr_context, output_path) if output_path else zarr_context
 
             spaces = tnd.Spaces(
-                f"{input_path}:{transform.input.name}",
-                f"{output_path}:{transform.output.name}",
+                (input_path, transform.input.name),
+                (output_path, transform.output.name),
             )
         else:
             spaces = tnd.Spaces(None, None)
@@ -443,14 +434,12 @@ class OMEZarrScene:
                 tnd_transform = tnd.transforms.Affine(aff, spaces=spaces)
 
         elif transform.type == "displacements":
-            path_to_dfield = transform.path if transform.path is not None else ""
-            if zarr_context != "" and path_to_dfield != "":
-                path_to_dfield = f"{zarr_context}/{path_to_dfield}"
+            path_to_dfield = transform.path or ""
+            if zarr_context and path_to_dfield:
+                path_to_dfield = posixpath.join(zarr_context, path_to_dfield)
 
             if self.coordinates_displacements is not None:
-                dfield = self.coordinates_displacements.get(
-                    path_to_dfield.split("/")[-1]
-                )
+                dfield = self.coordinates_displacements.get(posixpath.basename(path_to_dfield))
                 if dfield is not None:
                     if dfield.images[0].scale is None:
                         raise ValueError(
