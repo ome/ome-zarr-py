@@ -10,6 +10,28 @@ TRANSFORMS = [
     {"type": "rotation", "rotation": [[0.0, -1.0], [1.0, 0.0]]},
     {"type": "affine", "affine": [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]},
     {"type": "mapAxis", "mapAxis": [1, 0]},
+    {
+        "type": "sequence",
+        "transformations": [
+            {"type": "scale", "scale": [1.0, 1.0]},
+            {"type": "translation", "translation": [0.0, 0.0]},
+        ],
+    },
+    {
+        "type": "byDimension",
+        "transformations": [
+            {
+                "input_axes": [1],
+                "output_axes": [1],
+                "transformation": {"type": "translation", "translation": [0.0]},
+            },
+            {
+                "input_axes": [0],
+                "output_axes": [0],
+                "transformation": {"type": "scale", "scale": [1.0]},
+            },
+        ],
+    },
 ]
 
 
@@ -33,7 +55,10 @@ def create_data(shape, dtype=np.uint8, mean_val=10):
 def test_create_scene_without_coordinate_systems(test_data_dir, transform):
     """
     Create a scene with two images and a single coordinate transformation
-    between them. The data is saved and loaded back in the test.
+    between them.
+    One of the images has an additional coordinate system besides the
+    physical coordinate system.
+    The data is saved and loaded back in the test.
     """
     shape = (64, 64)
     img_a = OMEZarrImage(
@@ -50,13 +75,32 @@ def test_create_scene_without_coordinate_systems(test_data_dir, transform):
         scale={"y": 1.0, "x": 1.0},
     )
 
+    additional_cs = {
+        "name": "additional",
+        "axes": [
+            {"name": "y", "type": "space"},
+            {"name": "x", "type": "space"},
+        ],
+    }
+
+    additional_tf = {
+        "type": "rotation",
+        "rotation": [[0.0, -1.0], [1.0, 0.0]],
+        "input": {"name": "physical"},
+        "output": {"name": "additional"},
+    }
+
     img_a_ms = OMEZarrMultiscale(image=img_a)
-    img_b_ms = OMEZarrMultiscale(image=img_b)
+    img_b_ms = OMEZarrMultiscale(
+        image=img_b,
+        coordinate_systems=[additional_cs],
+        coordinate_transformations=[additional_tf],
+    )
 
     # avoid leaking transform mutations into other tests
     transform = transform.copy()
     transform["input"] = {"name": "physical", "path": "imageA"}
-    transform["output"] = {"name": "physical", "path": "imageB"}
+    transform["output"] = {"name": "additional", "path": "imageB"}
 
     scene = OMEZarrScene(
         images=[img_a_ms, img_b_ms],
@@ -70,7 +114,7 @@ def test_create_scene_without_coordinate_systems(test_data_dir, transform):
 
     # check that the graph has the correct number of nodes
     # (aka coordinate systems)
-    assert len(scene._graph.graph.nodes) == 2
+    assert len(scene._graph.graph.nodes) == 3
 
     # traverse graph
     tf = scene._graph.get_sequence((img_a.name, "physical"), (img_b.name, "physical"))
@@ -84,7 +128,7 @@ def test_create_scene_without_coordinate_systems(test_data_dir, transform):
 
     # check that the graph is created correctly on read
     assert scene_read._graph is not None
-    assert len(scene_read._graph.graph.nodes) == 2
+    assert len(scene_read._graph.graph.nodes) == 3
 
     # open the zarr group and check the metadata
     # and check that the correct metadata fields are present in the store
@@ -184,6 +228,76 @@ def test_create_scene_with_coordinate_systems(test_data_dir, transform):
     assert ome_metadata["version"] == "0.6"
     assert "coordinateSystems" in ome_metadata["scene"]
     assert len(ome_metadata["scene"]["coordinateSystems"]) == 2
+
+
+def test_coordinate_system_retrieval(test_data_dir):
+    """
+    Create a scene with two images and three coordinate transformations
+    between them. The data is saved and loaded back in the test.
+    """
+    shape = (64, 64)
+    img_a = OMEZarrImage(
+        data=create_data(shape),
+        name="imageA",
+        axes=["y", "x"],
+        scale={"y": 1.0, "x": 1.0},
+    )
+
+    img_b = OMEZarrImage(
+        data=create_data(shape),
+        name="imageB",
+        axes=["y", "x"],
+        scale={"y": 1.0, "x": 1.0},
+    )
+
+    img_a_ms = OMEZarrMultiscale(image=img_a)
+    img_b_ms = OMEZarrMultiscale(image=img_b)
+
+    world1_cs = {
+        "name": "world",
+        "axes": [ax.model_dump() for ax in img_a_ms.metadata.coordinateSystems[0].axes],
+    }
+    world2_cs = {
+        "name": "world2",
+        "axes": [ax.model_dump() for ax in img_b_ms.metadata.coordinateSystems[0].axes],
+    }
+
+    transform1 = {"type": "scale", "scale": [1.0, 1.0]}
+    transform1["input"] = {"name": "physical", "path": "imageA"}
+    transform1["output"] = {"name": "world"}
+
+    transform2 = {"type": "scale", "scale": [1.0, 1.0]}
+    transform2["input"] = {"name": "world"}
+    transform2["output"] = {"name": "world2"}
+
+    transform3 = {"type": "scale", "scale": [1.0, 1.0]}
+    transform3["input"] = {"name": "world2"}
+    transform3["output"] = {"name": "physical", "path": "imageB"}
+
+    scene = OMEZarrScene(
+        images=[img_a_ms, img_b_ms],
+        coordinate_transformations=[transform1, transform2, transform3],
+        coordinate_systems=[world1_cs, world2_cs],
+    )
+
+    # check that the get_coordinate_system returns the correct
+    # number and instances of coordinate systems
+    all_cs = scene.get_coordinate_system()
+
+    # the dict keys correspond to the names of the images
+    # or top-level if the name is ""
+    assert "" in all_cs
+    assert len(all_cs[""]) == 2
+    assert all_cs[""][0].name == "world"
+    assert all_cs[""][1].name == "world2"
+
+    assert "imageB" in all_cs
+    assert len(all_cs["imageB"]) == 1
+    assert all_cs["imageB"][0].name == "physical"
+
+    assert "imageA" in all_cs
+    assert len(all_cs["imageA"]) == 1
+    assert all_cs["imageA"][0].name == "physical"
 
 
 def test_appending_scene(test_data_dir):
