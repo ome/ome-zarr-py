@@ -184,7 +184,7 @@ class OMEZarrScene:
                     zarr_context="",
                     source_cs=source_cs[tf.input.path or ""][0],
                     target_cs=target_cs[tf.output.path or ""][0],
-                ).simplify()
+                )
             else:
                 tnd_transform = self._ozmp_tf_to_tnd(
                     tf, zarr_context="", source_cs=None, target_cs=None
