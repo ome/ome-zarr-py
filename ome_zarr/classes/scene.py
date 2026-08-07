@@ -163,6 +163,9 @@ class OMEZarrScene:
         if path is not None:
             matches = {k: v for k, v in matches.items() if k == path}
 
+        if "" in matches and len(matches[""]) == 0:
+            del matches[""]
+
         return matches
 
     def _build_graph(self):

@@ -312,7 +312,7 @@ def test_coordinate_system_retrieval(test_data_dir):
     assert "imageB" not in imageA_cs
 
     all_physical_cs = scene.get_coordinate_system(name="physical")
-    assert "" not in all_physical_cs or all_physical_cs[""] == []
+    assert "" not in all_physical_cs
     assert "imageA" in all_physical_cs
     assert len(all_physical_cs["imageA"]) == 1
     assert "imageB" in all_physical_cs
