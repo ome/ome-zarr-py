@@ -55,8 +55,8 @@ class OMEZarrScene:
             Write the scene to OME-Zarr format in the specified store.
         from_ome_zarr(store: StoreLike)
             Load an existing scene from OME-Zarr format in the specified store.
-        get_coordinate_system(name: str | None, path: str | None = None)
-            Retrieve a coordinate system by name or path.
+        get_coordinate_system(path: str | None, name: str | None = None)
+            Retrieve a coordinate system by path or name.
             If neither is
 
 
@@ -121,7 +121,7 @@ class OMEZarrScene:
         self._build_graph()
 
     def get_coordinate_system(
-        self, name: str | None = None, path: str | None = None
+        self, path: str | None = None, name: str | None = None
     ) -> dict[str, list[CoordinateSystem]]:
         """
         Retrieve a coordinate system by name and optional path.
@@ -177,8 +177,8 @@ class OMEZarrScene:
                     f"Coordinate transformation {tf} is missing input or output information."
                 )
             if tf.type == "sequence":
-                source_cs = self.get_coordinate_system(tf.input.name, tf.input.path)
-                target_cs = self.get_coordinate_system(tf.output.name, tf.output.path)
+                source_cs = self.get_coordinate_system(tf.input.path, tf.input.name)
+                target_cs = self.get_coordinate_system(tf.output.path, tf.output.name)
                 tnd_transform = self._ozmp_tf_to_tnd(
                     tf,
                     zarr_context="",
