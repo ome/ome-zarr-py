@@ -299,6 +299,25 @@ def test_coordinate_system_retrieval(test_data_dir):
     assert len(all_cs["imageA"]) == 1
     assert all_cs["imageA"][0].name == "physical"
 
+    world_cs = scene.get_coordinate_system(path="")
+    assert "" in world_cs
+    assert "imageA" not in world_cs
+    assert "imageB" not in world_cs
+    assert len(world_cs[""]) == 2
+
+    imageA_cs = scene.get_coordinate_system(path="imageA")
+    assert "imageA" in imageA_cs
+    assert len(imageA_cs["imageA"]) == 1
+    assert "" not in imageA_cs
+    assert "imageB" not in imageA_cs
+
+    all_physical_cs = scene.get_coordinate_system(name="physical")
+    assert "" not in all_physical_cs or all_physical_cs[""] == []
+    assert "imageA" in all_physical_cs
+    assert len(all_physical_cs["imageA"]) == 1
+    assert "imageB" in all_physical_cs
+    assert len(all_physical_cs["imageB"]) == 1
+
 
 def test_appending_scene(test_data_dir):
     """
@@ -475,3 +494,7 @@ def test_scene_with_displacements(test_data_dir):
     for image in dfield_img.images:
         assert image.axes_types["c"] == "displacement"
     assert dfield_img.metadata.coordinateSystems[0].axes[0].discrete
+
+
+if __name__ == "__main__":
+    pytest.main([__file__])
