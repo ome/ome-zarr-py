@@ -119,6 +119,12 @@ def test_create_scene_without_coordinate_systems(test_data_dir, transform):
     # traverse graph
     tf = scene._graph.get_sequence((img_a.name, "physical"), (img_b.name, "physical"))
 
+    # make sure transform matrix is square
+    # bydimension transforms cannot easily be expressed as matrix
+    if transform["type"] != "byDimension":
+        affine = tf.simplify().to_affine().matrix
+        assert affine.shape[0] == affine.shape[1]
+
     # check that the transform graph can be traversed (i.e. transform is not None)
     assert tf is not None
 
