@@ -498,9 +498,7 @@ class OMEZarrScene:
         elif transform.type == "rotation":
             affine_matrix = np.eye(len(transform.rotation) + 1)
             affine_matrix[:-1, :-1] = transform.rotation
-            tnd_transform = tnd.transforms.Affine(
-                affine_matrix, spaces=spaces
-            )
+            tnd_transform = tnd.transforms.Affine(affine_matrix, spaces=spaces)
 
         elif transform.type == "byDimension":
             sub_transformations = transform.transformations
