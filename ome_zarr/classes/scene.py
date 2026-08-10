@@ -176,20 +176,20 @@ class OMEZarrScene:
                 raise ValueError(
                     f"Coordinate transformation {tf} is missing input or output information."
                 )
-            if tf.type == "sequence":
-                source_cs = self.get_coordinate_system(tf.input.path, tf.input.name)
-                target_cs = self.get_coordinate_system(tf.output.path, tf.output.name)
-                tnd_transform = self._ozmp_tf_to_tnd(
-                    tf,
-                    zarr_context="",
-                    source_cs=source_cs[tf.input.path or ""][0],
-                    target_cs=target_cs[tf.output.path or ""][0],
-                )
-            else:
-                tnd_transform = self._ozmp_tf_to_tnd(
-                    tf, zarr_context="", source_cs=None, target_cs=None
-                )
+            source_cs = self.get_coordinate_system(tf.input.path, tf.input.name)
+            source_cs = source_cs[tf.input.path or ""][0]
+
+            # convert to transformnd transform and add to graph
+            target_cs = self.get_coordinate_system(tf.output.path, tf.output.name)
+            target_cs = target_cs[tf.output.path or ""][0]
+            tnd_transform = self._ozmp_tf_to_tnd(
+                tf,
+                zarr_context="",
+                source_cs=source_cs,
+                target_cs=target_cs,
+            )
             self._graph.add_transform(tnd_transform)
+
             # Add inverse edge if transform is invertible
             inverse = tnd_transform.invert()
             if inverse is not None:
