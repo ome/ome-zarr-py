@@ -36,6 +36,7 @@ from pydantic import TypeAdapter, ValidationError
 from ome_zarr.scale import Methods
 
 DISCRETE_DIMS = ["coordinate", "displacement", "channel"]
+DEFAULT_VERSION = "0.6"
 DEFAULT_COLORS = [
     "00FFFF",  # cyan
     "FF00FF",  # magenta
@@ -343,7 +344,7 @@ class OMEZarrMultiscaleBase:
         self,
         group: zarr.Group | str,
         storage_options: list[dict[str, Any]] | dict[str, Any] | None = None,
-        version: Literal["0.6", "0.5", "0.4"] = "0.6",
+        version: Literal["0.6", "0.5", "0.4"] = DEFAULT_VERSION,
         compute: bool = True,
         overwrite: bool = False,
     ) -> list:
@@ -619,7 +620,7 @@ class OMEZarrMultiscaleBase:
     def _write_additional_meta_data(
         self,
         group: zarr.Group,
-        version: Literal["0.6", "0.5", "0.4"] = "0.5",
+        version: Literal["0.6", "0.5", "0.4"] = DEFAULT_VERSION,
         storage_options: list[dict[str, Any]] | dict[str, Any] | None = None,
         compute: bool = True,
         overwrite: bool = False,
@@ -844,7 +845,7 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
     def _write_additional_meta_data(
         self,
         group: zarr.Group,
-        version: Literal["0.6", "0.5", "0.4"] = "0.5",
+        version: Literal["0.6", "0.5", "0.4"] = DEFAULT_VERSION,
         storage_options: list[dict[str, Any]] | dict[str, Any] | None = None,
         compute: bool = True,
         overwrite: bool = False,
