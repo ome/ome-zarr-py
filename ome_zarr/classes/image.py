@@ -36,7 +36,7 @@ from pydantic import TypeAdapter, ValidationError
 from ome_zarr.scale import Methods
 
 DISCRETE_DIMS = ["coordinate", "displacement", "channel"]
-DEFAULT_VERSION = "0.6"
+DEFAULT_VERSION: Literal["0.6", "0.5", "0.4"] = "0.6"
 DEFAULT_COLORS = [
     "00FFFF",  # cyan
     "FF00FF",  # magenta
