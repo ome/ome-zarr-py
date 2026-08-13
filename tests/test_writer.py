@@ -70,6 +70,16 @@ def pytest_generate_tests(metafunc):
         metafunc.parametrize("array_constructor", ARRAY_CONSTRUCTORS)
 
 
+def _codec_value(value):
+    """Return the plain value of a codec configuration attribute.
+
+    zarr < 3.3 exposes attributes such as ``BloscCodec.cname`` and
+    ``BytesCodec.endian`` as (non-str) ``Enum`` members, while zarr >= 3.3 uses
+    plain strings.
+    """
+    return getattr(value, "value", value)
+
+
 def _make_storage_options(fmt, shape, axes):
     from numcodecs import Blosc
     from zarr.codecs import (
@@ -121,6 +131,117 @@ class TestWriter:
     )
     def shape(self, request):
         return request.param
+
+    def test_additional_transforms(self):
+        data = self.create_data((2, 128, 128))
+
+        image = OMEZarrImage(data=data, axes="cyx", scale={"y": 0.5, "x": 0.5})
+
+        additional_transforms = {
+            "type": "sequence",
+            "input": {"name": "physical"},
+            "output": {"name": "world"},
+            "transformations": [
+                {
+                    "type": "scale",
+                    "scale": [1.0, 0.5, 0.5],
+                },
+                {
+                    "type": "translation",
+                    "translation": [0.0, 10.0, 10.0],
+                },
+            ],
+        }
+
+        additional_cs = [
+            {
+                "name": "world",
+                "axes": [
+                    {"name": "c", "type": "channel", "unit": "none"},
+                    {"name": "y", "type": "space", "unit": "micrometer"},
+                    {"name": "x", "type": "space", "unit": "micrometer"},
+                ],
+            }
+        ]
+
+        # this call lacks the coordinate system "world"
+        # needed as output for the additional transforms
+        with pytest.raises(ValueError):
+            OMEZarrMultiscale(
+                image=image,
+                scale_factors=None,
+                method=None,
+                coordinate_transformations=[
+                    additional_transforms,
+                ],
+            )
+
+        ms = OMEZarrMultiscale(
+            image=image,
+            scale_factors=None,
+            method=None,
+            coordinate_transformations=[
+                additional_transforms,
+            ],
+            coordinate_systems=additional_cs,
+            default_coordinate_system_name="physical",
+        )
+        ms.to_ome_zarr(
+            zarr.open(self.path / "test_transforms.zarr", mode="w"),
+            version="0.6.dev4",
+            overwrite=True,
+        )
+
+        # make transform go bad
+        additional_transforms["output"]["name"] = "nonexistent"
+        with pytest.raises(ValueError):
+            OMEZarrMultiscale(
+                image=image,
+                scale_factors=None,
+                method=None,
+                coordinate_transformations=[
+                    additional_transforms,
+                ],
+                coordinate_systems=additional_cs,
+                default_coordinate_system_name="physical",
+            )
+
+    @pytest.mark.parametrize(
+        "version", ("0.4", "0.5", "0.6.dev4"), ids=["V04", "V05", "V06"]
+    )
+    def test_image_class_versions(self, version):
+        from ome_zarr_models.v06.multiscales import Multiscale as Multiscale_V06
+
+        data = self.create_data((2, 128, 128))
+        image = OMEZarrImage(data=data, axes="cyx", scale={"y": 0.5, "x": 0.5})
+        ms = OMEZarrMultiscale(
+            image=image,
+        )
+        if version == "0.4":
+            grp = zarr.open(
+                self.path / f"test_versions_{version}.zarr",
+                mode="w",
+                zarr_format=2,
+            )
+        else:
+            grp = zarr.open(
+                self.path / f"test_versions_{version}.zarr",
+                mode="w",
+                zarr_format=3,
+            )
+        ms.to_ome_zarr(grp, overwrite=True, version=version)
+
+        # open the written zarr and check the version
+        out = zarr.open_group(self.path / f"test_versions_{version}.zarr")
+        if version == "0.4":
+            metadata = out.attrs["multiscales"][0]
+        else:
+            metadata = out.attrs.get("ome", {})
+
+        assert metadata["version"] == version
+
+        ms_read = OMEZarrMultiscale.from_ome_zarr(grp)
+        assert isinstance(ms_read.metadata, Multiscale_V06)
 
     def test_image_class_bad_args(self):
         data = self.create_data((2, 128, 128))
@@ -298,7 +419,7 @@ class TestWriter:
             cts = node_metadata["multiscales"][0]["datasets"][level][
                 "coordinateTransformations"
             ]
-            assert len(cts) == 1
+            assert len(cts) == 2
             transf = cts[0]
             assert transf["type"] == "scale"
             for d in axes:
@@ -358,11 +479,17 @@ class TestWriter:
                 axes_units[ax] = "micrometer"
 
         transformations = []
+        scale0 = TRANSFORMATIONS[0][0]["scale"][-len(shape) :]
         for dataset_transfs in TRANSFORMATIONS:
             transf = dataset_transfs[0]
             # e.g. slice [1, 1, z, x, y] -> [z, x, y] for 3D
+            sc = transf["scale"][-len(shape) :]
+            tl = [s / 2 - s0 / 2 for s, s0 in zip(sc, scale0)]
             transformations.append(
-                [{"type": "scale", "scale": transf["scale"][-len(shape) :]}]
+                [
+                    {"type": "scale", "scale": sc},
+                    {"type": "translation", "translation": tl},
+                ]
             )
 
         storage_options = _make_storage_options(fmt, shape, axes)
@@ -572,7 +699,7 @@ class TestWriter:
             for d in node_metadata["multiscales"][0]["datasets"]
         ]
         for level, transfs in enumerate(cts):
-            assert len(transfs) == 1
+            assert len(transfs) == 2
             assert transfs[0]["type"] == "scale"
             assert len(transfs[0]["scale"]) == len(shape)
 
@@ -673,7 +800,7 @@ class TestWriter:
             for d in node_metadata["multiscales"][0]["datasets"]
         ]
         for level, transfs in enumerate(cts):
-            assert len(transfs) == 1
+            assert len(transfs) == 2
             assert transfs[0]["type"] == "scale"
             assert len(transfs[0]["scale"]) == len(shape)
 
@@ -1747,7 +1874,7 @@ class TestLabelWriter:
 
         axes = list(scale.keys())
         for level, transfs in enumerate(cts):
-            assert len(transfs) == 1
+            assert len(transfs) == 2
             assert transfs[0]["type"] == "scale"
             assert len(transfs[0]["scale"]) == len(shape)
 
@@ -1940,7 +2067,7 @@ class TestLabelWriter:
         if level0.compressors:
             if fmt.version == "0.5":
                 if USE_DASK_ARRAY_KWARGS:
-                    assert level0.compressors[0].cname.name == "zstd"
+                    assert _codec_value(level0.compressors[0].cname) == "zstd"
                 else:
                     assert level0.compressors[0].to_dict()["name"] == "zstd"
             else:
@@ -1949,7 +2076,7 @@ class TestLabelWriter:
                 assert level0.compressors[0].clevel == 3
                 if fmt.version == "0.5" and hasattr(level0, "serializer"):
                     assert (
-                        level0.metadata.codecs[0].index_codecs[0].endian.name
+                        _codec_value(level0.metadata.codecs[0].index_codecs[0].endian)
                         == "little"
                     )
             else:
@@ -1973,11 +2100,17 @@ class TestLabelWriter:
             group = self.root
         axes = "tczyx"[-len(shape) :]
         transformations = []
+        scale0 = TRANSFORMATIONS[0][0]["scale"][-len(shape) :]
         for dataset_transfs in TRANSFORMATIONS:
             transf = dataset_transfs[0]
             # e.g. slice [1, 1, z, x, y] -> [z, x, y] for 3D
+            scale = transf["scale"][-len(shape) :]
+            trans = [s / 2 - s0 / 2 for s, s0 in zip(scale, scale0)]
             transformations.append(
-                [{"type": "scale", "scale": transf["scale"][-len(shape) :]}]
+                [
+                    {"type": "scale", "scale": scale},
+                    {"type": "translation", "translation": trans},
+                ]
             )
 
         # create the actual label data
@@ -2037,10 +2170,16 @@ class TestLabelWriter:
             group = self.root
         axes = "tczyx"[-len(shape) :]
         transformations = []
+        scale0 = TRANSFORMATIONS[0][0]["scale"][-len(shape) :]
         for dataset_transfs in TRANSFORMATIONS:
             transf = dataset_transfs[0]
+            scale = transf["scale"][-len(shape) :]
+            trans = [s / 2 - s0 / 2 for s, s0 in zip(scale, scale0)]
             transformations.append(
-                [{"type": "scale", "scale": transf["scale"][-len(shape) :]}]
+                [
+                    {"type": "scale", "scale": scale},
+                    {"type": "translation", "translation": trans},
+                ]
             )
 
         label_data = np.random.randint(0, 1000, size=shape)
@@ -2121,7 +2260,7 @@ class TestLabelWriter:
             if level.compressors:
                 if fmt.version == "0.5":
                     if USE_DASK_ARRAY_KWARGS:
-                        assert level.compressors[0].cname.name == "zstd"
+                        assert _codec_value(level.compressors[0].cname) == "zstd"
                     else:
                         assert level.compressors[0].to_dict()["name"] == "zstd"
                 else:
@@ -2130,7 +2269,9 @@ class TestLabelWriter:
                     assert level.compressors[0].clevel == 3
                     if fmt.version == "0.5" and hasattr(level, "serializer"):
                         assert (
-                            level.metadata.codecs[0].index_codecs[0].endian.name
+                            _codec_value(
+                                level.metadata.codecs[0].index_codecs[0].endian
+                            )
                             == "little"
                         )
                 else:
@@ -2163,9 +2304,17 @@ class TestLabelWriter:
             group = self.root
         axes = "tczyx"
         transformations = []
+        scale0 = TRANSFORMATIONS[0][0]["scale"]
         for dataset_transfs in TRANSFORMATIONS:
             transf = dataset_transfs[0]
-            transformations.append([{"type": "scale", "scale": transf["scale"]}])
+            scale = transf["scale"]
+            trans = [s / 2 - s0 / 2 for s, s0 in zip(scale, scale0)]
+            transformations.append(
+                [
+                    {"type": "scale", "scale": scale},
+                    {"type": "translation", "translation": trans},
+                ]
+            )
 
         # create the root level image data
         shape = (1, 2, 1, 256, 256)
