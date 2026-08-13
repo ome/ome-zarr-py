@@ -143,18 +143,20 @@ class OMEZarrScene:
             Empty if no match is found.
         """
         matches = {}
-        
+
         # Add top-level coordinate systems
         for cs in self.coordinate_systems:
             if (name is None or cs.name == name) and (path is None or path == ""):
                 matches[("", cs.name)] = cs
-        
+
         # Add image-level coordinate systems
         for img_path, img in self.images.items():
             for cs in img.metadata.coordinateSystems:
-                if (name is None or cs.name == name) and (path is None or path == img_path):
+                if (name is None or cs.name == name) and (
+                    path is None or path == img_path
+                ):
                     matches[(img_path, cs.name)] = cs
-        
+
         return matches
 
     def _build_graph(self):
