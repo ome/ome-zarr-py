@@ -290,39 +290,33 @@ def test_coordinate_system_retrieval(test_data_dir):
     # number and instances of coordinate systems
     all_cs = scene.get_coordinate_system()
 
-    # the dict keys correspond to the names of the images
-    # or top-level if the name is ""
-    assert "" in all_cs
-    assert len(all_cs[""]) == 2
-    assert all_cs[""][0].name == "world"
-    assert all_cs[""][1].name == "world2"
+    # Keys are (path, name) tuples
+    assert ("", "world") in all_cs
+    assert ("", "world2") in all_cs
+    assert all_cs[("", "world")].name == "world"
+    assert all_cs[("", "world2")].name == "world2"
 
-    assert "imageB" in all_cs
-    assert len(all_cs["imageB"]) == 1
-    assert all_cs["imageB"][0].name == "physical"
+    assert ("imageB", "physical") in all_cs
+    assert all_cs[("imageB", "physical")].name == "physical"
 
-    assert "imageA" in all_cs
-    assert len(all_cs["imageA"]) == 1
-    assert all_cs["imageA"][0].name == "physical"
+    assert ("imageA", "physical") in all_cs
+    assert all_cs[("imageA", "physical")].name == "physical"
 
     world_cs = scene.get_coordinate_system(path="")
-    assert "" in world_cs
-    assert "imageA" not in world_cs
-    assert "imageB" not in world_cs
-    assert len(world_cs[""]) == 2
+    assert ("", "world") in world_cs
+    assert ("", "world2") in world_cs
+    assert ("imageA", "physical") not in world_cs
+    assert ("imageB", "physical") not in world_cs
 
     imageA_cs = scene.get_coordinate_system(path="imageA")
-    assert "imageA" in imageA_cs
-    assert len(imageA_cs["imageA"]) == 1
-    assert "" not in imageA_cs
-    assert "imageB" not in imageA_cs
+    assert ("imageA", "physical") in imageA_cs
+    assert ("", "world") not in imageA_cs
+    assert ("imageB", "physical") not in imageA_cs
 
     all_physical_cs = scene.get_coordinate_system(name="physical")
-    assert "" not in all_physical_cs
-    assert "imageA" in all_physical_cs
-    assert len(all_physical_cs["imageA"]) == 1
-    assert "imageB" in all_physical_cs
-    assert len(all_physical_cs["imageB"]) == 1
+    assert ("", "world") not in all_physical_cs
+    assert ("imageA", "physical") in all_physical_cs
+    assert ("imageB", "physical") in all_physical_cs
 
 
 def test_appending_scene(test_data_dir):

@@ -122,9 +122,9 @@ class OMEZarrScene:
 
     def get_coordinate_system(
         self, path: str | None = None, name: str | None = None
-    ) -> dict[str, list[CoordinateSystem]]:
+    ) -> dict[tuple[str, str], CoordinateSystem]:
         """
-        Retrieve a coordinate system by name and optional path.
+        Retrieve coordinate systems.
 
         Parameters
         ----------
@@ -138,34 +138,23 @@ class OMEZarrScene:
 
         Returns
         -------
-        dict[str, list[CoordinateSystem]]
-            A dictionary of matching CoordinateSystem objects keyed by their context
-            (e.g., "" for top-level, image key for image-level).
+        dict[tuple[str, str], CoordinateSystem]
+            A dictionary of matching CoordinateSystem objects keyed by (path, name) tuples.
             Empty if no match is found.
         """
-        # find top-level matches
-        top_level_matches = {}
-        if len(self.coordinate_systems) > 0:
-            top_level_matches = {"": list(self.coordinate_systems)}
-
-        # find image-level matches
-        image_matches = {}
-        for key, img in self.images.items():
-            image_matches.update({key: list(img.metadata.coordinateSystems)})
-
-        matches = {**top_level_matches, **image_matches}
-
-        if name is not None:
-            matches = {
-                k: [cs for cs in v if cs.name == name] for k, v in matches.items()
-            }
-
-        if path is not None:
-            matches = {k: v for k, v in matches.items() if k == path}
-
-        if "" in matches and len(matches[""]) == 0:
-            del matches[""]
-
+        matches = {}
+        
+        # Add top-level coordinate systems
+        for cs in self.coordinate_systems:
+            if (name is None or cs.name == name) and (path is None or path == ""):
+                matches[("", cs.name)] = cs
+        
+        # Add image-level coordinate systems
+        for img_path, img in self.images.items():
+            for cs in img.metadata.coordinateSystems:
+                if (name is None or cs.name == name) and (path is None or path == img_path):
+                    matches[(img_path, cs.name)] = cs
+        
         return matches
 
     def _build_graph(self):
@@ -176,12 +165,12 @@ class OMEZarrScene:
                 raise ValueError(
                     f"Coordinate transformation {tf} is missing input or output information."
                 )
-            source_cs = self.get_coordinate_system(tf.input.path, tf.input.name)
-            source_cs = source_cs[tf.input.path or ""][0]
+            source_cs_dict = self.get_coordinate_system(tf.input.path, tf.input.name)
+            source_cs = source_cs_dict[(tf.input.path or "", tf.input.name)]
 
             # convert to transformnd transform and add to graph
-            target_cs = self.get_coordinate_system(tf.output.path, tf.output.name)
-            target_cs = target_cs[tf.output.path or ""][0]
+            target_cs_dict = self.get_coordinate_system(tf.output.path, tf.output.name)
+            target_cs = target_cs_dict[(tf.output.path or "", tf.output.name)]
             tnd_transform = self._ozmp_tf_to_tnd(
                 tf,
                 zarr_context="",
