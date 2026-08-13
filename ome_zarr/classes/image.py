@@ -867,8 +867,6 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
                 if "ome" not in group.attrs:
                     raise ValueError("OME-Zarr attributes not found in group")
                 ome = cast(dict, group.attrs["ome"])
-                if version == "0.5":
-                    omero_dict["version"] = version
                 ome["omero"] = omero_dict
                 group.attrs["ome"] = ome
 
