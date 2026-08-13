@@ -161,4 +161,4 @@ def create_zarr(
         overwrite=True,
     )
 
-    return zarr.open(zarr_directory, mode="r")
+    return zarr.open(zarr_directory, mode="a")
