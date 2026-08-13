@@ -497,7 +497,9 @@ class OMEZarrMultiscaleBase:
             if "image-label" in group.attrs:
                 is_label = True
 
-        elif version == "0.4":
+        # allow compatibility with 0.4.dev-spatialdata store
+        # not intended for other/future versions beyond 0.5
+        elif version.startswith("0.4"):
             from ome_zarr_models.v04.multiscales import Multiscale as Multiscalev04
 
             metadata_json = cast(dict, group.attrs.get("multiscales", [None])[0])
@@ -513,7 +515,9 @@ class OMEZarrMultiscaleBase:
             if "image-label" in group.attrs:
                 is_label = True
 
-        elif version == "0.5":
+        # allow compatibility with 0.5.dev-spatialdata store
+        # not intended for other/future versions beyond 0.5
+        elif version.startswith("0.5"):
             from ome_zarr_models.v05.multiscales import Multiscale as Multiscalev05
 
             ome_attrs = cast(dict[str, Any], group.attrs.get("ome", {}))
