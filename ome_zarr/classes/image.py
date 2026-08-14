@@ -36,6 +36,7 @@ from pydantic import TypeAdapter, ValidationError
 from ome_zarr.scale import Methods
 
 DISCRETE_DIMS = ["coordinate", "displacement", "channel"]
+DEFAULT_VERSION: Literal["0.6", "0.5", "0.4"] = "0.6"
 DEFAULT_COLORS = [
     "00FFFF",  # cyan
     "FF00FF",  # magenta
@@ -358,7 +359,7 @@ class OMEZarrMultiscaleBase:
         self,
         group: zarr.Group | str,
         storage_options: list[dict[str, Any]] | dict[str, Any] | None = None,
-        version: Literal["0.6.dev4", "0.5", "0.4"] = "0.5",
+        version: Literal["0.6", "0.5", "0.4"] = DEFAULT_VERSION,
         compute: bool = True,
         overwrite: bool = False,
     ) -> list:
@@ -387,7 +388,7 @@ class OMEZarrMultiscaleBase:
                 shutil.rmtree(group)
 
             fmt: Format | None = None
-            if version in {"0.5", "0.6", "0.6.dev4"}:
+            if version in {"0.5", "0.6"}:
                 fmt = FormatV05()
             elif version == "0.4":
                 fmt = FormatV04()
@@ -453,7 +454,7 @@ class OMEZarrMultiscaleBase:
 
                 group.attrs["ome"] = metadata_dict
 
-            elif version == "0.6.dev4":
+            elif version == "0.6":
                 metadata_dict = {
                     "version": version,
                     "multiscales": [
@@ -512,7 +513,9 @@ class OMEZarrMultiscaleBase:
             if "image-label" in group.attrs:
                 is_label = True
 
-        elif version == "0.4":
+        # allow compatibility with 0.4.dev-spatialdata store
+        # not intended for other/future versions beyond 0.5
+        elif version.startswith("0.4"):
             from ome_zarr_models.v04.multiscales import Multiscale as Multiscalev04
 
             metadata_json = cast(dict, group.attrs.get("multiscales", [None])[0])
@@ -528,7 +531,9 @@ class OMEZarrMultiscaleBase:
             if "image-label" in group.attrs:
                 is_label = True
 
-        elif version == "0.5":
+        # allow compatibility with 0.5.dev-spatialdata store
+        # not intended for other/future versions beyond 0.5
+        elif version.startswith("0.5"):
             from ome_zarr_models.v05.multiscales import Multiscale as Multiscalev05
 
             ome_attrs = cast(dict[str, Any], group.attrs.get("ome", {}))
@@ -625,7 +630,7 @@ class OMEZarrMultiscaleBase:
     def _write_additional_meta_data(
         self,
         group: zarr.Group,
-        version: Literal["0.6.dev4", "0.5", "0.4"] = "0.5",
+        version: Literal["0.6", "0.5", "0.4"] = DEFAULT_VERSION,
         storage_options: list[dict[str, Any]] | dict[str, Any] | None = None,
         compute: bool = True,
         overwrite: bool = False,
@@ -852,7 +857,7 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
     def _write_additional_meta_data(
         self,
         group: zarr.Group,
-        version: Literal["0.6.dev4", "0.5", "0.4"] = "0.5",
+        version: Literal["0.6", "0.5", "0.4"] = DEFAULT_VERSION,
         storage_options: list[dict[str, Any]] | dict[str, Any] | None = None,
         compute: bool = True,
         overwrite: bool = False,
@@ -865,13 +870,15 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
         if self._omero and isinstance(self._omero, Omero):
             omero_dict = _recursive_pop_nones(self._omero.model_dump(by_alias=True))
 
+            # in 0.4, omero metadata goes in group attrs
             if version == "0.4":
                 group.attrs["omero"] = omero_dict
-            elif version == "0.5":
+
+            # in >=0.5, omero metadata goes in the ome attr
+            elif version == "0.5" or version.startswith("0.6"):
                 if "ome" not in group.attrs:
                     raise ValueError("OME-Zarr attributes not found in group")
                 ome = cast(dict, group.attrs["ome"])
-                omero_dict["version"] = version
                 ome["omero"] = omero_dict
                 group.attrs["ome"] = ome
 
@@ -909,7 +916,7 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
             # Update labels list in metadata
             if version == "0.4":
                 label_group.attrs["labels"] = list_of_labels
-            elif version == "0.5":
+            elif version == "0.5" or version.startswith("0.6"):
                 label_group.attrs["ome"] = {
                     "version": version,
                     "labels": list_of_labels,
@@ -1043,7 +1050,7 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
 
         if version in ("0.1", "0.2", "0.3", "0.4") and "omero" in group.attrs:
             omero_dict = cast(dict[str, Any] | None, group.attrs.get("omero", None))
-        elif version == "0.5":
+        elif version == "0.5" or version.startswith("0.6"):
             ome_attrs = cast(dict[str, Any], group.attrs.get("ome", {}))
             if "omero" in ome_attrs:
                 omero_dict = cast(dict[str, Any] | None, ome_attrs.get("omero", None))
@@ -1062,7 +1069,7 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
             list_of_labels = (
                 cast(list[str], labels_json) if isinstance(labels_json, list) else []
             )
-        elif version == "0.5" and "labels" in group:
+        elif (version == "0.5" or version.startswith("0.6")) and "labels" in group:
             labels_ome_attrs = cast(
                 dict[str, Any], group["labels"].attrs.get("ome", {})
             )
@@ -1175,7 +1182,7 @@ class OMEZarrLabels(OMEZarrMultiscaleBase):
     def _write_additional_meta_data(
         self,
         group: zarr.Group,
-        version: Literal["0.6.dev4", "0.5", "0.4"] = "0.5",
+        version: Literal["0.6", "0.5", "0.4"] = "0.5",
         storage_options: list[dict[str, Any]] | dict[str, Any] | None = None,
         compute: bool = True,
         overwrite: bool = False,
@@ -1184,10 +1191,10 @@ class OMEZarrLabels(OMEZarrMultiscaleBase):
 
         if self._image_label is not None and isinstance(self._image_label, Label):
             if version == "0.4":
-                meta = _recursive_pop_nones(self._image_label.model_dump(by_alias=True))
-                meta["version"] = version
-                group.attrs["image-label"] = meta
-            elif version == "0.5":
+                group.attrs["image-label"] = _recursive_pop_nones(
+                    self._image_label.model_dump(by_alias=True)
+                )
+            elif version == "0.5" or version.startswith("0.6"):
                 ome = cast(dict, group.attrs.get("ome", {}))
                 ome["image-label"] = _recursive_pop_nones(
                     self._image_label.model_dump(by_alias=True)
@@ -1212,7 +1219,7 @@ class OMEZarrLabels(OMEZarrMultiscaleBase):
                 image_label_dict = cast(
                     dict[str, Any] | None, group.attrs.get("image-label", None)
                 )
-        elif version == "0.5":
+        elif version == "0.5" or version.startswith("0.6"):
             ome_attrs = cast(dict[str, Any], group.attrs.get("ome", {}))
             if "image-label" in ome_attrs:
                 image_label_dict = cast(
