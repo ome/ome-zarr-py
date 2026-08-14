@@ -4,7 +4,7 @@ import logging
 import warnings
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, TypeAlias
+from typing import Any, Literal, TypeAlias, cast
 
 import dask.array as da
 import numpy as np
@@ -272,47 +272,25 @@ def write_multiscale(
     compute: bool = True,
     scale: dict[str, float] | None = None,
     axes_units: dict[str, str] | None = None,
-    **metadata: str | JSONDict | list[JSONDict],
 ) -> list:
     """
-    Write a pyramid with multiscale metadata to disk.
+    Write a pyramid with precomputed multiscale resolution levels to disk.
 
-    :type pyramid: list of :class:`numpy.ndarray` or :class:`dask.array.Array`
-    :param pyramid:
+    Parameters
+    ----------
+    pyramid: list of :class:`numpy.ndarray` or :class:`dask.array.Array`
         The image data to save. Largest level first. All image arrays MUST be up to
         5-dimensional with dimensions ordered (t, c, z, y, x)
-    :type group: :class:`zarr.Group`
-    :param group: The group within the zarr store to store the data in
-    :type scale: dict of str to float, optional
-    :param scale:
-        The physical pixel size for each dimension, e.g. {"z": 0.1, "y": 0.1, "x": 0.5}.
-        The pixel sizes for every resolution level are calculated directly from the defined `scale` and
-        `scale_factors` for each level.
-    :type chunks: int or tuple of ints, optional
-    :param chunks:
-        The size of the saved chunks to store the image.
-
-        .. deprecated:: 0.4.0
-            This argument is deprecated and will be removed in a future version.
-            Use :attr:`storage_options` instead.
-    :type fmt: :class:`ome_zarr.format.Format`, optional
-    :param fmt:
+    group: :class:`zarr.Group`
+        The group within the zarr store to store the data in
+    fmt: :class:`ome_zarr.format.Format`, optional
         The format of the ome_zarr data which should be used.
-        Defaults to the most current.
-    :type axes: str list of str or list of dict, optional
-    :param axes:
-        List of axes dicts, or names. Not needed for v0.1 or v0.2 or if 2D. Otherwise
-        this must be provided
-    :param axes_units:
-        The physical units for each dimension, e.g. {"t": "millisecond", "z": "micrometer", "y": "micrometer", "x": "micrometer"}.
-        For a list of recommended units, see [ngff specification](https://ngff.openmicroscopy.org/specifications/0.5/index.html#axes-metadata).
-    :type coordinate_transformations: 2Dlist of dict, optional
-    :param coordinate_transformations:
-        List of transformations for each path.
-        Each list of dicts are added to each datasets in order and must include a
-        'scale' transform.
-    :type storage_options: dict or list of dict, optional
-    :param storage_options:
+        Defaults to the most current (:class:`ome_zarr.format.CurrentFormat`).
+    axes: list of str or list of dict, optional
+        List of axes dicts, or names, i.e. ["t", "c", "z", "y", "x"].
+    coordinate_transformations: list of list of dict, optional
+        [DEPRECATED] For each resolution, a list of transformation dicts (not validated).
+    storage_options: dict or list of dict, optional
         Options to be passed on to the storage backend.
         A list would need to match the number of datasets in a multiresolution pyramid.
         One can provide different chunk size and / or shards for each level of a pyramid using this
@@ -328,23 +306,22 @@ def write_multiscale(
         between dask and zarr chunks, potentially resulting in corrupted data. The default will be that if no sharding
         is specified, that the chunks correspond to the dask chunksize. This is also the case when chunks are provided as
         `None` and no sharding is provided.
-    :param compute:
-        If true compute immediately otherwise a list of :class:`dask.delayed.Delayed`
+    name: str, optional
+        The name of the image, to be included in the metadata. Defaults to "image".
+    compute: bool, optional
+        If true, compute immediately otherwise a list of :class:`dask.delayed.Delayed`
         is returned.
-    :type scale: dict of str to float, optional
-    :param scale:
+    scale: dict of str to float, optional
         The physical pixel size for each dimension, e.g. {"z": 0.1, "y": 0.1, "x": 0.5}.
         For each additional resolution level, the pixel sizes are derived from this
         base `scale` and the relative shapes of the arrays provided in `pyramid`.
-    :type axes_units: dict of str to str, optional
-    :param axes_units:
-        The physical units for each dimension, e.g. {"t": "millisecond", "z": "micrometer", "y": "micrometer", "x": "micrometer"}.
-        For a list of recommended units, see [ngff specification](https://ngff.openmicroscopy.org/specifications/0.5/index.html#axes-metadata).
-    :return:
-        Empty list if the compute flag is True, otherwise it returns a list of
-        :class:`dask.delayed.Delayed` representing the value to be computed by
-        dask.
+        If not provided, defaults to 1.0 for all dimensions.
+    axes_units: dict of str to str, optional
+        The physical units for each dimension,
+        e.g. {"t": "millisecond", "z": "micrometer", "y": "micrometer", "x": "micrometer"}.
     """
+    from ome_zarr import OMEZarrImage, OMEZarrMultiscale
+
     group, fmt = check_group_fmt(group, fmt)
     dims = len(pyramid[0].shape)
     axes = _get_valid_axes(dims, axes, axes_units=axes_units, fmt=fmt)
@@ -352,125 +329,48 @@ def write_multiscale(
     if scale is None:
         scale = dict.fromkeys(_extract_dims_from_axes(axes), 1.0)
 
+    if name is None:
+        name = "image"
+
     if coordinate_transformations is not None:
         msg = (
             "The 'coordinate_transformations' argument is deprecated and will "
             "be removed in a future version. Please use the `scale` argument "
-            "to specify the physical pixel size for each dimension instead. "
-            "When `coordinate_transformations` is provided, it takes "
-            "precedence over `scale`, so `scale` is not applied. When "
-            "`coordinate_transformations` is not provided, the pixel sizes "
-            "for every resolution level are calculated from `scale` and "
-            "`scale_factors`."
+            "to specify the physical pixel size for each dimension instead."
         )
         warnings.warn(msg, DeprecationWarning)
 
-    pyramid = [
-        da.from_array(level) if not isinstance(level, da.Array) else level
-        for level in pyramid
-    ]
-    dask_delayed = _write_pyramid_to_zarr(
-        pyramid,
+    images = []
+    for level in pyramid:
+        relative_factor = np.asarray(level.shape) / np.asarray(pyramid[0].shape)
+        level_scale = {
+            d: s * relative_factor[i] for i, (d, s) in enumerate(scale.items())
+        }
+        img = OMEZarrImage(
+            data=level,
+            axes=list(scale.keys()),
+            scale=level_scale,
+            axes_units=axes_units,
+            name=name,
+        )
+        images.append(img)
+
+    ms = OMEZarrMultiscale(
+        image=images,
+    )
+
+    if fmt.version not in ("0.4", "0.5", "0.6.dev4"):
+        raise ValueError(f"Unsupported format version: {fmt.version}")
+
+    dask_delayed = ms.to_ome_zarr(
         group,
-        fmt=fmt,
-        scale=scale,
-        axes=list(scale.keys()),
-        axes_units=axes_units,
-        coordinate_transformations=coordinate_transformations,
-        storage_options=storage_options,
-        name=name,
+        version=cast(Literal["0.6.dev4", "0.5", "0.4"], fmt.version),
         compute=compute,
-        **metadata,
+        storage_options=storage_options,
+        overwrite=True,
     )
 
     return dask_delayed
-
-
-def write_multiscales_metadata(
-    group: zarr.Group | str,
-    datasets: list[dict],
-    fmt: Format | None = None,
-    axes: AxesType = None,
-    axes_units: dict[str, str] | None = None,
-    name: str | None = None,
-    **metadata: str | JSONDict | list[JSONDict],
-) -> None:
-    """
-    Write the multiscales metadata in the group.
-
-    :type group: :class:`zarr.Group`
-    :param group: The zarr group or path.
-    :type datasets: list of dicts
-    :param datasets:
-      The list of datasets (dicts) for this multiscale image.
-      Each dict must include 'path' and a 'coordinateTransformations'
-      list for version 0.4 or later that must include a 'scale' transform.
-    :type fmt: :class:`ome_zarr.format.Format`, optional
-    :param fmt:
-      The format of the ome_zarr data which should be used.
-      Defaults to the most current.
-    :type axes: list of str or list of dicts, optional
-    :param axes:
-      The names of the axes. e.g. ["t", "c", "z", "y", "x"].
-      Ignored for versions 0.1 and 0.2. Required for version 0.3 or greater.
-    :type axes_units: dict of str to str, optional
-    :param axes_units:
-      The physical units for each dimension, e.g. {"t": "millisecond", "z": "micrometer", "y": "micrometer", "x": "micrometer"}.
-      For a list of recommended units, see [ngff specification](https://ngff.openmicroscopy.org/specifications/0.5/index.html#axes-metadata).
-    """
-
-    group, fmt = check_group_fmt(group, fmt)
-    ndim = -1
-    if axes is not None:
-        if fmt.version in ("0.1", "0.2"):
-            LOGGER.info("axes ignored for version 0.1 or 0.2")
-            axes = None
-        else:
-            axes = _get_valid_axes(axes=axes, axes_units=axes_units, fmt=fmt)
-            if axes is not None:
-                ndim = len(axes)
-    if (
-        isinstance(metadata, dict)
-        and metadata.get("metadata")
-        and isinstance(metadata["metadata"], dict)
-        and "omero" in metadata["metadata"]
-    ):
-        omero_metadata = metadata["metadata"].pop("omero")
-        if omero_metadata is None:
-            raise KeyError("If `'omero'` is present, value cannot be `None`.")
-        for c in omero_metadata["channels"]:
-            if "color" in c:  # noqa: SIM102
-                if not isinstance(c["color"], str) or len(c["color"]) != 6:
-                    raise TypeError("`'color'` must be a hex code string.")
-            if "window" in c:
-                if not isinstance(c["window"], dict):
-                    raise TypeError("`'window'` must be a dict.")
-                for p in ["min", "max", "start", "end"]:
-                    if p not in c["window"]:
-                        raise KeyError(f"`'{p}'` not found in `'window'`.")
-                    if not isinstance(c["window"][p], (int, float)):
-                        raise TypeError(f"`'{p}'` must be an int or float.")
-
-        add_metadata(group, {"omero": omero_metadata})
-
-    # note: we construct the multiscale metadata via dict(), rather than {}
-    # to avoid duplication of protected keys like 'version' in **metadata
-    # (for {} this would silently over-write it, with dict() it explicitly fails)
-    multiscales = [
-        dict(datasets=_validate_datasets(datasets, ndim, fmt), name=name or group.name)
-    ]
-    if len(metadata.get("metadata", {})) > 0:
-        multiscales[0]["metadata"] = metadata["metadata"]
-    if axes is not None:
-        multiscales[0]["axes"] = axes
-
-    if fmt.version in ("0.1", "0.2", "0.3", "0.4"):
-        multiscales[0]["version"] = fmt.version
-    else:
-        # Zarr v3 top-level version
-        add_metadata(group, {"version": fmt.version})
-
-    add_metadata(group, {"multiscales": multiscales})
 
 
 def write_plate_metadata(
@@ -744,7 +644,7 @@ def write_image(
     dask_delayed_jobs = multiscale.to_ome_zarr(
         group=group,
         storage_options=storage_options,
-        version=fmt.version,  # type: ignore[arg-type]
+        version=cast(Literal["0.6.dev4", "0.5", "0.4"], fmt.version),
         compute=compute,
         overwrite=True,
     )
@@ -907,85 +807,7 @@ def _write_pyramid_to_zarr(
         da.compute(*delayed)
         delayed = []
 
-    if coordinate_transformations is None:
-        # shapes = [data.shape for data in delayed]
-        coordinate_transformations = fmt.generate_coordinate_transformations(shapes)
-
-        if coordinate_transformations:
-            for transform in coordinate_transformations:
-                transform[0]["scale"] = [
-                    transform[0]["scale"][i] * scale.get(d, 1.0)
-                    for i, d in enumerate(axes)
-                ]
-
-    # we validate again later, but this catches length mismatch before zip(datasets...)
-    fmt.validate_coordinate_transformations(
-        len(pyramid[0].shape), len(datasets), coordinate_transformations
-    )
-    if coordinate_transformations is not None:
-        for dataset, transform in zip(datasets, coordinate_transformations):
-            dataset["coordinateTransformations"] = transform
-
-    write_multiscales_metadata(
-        group,
-        datasets=datasets,
-        fmt=fmt,
-        axes=list(axes),
-        name=name,
-        axes_units=axes_units,
-        **metadata,
-    )
     return delayed
-
-
-def write_label_metadata(
-    group: zarr.Group | str,
-    name: str,
-    colors: list[JSONDict] | None = None,
-    properties: list[JSONDict] | None = None,
-    fmt: Format | None = None,
-    **metadata: list[JSONDict] | JSONDict | str,
-) -> None:
-    """
-    Write image-label metadata to the group.
-
-    The label data must have been written to a sub-group,
-    with the same name as the second argument.
-
-    :type group: :class:`zarr.Group`
-    :param group: The zarr group or path to write the metadata in.
-    :type name: str
-    :param name: The name of the label sub-group.
-    :type colors: list of JSONDict, optional
-    :param colors:
-      Fixed colors for (a subset of) the label values.
-      Each dict specifies the color for one label and must contain the fields
-      "label-value" and "rgba".
-    :type properties: list of JSONDict, optional
-    :param properties:
-      Additional properties for (a subset of) the label values.
-      Each dict specifies additional properties for one label.
-      It must contain the field "label-value"
-      and may contain arbitrary additional properties.
-    :type fmt: :class:`ome_zarr.format.Format`, optional
-    :param fmt:
-      The format of the ome_zarr data which should be used.
-      Defaults to the most current.
-    """
-    group, fmt = check_group_fmt(group, fmt)
-    label_group = group[name]
-    image_label_metadata = {**metadata}
-    if colors is not None:
-        image_label_metadata["colors"] = colors
-    if properties is not None:
-        image_label_metadata["properties"] = properties
-    image_label_metadata["version"] = fmt.version
-
-    label_list = get_metadata(group).get("labels", [])
-    label_list.append(name)
-
-    add_metadata(group, {"labels": label_list}, fmt=fmt)
-    add_metadata(label_group, {"image-label": image_label_metadata}, fmt=fmt)
 
 
 def get_metadata(group: zarr.Group | str) -> dict:
@@ -1037,91 +859,72 @@ def write_multiscale_labels(
     scale: dict[str, float] | None = None,
     axes_units: dict[str, str] | None = None,
     compute: bool = True,
-    **metadata: JSONDict,
 ) -> list:
     """
-    Write pyramidal image labels to disk.
+        Write precomputed pyramidal image labels to disk.
 
-    Including the multiscales and image-label metadata.
-    Creates the label data in the sub-group "labels/{name}"
+        This function writes a multiscale pyramid of label data to a zarr store,
+        along with the appropriate metadata according to the OME-Zarr specification.
+        The label data is saved under a `labels/{name}` subgroup at the specified `group` location.
 
-    :type pyramid: list of :class:`numpy.ndarray`
-    :param pyramid:
-      the image label data to save. Largest level first
-      All image arrays MUST be up to 5-dimensional with dimensions
-      ordered (t, c, z, y, x)
-    :type group: :class:`zarr.Group`
-    :param group: The zarr group or path to write the metadata in.
-    :type name: str, optional
-    :param name: The name of this labels data.
-    :type scale: dict of str to float, optional
-    :param scale:
-        The physical pixel size for each dimension, e.g. {"z": 0.1, "y": 0.1, "x": 0.5}.
-        The pixel sizes for every resolution level are calculated directly from the defined `scale` and
-        `scale_factors` for each level.
-    :type chunks: int or tuple of ints, optional
-    :type fmt: :class:`ome_zarr.format.Format`, optional
-    :param fmt:
-      The format of the ome_zarr data which should be used.
-      Defaults to the most current.
-    :type axes: list of str or list of dicts, optional
-    :param axes:
-      The names of the axes. e.g. ["t", "c", "z", "y", "x"].
-      Ignored for versions 0.1 and 0.2. Required for version 0.3 or greater.
-    :type axes_units: dict of str to str, optional
-    :param axes_units:
-        The physical units for each dimension, e.g. {"t": "millisecond", "z": "micrometer", "y": "micrometer", "x": "micrometer"}.
-        For a list of recommended units, see [ngff specification](https://ngff.openmicroscopy.org/specifications/0.5/index.html#axes-metadata).
-    :type coordinate_transformations: list of dict
-    :param coordinate_transformations:
-      For each resolution, we have a List of transformation Dicts (not validated).
-      Each list of dicts are added to each datasets in order.
-    :type storage_options: dict or list of dict, optional
-    :param storage_options:
-        Options to be passed on to the storage backend.
-        A list would need to match the number of datasets in a multiresolution pyramid.
-        One can provide different chunk size for each level of a pyramid using this
-        option.
-        Regarding the key, value pairs in the dictionar(y)(ies), these depend both on the zarr_format used
-        for writing and the dask version being used. For dask version <=2025.11.0, please refer to
-        https://zarr.readthedocs.io/en/stable/api/zarr/create/#zarr.create for arguments that can be passed on.
-        For >=2026.3.0 and up, please refer to https://zarr.readthedocs.io/en/stable/api/zarr/create/#zarr.create_array.
-        It might be that you have to adjust the version of the docs. Note that the docs will also mention the
-        differences of allowed arguments between zarr_format 2 and 3.
+        Parameters
+        ----------
+        pyramid : list of numpy.ndarray
+            The image label data to save. The largest level should be first in the list.
+            All image arrays MUST be up to 5-dimensional with dimensions ordered (t, c,
+            z, y, x).
+        group : zarr.Group or str
+            The zarr group or path to write the data in.
+            The label data will be saved under a `labels/{name}` subgroup.
+        name : str
+            The name of this labels data.
+        fmt : ome_zarr.format.Format, optional
+            The format of the ome_zarr data which should be used.
+            Defaults to the most current.
+        axes : list of str or list of dicts, optional
+            The names of the axes, e.g. ["t", "c", "z", "y", "x"].
+        axes_units : dict of str to str, optional
+            The physical units for each dimension, e.g. {"t": "millisecond", "
+    z": "micrometer", "y": "micrometer", "x": "micrometer"}.
+            For a list of recommended units,
+            see [ngff specification](https://ngff.openmicroscopy.org/specifications/0.5/index.html#axes-metadata).
+        coordinate_transformations : list of list of dict, optional
+            [DEPRECATED] For each resolution, a list of transformation dicts (not validated).
+        storage_options : dict or list of dict, optional
+            Options to be passed on to the storage backend.
+            A list would need to match the number of datasets in a multiresolution pyramid.
+            One can provide different chunk size for each level of a pyramid using this
+            option.
+            Regarding the key, value pairs in the dictionar(y)(ies), these depend both on the zarr_format used
+            for writing and the dask version being used. For dask version <=2025.11.0, please refer to
+            https://zarr.readthedocs.io/en/stable/api/zarr/create/#zarr.create for arguments that can be passed on.
+            For >=2026.3.0 and up, please refer to https://zarr.readthedocs.io/en/stable/api/zarr/create/#zarr.create_array.
+            It might be that you have to adjust the version of the docs. Note that the docs will also mention the
+            differences of allowed arguments between zarr_format 2 and 3.
 
-        Note: for chunks the default of `auto` is not allowed. This because the argument here refers to zarr chunks and
-        autochunking here can result in different chunks then for the dask array. This can cause inconsistent overlap
-        between dask and zarr chunks, potentially resulting in corrupted data. The default will be that if no sharding
-        is specified, that the chunks correspond to the dask chunksize. This is also the case when chunks are provided as
-        `None` and no sharding is provided.
-    :type label_metadata: dict, optional
-    :param label_metadata:
-      Image label metadata. See :meth:`write_label_metadata` for details
-    :param compute:
-        If true compute immediately otherwise a list of :class:`dask.delayed.Delayed`
-        is returned.
-    :type scale: dict of str to float, optional
-    :param scale:
-        The physical pixel size for each dimension at the highest-resolution level,
-        e.g. {"z": 0.1, "y": 0.1, "x": 0.5}. Pixel sizes for lower-resolution
-        levels are inferred from the shapes of the arrays in `pyramid`.
-    :type axes_units: dict of str to str, optional
-    :param axes_units:
-        The physical units for each dimension, e.g. {"t": "millisecond", "z": "micrometer", "y": "micrometer", "x": "micrometer"}.
-        For a list of recommended units, see [ngff specification](https://ngff.openmicroscopy.org/specifications/0.5/index.html#axes-metadata).
-    :return:
-        Empty list if the compute flag is True, otherwise it returns a list of
-        :class:`dask.delayed.Delayed` representing the value to be computed by
-        dask.
+            Note: for chunks the default of `auto` is not allowed. This because the argument here refers to zarr chunks and
+            autochunking here can result in different chunks then for the dask array. This can cause inconsistent overlap
+            between dask and zarr chunks, potentially resulting in corrupted data. The default will be that if no sharding
+            is specified, that the chunks correspond to the dask chunksize. This is also the case when chunks are provided as
+            `None` and no sharding is provided.
+        label_metadata : dict, optional
+            Image label metadata.
+            See [ngff specification](https://ngff.openmicroscopy.org/specifications/0.5/index.html#labels-metadata) for details.
+            If not passed, is computed from the label data and stored in the metadata.
+        scale : dict of str to float, optional
+            The physical pixel size for each dimension, e.g. {"z": 0.1, "y": 0.1, "x": 0.5}.
+            The pixel sizes for every passed resolution level are calculated directly from the defined `scale`
+            for each resolution level. If not passed, defaults to 1.0 for all dimensions.
+        axes_units : dict of str to str, optional
+            The physical units for each axis, e.g. {"z": "micrometer", "y": "micrometer", "x": "micrometer"}.
+        compute : bool, optional
+            If True, compute immediately; otherwise, return a list of dask.delayed.Delayed objects.
     """
-    group, fmt = check_group_fmt(group, fmt)
-    sub_group = group.require_group(f"labels/{name}")
+    from ome_zarr import OMEZarrImage, OMEZarrLabels
 
-    # Ensure pyramid is all dask arrays
-    pyramid = [
-        da.from_array(level) if not isinstance(level, da.Array) else level
-        for level in pyramid
-    ]
+    group, fmt = check_group_fmt(group, fmt)
+    dims = len(pyramid[0].shape)
+    axes = _get_valid_axes(dims, axes, axes_units=axes_units, fmt=fmt)
 
     if scale is None:
         _axes = _get_valid_axes(
@@ -1142,25 +945,52 @@ def write_multiscale_labels(
         )
         warnings.warn(msg, DeprecationWarning)
 
-    dask_delayed_jobs = _write_pyramid_to_zarr(
-        pyramid,
-        sub_group,
-        fmt=fmt,
-        scale=scale,
-        axes=list(scale.keys()),
-        axes_units=axes_units,
-        coordinate_transformations=coordinate_transformations,
+    sub_group = group.require_group(f"labels/{name}")
+
+    images: list[OMEZarrImage] = []
+    for level in pyramid:
+        relative_factor = np.asarray(level.shape) / np.asarray(pyramid[0].shape)
+        level_scale = {
+            d: s / relative_factor[i] for i, (d, s) in enumerate(scale.items())
+        }
+        images.append(
+            OMEZarrImage(
+                data=level,
+                scale=level_scale,
+                axes=list(scale.keys()),
+                name=name,
+                axes_units=axes_units,
+            )
+        )
+
+    ms = OMEZarrLabels(image=images)
+    if label_metadata is not None:
+        ms.image_label = label_metadata
+
+    dask_delayed_jobs = ms.to_ome_zarr(
+        group=sub_group,
         storage_options=storage_options,
-        name=name,
+        version=cast(Literal["0.6.dev4", "0.5", "0.4"], fmt.version),
         compute=compute,
-        **metadata,
+        overwrite=True,
     )
-    write_label_metadata(
-        group["labels"],
-        name,
-        fmt=fmt,
-        **({} if label_metadata is None else label_metadata),
-    )
+
+    label_list = []
+    if fmt.version in ("0.1", "0.2", "0.3", "0.4"):
+        node_metadata = group["labels"].attrs
+    else:
+        node_metadata = group["labels"].attrs.get("ome", {})
+
+    label_list = node_metadata.get("labels", [])
+    label_list.append(name)
+
+    if fmt.version in ("0.1", "0.2", "0.3", "0.4"):
+        group["labels"].attrs["labels"] = label_list
+    else:
+        group["labels"].attrs["ome"] = {
+            "version": fmt.version,
+            "labels": label_list,
+        }
 
     return dask_delayed_jobs
 
@@ -1291,8 +1121,6 @@ def write_labels(
     if method is None:
         method = Methods.NEAREST
 
-    image_label = metadata.get("image-label")
-
     if scaler is not None:
         msg = """
         The 'scaler' argument is deprecated and will be removed in version 0.13.0.
@@ -1320,21 +1148,35 @@ def write_labels(
         scale_factors=scale_factors,
         method=method,
     )
-    multiscales.image_label = image_label
+
+    label_metadata = metadata.get("image-label")
+    if label_metadata is not None:
+        multiscales.image_label = label_metadata
+
     dask_delayed_jobs = multiscales.to_ome_zarr(
         group=sub_group,
         storage_options=storage_options,
-        version=fmt.version,  # type: ignore[arg-type]
+        version=cast(Literal["0.6.dev4", "0.5", "0.4"], fmt.version),
         compute=compute,
         overwrite=True,
     )
 
-    write_label_metadata(
-        group=group["labels"],
-        name=name,
-        fmt=fmt,
-        **({} if label_metadata is None else label_metadata),
-    )
+    label_list = []
+    if fmt.version in ("0.1", "0.2", "0.3", "0.4"):
+        node_metadata = group["labels"].attrs
+    else:
+        node_metadata = group["labels"].attrs.get("ome", {})
+
+    label_list = node_metadata.get("labels", [])
+    label_list.append(name)
+
+    if fmt.version in ("0.1", "0.2", "0.3", "0.4"):
+        group["labels"].attrs["labels"] = label_list
+    else:
+        group["labels"].attrs["ome"] = {
+            "version": fmt.version,
+            "labels": label_list,
+        }
 
     return dask_delayed_jobs
 
