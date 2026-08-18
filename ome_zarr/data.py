@@ -1,6 +1,7 @@
 """Functions for generating synthetic data."""
 
 from collections.abc import Callable
+from typing import Literal, cast
 
 import dask.array as da
 import numpy as np
@@ -154,9 +155,10 @@ def create_zarr(
     """Generate a synthetic image pyramid with labels."""
     image, label = method()
     image.labels = {label.name: label}
+    version = cast(Literal["0.4", "0.5", "0.6"], fmt.version)
     image.to_ome_zarr(
         zarr_directory,
-        version=fmt.version,
+        version=version,
         overwrite=True,
     )
 
