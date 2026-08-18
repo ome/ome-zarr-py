@@ -465,7 +465,7 @@ def test_scene_with_displacements(test_data_dir):
     scene = OMEZarrScene(
         images=[img_a_ms, img_b_ms],
         coordinate_transformations=[transform],
-        coordinates_displacements={"displacementField": dfield_img_ms},
+        coordinate_displacements={"displacementField": dfield_img_ms},
     )
 
     save_grp = str(test_data_dir / "test_scene_displacement.zarr")

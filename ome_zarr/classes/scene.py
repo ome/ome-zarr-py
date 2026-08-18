@@ -23,7 +23,7 @@ class OMEZarrScene:
         images: list[OMEZarrMultiscale] | dict[str, OMEZarrMultiscale],
         coordinate_transformations: Sequence[AnyTransform] | list[dict[str, Any]],
         coordinate_systems: Sequence[CoordinateSystem] | Sequence[dict[str, Any]] = (),
-        coordinates_displacements: dict[str, OMEZarrMultiscale] | None = None,
+        coordinate_displacements: dict[str, OMEZarrMultiscale] | None = None,
     ):
         """
         Parameters
@@ -67,7 +67,7 @@ class OMEZarrScene:
         else:
             self.images = images
 
-        self.coordinates_displacements = coordinates_displacements
+        self.coordinates_displacements = coordinate_displacements
 
         # metadata is the single source of truth
         self._metadata = SceneAttrs(
@@ -344,7 +344,7 @@ class OMEZarrScene:
             coordinate_systems=(
                 coordinate_systems if coordinate_systems is not None else ()
             ),
-            coordinates_displacements=coordinates_displacements,
+            coordinate_displacements=coordinates_displacements,
         )
 
         return scene
