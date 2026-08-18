@@ -36,6 +36,7 @@ from pydantic import TypeAdapter, ValidationError
 from ome_zarr.scale import Methods
 
 DISCRETE_DIMS = ["coordinate", "displacement", "channel"]
+DEFAULT_VERSION: Literal["0.6", "0.5", "0.4"] = "0.6"
 DEFAULT_COLORS = [
     "00FFFF",  # cyan
     "FF00FF",  # magenta
@@ -343,7 +344,7 @@ class OMEZarrMultiscaleBase:
         self,
         group: zarr.Group | str,
         storage_options: list[dict[str, Any]] | dict[str, Any] | None = None,
-        version: Literal["0.6", "0.5", "0.4"] = "0.6",
+        version: Literal["0.6", "0.5", "0.4"] = DEFAULT_VERSION,
         compute: bool = True,
         overwrite: bool = False,
     ) -> list:
@@ -497,7 +498,9 @@ class OMEZarrMultiscaleBase:
             if "image-label" in group.attrs:
                 is_label = True
 
-        elif version == "0.4":
+        # allow compatibility with 0.4.dev-spatialdata store
+        # not intended for other/future versions beyond 0.5
+        elif version.startswith("0.4"):
             from ome_zarr_models.v04.multiscales import Multiscale as Multiscalev04
 
             metadata_json = cast(dict, group.attrs.get("multiscales", [None])[0])
@@ -513,7 +516,9 @@ class OMEZarrMultiscaleBase:
             if "image-label" in group.attrs:
                 is_label = True
 
-        elif version == "0.5":
+        # allow compatibility with 0.5.dev-spatialdata store
+        # not intended for other/future versions beyond 0.5
+        elif version.startswith("0.5"):
             from ome_zarr_models.v05.multiscales import Multiscale as Multiscalev05
 
             ome_attrs = cast(dict[str, Any], group.attrs.get("ome", {}))
@@ -615,7 +620,7 @@ class OMEZarrMultiscaleBase:
     def _write_additional_meta_data(
         self,
         group: zarr.Group,
-        version: Literal["0.6", "0.5", "0.4"] = "0.5",
+        version: Literal["0.6", "0.5", "0.4"] = DEFAULT_VERSION,
         storage_options: list[dict[str, Any]] | dict[str, Any] | None = None,
         compute: bool = True,
         overwrite: bool = False,
@@ -840,7 +845,7 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
     def _write_additional_meta_data(
         self,
         group: zarr.Group,
-        version: Literal["0.6", "0.5", "0.4"] = "0.5",
+        version: Literal["0.6", "0.5", "0.4"] = DEFAULT_VERSION,
         storage_options: list[dict[str, Any]] | dict[str, Any] | None = None,
         compute: bool = True,
         overwrite: bool = False,
@@ -862,8 +867,6 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
                 if "ome" not in group.attrs:
                     raise ValueError("OME-Zarr attributes not found in group")
                 ome = cast(dict, group.attrs["ome"])
-                if version == "0.5":
-                    omero_dict["version"] = version
                 ome["omero"] = omero_dict
                 group.attrs["ome"] = ome
 

@@ -4,7 +4,7 @@ import logging
 import math
 from abc import ABC
 from collections.abc import Iterator
-from typing import Any, Optional, Union, cast, overload
+from typing import Any, Optional, TypeVar, Union, cast, overload
 
 import dask.array as da
 import numpy as np
@@ -15,6 +15,8 @@ from .io import ZarrLocation
 from .types import JSONDict
 
 LOGGER = logging.getLogger("ome_zarr.reader")
+
+S = TypeVar("S", bound="Spec")
 
 
 class Node:
@@ -100,7 +102,7 @@ class Node:
                 node.visible = visibility
         return old
 
-    def load(self, spec_type: type["Spec"]) -> Optional["Spec"]:
+    def load(self, spec_type: type[S]) -> S | None:
         for spec in self.specs:
             if isinstance(spec, spec_type):
                 return spec
