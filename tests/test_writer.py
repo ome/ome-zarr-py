@@ -197,15 +197,17 @@ class TestWriter:
         )
 
         # make transform go bad
-        additional_transforms["output"]["name"] = "nonexistent"
+        additional_transforms = additional_transforms.model_copy(
+            update={"output": {"name": "nonexistent"}}
+            )
         with pytest.raises(ValueError):
             OMEZarrMultiscale(
                 image=image,
                 scale_factors=None,
                 method=None,
-                coordinate_transformations=[
+                coordinate_transformations=(
                     additional_transforms,
-                ],
+                ),
                 coordinate_systems=additional_cs,
                 default_coordinate_system_name="physical",
             )
