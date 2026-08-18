@@ -133,11 +133,15 @@ class TestWriter:
         return request.param
 
     def test_additional_transforms(self):
+        from ome_zarr_models.v06.coordinate_transforms import (
+            Sequence,
+            CoordinateSystem
+        )
         data = self.create_data((2, 128, 128))
 
         image = OMEZarrImage(data=data, axes="cyx", scale={"y": 0.5, "x": 0.5})
 
-        additional_transforms = {
+        additional_transforms = Sequence.model_validate({
             "type": "sequence",
             "input": {"name": "physical"},
             "output": {"name": "world"},
@@ -151,17 +155,17 @@ class TestWriter:
                     "translation": [0.0, 10.0, 10.0],
                 },
             ],
-        }
+        })
 
         additional_cs = [
-            {
+            CoordinateSystem.model_validate({
                 "name": "world",
                 "axes": [
                     {"name": "c", "type": "channel", "unit": "none"},
                     {"name": "y", "type": "space", "unit": "micrometer"},
                     {"name": "x", "type": "space", "unit": "micrometer"},
                 ],
-            }
+            })
         ]
 
         # this call lacks the coordinate system "world"
@@ -171,18 +175,18 @@ class TestWriter:
                 image=image,
                 scale_factors=None,
                 method=None,
-                coordinate_transformations=[
+                coordinate_transformations=(
                     additional_transforms,
-                ],
+                ),
             )
 
         ms = OMEZarrMultiscale(
             image=image,
             scale_factors=None,
             method=None,
-            coordinate_transformations=[
+            coordinate_transformations=(
                 additional_transforms,
-            ],
+            ),
             coordinate_systems=additional_cs,
             default_coordinate_system_name="physical",
         )
