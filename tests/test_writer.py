@@ -133,7 +133,11 @@ class TestWriter:
         return request.param
 
     def test_additional_transforms(self):
-        from ome_zarr_models.v06.coordinate_transforms import CoordinateSystem, Sequence
+        from ome_zarr_models.v06.coordinate_transforms import (
+            CoordinateSystem,
+            Sequence,
+            CoordinateSystemIdentifier,
+        )
 
         data = self.create_data((2, 128, 128))
 
@@ -196,7 +200,7 @@ class TestWriter:
 
         # make transform go bad
         additional_transforms = additional_transforms.model_copy(
-            update={"output": {"name": "nonexistent"}}
+            update={"output": CoordinateSystemIdentifier(name="nonexistent")}
         )
         with pytest.raises(ValueError):
             OMEZarrMultiscale(
