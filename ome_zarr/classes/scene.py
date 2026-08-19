@@ -43,7 +43,7 @@ class OMEZarrScene:
             Each coordinate system can be provided as a CoordinateSystem instance
             or as a dictionary that can be validated into a CoordinateSystem.
             For more information see [ngff specification](https://ngff.openmicroscopy.org/specifications/dev/index.html#coordinatesystems-metadata).
-        coordinates_displacements : dict[str, OMEZarrMultiscale] | None, optional
+        coordinate_displacements : dict[str, OMEZarrMultiscale] | None, optional
             A dictionary mapping zarr group paths to displacement field images
             or coordinate arrays, which are referenced by the [displacements and
             coordinates transformations](https://ngff.openmicroscopy.org/specifications/dev/index.html#coordinates-and-displacements) in the scene metadata.
@@ -66,7 +66,7 @@ class OMEZarrScene:
         else:
             self.images = images
 
-        self.coordinates_displacements = coordinate_displacements
+        self.coordinate_displacements = coordinate_displacements
 
         # metadata is the single source of truth
         self._metadata = SceneAttrs(
@@ -81,12 +81,8 @@ class OMEZarrScene:
         return tuple(self._metadata.coordinateSystems or ())
 
     @coordinate_systems.setter
-    def coordinate_systems(
-        self, value: Sequence[CoordinateSystem]
-    ) -> None:
-        self._metadata = self._metadata.model_copy(
-            update={"coordinateSystems": value}
-        )
+    def coordinate_systems(self, value: Sequence[CoordinateSystem]) -> None:
+        self._metadata = self._metadata.model_copy(update={"coordinateSystems": value})
 
     @property
     def coordinate_transformations(self) -> tuple[AnyTransform, ...]:
@@ -251,7 +247,7 @@ class OMEZarrScene:
                 subgroup, overwrite=True, version="0.6", compute=compute
             )
 
-        for disp_path, disp_img in (self.coordinates_displacements or {}).items():
+        for disp_path, disp_img in (self.coordinate_displacements or {}).items():
             # Skip if already written (incremental mode)
             if not overwrite and disp_path in zarr_group:
                 continue
@@ -292,15 +288,15 @@ class OMEZarrScene:
 
         # load coordinateTransformations array data, if it exists
         if "coordinateTransformations" in zarr_group:
-            coordinates_displacements = {}
+            coordinate_displacements = {}
             for disp_path in zarr_group["coordinateTransformations"].group_keys():
                 disp_group = zarr_group["coordinateTransformations"][disp_path]
                 disp_img = cast(
                     OMEZarrMultiscale, OMEZarrMultiscale.from_ome_zarr(disp_group)
                 )
-                coordinates_displacements[disp_path] = disp_img
+                coordinate_displacements[disp_path] = disp_img
         else:
-            coordinates_displacements = None
+            coordinate_displacements = None
 
         # Load scene metadata
         scene_metadata = BaseSceneAttrs.model_validate(zarr_group.attrs.get("ome", {}))
@@ -341,7 +337,7 @@ class OMEZarrScene:
             coordinate_systems=(
                 coordinate_systems if coordinate_systems is not None else ()
             ),
-            coordinate_displacements=coordinates_displacements,
+            coordinate_displacements=coordinate_displacements,
         )
 
         return scene
@@ -403,8 +399,8 @@ class OMEZarrScene:
             if zarr_context and path_to_dfield:
                 path_to_dfield = posixpath.join(zarr_context, path_to_dfield)
 
-            if self.coordinates_displacements is not None:
-                dfield = self.coordinates_displacements.get(
+            if self.coordinate_displacements is not None:
+                dfield = self.coordinate_displacements.get(
                     posixpath.basename(path_to_dfield)
                 )
                 if dfield is not None:

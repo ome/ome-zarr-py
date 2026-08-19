@@ -31,7 +31,7 @@ from ome_zarr_models.v06.multiscales import (
 from ome_zarr_models.v06.multiscales import (
     Multiscale as MultiscaleV06,
 )
-from pydantic import TypeAdapter, ValidationError
+from pydantic import ValidationError
 
 from ome_zarr.scale import Methods
 
@@ -159,9 +159,7 @@ class OMEZarrMultiscaleBase:
         self,
         image: OMEZarrImage,
         scale_factors: list[int] | tuple[int, ...] | list[dict[str, int]] | None = None,
-        coordinate_transformations: (
-            tuple[AnyTransform, ...] |  None
-        ) = None,
+        coordinate_transformations: tuple[AnyTransform, ...] | None = None,
         coordinate_systems: list[CoordinateSystem] | None = None,
         method: str | Methods | None = Methods.RESIZE,
         default_coordinate_system_name: str = "physical",
@@ -800,9 +798,7 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
         image: OMEZarrImage,
         scale_factors: list[int] | tuple[int, ...] | list[dict[str, int]] | None = None,
         method: str | Methods | None = Methods.RESIZE,
-        coordinate_transformations: (
-            tuple[AnyTransform, ...] | None
-        ) = None,
+        coordinate_transformations: tuple[AnyTransform, ...] | None = None,
         coordinate_systems: list[CoordinateSystem] | None = None,
         default_coordinate_system_name: str = "physical",
         labels: (

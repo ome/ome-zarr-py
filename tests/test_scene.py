@@ -1,15 +1,14 @@
 import numpy as np
 import pytest
 import zarr
-
-from ome_zarr import OMEZarrImage, OMEZarrMultiscale, OMEZarrScene
-from pydantic import TypeAdapter
 from ome_zarr_models.v06.coordinate_transforms import (
+    AnyTransform,
     CoordinateSystem,
     CoordinateSystemIdentifier,
-    Translation,
-    AnyTransform,
 )
+from pydantic import TypeAdapter
+
+from ome_zarr import OMEZarrImage, OMEZarrMultiscale, OMEZarrScene
 
 transform_adapter = TypeAdapter(AnyTransform)
 
@@ -86,20 +85,24 @@ def test_create_scene_without_coordinate_systems(test_data_dir, transform):
         scale={"y": 1.0, "x": 1.0},
     )
 
-    additional_cs = CoordinateSystem.model_validate({
-        "name": "additional",
-        "axes": [
-            {"name": "y", "type": "space"},
-            {"name": "x", "type": "space"},
-        ],
-    })
+    additional_cs = CoordinateSystem.model_validate(
+        {
+            "name": "additional",
+            "axes": [
+                {"name": "y", "type": "space"},
+                {"name": "x", "type": "space"},
+            ],
+        }
+    )
 
-    additional_tf = TypeAdapter(AnyTransform).validate_python({
-        "type": "rotation",
-        "rotation": ((0.0, -1.0), (1.0, 0.0)),
-        "input": {"name": "physical"},
-        "output": {"name": "additional"},
-    })
+    additional_tf = TypeAdapter(AnyTransform).validate_python(
+        {
+            "type": "rotation",
+            "rotation": ((0.0, -1.0), (1.0, 0.0)),
+            "input": {"name": "physical"},
+            "output": {"name": "additional"},
+        }
+    )
 
     img_a_ms = OMEZarrMultiscale(image=img_a)
     img_b_ms = OMEZarrMultiscale(
@@ -194,14 +197,22 @@ def test_create_scene_with_coordinate_systems(test_data_dir, transform):
     img_a_ms = OMEZarrMultiscale(image=img_a)
     img_b_ms = OMEZarrMultiscale(image=img_b)
 
-    world1_cs = CoordinateSystem.model_validate({
-        "name": "world",
-        "axes": [ax.model_dump() for ax in img_a_ms.metadata.coordinateSystems[0].axes],
-    })
-    world2_cs = CoordinateSystem.model_validate({
-        "name": "world2",
-        "axes": [ax.model_dump() for ax in img_b_ms.metadata.coordinateSystems[0].axes],
-    })
+    world1_cs = CoordinateSystem.model_validate(
+        {
+            "name": "world",
+            "axes": [
+                ax.model_dump() for ax in img_a_ms.metadata.coordinateSystems[0].axes
+            ],
+        }
+    )
+    world2_cs = CoordinateSystem.model_validate(
+        {
+            "name": "world2",
+            "axes": [
+                ax.model_dump() for ax in img_b_ms.metadata.coordinateSystems[0].axes
+            ],
+        }
+    )
 
     transform1 = transform.copy()
     transform1 = transform1.model_copy(
@@ -515,9 +526,9 @@ def test_scene_with_displacements(test_data_dir):
 
     # read displacements back in and check that the (meta)data is correct
     scene_read = OMEZarrScene.from_ome_zarr(save_grp)
-    assert "displacementField" in scene_read.coordinates_displacements
+    assert "displacementField" in scene_read.coordinate_displacements
 
-    dfield_img = scene_read.coordinates_displacements["displacementField"]
+    dfield_img = scene_read.coordinate_displacements["displacementField"]
     for image in dfield_img.images:
         assert image.axes_types["c"] == "displacement"
     assert dfield_img.metadata.coordinateSystems[0].axes[0].discrete
