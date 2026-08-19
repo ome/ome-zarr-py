@@ -135,8 +135,8 @@ class TestWriter:
     def test_additional_transforms(self):
         from ome_zarr_models.v06.coordinate_transforms import (
             CoordinateSystem,
-            Sequence,
             CoordinateSystemIdentifier,
+            Sequence,
         )
 
         data = self.create_data((2, 128, 128))
