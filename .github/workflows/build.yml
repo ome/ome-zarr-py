@@ -10,12 +10,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.11', '3.12', '3.13']
+        python-version: ['3.12', '3.13', '3.14']
         os: ['windows-latest', 'macos-latest', 'ubuntu-latest']
         dask-version: [ 'latest' ]
         include:
           - os: ubuntu-latest
-            python-version: '3.11'
+            python-version: '3.12'
             dask-version: '2025.2.0'
     steps:
       - uses: actions/checkout@v4

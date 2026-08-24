@@ -16,6 +16,19 @@ parts:
 
   - caption: Advanced
     chapters:
+    - file: advanced/labels/index
+      sections:
+      - file: advanced/labels/adding_labels
+      - file: advanced/labels/labels_metadata
+
+    - file: advanced/transforms/index
+      sections:
+      - file: advanced/transforms/add_transforms_to_multiscales
+      - file: advanced/transforms/create_scenes
+      - file: advanced/transforms/reading_scenes
+      - file: advanced/transforms/scene_2d_to_3d
+
+    - file: advanced/sharding
     - file: advanced/build_custom_pyramid
     - file: advanced/write_hcs_plate
 

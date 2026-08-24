@@ -1,3 +1,9 @@
-from .image import NgffImage, NgffMultiscales
+from .image import OMEZarrImage, OMEZarrLabels, OMEZarrMultiscale
+from .scene import OMEZarrScene
 
-__all__ = ["NgffImage", "NgffMultiscales"]
+__all__ = [
+    "OMEZarrImage",
+    "OMEZarrLabels",
+    "OMEZarrMultiscale",
+    "OMEZarrScene",
+]
