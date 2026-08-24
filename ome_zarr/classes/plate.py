@@ -76,7 +76,6 @@ class OMEZarrHCSPlate:
         import shutil
 
         from ome_zarr.format import Format, FormatV04, FormatV05
-        from ome_zarr.utils import _recursive_pop_nones
         from ome_zarr.writer import check_group_fmt
 
         if os.path.exists(str(group)):

@@ -10,10 +10,6 @@ except ImportError:
     __version__ = "0+unknown"
 
 from .classes import (
-    OMEZarrImage,
-    OMEZarrMultiscale,
-    OMEZarrLabels,
-    OMEZarrScene,
     OMEZarrHCSPlate,
 )
 
@@ -21,10 +17,10 @@ from .classes import (
 USE_DASK_ARRAY_KWARGS = Version(dask_version) >= Version("2026.3.0")
 
 __all__ = [
+    "OMEZarrHCSPlate",
     "OMEZarrImage",
     "OMEZarrLabels",
     "OMEZarrMultiscale",
     "OMEZarrScene",
-    "OMEZarrHCSPlate",
     "__version__",
 ]
