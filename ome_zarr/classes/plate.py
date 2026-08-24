@@ -67,6 +67,7 @@ class OMEZarrHCSPlate:
                 columns=self.columns,
                 wells=self.wells,
                 acquisitions=[Acquisition(id=1, maximumfieldcount=1)],
+                version="0.6",
             ),
         )
 
