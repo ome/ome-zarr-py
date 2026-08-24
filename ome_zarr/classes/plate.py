@@ -1,8 +1,10 @@
 from dataclasses import dataclass
-from typing import Any
-
-from ome_zarr_models.common.well_types import WellImage, WellMeta
-from ome_zarr_models.v05.plate import Acquisition, Column, Plate, Row, WellInPlate
+from typing import Any, Literal
+import zarr
+from ome_zarr_models.v06.well import WellAttrs
+from ome_zarr_models.v06.well_types import WellMeta, WellImage
+from ome_zarr_models.v06.plate import Acquisition, Column, Plate, Row, WellInPlate
+from ome_zarr_models.v06.hcs import HCSAttrs
 
 from .image import OMEZarrMultiscale
 
@@ -57,18 +59,22 @@ class OMEZarrHCSPlate:
                 )
             )
 
-        self.plate = Plate(
-            rows=self.rows,
-            columns=self.columns,
-            wells=self.wells,
-            acquisitions=[Acquisition(id=1, maximumfieldcount=1)],
+        self._metadata = HCSAttrs(
+            version="0.6",
+            plate=Plate(
+                rows=self.rows,
+                columns=self.columns,
+                wells=self.wells,
+                acquisitions=[Acquisition(id=1, maximumfieldcount=1)],
+            )
         )
 
     def to_ome_zarr(
         self,
         group: zarr.Group | str,
         storage_options: list[dict[str, Any]] | dict[str, Any] | None = None,
-        version: str = "0.5",
+        version: Literal["0.4", "0.5", "0.6"] = "0.6",
+        overwrite: bool = False,
         compute: bool = True,
     ) -> list:
 
@@ -76,14 +82,18 @@ class OMEZarrHCSPlate:
         import shutil
 
         from ome_zarr.format import Format, FormatV04, FormatV05
-        from ome_zarr.utils import _recursive_pop_nones
         from ome_zarr.writer import check_group_fmt
 
         if os.path.exists(str(group)):
-            shutil.rmtree(str(group))
+            if overwrite:
+                shutil.rmtree(str(group))
+            else:
+                raise FileExistsError(f"Group {group} already exists and overwrite is False.")
 
         fmt: Format | None = None
-        if version == "0.5":
+        if version == "0.6":
+            fmt = FormatV05()
+        elif version == "0.5":
             fmt = FormatV05()
         elif version == "0.4":
             fmt = FormatV04()
@@ -92,26 +102,28 @@ class OMEZarrHCSPlate:
 
         group, fmt = check_group_fmt(group, fmt)
 
+        delayed: list = []
+
         for key, images_in_well in self.images.items():
             well_group = group.require_group(f"{key[1]}/{key[0]}")
             well_images = []
             for i, image in enumerate(images_in_well):
-                image_group = well_group.require_group(f"{i}")
-                image.to_ome_zarr(
+                image_group = well_group.require_group(str(i))
+                delayed += image.to_ome_zarr(
                     image_group,
                     storage_options=storage_options,
                     version=version,
+                    overwrite=overwrite,
                     compute=compute,
                 )
                 well_images.append(WellImage(acquisition=1, path=f"{i}"))
 
-            well_metadata = WellMeta(images=well_images, version=version)
+            well_attrs = WellAttrs(version=version, well=WellMeta(images=well_images))
+            well_group.attrs["ome"] = well_attrs.model_dump(exclude_none=True)
 
-            if version == "0.5":
-                well_group.attrs["ome"] = {
-                    "well": well_metadata.model_dump(exclude_none=True)
-                }
 
-        ome_attrs = group.attrs.get("ome", {})
-        ome_attrs["plate"] = self.plate.model_dump(exclude_none=True)
+        ome_attrs: dict = group.attrs.get("ome", {})
+        ome_attrs.update(self._metadata.model_dump(exclude_none=True))
         group.attrs["ome"] = ome_attrs
+
+        return delayed
