@@ -533,6 +533,7 @@ def test_scene_with_displacements(test_data_dir):
         assert image.axes_types["c"] == "displacement"
     assert dfield_img.metadata.coordinateSystems[0].axes[0].discrete
 
+
 def test_metadata_preservation(test_data_dir):
     """
     Create a scene with two images and a single coordinate transformation
