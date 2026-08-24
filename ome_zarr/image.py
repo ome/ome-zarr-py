@@ -7,14 +7,14 @@ from typing import Any
 import dask.array as da
 import numpy as np
 import zarr
-from ome_zarr_models._v06.coordinate_transforms import (
+from ome_zarr_models.v06.coordinate_transforms import (
     Axis,
     CoordinateSystem,
     CoordinateSystemIdentifier,
     Scale,
     Transform,
 )
-from ome_zarr_models._v06.multiscales import (
+from ome_zarr_models.v06.multiscales import (
     Dataset,
     Multiscale,
 )
@@ -432,7 +432,7 @@ class NgffMultiscales:
             metadata_json = ome_attrs.get("multiscales", [None])[0]
             metadata = Multiscalev05.model_validate(metadata_json).to_version("0.6")
         elif version == "0.6":
-            from ome_zarr_models._v06.multiscales import Multiscale
+            from ome_zarr_models.v06.multiscales import Multiscale
 
             ome_attrs = group.attrs.get("ome", {})
             metadata_json = ome_attrs.get("multiscales", [None])[0]

@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 
 import networkx as nx
 import zarr
-from ome_zarr_models._v06.coordinate_transforms import (
+from ome_zarr_models.v06.coordinate_transforms import (
     CoordinateSystemIdentifier,
     Transform,
     Translation,
