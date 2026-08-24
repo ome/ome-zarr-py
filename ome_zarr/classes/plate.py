@@ -1,10 +1,11 @@
 from dataclasses import dataclass
 from typing import Any, Literal
+
 import zarr
-from ome_zarr_models.v06.well import WellAttrs
-from ome_zarr_models.v06.well_types import WellMeta, WellImage
-from ome_zarr_models.v06.plate import Acquisition, Column, Plate, Row, WellInPlate
 from ome_zarr_models.v06.hcs import HCSAttrs
+from ome_zarr_models.v06.plate import Acquisition, Column, Plate, Row, WellInPlate
+from ome_zarr_models.v06.well import WellAttrs
+from ome_zarr_models.v06.well_types import WellImage, WellMeta
 
 from .image import OMEZarrMultiscale
 
@@ -66,7 +67,7 @@ class OMEZarrHCSPlate:
                 columns=self.columns,
                 wells=self.wells,
                 acquisitions=[Acquisition(id=1, maximumfieldcount=1)],
-            )
+            ),
         )
 
     def to_ome_zarr(
@@ -88,12 +89,12 @@ class OMEZarrHCSPlate:
             if overwrite:
                 shutil.rmtree(str(group))
             else:
-                raise FileExistsError(f"Group {group} already exists and overwrite is False.")
+                raise FileExistsError(
+                    f"Group {group} already exists and overwrite is False."
+                )
 
         fmt: Format | None = None
-        if version == "0.6":
-            fmt = FormatV05()
-        elif version == "0.5":
+        if version == "0.6" or version == "0.5":
             fmt = FormatV05()
         elif version == "0.4":
             fmt = FormatV04()
@@ -120,7 +121,6 @@ class OMEZarrHCSPlate:
 
             well_attrs = WellAttrs(version=version, well=WellMeta(images=well_images))
             well_group.attrs["ome"] = well_attrs.model_dump(exclude_none=True)
-
 
         ome_attrs: dict = group.attrs.get("ome", {})
         ome_attrs.update(self._metadata.model_dump(exclude_none=True))
