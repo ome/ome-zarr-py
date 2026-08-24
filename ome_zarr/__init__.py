@@ -9,7 +9,13 @@ try:
 except ImportError:
     __version__ = "0+unknown"
 
-from .classes import NgffImage, NgffMultiscales
+from .classes import (
+    OMEZarrImage,
+    OMEZarrMultiscale,
+    OMEZarrLabels,
+    OMEZarrScene,
+    OMEZarrHCSPlate,
+)
 
 # If not 2026.3.0 it must be 2025.11.0 or lower. Name indicates kwargs only contain array kwargs in the dask version.
 USE_DASK_ARRAY_KWARGS = Version(dask_version) >= Version("2026.3.0")
@@ -19,5 +25,6 @@ __all__ = [
     "OMEZarrLabels",
     "OMEZarrMultiscale",
     "OMEZarrScene",
+    "OMEZarrHCSPlate",
     "__version__",
 ]

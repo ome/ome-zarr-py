@@ -4,16 +4,16 @@ from typing import Any
 from ome_zarr_models.common.well_types import WellImage, WellMeta
 from ome_zarr_models.v05.plate import Acquisition, Column, Plate, Row, WellInPlate
 
-from .image import NgffMultiscales
+from .image import OMEZarrMultiscale
 
 
 @dataclass
-class NgffHCSPlate:
+class OMEZarrHCSPlate:
     """
     A plate in the HCS specification.
     """
 
-    images: dict[tuple[str, str], list[NgffMultiscales]]
+    images: dict[tuple[str, str], list[OMEZarrMultiscale]]
 
     def __post_init__(self):
 
@@ -33,10 +33,10 @@ class NgffHCSPlate:
             if key[0] not in self.columns:
                 self.columns.append(key[0])
 
-                # make sure we have a list of NgffMultiscales
-            if not all(isinstance(item, NgffMultiscales) for item in value):
+                # make sure we have a list of OMEZarrMultiscale
+            if not all(isinstance(item, OMEZarrMultiscale) for item in value):
                 raise TypeError(
-                    f"Expected list of NgffMultiscales, got {type(value)} for key {key}"
+                    f"Expected list of OMEZarrMultiscale, got {type(value)} for key {key}"
                 )
 
         # convert to ozmp instances
@@ -109,7 +109,9 @@ class NgffHCSPlate:
 
             if version == "0.5":
                 well_group.attrs["ome"] = {
-                    "well": _recursive_pop_nones(well_metadata.model_dump())
+                    "well": well_metadata.model_dump(exclude_none=True)
                 }
 
-        group.attrs["ome"] = {"plate": _recursive_pop_nones(self.plate.model_dump())}
+        ome_attrs = group.attrs.get("ome", {})
+        ome_attrs["plate"] = self.plate.model_dump(exclude_none=True)
+        group.attrs["ome"] = ome_attrs
