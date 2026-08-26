@@ -17,8 +17,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - {os: windows-latest, python_Version: '3.11', toxenv: 'py311'}
-          - {os: macos-latest, python_Version: '3.11', toxenv: 'py311'}
+          - {os: windows-latest, python_version: '3.13', toxenv: 'py313'}
+          - {os: macos-latest, python_version: '3.13', toxenv: 'py313'}
 
     steps:
       - uses: actions/checkout@v4
