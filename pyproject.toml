@@ -27,7 +27,7 @@ dependencies = [
     "toolz",
     "rangehttpserver",
     "transformnd>=0.6.0",
-    "ome-zarr-models==1.8.0rc2",
+    "ome-zarr-models>=1.8.0",
     "Deprecated",
 ]
 classifiers = [
