@@ -10,5 +10,5 @@ OMEZarr classes (``ome_zarr.classes``)
 .. autoclass:: ome_zarr.classes.image.OMEZarrLabels
    :members:
 
-.. autoclass:: ome_zarr.classes.image.OMEZarrScene
+.. autoclass:: ome_zarr.classes.scene.OMEZarrScene
    :members:
