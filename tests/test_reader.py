@@ -256,6 +256,18 @@ def test_class_reader():
     assert isinstance(image.omero, Omero)
     assert hasattr(image.omero, "channels")
 
+    # make sure we got the expected attributes from the omero metadata
+    # introspect at https://ome.github.io/ome-ngff-validator/?source=https://livingobjects.ebi.ac.uk/idr/zarr/v0.5/idr0062A/6001240_labels.zarr/zarr.json
+    assert hasattr(image, "channel_names")
+    assert len(image.channel_names) == 2
+    assert image.channel_names == ["LaminB1", "Dapi"]
+    assert hasattr(image, "channel_colors")
+    assert len(image.channel_colors) == 2
+    assert image.channel_colors == ["0000FF", "FFFF00"]
+    assert hasattr(image, "contrast_limits")
+    assert len(image.contrast_limits) == 2
+    assert image.contrast_limits == [(0.0, 1500.0), (0.0, 1500.0)]
+
     # image is known to have one labels image of name "0"
     assert len(image.labels) == 1
     assert "0" in image.labels

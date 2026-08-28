@@ -1046,6 +1046,45 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
         if omero_dict is not None:
             try:
                 self._omero = Omero.model_validate(omero_dict)
+
+                # reverse-populate channel_names, channel_colors, contrast_limits from omero metadata
+                channel_names: list[str] = []
+                channel_colors: list[str] = []
+                contrast_limits: list[tuple[float, float]] = []
+
+                if (
+                    self._omero is not None
+                    and self._omero.channels is not None
+                    and len(self._omero.channels) > 0
+                ):
+                    for i, ch in enumerate(self._omero.channels):
+                        channel_names.append(getattr(ch, "label", f"Channel {i}"))
+
+                        ch_color = getattr(ch, "color", None)
+                        if ch_color is not None:
+                            channel_colors.append(ch_color)
+                        else:
+                            channel_colors.append(
+                                DEFAULT_COLORS[i % len(DEFAULT_COLORS)]
+                            )
+
+                        ch_window = getattr(ch, "window", None)
+                        if ch_window is not None:
+                            start = getattr(ch_window, "start", 0)
+                            end = getattr(
+                                ch_window,
+                                "end",
+                                self._images[0].data.dtype.itemsize * 255,
+                            )
+                            contrast_limits.append((start, end))
+                        else:
+                            contrast_limits.append(
+                                (0, self._images[0].data.dtype.itemsize * 255)
+                            )
+
+                self.channel_names = channel_names
+                self.channel_colors = channel_colors
+                self.contrast_limits = contrast_limits
             except ValidationError as e:
                 warnings.warn(f"Invalid Omero metadata: {e}")
 
