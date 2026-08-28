@@ -11,7 +11,6 @@ from ome_zarr_models.v06.coordinate_transforms import (
     CoordinateSystem,
 )
 from ome_zarr_models.v06.scene import SceneAttrs
-from pydantic import TypeAdapter
 from zarr.storage import StoreLike
 
 from .image import OMEZarrMultiscale
@@ -21,8 +20,8 @@ class OMEZarrScene:
     def __init__(
         self,
         images: list[OMEZarrMultiscale] | dict[str, OMEZarrMultiscale],
-        coordinate_transformations: Sequence[AnyTransform] | list[dict[str, Any]],
-        coordinate_systems: Sequence[CoordinateSystem] | Sequence[dict[str, Any]] = (),
+        coordinate_transformations: Sequence[AnyTransform],
+        coordinate_systems: Sequence[CoordinateSystem] = (),
         coordinate_displacements: dict[str, OMEZarrMultiscale] | None = None,
     ):
         """
@@ -32,19 +31,19 @@ class OMEZarrScene:
             Either a list of images (keyed internally by metadata.name) or a dict
             mapping zarr group paths to images. The dict form gives explicit control
             over the paths where images will be stored in the zarr hierarchy.
-        coordinate_transformations : Sequence[ome_zarr_models.v06.coordinate_transforms.AnyTransform] | list[dict[str, Any]]
+        coordinate_transformations : Sequence[ome_zarr_models.v06.coordinate_transforms.AnyTransform]
             A sequence of coordinate transformations that define how to map between
             different coordinate systems in the scene.
             Each transformation can be provided as an AnyTransform instance
             or as a dictionary that can be validated into an AnyTransform.
             For more information see [ngff specification](https://ngff.openmicroscopy.org/specifications/dev/index.html#coordinatetransformations-metadata).
-        coordinate_systems : Sequence[ome_zarr_models.v06.coordinate_transforms.CoordinateSystem] | Sequence[dict[str, Any]], optional
+        coordinate_systems : Sequence[ome_zarr_models.v06.coordinate_transforms.CoordinateSystem]
             A sequence of coordinate systems that define the coordinate spaces used
             in the scene.
             Each coordinate system can be provided as a CoordinateSystem instance
             or as a dictionary that can be validated into a CoordinateSystem.
             For more information see [ngff specification](https://ngff.openmicroscopy.org/specifications/dev/index.html#coordinatesystems-metadata).
-        coordinates_displacements : dict[str, OMEZarrMultiscale] | None, optional
+        coordinate_displacements : dict[str, OMEZarrMultiscale] | None, optional
             A dictionary mapping zarr group paths to displacement field images
             or coordinate arrays, which are referenced by the [displacements and
             coordinates transformations](https://ngff.openmicroscopy.org/specifications/dev/index.html#coordinates-and-displacements) in the scene metadata.
@@ -67,14 +66,12 @@ class OMEZarrScene:
         else:
             self.images = images
 
-        self.coordinates_displacements = coordinate_displacements
+        self.coordinate_displacements = coordinate_displacements
 
         # metadata is the single source of truth
         self._metadata = SceneAttrs(
-            coordinateSystems=self._parse_coordinate_systems(coordinate_systems),
-            coordinateTransformations=self._parse_transforms(
-                coordinate_transformations
-            ),
+            coordinateSystems=tuple(coordinate_systems),
+            coordinateTransformations=tuple(coordinate_transformations),
         )
 
         self._build_graph()
@@ -84,12 +81,8 @@ class OMEZarrScene:
         return tuple(self._metadata.coordinateSystems or ())
 
     @coordinate_systems.setter
-    def coordinate_systems(
-        self, value: Sequence[CoordinateSystem] | Sequence[dict[str, Any]]
-    ) -> None:
-        self._metadata = self._metadata.model_copy(
-            update={"coordinateSystems": self._parse_coordinate_systems(value)}
-        )
+    def coordinate_systems(self, value: Sequence[CoordinateSystem]) -> None:
+        self._metadata = self._metadata.model_copy(update={"coordinateSystems": value})
 
     @property
     def coordinate_transformations(self) -> tuple[AnyTransform, ...]:
@@ -100,7 +93,7 @@ class OMEZarrScene:
         self, value: Sequence[AnyTransform] | list[dict[str, Any]]
     ) -> None:
         self._metadata = self._metadata.model_copy(
-            update={"coordinateTransformations": self._parse_transforms(value)}
+            update={"coordinateTransformations": value}
         )
 
     @property
@@ -254,7 +247,7 @@ class OMEZarrScene:
                 subgroup, overwrite=True, version="0.6", compute=compute
             )
 
-        for disp_path, disp_img in (self.coordinates_displacements or {}).items():
+        for disp_path, disp_img in (self.coordinate_displacements or {}).items():
             # Skip if already written (incremental mode)
             if not overwrite and disp_path in zarr_group:
                 continue
@@ -295,15 +288,15 @@ class OMEZarrScene:
 
         # load coordinateTransformations array data, if it exists
         if "coordinateTransformations" in zarr_group:
-            coordinates_displacements = {}
+            coordinate_displacements = {}
             for disp_path in zarr_group["coordinateTransformations"].group_keys():
                 disp_group = zarr_group["coordinateTransformations"][disp_path]
                 disp_img = cast(
                     OMEZarrMultiscale, OMEZarrMultiscale.from_ome_zarr(disp_group)
                 )
-                coordinates_displacements[disp_path] = disp_img
+                coordinate_displacements[disp_path] = disp_img
         else:
-            coordinates_displacements = None
+            coordinate_displacements = None
 
         # Load scene metadata
         scene_metadata = BaseSceneAttrs.model_validate(zarr_group.attrs.get("ome", {}))
@@ -344,50 +337,10 @@ class OMEZarrScene:
             coordinate_systems=(
                 coordinate_systems if coordinate_systems is not None else ()
             ),
-            coordinate_displacements=coordinates_displacements,
+            coordinate_displacements=coordinate_displacements,
         )
 
         return scene
-
-    @staticmethod
-    def _parse_transforms(
-        transforms: Sequence[AnyTransform] | list[dict[str, Any]],
-    ) -> tuple[AnyTransform, ...]:
-        """
-        Helper method to parse a sequence of coordinate transformations that may be provided as either
-        AnyTransform instances or dictionaries.
-        This ensures that all transformations are stored as AnyTransform objects in the scene metadata.
-        """
-        tf_adapter = TypeAdapter(AnyTransform)
-        parsed_transforms = []
-
-        for tf in transforms:
-            if isinstance(tf, dict):
-                parsed_transforms.append(tf_adapter.validate_python(tf))
-            else:
-                parsed_transforms.append(tf)
-
-        return tuple(parsed_transforms)
-
-    @staticmethod
-    def _parse_coordinate_systems(
-        coordinate_systems: Sequence[CoordinateSystem] | Sequence[dict[str, Any]],
-    ) -> tuple[CoordinateSystem, ...]:
-        """
-        Helper method to parse a sequence of coordinate systems that may be provided as either
-        CoordinateSystem instances or dictionaries.
-        This ensures that all coordinate systems are stored as CoordinateSystem objects in the scene metadata.
-        If coordinate_systems is None, it will be returned as None.
-        """
-
-        parsed_coordinate_systems = []
-        for cs in coordinate_systems:
-            if isinstance(cs, dict):
-                parsed_coordinate_systems.append(CoordinateSystem.model_validate(cs))
-            elif isinstance(cs, CoordinateSystem):
-                parsed_coordinate_systems.append(cs)
-
-        return tuple(parsed_coordinate_systems)
 
     def _ozmp_tf_to_tnd(
         self,
@@ -446,8 +399,8 @@ class OMEZarrScene:
             if zarr_context and path_to_dfield:
                 path_to_dfield = posixpath.join(zarr_context, path_to_dfield)
 
-            if self.coordinates_displacements is not None:
-                dfield = self.coordinates_displacements.get(
+            if self.coordinate_displacements is not None:
+                dfield = self.coordinate_displacements.get(
                     posixpath.basename(path_to_dfield)
                 )
                 if dfield is not None:

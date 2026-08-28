@@ -1,20 +1,28 @@
 import numpy as np
 import pytest
 import zarr
+from ome_zarr_models.v06.coordinate_transforms import (
+    AnyTransform,
+    CoordinateSystem,
+    CoordinateSystemIdentifier,
+)
+from pydantic import TypeAdapter
 
 from ome_zarr import OMEZarrImage, OMEZarrMultiscale, OMEZarrScene
 
+transform_adapter = TypeAdapter(AnyTransform)
+
 TRANSFORMS = [
-    {"type": "scale", "scale": [1.0, 1.0]},
-    {"type": "translation", "translation": [0.0, 0.0]},
-    {"type": "rotation", "rotation": [[0.0, -1.0], [1.0, 0.0]]},
-    {"type": "affine", "affine": [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]},
-    {"type": "mapAxis", "mapAxis": [1, 0]},
+    {"type": "scale", "scale": (1.0, 1.0)},
+    {"type": "translation", "translation": (0.0, 0.0)},
+    {"type": "rotation", "rotation": ((0.0, -1.0), (1.0, 0.0))},
+    {"type": "affine", "affine": ((1.0, 0.0, 0.0), (0.0, 1.0, 0.0))},
+    {"type": "mapAxis", "mapAxis": (1, 0)},
     {
         "type": "sequence",
         "transformations": [
-            {"type": "scale", "scale": [1.0, 1.0]},
-            {"type": "translation", "translation": [0.0, 0.0]},
+            {"type": "scale", "scale": (1.0, 1.0)},
+            {"type": "translation", "translation": (0.0, 0.0)},
         ],
     },
     {
@@ -23,16 +31,18 @@ TRANSFORMS = [
             {
                 "input_axes": [1],
                 "output_axes": [1],
-                "transformation": {"type": "translation", "translation": [0.0]},
+                "transformation": {"type": "translation", "translation": (0.0,)},
             },
             {
                 "input_axes": [0],
                 "output_axes": [0],
-                "transformation": {"type": "scale", "scale": [1.0]},
+                "transformation": {"type": "scale", "scale": (1.0,)},
             },
         ],
     },
 ]
+
+TRANSFORMS = [transform_adapter.validate_python(t) for t in TRANSFORMS]
 
 
 @pytest.fixture
@@ -75,20 +85,24 @@ def test_create_scene_without_coordinate_systems(test_data_dir, transform):
         scale={"y": 1.0, "x": 1.0},
     )
 
-    additional_cs = {
-        "name": "additional",
-        "axes": [
-            {"name": "y", "type": "space"},
-            {"name": "x", "type": "space"},
-        ],
-    }
+    additional_cs = CoordinateSystem.model_validate(
+        {
+            "name": "additional",
+            "axes": [
+                {"name": "y", "type": "space"},
+                {"name": "x", "type": "space"},
+            ],
+        }
+    )
 
-    additional_tf = {
-        "type": "rotation",
-        "rotation": [[0.0, -1.0], [1.0, 0.0]],
-        "input": {"name": "physical"},
-        "output": {"name": "additional"},
-    }
+    additional_tf = TypeAdapter(AnyTransform).validate_python(
+        {
+            "type": "rotation",
+            "rotation": ((0.0, -1.0), (1.0, 0.0)),
+            "input": {"name": "physical"},
+            "output": {"name": "additional"},
+        }
+    )
 
     img_a_ms = OMEZarrMultiscale(image=img_a)
     img_b_ms = OMEZarrMultiscale(
@@ -99,8 +113,12 @@ def test_create_scene_without_coordinate_systems(test_data_dir, transform):
 
     # avoid leaking transform mutations into other tests
     transform = transform.copy()
-    transform["input"] = {"name": "physical", "path": "imageA"}
-    transform["output"] = {"name": "additional", "path": "imageB"}
+    transform = transform.model_copy(
+        update={
+            "input": CoordinateSystemIdentifier(name="physical", path="imageA"),
+            "output": CoordinateSystemIdentifier(name="physical", path="imageB"),
+        }
+    )
 
     scene = OMEZarrScene(
         images=[img_a_ms, img_b_ms],
@@ -121,7 +139,7 @@ def test_create_scene_without_coordinate_systems(test_data_dir, transform):
 
     # make sure transform matrix is square
     # bydimension transforms cannot easily be expressed as matrix
-    if transform["type"] != "byDimension":
+    if transform.type != "byDimension":
         affine = tf.simplify().to_affine().matrix
         assert affine.shape[0] == affine.shape[1]
 
@@ -152,7 +170,7 @@ def test_create_scene_without_coordinate_systems(test_data_dir, transform):
     transform_md = ome_metadata["scene"]["coordinateTransformations"][0]
 
     # make sure that the loaded transform is the same as the original
-    assert transform_md == transform
+    assert transform_md == transform.model_dump(exclude_unset=True, mode="json")
 
 
 @pytest.mark.parametrize("transform", TRANSFORMS)
@@ -179,26 +197,46 @@ def test_create_scene_with_coordinate_systems(test_data_dir, transform):
     img_a_ms = OMEZarrMultiscale(image=img_a)
     img_b_ms = OMEZarrMultiscale(image=img_b)
 
-    world1_cs = {
-        "name": "world",
-        "axes": [ax.model_dump() for ax in img_a_ms.metadata.coordinateSystems[0].axes],
-    }
-    world2_cs = {
-        "name": "world2",
-        "axes": [ax.model_dump() for ax in img_b_ms.metadata.coordinateSystems[0].axes],
-    }
+    world1_cs = CoordinateSystem.model_validate(
+        {
+            "name": "world",
+            "axes": [
+                ax.model_dump() for ax in img_a_ms.metadata.coordinateSystems[0].axes
+            ],
+        }
+    )
+    world2_cs = CoordinateSystem.model_validate(
+        {
+            "name": "world2",
+            "axes": [
+                ax.model_dump() for ax in img_b_ms.metadata.coordinateSystems[0].axes
+            ],
+        }
+    )
 
     transform1 = transform.copy()
-    transform1["input"] = {"name": "physical", "path": "imageA"}
-    transform1["output"] = {"name": "world"}
+    transform1 = transform1.model_copy(
+        update={
+            "input": CoordinateSystemIdentifier(name="physical", path="imageA"),
+            "output": CoordinateSystemIdentifier(name="world"),
+        }
+    )
 
     transform2 = transform.copy()
-    transform2["input"] = {"name": "world"}
-    transform2["output"] = {"name": "world2"}
+    transform2 = transform2.model_copy(
+        update={
+            "input": CoordinateSystemIdentifier(name="world"),
+            "output": CoordinateSystemIdentifier(name="world2"),
+        }
+    )
 
     transform3 = transform.copy()
-    transform3["input"] = {"name": "world2"}
-    transform3["output"] = {"name": "physical", "path": "imageB"}
+    transform3 = transform3.model_copy(
+        update={
+            "input": CoordinateSystemIdentifier(name="world2"),
+            "output": CoordinateSystemIdentifier(name="physical", path="imageB"),
+        }
+    )
 
     scene = OMEZarrScene(
         images=[img_a_ms, img_b_ms],
@@ -488,9 +526,9 @@ def test_scene_with_displacements(test_data_dir):
 
     # read displacements back in and check that the (meta)data is correct
     scene_read = OMEZarrScene.from_ome_zarr(save_grp)
-    assert "displacementField" in scene_read.coordinates_displacements
+    assert "displacementField" in scene_read.coordinate_displacements
 
-    dfield_img = scene_read.coordinates_displacements["displacementField"]
+    dfield_img = scene_read.coordinate_displacements["displacementField"]
     for image in dfield_img.images:
         assert image.axes_types["c"] == "displacement"
     assert dfield_img.metadata.coordinateSystems[0].axes[0].discrete

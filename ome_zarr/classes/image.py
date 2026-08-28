@@ -31,7 +31,7 @@ from ome_zarr_models.v06.multiscales import (
 from ome_zarr_models.v06.multiscales import (
     Multiscale as MultiscaleV06,
 )
-from pydantic import TypeAdapter, ValidationError
+from pydantic import ValidationError
 
 from ome_zarr.scale import Methods
 
@@ -159,10 +159,8 @@ class OMEZarrMultiscaleBase:
         self,
         image: OMEZarrImage,
         scale_factors: list[int] | tuple[int, ...] | list[dict[str, int]] | None = None,
-        coordinate_transformations: (
-            tuple[AnyTransform, ...] | list[dict[str, Any]] | None
-        ) = None,
-        coordinate_systems: list[CoordinateSystem] | list[dict[str, Any]] | None = None,
+        coordinate_transformations: tuple[AnyTransform, ...] | None = None,
+        coordinate_systems: list[CoordinateSystem] | None = None,
         method: str | Methods | None = Methods.RESIZE,
         default_coordinate_system_name: str = "physical",
     ):
@@ -266,14 +264,7 @@ class OMEZarrMultiscaleBase:
             # coerce coordinate_systems to ozmp object if passed as dict
             additional_cs = []
             for idx, cs in enumerate(coordinate_systems):
-                if isinstance(cs, dict):
-                    additional_cs.append(
-                        TypeAdapter(CoordinateSystem).validate_python(cs)
-                    )
-                elif isinstance(cs, CoordinateSystem):
-                    additional_cs.append(cs)
-                else:
-                    raise ValueError(f"Invalid coordinate system at index {idx}: {cs}")
+                additional_cs.append(cs)
 
         coordinate_systems = [
             CoordinateSystem(
@@ -287,14 +278,7 @@ class OMEZarrMultiscaleBase:
         if coordinate_transformations is not None:
             transforms = []
             for idx, tf in enumerate(coordinate_transformations):
-                if isinstance(tf, dict):
-                    transforms.append(TypeAdapter(AnyTransform).validate_python(tf))
-                elif tf is AnyTransform:
-                    transforms.append(tf)
-                else:
-                    raise ValueError(
-                        f"Invalid coordinate transformation at index {idx}: {tf}"
-                    )
+                transforms.append(tf)
             transforms = tuple(transforms)
 
             # Some checks on the transform's input and output coordinate system
@@ -814,10 +798,8 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
         image: OMEZarrImage,
         scale_factors: list[int] | tuple[int, ...] | list[dict[str, int]] | None = None,
         method: str | Methods | None = Methods.RESIZE,
-        coordinate_transformations: (
-            tuple[AnyTransform, ...] | list[dict[str, Any]] | None
-        ) = None,
-        coordinate_systems: list[CoordinateSystem] | list[dict[str, Any]] | None = None,
+        coordinate_transformations: tuple[AnyTransform, ...] | None = None,
+        coordinate_systems: list[CoordinateSystem] | None = None,
         default_coordinate_system_name: str = "physical",
         labels: (
             OMEZarrLabels | list[OMEZarrLabels] | dict[str, OMEZarrLabels] | None
