@@ -8,7 +8,7 @@ import urllib
 import webbrowser
 import xml.etree.ElementTree as ET
 from collections.abc import Iterator
-from datetime import datetime
+from datetime import UTC, datetime
 from http.server import (  # type: ignore[attr-defined]
     HTTPServer,
     SimpleHTTPRequestHandler,
@@ -274,7 +274,7 @@ def finder(input_path: str, port: int = 8000, dry_run=False) -> None:
                 try:
                     mtime = os.path.getmtime(zarr_img[0])
                     # format mtime as "YYYY-MM-DD HH:MM:SS.Z"
-                    timestamp = datetime.fromtimestamp(mtime).strftime(
+                    timestamp = datetime.fromtimestamp(mtime, tz=UTC).strftime(
                         "%Y-%m-%d %H:%M:%S.%Z"
                     )
                 except OSError:
@@ -421,7 +421,7 @@ def strip_common_prefix(parts: list[list[str]]) -> str:
         msg = "No common prefix:\n"
         for path in parts:
             msg += f"{path}\n"
-        raise Exception(msg)
+        raise ValueError(msg)
     else:
         common = parts[0][first_mismatch - 1]
 

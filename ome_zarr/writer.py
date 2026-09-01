@@ -127,12 +127,12 @@ def _validate_well_images(
             if "path" not in image:
                 raise ValueError(f"{image} must contain a path key")
             if not isinstance(image["path"], str):
-                raise ValueError(f"{image} path must be of string type")
+                raise TypeError(f"{image} path must be of string type")
             if "acquisition" in image and not isinstance(image["acquisition"], int):
-                raise ValueError(f"{image} acquisition must be of int type")
+                raise TypeError(f"{image} acquisition must be of int type")
             validated_images.append(image)
         else:
-            raise ValueError(f"Unrecognized type for {image}")
+            raise TypeError(f"Unrecognized type for {image}")
     return validated_images
 
 
@@ -150,13 +150,13 @@ def _validate_plate_acquisitions(
 
     for acquisition in acquisitions:
         if not isinstance(acquisition, dict):
-            raise ValueError(f"{acquisition} must be a dictionary")
+            raise TypeError(f"{acquisition} must be a dictionary")
         if any(e not in VALID_KEYS for e in acquisition):
             LOGGER.debug("%s contains unspecified keys", acquisition)
         if "id" not in acquisition:
             raise ValueError(f"{acquisition} must contain an id key")
         if not isinstance(acquisition["id"], int):
-            raise ValueError(f"{acquisition} id must be of int type")
+            raise TypeError(f"{acquisition} id must be of int type")
     return acquisitions
 
 
@@ -189,7 +189,7 @@ def _validate_datasets(
             if transformation is not None:
                 transformations.append(transformation)
         else:
-            raise ValueError(f"Unrecognized type for {dataset}")
+            raise TypeError(f"Unrecognized type for {dataset}")
 
     fmt.validate_coordinate_transformations(dims, len(datasets), transformations)
     return datasets
@@ -213,7 +213,7 @@ def _validate_plate_wells(
             fmt.validate_well_dict(well, rows, columns)
             validated_wells.append(well)
         else:
-            raise ValueError(f"Unrecognized type for {well}")
+            raise TypeError(f"Unrecognized type for {well}")
     return validated_wells
 
 
