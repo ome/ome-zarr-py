@@ -190,7 +190,7 @@ class OMEZarrMultiscaleBase:
         # image.scale is guaranteed to be a dict after NgffImage.__post_init__
         image_scale = image.scale
         if not isinstance(image_scale, dict):
-            raise ValueError("Expected image.scale to be a dict after initialization")
+            raise TypeError("Expected image.scale to be a dict after initialization")
 
         for shape in [d.shape for d in pyramid]:
             scale = [full / level for full, level in zip(image.data.shape, shape)]
@@ -469,7 +469,7 @@ class OMEZarrMultiscaleBase:
         if isinstance(group, str):
             opened = zarr.open(group, mode="r")
             if not isinstance(opened, zarr.Group):
-                raise ValueError(f"Expected a zarr.Group but got {type(opened)}")
+                raise TypeError(f"Expected a zarr.Group but got {type(opened)}")
             group = opened
 
         version = _get_version(group)
@@ -913,7 +913,7 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
         # Make sure that all channel descriptors line up with the data dimensions
         for param in [channel_names, channel_colors, contrast_limits]:
             if param is not None and len(param) != n_channels:
-                raise ValueError(
+                raise TypeError(
                     f"Length of {param} ({len(param)}) does not match "
                     f"number of channels ({n_channels})"
                 )
