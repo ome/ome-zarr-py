@@ -131,7 +131,7 @@ class Scaler:
         """Get downsample function."""
         func = getattr(self, self.method, None)
         if not func:
-            raise Exception
+            raise ValueError(f"Unknown method: {self.method}")
         return func
 
     def __assert_values(self, pyramid: list[np.ndarray]) -> None:
@@ -143,9 +143,9 @@ class Scaler:
             print(f"level {i}", pyramid[i].shape, len(expected))
             found = set(np.unique(level))
             if not expected.issuperset(found):
-                raise Exception(
+                raise ValueError(
                     f"{len(found)} found values are not "
-                    "a subset of {len(expected)} values"
+                    f"a subset of {len(expected)} values"
                 )
 
     def __create_group(
@@ -394,7 +394,7 @@ def _build_pyramid(
     scale_factors: list[dict[str, int]] | list[int] | tuple[int, ...],
     dims: Sequence[str],
     method: str | Methods = "nearest",
-    chunks: tuple[int, ...] | None | str = None,
+    chunks: tuple[int, ...] | str | None = None,
 ) -> list[da.Array]:
     """
     Build a pyramid of downscaled images.
