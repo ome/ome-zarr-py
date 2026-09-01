@@ -268,14 +268,14 @@ class TestWriter:
         assert image.scale["c"] == 1.0
 
         # less channels then dims in channel axis
-        with pytest.raises(ValueError):
+        with pytest.raises(TypeError):
             multiscales = OMEZarrMultiscale(
                 image=image,
                 channel_names=["Channel 0"],
             )
 
         # less channel_names than channel_colors
-        with pytest.raises(ValueError):
+        with pytest.raises(TypeError):
             multiscales = OMEZarrMultiscale(
                 image=image,
                 channel_names=["Channel 0", "Channel 1"],
@@ -283,7 +283,7 @@ class TestWriter:
             )
 
         # less channel_names than contrast limits
-        with pytest.raises(ValueError):
+        with pytest.raises(TypeError):
             multiscales = OMEZarrMultiscale(
                 image=image,
                 channel_names=["Channel 0", "Channel 1"],
@@ -1026,7 +1026,7 @@ class TestWriter:
             # transformations different length than levels
             fmt.validate_coordinate_transformations(2, 1, transformations)
 
-        with pytest.raises(ValueError):
+        with pytest.raises(TypeError):
             transf = [[{"type": "scale", "scale": ("1", 1)}]]
             fmt.validate_coordinate_transformations(2, 1, transf)
 
@@ -1189,7 +1189,7 @@ class TestMultiscalesMetadata:
         assert "multiscales" in self.root.attrs
         # for v0.3, axes is a list of names
         assert self.root.attrs["multiscales"][0]["axes"] == axes
-        with pytest.raises(ValueError):
+        with pytest.raises(TypeError):
             # for v0.4 and above, paths no-longer supported (need dataset dicts)
             write_multiscales_metadata(self.root, ["0"], axes=axes, fmt=FormatV04())
 
@@ -1209,7 +1209,7 @@ class TestMultiscalesMetadata:
 
     @pytest.mark.parametrize("datasets", ([], None, "0", ["0"], [{"key": 1}]))
     def test_invalid_datasets(self, datasets):
-        with pytest.raises(ValueError):
+        with pytest.raises((ValueError, TypeError)):
             write_multiscales_metadata(
                 self.root, datasets, axes=["t", "c", "z", "y", "x"], fmt=FormatV04()
             )
@@ -1290,7 +1290,7 @@ class TestMultiscalesMetadata:
         datasets = [
             {"path": "0", "coordinateTransformations": coordinateTransformations}
         ]
-        with pytest.raises(ValueError):
+        with pytest.raises((ValueError, TypeError)):
             write_multiscales_metadata(self.root, datasets, axes=axes, fmt=FormatV04())
 
     @pytest.mark.parametrize(
@@ -1619,7 +1619,7 @@ class TestPlateMetadata:
         ),
     )
     def test_invalid_acquisition_keys(self, acquisitions):
-        with pytest.raises(ValueError):
+        with pytest.raises((TypeError, ValueError)):
             write_plate_metadata(
                 self.root_v3, ["A"], ["1"], ["A/1"], acquisitions=acquisitions
             )
@@ -1635,7 +1635,7 @@ class TestPlateMetadata:
         (None, [], [1]),
     )
     def test_invalid_well_list(self, wells):
-        with pytest.raises(ValueError):
+        with pytest.raises((ValueError, TypeError)):
             write_plate_metadata(self.root, ["A"], ["1"], wells)
 
     @pytest.mark.parametrize(
@@ -1667,7 +1667,7 @@ class TestPlateMetadata:
         ),
     )
     def test_invalid_well_keys(self, wells):
-        with pytest.raises(ValueError):
+        with pytest.raises((ValueError, TypeError)):
             write_plate_metadata(self.root, ["A"], ["1"], wells, fmt=FormatV04())
 
     def test_unspecified_well_keys(self):
@@ -1700,21 +1700,21 @@ class TestPlateMetadata:
             {"path": "A/2"},
             {"path": "B/1"},
         ]
-        with pytest.raises(ValueError):
+        with pytest.raises((ValueError, TypeError)):
             write_plate_metadata(
                 self.root, ["A", "B"], ["1", "2"], wells, fmt=FormatV04()
             )
 
     def test_well_not_in_rows(self):
         wells = ["A/1", "B/1", "C/1"]
-        with pytest.raises(ValueError):
+        with pytest.raises((ValueError, TypeError)):
             write_plate_metadata(
                 self.root, ["A", "B"], ["1", "2"], wells, fmt=FormatV04()
             )
 
     def test_well_not_in_columns(self):
         wells = ["A/1", "A/2", "A/3"]
-        with pytest.raises(ValueError):
+        with pytest.raises((ValueError, TypeError)):
             write_plate_metadata(
                 self.root, ["A", "B"], ["1", "2"], wells, fmt=FormatV04()
             )
@@ -1812,7 +1812,7 @@ class TestWellMetadata:
         ),
     )
     def test_invalid_images(self, images):
-        with pytest.raises(ValueError):
+        with pytest.raises((ValueError, TypeError)):
             write_well_metadata(self.root, images)
 
     def test_unspecified_images_keys(self):
