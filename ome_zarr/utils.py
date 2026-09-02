@@ -154,10 +154,20 @@ def find_multiscales(path_to_zattrs):
         if len(wells) > 0:
             path_to_zarr = path_to_zattrs / wells[0].get("path") / field
             plate_name = os.path.basename(path_to_zattrs)
+            # when used for "finder", show the plate as a single entry with thumbnail
             return [[path_to_zarr, plate_name, os.path.dirname(path_to_zattrs)]]
         else:
             LOGGER.info("No wells found in plate%s", path_to_zattrs)
             return []
+    elif "scene" in zattrs:
+        # use first input image as the representative for the scene
+        path_to_zarr = path_to_zattrs
+        for ct in zattrs["scene"].get("coordinateTransformations", []):
+            input_path = ct.get("input", {}).get("path")
+            if input_path is not None:
+                path_to_zarr = path_to_zattrs / input_path
+                break
+        return [[path_to_zarr, path_to_zattrs.name, os.path.dirname(path_to_zattrs)]]
     elif zattrs.get("bioformats2raw.layout") == 3:
         # Open OME/METADATA.ome.xml
         try:
