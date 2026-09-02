@@ -29,13 +29,13 @@ TRANSFORMS = [
         "type": "byDimension",
         "transformations": [
             {
-                "input_axes": [1],
-                "output_axes": [1],
+                "inputAxes": [1],
+                "outputAxes": [1],
                 "transformation": {"type": "translation", "translation": (0.0,)},
             },
             {
-                "input_axes": [0],
-                "output_axes": [0],
+                "inputAxes": [0],
+                "outputAxes": [0],
                 "transformation": {"type": "scale", "scale": (1.0,)},
             },
         ],

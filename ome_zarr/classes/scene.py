@@ -449,8 +449,8 @@ class OMEZarrScene:
             tnd_sub_transforms = [
                 tnd.transforms.by_dimension.SubTransform(
                     transform=self._ozmp_tf_to_tnd(sub_tf.transformation),
-                    input_axes=sub_tf.input_axes,
-                    output_axes=sub_tf.output_axes,
+                    input_axes=sub_tf.inputAxes,
+                    output_axes=sub_tf.outputAxes,
                 )
                 for sub_tf in sub_transformations
             ]
