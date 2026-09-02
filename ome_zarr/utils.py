@@ -24,7 +24,7 @@ from dask.diagnostics import ProgressBar
 # Not needed with python 3.15+? https://github.com/python/cpython/issues/86809
 from RangeHTTPServer import RangeRequestHandler
 
-from . import USE_DASK_ARRAY_KWARGS
+from . import USE_DASK_ARRAY_KWARGS, OMEZarrScene
 from .format import format_from_version
 from .io import parse_url
 from .reader import Multiscales, Node, Reader
@@ -332,6 +332,14 @@ def download(input_path: str, output_dir: str = ".") -> None:
     """
     location = parse_url(input_path)
     assert location, f"not a zarr: {location}"
+
+    if "scene" in location.root_attrs:
+        # ponytail: scene coordinate systems/axes vary by version; the
+        # ome_zarr_models-backed OMEZarrScene already handles this round-trip.
+        name = Path(location.path).name or "scene.zarr"
+        scene = OMEZarrScene.from_ome_zarr(location.store)
+        scene.to_ome_zarr(Path(output_dir) / name, overwrite=True)
+        return
 
     reader = Reader(location)
     nodes: list[Node] = list()
