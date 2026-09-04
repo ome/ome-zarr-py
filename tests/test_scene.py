@@ -534,5 +534,57 @@ def test_scene_with_displacements(test_data_dir):
     assert dfield_img.metadata.coordinateSystems[0].axes[0].discrete
 
 
-if __name__ == "__main__":
-    pytest.main([__file__])
+def test_metadata_preservation(test_data_dir):
+    """
+    Create a scene with two images and a single coordinate transformation
+    between them. The data is saved and loaded back in the test.
+    We then add some other metadata under the ome key (i.e., `plate`) metadata,
+    and save the scene again. We check that the existing metadata is preserved
+    and that the scene metadata is updated.
+    """
+    img_a = OMEZarrImage(
+        data=create_data((64, 64)),
+        name="imageA",
+        axes=["y", "x"],
+        scale={"y": 1.0, "x": 1.0},
+    )
+    img_b = OMEZarrImage(
+        data=create_data((64, 64)),
+        name="imageB",
+        axes=["y", "x"],
+        scale={"y": 1.0, "x": 1.0},
+    )
+
+    img_a_ms = OMEZarrMultiscale(image=img_a)
+    img_b_ms = OMEZarrMultiscale(image=img_b)
+
+    tf1 = TRANSFORMS[0].copy()
+    tf1 = tf1.model_copy(
+        update={
+            "input": CoordinateSystemIdentifier(name="physical", path="imageA"),
+            "output": CoordinateSystemIdentifier(name="physical", path="imageB"),
+        }
+    )
+
+    scene = OMEZarrScene(
+        images=[img_a_ms, img_b_ms],
+        coordinate_transformations=(tf1,),
+    )
+
+    scene.to_ome_zarr(str(test_data_dir / "test_scene_metadata.zarr"), overwrite=True)
+
+    # add some other metadata under the ome key
+    # doesn't have to be a valid ome-zarr metadata field, just for testing
+    grp = zarr.open_group(str(test_data_dir / "test_scene_metadata.zarr"), mode="a")
+    ome = dict(grp.attrs["ome"])
+    ome["plate"] = {"name": "test_plate", "id": "12345"}
+    grp.attrs["ome"] = ome
+    scene.to_ome_zarr(str(test_data_dir / "test_scene_metadata.zarr"), overwrite=False)
+
+    # now check that the existing metadata is preserved and that the scene metadata is updated
+    grp = zarr.open_group(str(test_data_dir / "test_scene_metadata.zarr"), mode="r")
+    assert "ome" in grp.attrs
+    ome_metadata = grp.attrs["ome"]
+    assert "scene" in ome_metadata
+    assert "plate" in ome_metadata
+    assert ome_metadata["plate"]["name"] == "test_plate"
