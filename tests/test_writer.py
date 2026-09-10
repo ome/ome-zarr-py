@@ -854,6 +854,19 @@ class TestWriter:
             assert d["coordinateTransformations"][0]["input"]["path"] == f"s{i}"
             assert d["coordinateTransformations"][0]["output"]["name"] == "physical"
 
+    def test_writer_fails_if_existing(self):
+        # create dummy data
+        image_data = np.random.randint(0, 1000, size=(1, 1, 1, 32, 32))
+
+        # create single-scale object
+        singlescale = OMEZarrImage(data=image_data, axes="tczyx")
+
+        # create multiscale object
+        ms = OMEZarrMultiscale(image=singlescale, method="nearest")
+        # attempt to write twice with overwrite = False
+        ms.to_ome_zarr(self.path / "overwrite")
+        with pytest.raises(OSError):
+            ms.to_ome_zarr(self.path / "overwrite", overwrite=False)
 
 class TestMultiscalesMetadata:
     @pytest.fixture(autouse=True)

@@ -224,7 +224,7 @@ def _blosc_compressor() -> Blosc:
 
 
 def check_group_fmt(
-    group: zarr.Group | str,
+    group: zarr.Group | str | Path,
     fmt: Format | None = None,
     mode: str = "a",
 ) -> tuple[zarr.Group, Format]:
@@ -232,7 +232,7 @@ def check_group_fmt(
     Create group if string, according to fmt
     OR check fmt is compatible with group
     """
-    if isinstance(group, str):
+    if isinstance(group, str) or isinstance(group, Path):
         if not fmt:
             group = zarr.open_group(group, mode=mode)
         else:
