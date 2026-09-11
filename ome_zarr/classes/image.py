@@ -394,10 +394,23 @@ class OMEZarrMultiscaleBase:
         if write_image_data:
             # Create a copy of metadata with normalized paths (s0, s1, etc.)
             # to match the paths used by _write_pyramid_to_zarr
-            write_datasets = tuple(
-                ds.model_copy(update={"path": f"s{idx}"})
-                for idx, ds in enumerate(self.metadata.datasets)
-            )
+            write_datasets = []
+            for idx, ds in enumerate(self.metadata.datasets):
+                path = f"s{idx}"
+                transform = ds.coordinateTransformations[0]
+                if transform.input is None:
+                    raise ValueError(
+                        f"Transform input cannot be None in dataset {idx} "
+                        f"transform {transform}"
+                    )
+                transform = transform.model_copy(
+                    update={"input": transform.input.model_copy(update={"path": path})}
+                )
+                dataset = ds.model_copy(
+                    update={"path": path, "coordinateTransformations": (transform,)}
+                )
+                write_datasets.append(dataset)
+
             write_metadata = self.metadata.model_copy(
                 update={"datasets": write_datasets}
             )

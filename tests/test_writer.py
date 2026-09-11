@@ -1120,6 +1120,74 @@ class TestWriter:
                 axes="xt",
             )
 
+    def test_normalize_resolution_level_paths(self):
+        """
+        Some tools write resolution levels as, for instance,
+        0, 1, 2 instead of s0, s1, s2.
+        ome-zarr-py normalizes these paths to the s0, s1, s2 format.
+        This test checks whether this normalization is performed correctly.
+        """
+        # Create data at non-normalized paths (0, 1, 2)
+        path_v3 = self.path / "normalize_test"
+        root_v3 = zarr.open_group(path_v3, mode="w", zarr_format=3)
+
+        n_levels = 3
+        datasets = []
+        for level in range(n_levels):
+            path = str(level)
+            random_data = np.random.rand(125 >> level, 125 >> level)
+            root_v3.create(path, data=random_data)
+
+            datasets.append(
+                {
+                    "path": path,
+                    "coordinateTransformations": [
+                        {
+                            "type": "scale",
+                            "scale": [2**level, 2**level],
+                            "input": {"path": path},
+                            "output": {"name": "physical"},
+                        }
+                    ],
+                }
+            )
+
+        # Write metadata with non-normalized paths directly (bypassing writer)
+        root_v3.attrs["ome"] = {
+            "version": "0.6",
+            "multiscales": [
+                {
+                    "coordinateSystems": [
+                        {
+                            "name": "physical",
+                            "axes": [
+                                {"name": ax, "type": "space"} for ax in ["y", "x"]
+                            ],
+                        }
+                    ],
+                    "datasets": datasets,
+                }
+            ],
+        }
+
+        # Read back and verify paths were normalized to s0, s1, s2
+        ms = OMEZarrMultiscale.from_ome_zarr(root_v3)
+
+        # write to a new group with normalized paths
+        path_v3_normalized = self.path / "normalize_test_normalized"
+        ms.to_ome_zarr(str(path_v3_normalized))
+
+        # Verify that the paths in the new group are normalized
+        grp = zarr.open_group(str(path_v3_normalized), mode="r")
+        for i in range(3):
+            assert f"s{i}" in grp
+
+        datasets = grp.attrs["ome"]["multiscales"][0]["datasets"]
+        for i, d in enumerate(datasets):
+            assert d["path"] == f"s{i}"
+            assert d["coordinateTransformations"][0]["input"]["path"] == f"s{i}"
+            assert d["coordinateTransformations"][0]["output"]["name"] == "physical"
+
 
 class TestMultiscalesMetadata:
     @pytest.fixture(autouse=True)
@@ -2462,4 +2530,4 @@ class TestLabelWriter:
 
 
 if __name__ == "__main__":
-    pytest.main([__file__])
+    pytest.main([__file__ + "::TestWriter::test_normalize_resolution_level_paths"])
