@@ -9,6 +9,7 @@ from ome_zarr_models.v06.coordinate_transforms import (
 from pydantic import TypeAdapter
 
 from ome_zarr import OMEZarrImage, OMEZarrMultiscale, OMEZarrScene
+from ome_zarr.utils import download
 
 transform_adapter = TypeAdapter(AnyTransform)
 
@@ -125,7 +126,12 @@ def test_create_scene_without_coordinate_systems(test_data_dir, transform):
         coordinate_transformations=[transform],
     )
 
-    scene.to_ome_zarr("test_scene.zarr", overwrite=True)
+    scene.to_ome_zarr(test_data_dir / "test_scene.zarr", overwrite=True)
+
+    # test "downloading" the scene elsewhere
+    download(
+        test_data_dir / "test_scene.zarr", test_data_dir / "test_scene_downloaded.zarr"
+    )
 
     # check that the graph is created correctly
     assert scene._graph is not None
@@ -250,6 +256,14 @@ def test_create_scene_with_coordinate_systems(test_data_dir, transform):
     assert len(scene._graph.graph.nodes) == 4
 
     scene.to_ome_zarr(str(test_data_dir / "test_scene_with_cs.zarr"), overwrite=True)
+
+    # test "downloading" the scene elsewhere
+    download(
+        test_data_dir / "test_scene_with_cs.zarr",
+        test_data_dir / "test_scene_with_cs_downloaded.zarr",
+    )
+
+    # read in saved scene and check everything's there
     scene_read = OMEZarrScene.from_ome_zarr(
         str(test_data_dir / "test_scene_with_cs.zarr")
     )
