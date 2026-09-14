@@ -129,7 +129,9 @@ def test_create_scene_without_coordinate_systems(test_data_dir, transform):
     scene.to_ome_zarr(test_data_dir / "test_scene.zarr", overwrite=True)
 
     # test "downloading" the scene elsewhere
-    download(test_data_dir / "test_scene.zarr", test_data_dir / "test_scene_downloaded.zarr")
+    download(
+        test_data_dir / "test_scene.zarr", test_data_dir / "test_scene_downloaded.zarr"
+    )
 
     # check that the graph is created correctly
     assert scene._graph is not None
@@ -175,6 +177,7 @@ def test_create_scene_without_coordinate_systems(test_data_dir, transform):
 
     # make sure that the loaded transform is the same as the original
     assert transform_md == transform.model_dump(exclude_unset=True, mode="json")
+
 
 @pytest.mark.parametrize("transform", TRANSFORMS)
 def test_create_scene_with_coordinate_systems(test_data_dir, transform):
@@ -255,7 +258,10 @@ def test_create_scene_with_coordinate_systems(test_data_dir, transform):
     scene.to_ome_zarr(str(test_data_dir / "test_scene_with_cs.zarr"), overwrite=True)
 
     # test "downloading" the scene elsewhere
-    download(test_data_dir / "test_scene_with_cs.zarr", test_data_dir / "test_scene_with_cs_downloaded.zarr")
+    download(
+        test_data_dir / "test_scene_with_cs.zarr",
+        test_data_dir / "test_scene_with_cs_downloaded.zarr",
+    )
 
     # read in saved scene and check everything's there
     scene_read = OMEZarrScene.from_ome_zarr(
