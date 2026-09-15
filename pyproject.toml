@@ -73,7 +73,6 @@ tests = [
     "pytest",
     "pytest-cov",
     "pooch",
-    "pydantic==2.12.5",
 ]
 
 [project.urls]
