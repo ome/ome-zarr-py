@@ -1,12 +1,14 @@
 from pathlib import Path
 
+import numpy as np
 import pytest
 import zarr
-from zarr.storage import LocalStore
+from zarr.storage import LocalStore, MemoryStore, StorePath
 
 from ome_zarr.data import create_zarr
 from ome_zarr.io import ZarrLocation, parse_url
-from ome_zarr.writer import add_metadata, get_metadata
+from ome_zarr.reader import Reader
+from ome_zarr.writer import add_metadata, get_metadata, write_image
 
 
 class TestIO:
@@ -52,3 +54,37 @@ class TestIO:
         attrs = get_metadata(read_root)
         assert attrs.get("extra") == "test_no_overwrite"
         assert attrs.get("multiscales") is not None
+
+
+class TestStoreLocation:
+    """A location on a store that has no path of its own."""
+
+    image = np.arange(64 * 64, dtype="uint16").reshape(64, 64)
+
+    def test_store_without_a_path(self):
+        store = MemoryStore()
+        write_image(self.image, zarr.open_group(store, mode="w"), axes="yx", scaler=None)
+
+        loc = ZarrLocation(store)
+        assert loc.exists()
+        assert loc.store is store
+        nodes = list(Reader(loc)())
+        assert nodes, "the reader found no node on the store"
+        np.testing.assert_array_equal(np.asarray(nodes[0].data[0]), self.image)
+
+    def test_prefix_inside_a_store(self):
+        store = MemoryStore()
+        write_image(self.image, zarr.open_group(store, path="images/img", mode="w"), axes="yx", scaler=None)
+
+        loc = ZarrLocation(StorePath(store, "images/img"))
+        assert loc.exists()
+        assert loc.basename() == "img"
+        finest = loc.root_attrs["multiscales"][0]["datasets"][0]["path"]
+        np.testing.assert_array_equal(np.asarray(loc.load(finest)), self.image)
+
+        # A child location shares the store and extends the prefix.
+        assert loc.create(finest) == ZarrLocation(StorePath(store, f"images/img/{finest}"))
+        assert not ZarrLocation(StorePath(store, "images/other")).exists()
+
+    def test_unrelated_stores_differ(self):
+        assert ZarrLocation(MemoryStore()) != ZarrLocation(MemoryStore())
