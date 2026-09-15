@@ -1,3 +1,4 @@
+import json
 import os
 from collections import deque
 from pathlib import Path
@@ -141,6 +142,24 @@ class TestCli:
         # main(["view", filename, "8000"])
         # we need dry_run to be True to avoid blocking the test with server
         view(filename, 8000, True)
+
+        # write minimal scene for test coverage
+        scene_dir = self.path / "scene.zarr"
+        scene_dir.mkdir()
+        with open(scene_dir / "zarr.json", "w") as f:
+            scene_json = {
+                "attributes": {
+                    "ome": {
+                        "scene": {
+                            "coordinateTransformations": [
+                                {"input": {"path": "image.zarr"}}
+                            ]
+                        }
+                    }
+                }
+            }
+            f.write(json.dumps(scene_json))
+        view(scene_dir, 8000, True)
 
     @pytest.mark.parametrize(
         "fmt",

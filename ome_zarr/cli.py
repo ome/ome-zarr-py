@@ -62,7 +62,7 @@ def create(args: argparse.Namespace) -> None:
         method = astronaut
         label_name = "circles"
     else:
-        raise Exception(f"unknown method: {args.method}")
+        raise TypeError(f"unknown method: {args.method}")
     fmt: Format = CurrentFormat()
     if args.format:
         fmt = format_from_version(args.format)

@@ -8,7 +8,7 @@ import urllib
 import webbrowser
 import xml.etree.ElementTree as ET
 from collections.abc import Iterator
-from datetime import datetime
+from datetime import UTC, datetime
 from http.server import (  # type: ignore[attr-defined]
     HTTPServer,
     SimpleHTTPRequestHandler,
@@ -24,7 +24,7 @@ from dask.diagnostics import ProgressBar
 # Not needed with python 3.15+? https://github.com/python/cpython/issues/86809
 from RangeHTTPServer import RangeRequestHandler
 
-from . import USE_DASK_ARRAY_KWARGS
+from . import USE_DASK_ARRAY_KWARGS, OMEZarrScene
 from .format import format_from_version
 from .io import parse_url
 from .reader import Multiscales, Node, Reader
@@ -154,10 +154,20 @@ def find_multiscales(path_to_zattrs):
         if len(wells) > 0:
             path_to_zarr = path_to_zattrs / wells[0].get("path") / field
             plate_name = os.path.basename(path_to_zattrs)
+            # when used for "finder", show the plate as a single entry with thumbnail
             return [[path_to_zarr, plate_name, os.path.dirname(path_to_zattrs)]]
         else:
             LOGGER.info("No wells found in plate%s", path_to_zattrs)
             return []
+    elif "scene" in zattrs:
+        # use first input image as the representative for the scene
+        path_to_zarr = path_to_zattrs
+        for ct in zattrs["scene"].get("coordinateTransformations", []):
+            input_path = ct.get("input", {}).get("path")
+            if input_path is not None:
+                path_to_zarr = path_to_zattrs / input_path
+                break
+        return [[path_to_zarr, path_to_zattrs.name, os.path.dirname(path_to_zattrs)]]
     elif zattrs.get("bioformats2raw.layout") == 3:
         # Open OME/METADATA.ome.xml
         try:
@@ -274,7 +284,7 @@ def finder(input_path: str, port: int = 8000, dry_run=False) -> None:
                 try:
                     mtime = os.path.getmtime(zarr_img[0])
                     # format mtime as "YYYY-MM-DD HH:MM:SS.Z"
-                    timestamp = datetime.fromtimestamp(mtime).strftime(
+                    timestamp = datetime.fromtimestamp(mtime, tz=UTC).strftime(
                         "%Y-%m-%d %H:%M:%S.%Z"
                     )
                 except OSError:
@@ -322,6 +332,14 @@ def download(input_path: str, output_dir: str = ".") -> None:
     """
     location = parse_url(input_path)
     assert location, f"not a zarr: {location}"
+
+    if "scene" in location.root_attrs:
+        # ponytail: scene coordinate systems/axes vary by version; the
+        # ome_zarr_models-backed OMEZarrScene already handles this round-trip.
+        name = Path(location.path).name or "scene.zarr"
+        scene = OMEZarrScene.from_ome_zarr(location.store)
+        scene.to_ome_zarr(Path(output_dir) / name, overwrite=True)
+        return
 
     reader = Reader(location)
     nodes: list[Node] = list()
@@ -421,7 +439,7 @@ def strip_common_prefix(parts: list[list[str]]) -> str:
         msg = "No common prefix:\n"
         for path in parts:
             msg += f"{path}\n"
-        raise Exception(msg)
+        raise ValueError(msg)
     else:
         common = parts[0][first_mismatch - 1]
 

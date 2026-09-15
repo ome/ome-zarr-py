@@ -240,9 +240,9 @@ class Label(Spec):
                     if isinstance(label_value, (bool, int)):
                         colors[label_value] = rgba
                     else:
-                        raise Exception("not bool or int")
+                        raise TypeError("not bool or int")
 
-                except Exception:
+                except TypeError:
                     LOGGER.exception("invalid color - %s", color)
 
         properties: dict[int, dict[str, str]] = {}
@@ -498,7 +498,7 @@ class Plate(Spec):
         well_node = Node(well_zarr, node)
         well_spec: Well | None = well_node.first(Well)
         if well_spec is None:
-            raise Exception("Could not find first well")
+            raise ValueError("Could not find first well")
         self.first_field_path = well_spec.well_data["images"][0]["path"]
         img0 = self.zarr.create(f"{self.well_paths[0]}/{self.first_field_path}")
         self.img_paths = [

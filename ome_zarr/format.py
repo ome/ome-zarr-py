@@ -184,11 +184,11 @@ class FormatV01(Format):
             LOGGER.debug("%s contains unspecified keys", well)
         for key, key_type in self.REQUIRED_PLATE_WELL_KEYS.items():
             if key not in well:
-                raise ValueError(
+                raise TypeError(
                     "%s must contain a %s key of type %s", well, key, key_type
                 )
             if not isinstance(well[key], key_type):
-                raise ValueError("%s path must be of %s type", well, key_type)
+                raise TypeError("%s path must be of %s type", well, key_type)
 
     def generate_coordinate_transformations(
         self, shapes: list[tuple]
@@ -339,7 +339,7 @@ class FormatV04(FormatV03):
                 )
             for value in scale:
                 if not isinstance(value, (float, int)):
-                    raise ValueError(f"'scale' values must all be numbers: {scale}")
+                    raise TypeError(f"'scale' values must all be numbers: {scale}")
 
             # validate translations...
             translation_types = [t == "translation" for t in types]
@@ -360,7 +360,7 @@ class FormatV04(FormatV03):
                     )
                 for value in translation:
                     if not isinstance(value, (float, int)):
-                        raise ValueError(
+                        raise TypeError(
                             f"'translation' values must all be numbers: {translation}"
                         )
 

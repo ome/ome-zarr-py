@@ -155,9 +155,10 @@ def create_zarr(
     """Generate a synthetic image pyramid with labels."""
     image, label = method()
     image.labels = {label.name: label}
+    version = cast(Literal["0.4", "0.5", "0.6"], fmt.version)
     image.to_ome_zarr(
         zarr_directory,
-        version=cast(Literal["0.6.dev4", "0.5", "0.4"], fmt.version),
+        version=version,
         overwrite=True,
     )
 
