@@ -47,9 +47,33 @@ authors = [
 [project.entry-points."console_scripts"]
 ome_zarr = "ome_zarr.cli:main"
 
+[project.optional-dependencies]
+docs = [
+    "sphinx==8.1.3",
+    "sphinx-rtd-theme==3.0.2",
+    "jupytext",
+    "matplotlib",
+    "pooch",
+    "sphinx-copybutton",
+    "sphinx-togglebutton",
+    "myst-nb",
+    "sphinx-thebe",
+    "sphinx-comments",
+    "sphinx-design",
+    "sphinx-book-theme",
+    "sphinx-external-toc",
+    "sphinx-jupyterbook-latex",
+    "linkify-it-py",
+    "napari",
+    "pyqt6",
+]
+
 [dependency-groups]
 tests = [
     "pytest",
+    "pytest-cov",
+    "pooch",
+    "pydantic==2.12.5",
 ]
 
 [project.urls]
