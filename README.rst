@@ -15,16 +15,15 @@ Documentation will be automatically built with `readthedocs`.
 
 It can be built locally with::
 
-    $ pip install -r docs/requirements.txt
-    $ sphinx-build -b html docs/source/ docs/build/html
+    $ pip install .[docs]
+    $ sphinx-build -b html docs/source/ docs/build/
 
 Tests
 -----
 
-Tests can be run locally via `tox` with::
+Tests can be run locally via `uv` with::
 
-    $ pip install tox
-    $ tox
+    $ uv run --group tests pytest
 
 To enable pre-commit code validation::
 
