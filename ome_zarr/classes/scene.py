@@ -1,6 +1,5 @@
 # the class for storage representation, not exposed to the user
 import os
-import posixpath
 from collections.abc import Sequence
 from typing import Any, cast
 

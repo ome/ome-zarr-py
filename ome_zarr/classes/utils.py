@@ -1,11 +1,13 @@
+import posixpath
+
+import transformnd as tnd
 from ome_zarr_models.v06.coordinate_transforms import (
     AnyTransform,
     CoordinateSystem,
 )
 
-import transformnd as tnd
-import posixpath
 from ome_zarr import OMEZarrMultiscale
+
 
 def _ozmp_tf_to_tnd(
     transform: AnyTransform,
@@ -41,9 +43,7 @@ def _ozmp_tf_to_tnd(
         # to keep track of global location of coordinate systems in the zarr store
         if zarr_context:
             input_path = (
-                posixpath.join(zarr_context, input_path)
-                if input_path
-                else zarr_context
+                posixpath.join(zarr_context, input_path) if input_path else zarr_context
             )
             output_path = (
                 posixpath.join(zarr_context, output_path)
@@ -78,9 +78,7 @@ def _ozmp_tf_to_tnd(
             path_to_dfield = posixpath.join(zarr_context, path_to_dfield)
 
         if coordinate_displacements is not None:
-            dfield = coordinate_displacements.get(
-                posixpath.basename(path_to_dfield)
-            )
+            dfield = coordinate_displacements.get(posixpath.basename(path_to_dfield))
             if dfield is not None:
                 if dfield.images[0].scale is None:
                     raise ValueError(
@@ -113,9 +111,7 @@ def _ozmp_tf_to_tnd(
         tnd_transform = tnd.transforms.Scale(transform.scale, spaces=spaces)
 
     elif transform.type == "translation":
-        tnd_transform = tnd.transforms.Translate(
-            transform.translation, spaces=spaces
-        )
+        tnd_transform = tnd.transforms.Translate(transform.translation, spaces=spaces)
 
     elif transform.type == "rotation":
         affine_matrix = np.eye(len(transform.rotation) + 1)
