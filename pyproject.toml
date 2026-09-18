@@ -47,12 +47,7 @@ authors = [
 [project.scripts]
 ome_zarr = "ome_zarr.cli:main"
 
-[dependency-groups]
-tests = [
-    "pytest",
-    "pytest-cov",
-    "pooch",
-]
+[project.optional-dependencies]
 docs = [
     "sphinx==8.1.3",
     "sphinx-rtd-theme==3.0.2",
@@ -72,7 +67,14 @@ docs = [
     "napari",
     "pyqt6",
 ]
-dev = [{include-group = "tests"}, {include-group = "docs"}]
+
+[dependency-groups]
+tests = [
+    "pytest",
+    "pytest-cov",
+    "pooch",
+]
+dev = [{include-group = "tests"}]
 
 [project.urls]
 Documentation = "https://ome-zarr.readthedocs.io"
