@@ -68,9 +68,11 @@ def _ozmp_tf_to_tnd(
                 spaces=spaces,
             )
         else:
-            aff = np.eye(max(aff.shape))
-            aff[: aff.shape[0], : aff.shape[1]] = aff
-            tnd_transform = tnd.transforms.Affine(aff, spaces=spaces)
+            # NGFF stores affines in inhomogeneous (n x n+1) form; transformnd
+            # needs the homogeneous [0 ... 0 1] bottom row to resolve correctly.
+            homogeneous = np.eye(aff.shape[1])
+            homogeneous[: aff.shape[0], : aff.shape[1]] = aff
+            tnd_transform = tnd.transforms.Affine(homogeneous, spaces=spaces)
 
     elif transform.type == "displacements":
         path_to_dfield = transform.path or ""
