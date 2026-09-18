@@ -415,7 +415,13 @@ class OMEZarrScene:
         tnd_transform = None
         # Example for an affine transformation (this will depend on the actual structure of AnyTransform)
         if isinstance(transform, ozmt.Affine):
-            aff = np.asarray(transform.affine_matrix)
+            try:
+                aff = np.asarray(transform.affine_matrix)
+            except NotImplementedError:
+                logger.warning(
+                    "Path-form affine matrix transformations are not implemented"
+                )
+                return None
             if aff.shape[0] == aff.shape[1]:
                 tnd_transform = tnd.transforms.Affine(aff)
             else:
@@ -466,11 +472,16 @@ class OMEZarrScene:
             )
 
         elif isinstance(transform, ozmt.Rotation):
-            affine_matrix = np.eye(len(transform.rotation_matrix) + 1)
-            affine_matrix[:-1, :-1] = transform.rotation_matrix
-            tnd_transform = tnd.transforms.Affine(
-                affine_matrix,
-            )
+            try:
+                rot = transform.rotation_matrix
+            except NotImplementedError:
+                logger.warning(
+                    "Path-form rotation matrix transforms are not implemented"
+                )
+                return None
+            affine_matrix = np.eye(len(rot) + 1)
+            affine_matrix[:-1, :-1] = rot
+            tnd_transform = tnd.transforms.Affine(affine_matrix)
 
         elif isinstance(transform, ozmt.ByDimension):
             sub_transformations = transform.transformations
