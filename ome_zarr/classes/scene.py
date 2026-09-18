@@ -11,6 +11,7 @@ from ome_zarr_models.v06.coordinate_transforms import (
     AnyTransform,
     CoordinateSystem,
 )
+import ome_zarr_models.v06.coordinate_transforms as ozmt
 from ome_zarr_models.v06.scene import SceneAttrs
 from zarr.storage import StoreLike
 
@@ -413,18 +414,16 @@ class OMEZarrScene:
 
         tnd_transform = None
         # Example for an affine transformation (this will depend on the actual structure of AnyTransform)
-        if transform.type == "affine":
-            aff = np.asarray(transform.affine)
+        if isinstance(transform, ozmt.Affine):
+            aff = np.asarray(transform.affine_matrix)
             if aff.shape[0] == aff.shape[1]:
-                tnd_transform = tnd.transforms.Affine(
-                    transform.affine,
-                )
+                tnd_transform = tnd.transforms.Affine(aff)
             else:
                 aff = np.eye(max(aff.shape))
                 aff[: aff.shape[0], : aff.shape[1]] = aff
                 tnd_transform = tnd.transforms.Affine(aff)
 
-        elif transform.type == "displacements":
+        elif isinstance(transform, ozmt.Displacements):
             path_to_dfield = transform.path or ""
             if zarr_context and path_to_dfield:
                 path_to_dfield = posixpath.join(zarr_context, path_to_dfield)
@@ -445,35 +444,35 @@ class OMEZarrScene:
                         ),
                         vector_axis=0,
                     )
-        elif transform.type == "mapAxis":
+        elif isinstance(transform, ozmt.MapAxis):
             tnd_transform = tnd.transforms.MapAxis(
                 list(transform.mapAxis),
             )
 
-        elif transform.type == "projectAxis":
+        elif isinstance(transform, ozmt.ProjectAxis):
             tnd_transform = tnd.transforms.ProjectAxis(
-                created=transform.createdOutputs,
-                dropped=transform.droppedInputs,
+                created=set_or_none(transform.createdOutputs),
+                dropped=set_or_none(transform.droppedInputs),
                 source_ndim=len(source_cs.axes) if source_cs is not None else None,
                 target_ndim=len(target_cs.axes) if target_cs is not None else None,
             )
 
-        elif transform.type == "scale":
+        elif isinstance(transform, ozmt.Scale):
             tnd_transform = tnd.transforms.Scale(transform.scale)
 
-        elif transform.type == "translation":
+        elif isinstance(transform, ozmt.Translation):
             tnd_transform = tnd.transforms.Translate(
                 transform.translation,
             )
 
-        elif transform.type == "rotation":
-            affine_matrix = np.eye(len(transform.rotation) + 1)
-            affine_matrix[:-1, :-1] = transform.rotation
+        elif isinstance(transform, ozmt.Rotation):
+            affine_matrix = np.eye(len(transform.rotation_matrix) + 1)
+            affine_matrix[:-1, :-1] = transform.rotation_matrix
             tnd_transform = tnd.transforms.Affine(
                 affine_matrix,
             )
 
-        elif transform.type == "byDimension":
+        elif isinstance(transform, ozmt.ByDimension):
             sub_transformations = transform.transformations
             tnd_sub_transforms = []
 
@@ -484,15 +483,15 @@ class OMEZarrScene:
                 tnd_sub_transforms.append(
                     tnd.transforms.by_dimension.SubTransform(
                         transform=t,
-                        input_axes=sub_tf.inputAxes,
-                        output_axes=sub_tf.outputAxes,
+                        input_axes=list(sub_tf.inputAxes),
+                        output_axes=list(sub_tf.outputAxes),
                     )
                 )
             tnd_transform = tnd.transforms.ByDimension(
                 subtransforms=tnd_sub_transforms,
                 fill_identity=0,
             )
-        elif transform.type == "sequence":
+        elif isinstance(transform, ozmt.Sequence):
             sub_transformations = transform.transformations
             tnd_sub_transforms = []
 
@@ -509,3 +508,9 @@ class OMEZarrScene:
             logger.warning("could not load transform: %s", transform)
 
         return tnd_transform
+
+
+def set_or_none(it: Sequence[int] | None) -> set[int] | None:
+    if it is None:
+        return None
+    return set(it)
