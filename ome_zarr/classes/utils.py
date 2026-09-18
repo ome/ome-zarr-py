@@ -6,7 +6,6 @@ from ome_zarr_models.v06.coordinate_transforms import (
     CoordinateSystem,
 )
 
-from ome_zarr import OMEZarrMultiscale
 from ome_zarr.classes.image import OMEZarrMultiscale
 
 
