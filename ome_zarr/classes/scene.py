@@ -361,9 +361,7 @@ class OMEZarrScene:
         This is a placeholder function and will need to be implemented based on the specific types of transformations you expect to encounter in OME-Zarr metadata.
 
         Returns:
-            - None, if the transform could not be converted.
-            - transformnd.Transform, if the transform has no information about its input and output coordinate systems.
-            - transformnd.spaced.Spaced, if all information is present and correct.
+            transformnd.Spaced, if the transform can be constructed and the coordinate system information is present; else None.
         """
         if transform.input is None or transform.output is None:
             logger.warning(
@@ -409,9 +407,7 @@ class OMEZarrScene:
         This is a placeholder function and will need to be implemented based on the specific types of transformations you expect to encounter in OME-Zarr metadata.
 
         Returns:
-            - None, if the transform could not be converted.
-            - transformnd.Transform, if the transform has no information about its input and output coordinate systems.
-            - transformnd.spaced.Spaced, if all information is present and correct.
+            transformnd.Transform if it can be constructed, None otherwise.
         """
         import numpy as np
 
