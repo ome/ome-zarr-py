@@ -26,7 +26,7 @@ dependencies = [
     "scikit-image>=0.19.0",
     "toolz",
     "rangehttpserver",
-    "transformnd>=0.6.0,<0.8.0",
+    "transformnd>=0.9.1,<0.10.0",
     "ome-zarr-models>=1.8.1",
     "Deprecated",
 ]
@@ -44,10 +44,15 @@ authors = [
     {name = "The Open Microscopy Team"},
 ]
 
-[project.entry-points."console_scripts"]
+[project.scripts]
 ome_zarr = "ome_zarr.cli:main"
 
-[project.optional-dependencies]
+[dependency-groups]
+tests = [
+    "pytest",
+    "pytest-cov",
+    "pooch",
+]
 docs = [
     "sphinx==8.1.3",
     "sphinx-rtd-theme==3.0.2",
@@ -67,13 +72,7 @@ docs = [
     "napari",
     "pyqt6",
 ]
-
-[dependency-groups]
-tests = [
-    "pytest",
-    "pytest-cov",
-    "pooch",
-]
+dev = [{include-group = "tests"}, {include-group = "docs"}]
 
 [project.urls]
 Documentation = "https://ome-zarr.readthedocs.io"

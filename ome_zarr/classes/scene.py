@@ -1,4 +1,5 @@
 # the class for storage representation, not exposed to the user
+import logging
 import os
 import posixpath
 from collections.abc import Sequence
@@ -14,6 +15,8 @@ from ome_zarr_models.v06.scene import SceneAttrs
 from zarr.storage import StoreLike
 
 from .image import OMEZarrMultiscale
+
+logger = logging.getLogger(__name__)
 
 
 class OMEZarrScene:
@@ -166,12 +169,14 @@ class OMEZarrScene:
             # convert to transformnd transform and add to graph
             target_cs_dict = self.get_coordinate_system(tf.output.path, tf.output.name)
             target_cs = target_cs_dict[(tf.output.path or "", tf.output.name)]
-            tnd_transform = self._ozmp_tf_to_tnd(
+            tnd_transform = self._ozmp_tf_to_tnd_spaced(
                 tf,
                 zarr_context="",
                 source_cs=source_cs,
                 target_cs=target_cs,
             )
+            if tnd_transform is None:
+                continue
             self._graph.add_transform(tnd_transform)
 
             # Add inverse edge if transform is invertible
@@ -193,12 +198,14 @@ class OMEZarrScene:
                     continue
                 if img.metadata.coordinateTransformations:
                     for img_tf in img.metadata.coordinateTransformations:
-                        ind_transform = self._ozmp_tf_to_tnd(
+                        ind_transform = self._ozmp_tf_to_tnd_spaced(
                             img_tf,
                             zarr_context=subgroup,
                             source_cs=None,
                             target_cs=None,
                         )
+                        if ind_transform is None:
+                            continue
                         self._graph.add_transform(ind_transform)
                         # Add inverse edge if transform is invertible
                         inverse = ind_transform.invert()
@@ -342,43 +349,71 @@ class OMEZarrScene:
 
         return scene
 
+    def _ozmp_tf_to_tnd_spaced(
+        self,
+        transform: AnyTransform,
+        zarr_context: str = "",
+        source_cs: CoordinateSystem | None = None,
+        target_cs: CoordinateSystem | None = None,
+    ) -> tnd.Spaced | None:
+        """
+        Convert an OME-Zarr coordinate transformation to a transformnd Transform object.
+        This is a placeholder function and will need to be implemented based on the specific types of transformations you expect to encounter in OME-Zarr metadata.
+
+        Returns:
+            - None, if the transform could not be converted.
+            - transformnd.Transform, if the transform has no information about its input and output coordinate systems.
+            - transformnd.spaced.Spaced, if all information is present and correct.
+        """
+        if transform.input is None or transform.output is None:
+            logger.warning(
+                "Transform's coordinate systems are not defined: %s", transform
+            )
+            return None
+
+        t = self._ozmp_tf_to_tnd(transform, zarr_context, source_cs, target_cs)
+        if t is None:
+            return None
+
+        input_path = transform.input.path or ""
+        output_path = transform.output.path or ""
+
+        # zarr_context prepends path with relative path from root
+        # to keep track of global location of coordinate systems in the zarr store
+        if zarr_context:
+            input_path = (
+                posixpath.join(zarr_context, input_path) if input_path else zarr_context
+            )
+            output_path = (
+                posixpath.join(zarr_context, output_path)
+                if output_path
+                else zarr_context
+            )
+
+        spaces = (
+            (input_path, transform.input.name),
+            (output_path, transform.output.name),
+        )
+
+        return tnd.Spaced(t, *spaces)
+
     def _ozmp_tf_to_tnd(
         self,
         transform: AnyTransform,
         zarr_context: str = "",
         source_cs: CoordinateSystem | None = None,
         target_cs: CoordinateSystem | None = None,
-    ) -> tnd.base.Transform:
+    ) -> tnd.Transform | None:
         """
         Convert an OME-Zarr coordinate transformation to a transformnd Transform object.
         This is a placeholder function and will need to be implemented based on the specific types of transformations you expect to encounter in OME-Zarr metadata.
+
+        Returns:
+            - None, if the transform could not be converted.
+            - transformnd.Transform, if the transform has no information about its input and output coordinate systems.
+            - transformnd.spaced.Spaced, if all information is present and correct.
         """
         import numpy as np
-
-        if transform.input is not None:
-            input_path = transform.input.path or ""
-            output_path = transform.output.path or ""
-
-            # zarr_context prepends path with relative path from root
-            # to keep track of global location of coordinate systems in the zarr store
-            if zarr_context:
-                input_path = (
-                    posixpath.join(zarr_context, input_path)
-                    if input_path
-                    else zarr_context
-                )
-                output_path = (
-                    posixpath.join(zarr_context, output_path)
-                    if output_path
-                    else zarr_context
-                )
-
-            spaces = tnd.Spaces(
-                (input_path, transform.input.name),
-                (output_path, transform.output.name),
-            )
-        else:
-            spaces = tnd.Spaces(None, None)
 
         tnd_transform = None
         # Example for an affine transformation (this will depend on the actual structure of AnyTransform)
@@ -387,12 +422,11 @@ class OMEZarrScene:
             if aff.shape[0] == aff.shape[1]:
                 tnd_transform = tnd.transforms.Affine(
                     transform.affine,
-                    spaces=spaces,
                 )
             else:
                 aff = np.eye(max(aff.shape))
                 aff[: aff.shape[0], : aff.shape[1]] = aff
-                tnd_transform = tnd.transforms.Affine(aff, spaces=spaces)
+                tnd_transform = tnd.transforms.Affine(aff)
 
         elif transform.type == "displacements":
             path_to_dfield = transform.path or ""
@@ -414,60 +448,68 @@ class OMEZarrScene:
                             list(dfield.images[0].scale.values())[1:]
                         ),
                         vector_axis=0,
-                        spaces=spaces,
                     )
         elif transform.type == "mapAxis":
             tnd_transform = tnd.transforms.MapAxis(
                 list(transform.mapAxis),
-                spaces=spaces,
             )
 
         elif transform.type == "projectAxis":
             tnd_transform = tnd.transforms.ProjectAxis(
                 created=transform.createdOutputs,
                 dropped=transform.droppedInputs,
-                spaces=spaces,
                 source_ndim=len(source_cs.axes) if source_cs is not None else None,
                 target_ndim=len(target_cs.axes) if target_cs is not None else None,
             )
 
         elif transform.type == "scale":
-            tnd_transform = tnd.transforms.Scale(transform.scale, spaces=spaces)
+            tnd_transform = tnd.transforms.Scale(transform.scale)
 
         elif transform.type == "translation":
             tnd_transform = tnd.transforms.Translate(
-                transform.translation, spaces=spaces
+                transform.translation,
             )
 
         elif transform.type == "rotation":
             affine_matrix = np.eye(len(transform.rotation) + 1)
             affine_matrix[:-1, :-1] = transform.rotation
-            tnd_transform = tnd.transforms.Affine(affine_matrix, spaces=spaces)
+            tnd_transform = tnd.transforms.Affine(
+                affine_matrix,
+            )
 
         elif transform.type == "byDimension":
             sub_transformations = transform.transformations
-            tnd_sub_transforms = [
-                tnd.transforms.by_dimension.SubTransform(
-                    transform=self._ozmp_tf_to_tnd(sub_tf.transformation),
-                    input_axes=sub_tf.inputAxes,
-                    output_axes=sub_tf.outputAxes,
+            tnd_sub_transforms = []
+
+            for sub_tf in sub_transformations:
+                t = self._ozmp_tf_to_tnd(sub_tf.transformation)
+                if t is None:
+                    return None
+                tnd_sub_transforms.append(
+                    tnd.transforms.by_dimension.SubTransform(
+                        transform=t,
+                        input_axes=sub_tf.inputAxes,
+                        output_axes=sub_tf.outputAxes,
+                    )
                 )
-                for sub_tf in sub_transformations
-            ]
             tnd_transform = tnd.transforms.ByDimension(
                 subtransforms=tnd_sub_transforms,
                 fill_identity=0,
-                spaces=spaces,
             )
         elif transform.type == "sequence":
             sub_transformations = transform.transformations
-            tnd_sub_transforms = [
-                self._ozmp_tf_to_tnd(sub_tf, zarr_context, source_cs, target_cs)
-                for sub_tf in sub_transformations
-            ]
+            tnd_sub_transforms = []
+
+            for sub_tf in sub_transformations:
+                t = self._ozmp_tf_to_tnd(sub_tf, zarr_context, source_cs, target_cs)
+                if t is None:
+                    return None
+                tnd_sub_transforms.append(t)
+
             tnd_transform = tnd.base.TransformSequence(
                 tnd_sub_transforms,
-                spaces=spaces,
             )
+        else:
+            logger.warning("could not load transform: %s", transform)
 
         return tnd_transform
