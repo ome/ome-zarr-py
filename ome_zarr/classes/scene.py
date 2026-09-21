@@ -487,12 +487,7 @@ class OMEZarrScene:
                     "Path-form transformations are not implemented", transform
                 ) from e
 
-            if aff.shape[0] == aff.shape[1]:
-                return tnd.transforms.Affine(aff)
-            else:
-                aff2 = np.eye(max(aff.shape))
-                aff2[: aff.shape[0], : aff.shape[1]] = aff
-                return tnd.transforms.Affine(aff2)
+            return tnd.transforms.Affine.from_linear_map(aff[:, :-1], aff[:, -1])
 
         elif isinstance(transform, ozmt.Coordinates):
             arr, index_transform, vector_axis = self._setup_vectorfield_args(
