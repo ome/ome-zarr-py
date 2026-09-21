@@ -539,13 +539,30 @@ class OMEZarrScene:
             return tnd.transforms.ByDimension(tnd_sub_transforms)
 
         elif isinstance(transform, ozmt.Sequence):
-            tnd_sub_transforms = [
-                self._ozmp_tf_to_tnd(t, zarr_context) for t in transform.transformations
-            ]
+            ts = transform.transformations
+            if not transform.transformations:
+                if source_cs is not None:
+                    ndim = len(source_cs.axes)
+                elif target_cs is not None:
+                    ndim = len(target_cs.axes)
+                else:
+                    raise UnsupportedTransformation(
+                        "Could not infer dimensionality", transform
+                    )
+                return tnd.TransformSequence.empty(ndim)
 
-            return tnd.TransformSequence(
-                tnd_sub_transforms,
+            elif len(transform.transformations) == 1:
+                return tnd.TransformSequence(
+                    [self._ozmp_tf_to_tnd(ts[0], zarr_context, source_cs, target_cs)]
+                )
+
+            inner = [self._ozmp_tf_to_tnd(ts[0], zarr_context, source_cs, None)]
+            inner.extend(
+                self._ozmp_tf_to_tnd(t, zarr_context, None, None) for t in ts[1:-1]
             )
+            inner.append(self._ozmp_tf_to_tnd(ts[-1], zarr_context, None, target_cs))
+
+            return tnd.TransformSequence(inner)
 
         raise UnsupportedTransformation("Unsupported transform type", transform)
 
