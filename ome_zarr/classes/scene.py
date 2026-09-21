@@ -493,6 +493,16 @@ class OMEZarrScene:
                 aff[: aff.shape[0], : aff.shape[1]] = aff
                 return tnd.transforms.Affine(aff)
 
+        elif isinstance(transform, ozmt.Coordinates):
+            arr, index_transform, vector_axis = self._setup_vectorfield_args(
+                transform, zarr_context
+            )
+            return tnd.transforms.Coordinates(
+                arr,
+                index_transform=index_transform,
+                vector_axis=vector_axis,
+            )
+
         elif isinstance(transform, ozmt.Displacements):
             arr, index_transform, vector_axis = self._setup_vectorfield_args(
                 transform, zarr_context
