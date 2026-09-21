@@ -447,9 +447,14 @@ class OMEZarrScene:
                 "Vector field missing scale information", transform
             )
 
+        # Metadata is defined from displacements to input space,
+        # but transformnd expects input space to displacemeents,
+        # so this is inverted.
+        index_transform = ~tnd.transforms.Scale(list(img.scale.values())[1:])
+
         return (
             img.data,
-            tnd.transforms.Scale(list(img.scale.values())[1:]),
+            index_transform,
             VECTOR_FIELD_AXIS,
         )
 
