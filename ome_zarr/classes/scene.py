@@ -1,9 +1,11 @@
 # the class for storage representation, not exposed to the user
+from __future__ import annotations
+
 import logging
 import os
 import posixpath
 from collections.abc import Sequence
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import ome_zarr_models.v06.coordinate_transforms as ozmt
 import transformnd as tnd
@@ -15,9 +17,16 @@ from ome_zarr_models.v06.coordinate_transforms import (
 from ome_zarr_models.v06.scene import SceneAttrs
 from zarr.storage import StoreLike
 
+if TYPE_CHECKING:
+    import dask.array as da
+    import numpy as np
+
 from .image import OMEZarrMultiscale
 
 logger = logging.getLogger(__name__)
+
+VECTOR_FIELD_AXIS = 0
+"""Which dimension of a vector field array contains the vectors."""
 
 
 class OMEZarrScene:
@@ -62,13 +71,15 @@ class OMEZarrScene:
             Retrieve a coordinate system by path or name.
             If neither is
 
-
         """
         # Coerce list to dict keyed by metadata.name
         if isinstance(images, list):
             self.images = {str(img.metadata.name): img for img in images}
         else:
             self.images = images
+
+        if coordinate_displacements is None:
+            coordinate_displacements = dict()
 
         self.coordinate_displacements = coordinate_displacements
 
@@ -78,7 +89,8 @@ class OMEZarrScene:
             coordinateTransformations=tuple(coordinate_transformations),
         )
 
-        self._build_graph()
+        self._graph = tnd.TransformGraph()
+        self._populate_graph()
 
     @property
     def coordinate_systems(self) -> tuple[CoordinateSystem, ...]:
@@ -115,7 +127,8 @@ class OMEZarrScene:
     @metadata.setter
     def metadata(self, value: SceneAttrs) -> None:
         self._metadata = value
-        self._build_graph()
+        self._graph = tnd.TransformGraph()
+        self._populate_graph()
 
     def get_coordinate_system(
         self, path: str | None = None, name: str | None = None
@@ -156,8 +169,7 @@ class OMEZarrScene:
 
         return matches
 
-    def _build_graph(self):
-        self._graph = tnd.graph.TransformGraph()
+    def _populate_graph(self):
         # Add scene-level transformations (empty context = root level)
         for tf in self.coordinate_transformations:
             if tf.input is None or tf.output is None:
@@ -170,13 +182,16 @@ class OMEZarrScene:
             # convert to transformnd transform and add to graph
             target_cs_dict = self.get_coordinate_system(tf.output.path, tf.output.name)
             target_cs = target_cs_dict[(tf.output.path or "", tf.output.name)]
-            tnd_transform = self._ozmp_tf_to_tnd_spaced(
-                tf,
-                zarr_context="",
-                source_cs=source_cs,
-                target_cs=target_cs,
-            )
-            if tnd_transform is None:
+            try:
+                tnd_transform = self._ozmp_tf_to_tnd_spaced(
+                    tf,
+                    zarr_context="",
+                    source_cs=source_cs,
+                    target_cs=target_cs,
+                )
+            except UnsupportedTransformation as e:
+                # error message contains transform info
+                logger.warning("Skipping unsupported transformation: %s", e)
                 continue
             self._graph.add_transform(tnd_transform)
 
@@ -199,14 +214,17 @@ class OMEZarrScene:
                     continue
                 if img.metadata.coordinateTransformations:
                     for img_tf in img.metadata.coordinateTransformations:
-                        ind_transform = self._ozmp_tf_to_tnd_spaced(
-                            img_tf,
-                            zarr_context=subgroup,
-                            source_cs=None,
-                            target_cs=None,
-                        )
-                        if ind_transform is None:
+                        try:
+                            ind_transform = self._ozmp_tf_to_tnd_spaced(
+                                img_tf,
+                                zarr_context=subgroup,
+                                source_cs=None,
+                                target_cs=None,
+                            )
+                        except UnsupportedTransformation as e:
+                            logger.warning("Skipping unsupported transformation: %s", e)
                             continue
+
                         self._graph.add_transform(ind_transform)
                         # Add inverse edge if transform is invertible
                         inverse = ind_transform.invert()
@@ -356,23 +374,21 @@ class OMEZarrScene:
         zarr_context: str = "",
         source_cs: CoordinateSystem | None = None,
         target_cs: CoordinateSystem | None = None,
-    ) -> tnd.Spaced | None:
+    ) -> tnd.Spaced:
         """
-        Convert an OME-Zarr coordinate transformation to a transformnd Transform object.
-        This is a placeholder function and will need to be implemented based on the specific types of transformations you expect to encounter in OME-Zarr metadata.
+        Convert an OME-Zarr coordinate transformation with coordinate system information to a transformnd Spaced object.
 
         Returns:
             transformnd.Spaced, if the transform can be constructed and the coordinate system information is present; else None.
+
+        Raises:
+            UnsupportedTransformation
+                Transformation cannot be recreated in transformnd, or is lacking coordinate system information.
         """
         if transform.input is None or transform.output is None:
-            logger.warning(
-                "Transform's coordinate systems are not defined: %s", transform
-            )
-            return None
+            raise UnsupportedTransformation("Missing coordinate system", transform)
 
         t = self._ozmp_tf_to_tnd(transform, zarr_context, source_cs, target_cs)
-        if t is None:
-            return None
 
         input_path = transform.input.path or ""
         output_path = transform.output.path or ""
@@ -396,67 +412,97 @@ class OMEZarrScene:
 
         return tnd.Spaced(t, *spaces)
 
+    def _setup_vectorfield_args(
+        self, transform: ozmt.Displacements | ozmt.Coordinates, zarr_context: str = ""
+    ) -> tuple[da.Array | np.ndarray, tnd.Transform, int]:
+        """Set up the arguments for vector field transformations.
+
+        i.e. displacements, coordinates.
+
+        Returns:
+            dask.array.Array or numpy.ndarray
+                Vector field array
+            transformnd.Transform
+                index_transformation argument
+            int
+                vector_axis argument
+
+        Raises:
+            UnsupportedTransformation
+                If vector field is missing or malformed
+        """
+        path_to_vfield = transform.path or ""
+        if zarr_context and path_to_vfield:
+            path_to_vfield = posixpath.join(zarr_context, path_to_vfield)
+
+        vfield = self.coordinate_displacements.get(posixpath.basename(path_to_vfield))
+        if vfield is None:
+            raise UnsupportedTransformation("Missing vector field", transform)
+
+        img = vfield.images[0]
+        if img.scale is None:
+            raise UnsupportedTransformation(
+                "Vector field missing scale information", transform
+            )
+
+        return (
+            img.data,
+            tnd.transforms.Scale(list(img.scale.values())[1:]),
+            VECTOR_FIELD_AXIS,
+        )
+
     def _ozmp_tf_to_tnd(
         self,
         transform: AnyTransform,
         zarr_context: str = "",
         source_cs: CoordinateSystem | None = None,
         target_cs: CoordinateSystem | None = None,
-    ) -> tnd.Transform | None:
+    ) -> tnd.Transform:
         """
         Convert an OME-Zarr coordinate transformation to a transformnd Transform object.
-        This is a placeholder function and will need to be implemented based on the specific types of transformations you expect to encounter in OME-Zarr metadata.
 
         Returns:
-            transformnd.Transform if it can be constructed, None otherwise.
+            transformnd.Transform
+                If it can be constructed, None otherwise.
+
+        Raises:
+            UnsupportedTransformation
+                Transformation cannot be recreated in transformnd.
         """
         import numpy as np
 
-        tnd_transform = None
         # Example for an affine transformation (this will depend on the actual structure of AnyTransform)
         if isinstance(transform, ozmt.Affine):
             try:
                 aff = np.asarray(transform.affine_matrix)
-            except NotImplementedError:
-                logger.warning(
-                    "Path-form affine matrix transformations are not implemented"
-                )
-                return None
+            except NotImplementedError as e:
+                raise UnsupportedTransformation(
+                    "Path-form transformations are not implemented", transform
+                ) from e
             if aff.shape[0] == aff.shape[1]:
-                tnd_transform = tnd.transforms.Affine(aff)
+                return tnd.transforms.Affine(aff)
             else:
                 aff = np.eye(max(aff.shape))
                 aff[: aff.shape[0], : aff.shape[1]] = aff
-                tnd_transform = tnd.transforms.Affine(aff)
+                return tnd.transforms.Affine(aff)
 
         elif isinstance(transform, ozmt.Displacements):
-            path_to_dfield = transform.path or ""
-            if zarr_context and path_to_dfield:
-                path_to_dfield = posixpath.join(zarr_context, path_to_dfield)
+            arr, index_transform, vector_axis = self._setup_vectorfield_args(
+                transform, zarr_context
+            )
+            return tnd.transforms.Displacements(
+                arr,
+                index_transform=index_transform,
+                vector_axis=vector_axis,
+            )
 
-            if self.coordinate_displacements is not None:
-                dfield = self.coordinate_displacements.get(
-                    posixpath.basename(path_to_dfield)
-                )
-                if dfield is not None:
-                    if dfield.images[0].scale is None:
-                        raise ValueError(
-                            f"Displacement field at {path_to_dfield} is missing scale information."
-                        )
-                    tnd_transform = tnd.transforms.Displacements(
-                        dfield.images[0].data,
-                        index_transform=tnd.transforms.Scale(
-                            list(dfield.images[0].scale.values())[1:]
-                        ),
-                        vector_axis=0,
-                    )
         elif isinstance(transform, ozmt.MapAxis):
-            tnd_transform = tnd.transforms.MapAxis(
+            return tnd.transforms.MapAxis(
                 list(transform.mapAxis),
             )
 
         elif isinstance(transform, ozmt.ProjectAxis):
-            tnd_transform = tnd.transforms.ProjectAxis(
+            return tnd.transforms.ProjectAxis(
                 created=set_or_none(transform.createdOutputs),
                 dropped=set_or_none(transform.droppedInputs),
                 source_ndim=len(source_cs.axes) if source_cs is not None else None,
@@ -464,64 +510,59 @@ class OMEZarrScene:
             )
 
         elif isinstance(transform, ozmt.Scale):
-            tnd_transform = tnd.transforms.Scale(transform.scale)
+            return tnd.transforms.Scale(transform.scale)
 
         elif isinstance(transform, ozmt.Translation):
-            tnd_transform = tnd.transforms.Translate(
+            return tnd.transforms.Translate(
                 transform.translation,
             )
 
         elif isinstance(transform, ozmt.Rotation):
             try:
                 rot = transform.rotation_matrix
-            except NotImplementedError:
-                logger.warning(
-                    "Path-form rotation matrix transforms are not implemented"
-                )
-                return None
-            affine_matrix = np.eye(len(rot) + 1)
-            affine_matrix[:-1, :-1] = rot
-            tnd_transform = tnd.transforms.Affine(affine_matrix)
+            except NotImplementedError as e:
+                raise UnsupportedTransformation(
+                    "Path-form transformations are not yet implemented", transform
+                ) from e
+            return tnd.transforms.Affine.from_linear_map(rot)
 
         elif isinstance(transform, ozmt.ByDimension):
-            sub_transformations = transform.transformations
-            tnd_sub_transforms = []
-
-            for sub_tf in sub_transformations:
-                t = self._ozmp_tf_to_tnd(sub_tf.transformation)
-                if t is None:
-                    return None
-                tnd_sub_transforms.append(
-                    tnd.transforms.by_dimension.SubTransform(
-                        transform=t,
-                        input_axes=list(sub_tf.inputAxes),
-                        output_axes=list(sub_tf.outputAxes),
-                    )
+            tnd_sub_transforms = [
+                tnd.transforms.SubTransform(
+                    transform=self._ozmp_tf_to_tnd(t.transformation, zarr_context),
+                    input_axes=list(t.inputAxes),
+                    output_axes=list(t.outputAxes),
                 )
-            tnd_transform = tnd.transforms.ByDimension(
-                subtransforms=tnd_sub_transforms,
-                fill_identity=0,
-            )
+                for t in transform.transformations
+            ]
+
+            return tnd.transforms.ByDimension(tnd_sub_transforms)
+
         elif isinstance(transform, ozmt.Sequence):
-            sub_transformations = transform.transformations
-            tnd_sub_transforms = []
+            tnd_sub_transforms = [
+                self._ozmp_tf_to_tnd(t, zarr_context) for t in transform.transformations
+            ]
 
-            for sub_tf in sub_transformations:
-                t = self._ozmp_tf_to_tnd(sub_tf, zarr_context, source_cs, target_cs)
-                if t is None:
-                    return None
-                tnd_sub_transforms.append(t)
-
-            tnd_transform = tnd.base.TransformSequence(
+            return tnd.TransformSequence(
                 tnd_sub_transforms,
             )
-        else:
-            logger.warning("could not load transform: %s", transform)
 
-        return tnd_transform
+        raise UnsupportedTransformation("Unsupported transform type", transform)
 
 
 def set_or_none(it: Sequence[int] | None) -> set[int] | None:
     if it is None:
         return None
     return set(it)
+
+
+class UnsupportedTransformation(Exception):
+    """Exception where ome-zarr-models has deserialised transformation metadata
+    but it could not be converted into a "functional" form."""
+
+    def __init__(self, msg: str, parsed: ozmt.Transform) -> None:
+        self.msg = msg
+        self.parsed = parsed
+
+    def __str__(self) -> str:
+        return f"{self.msg}: {self.parsed}"
