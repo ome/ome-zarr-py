@@ -569,7 +569,9 @@ class OMEZarrScene:
                 src_ndim = inner[-1].ndims.target
                 inner.append(self._ozmp_tf_to_tnd(t, zarr_context, src_ndim, None))
             src_ndim = inner[-1].ndims.target
-            inner.append(self._ozmp_tf_to_tnd(t, zarr_context, src_ndim, target_ndim))
+            inner.append(
+                self._ozmp_tf_to_tnd(ts[-1], zarr_context, src_ndim, target_ndim)
+            )
 
             return tnd.TransformSequence(inner)
 
