@@ -388,7 +388,9 @@ class OMEZarrScene:
         if transform.input is None or transform.output is None:
             raise UnsupportedTransformation("Missing coordinate system", transform)
 
-        t = self._ozmp_tf_to_tnd(transform, zarr_context, source_cs, target_cs)
+        t = self._ozmp_tf_to_tnd(
+            transform, zarr_context, _get_ndim(source_cs), _get_ndim(target_cs)
+        )
 
         input_path = transform.input.path or ""
         output_path = transform.output.path or ""
@@ -455,8 +457,8 @@ class OMEZarrScene:
         self,
         transform: AnyTransform,
         zarr_context: str = "",
-        source_cs: CoordinateSystem | None = None,
-        target_cs: CoordinateSystem | None = None,
+        source_ndim: int | None = None,
+        target_ndim: int | None = None,
     ) -> tnd.Transform:
         """
         Convert an OME-Zarr coordinate transformation to a transformnd Transform object.
@@ -503,10 +505,10 @@ class OMEZarrScene:
 
         elif isinstance(transform, ozmt.ProjectAxis):
             return tnd.transforms.ProjectAxis(
-                created=set_or_none(transform.createdOutputs),
-                dropped=set_or_none(transform.droppedInputs),
-                source_ndim=len(source_cs.axes) if source_cs is not None else None,
-                target_ndim=len(target_cs.axes) if target_cs is not None else None,
+                created=_set_or_none(transform.createdOutputs),
+                dropped=_set_or_none(transform.droppedInputs),
+                source_ndim=source_ndim,
+                target_ndim=target_ndim,
             )
 
         elif isinstance(transform, ozmt.Scale):
@@ -529,7 +531,12 @@ class OMEZarrScene:
         elif isinstance(transform, ozmt.ByDimension):
             tnd_sub_transforms = [
                 tnd.transforms.SubTransform(
-                    transform=self._ozmp_tf_to_tnd(t.transformation, zarr_context),
+                    transform=self._ozmp_tf_to_tnd(
+                        t.transformation,
+                        zarr_context,
+                        len(t.inputAxes),
+                        len(t.outputAxes),
+                    ),
                     input_axes=list(t.inputAxes),
                     output_axes=list(t.outputAxes),
                 )
@@ -541,11 +548,8 @@ class OMEZarrScene:
         elif isinstance(transform, ozmt.Sequence):
             ts = transform.transformations
             if not transform.transformations:
-                if source_cs is not None:
-                    ndim = len(source_cs.axes)
-                elif target_cs is not None:
-                    ndim = len(target_cs.axes)
-                else:
+                ndim = source_ndim or target_ndim
+                if ndim is None:
                     raise UnsupportedTransformation(
                         "Could not infer dimensionality", transform
                     )
@@ -553,24 +557,35 @@ class OMEZarrScene:
 
             elif len(transform.transformations) == 1:
                 return tnd.TransformSequence(
-                    [self._ozmp_tf_to_tnd(ts[0], zarr_context, source_cs, target_cs)]
+                    [
+                        self._ozmp_tf_to_tnd(
+                            ts[0], zarr_context, source_ndim, target_ndim
+                        )
+                    ]
                 )
 
-            inner = [self._ozmp_tf_to_tnd(ts[0], zarr_context, source_cs, None)]
-            inner.extend(
-                self._ozmp_tf_to_tnd(t, zarr_context, None, None) for t in ts[1:-1]
-            )
-            inner.append(self._ozmp_tf_to_tnd(ts[-1], zarr_context, None, target_cs))
+            inner = [self._ozmp_tf_to_tnd(ts[0], zarr_context, source_ndim, None)]
+            for t in ts[1:-1]:
+                src_ndim = inner[-1].ndims.target
+                inner.append(self._ozmp_tf_to_tnd(t, zarr_context, src_ndim, None))
+            src_ndim = inner[-1].ndims.target
+            inner.append(self._ozmp_tf_to_tnd(t, zarr_context, src_ndim, target_ndim))
 
             return tnd.TransformSequence(inner)
 
         raise UnsupportedTransformation("Unsupported transform type", transform)
 
 
-def set_or_none(it: Sequence[int] | None) -> set[int] | None:
+def _set_or_none(it: Sequence[int] | None) -> set[int] | None:
     if it is None:
         return None
     return set(it)
+
+
+def _get_ndim(cs: CoordinateSystem | None) -> int | None:
+    if cs is None:
+        return None
+    return len(cs.axes)
 
 
 class UnsupportedTransformation(Exception):
