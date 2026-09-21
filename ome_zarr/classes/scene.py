@@ -89,8 +89,7 @@ class OMEZarrScene:
             coordinateTransformations=tuple(coordinate_transformations),
         )
 
-        self._graph = tnd.TransformGraph()
-        self._populate_graph()
+        self._graph = self._setup_graph()
 
     @property
     def coordinate_systems(self) -> tuple[CoordinateSystem, ...]:
@@ -127,8 +126,7 @@ class OMEZarrScene:
     @metadata.setter
     def metadata(self, value: SceneAttrs) -> None:
         self._metadata = value
-        self._graph = tnd.TransformGraph()
-        self._populate_graph()
+        self._graph = self._setup_graph()
 
     def get_coordinate_system(
         self, path: str | None = None, name: str | None = None
@@ -169,7 +167,8 @@ class OMEZarrScene:
 
         return matches
 
-    def _populate_graph(self):
+    def _setup_graph(self) -> tnd.TransformGraph:
+        g = tnd.TransformGraph()
         # Add scene-level transformations (empty context = root level)
         for tf in self.coordinate_transformations:
             if tf.input is None or tf.output is None:
@@ -193,12 +192,12 @@ class OMEZarrScene:
                 # error message contains transform info
                 logger.warning("Skipping unsupported transformation: %s", e)
                 continue
-            self._graph.add_transform(tnd_transform)
+            g.add_transform(tnd_transform)
 
             # Add inverse edge if transform is invertible
             inverse = tnd_transform.invert()
             if inverse is not None:
-                self._graph.add_transform(inverse)
+                g.add_transform(inverse)
 
             # check if input/output are defined
             subgroups = []
@@ -225,11 +224,12 @@ class OMEZarrScene:
                             logger.warning("Skipping unsupported transformation: %s", e)
                             continue
 
-                        self._graph.add_transform(ind_transform)
+                        g.add_transform(ind_transform)
                         # Add inverse edge if transform is invertible
                         inverse = ind_transform.invert()
                         if inverse is not None:
-                            self._graph.add_transform(inverse)
+                            g.add_transform(inverse)
+        return g
 
     def to_ome_zarr(
         self, store: StoreLike, overwrite: bool = False, compute: bool = True
