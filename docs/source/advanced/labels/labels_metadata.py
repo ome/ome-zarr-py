@@ -18,14 +18,14 @@ rng = np.random.default_rng(0)
 data = rng.poisson(10, size=(64, 64, 64)).astype(np.uint8)
 
 ngff_image = OMEZarrImage(data, axes="zyx", name="image")
-ngff_multiscales = OMEZarrMultiscale(image=ngff_image)
+ngff_multiscales = OMEZarrMultiscale.from_singlescale(image=ngff_image)
 
 # %%
 labels = OMEZarrImage(
     data=binary_blobs(length=64, volume_fraction=0.1, n_dim=3).astype("int8"),
     axes="zyx",
 )
-labels_multiscales = OMEZarrLabels(image=labels)
+labels_multiscales = OMEZarrLabels.from_singlescale(image=labels)
 
 # %% [markdown]
 # ## Composing the image-label metadata
