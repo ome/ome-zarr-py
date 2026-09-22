@@ -4,7 +4,7 @@ import logging
 import warnings
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal, cast
 
 import dask.array as da
 import numpy as np
@@ -13,6 +13,7 @@ from numcodecs import Blosc
 
 from . import USE_DASK_ARRAY_KWARGS
 from .axes import Axes
+from .classes import OMEZarrImage, OMEZarrLabels, OMEZarrMultiscale
 from .format import CurrentFormat, Format, FormatV01, FormatV02, FormatV03, FormatV04
 from .scale import Methods, Scaler
 from .types import JSONDict
@@ -667,7 +668,6 @@ def write_image(
     The `scaler` argument is deprecated and will be removed in a future version. Use
     `scale_factors` and `method` for all new code.
     """
-    from .classes import OMEZarrImage, OMEZarrMultiscale
 
     if method is None:
         method = Methods.RESIZE
@@ -744,7 +744,7 @@ def write_image(
     dask_delayed_jobs = multiscale.to_ome_zarr(
         group=group,
         storage_options=storage_options,
-        version=fmt.version,  # type: ignore[arg-type]
+        version=cast(Literal["0.6", "0.5", "0.4"], fmt.version),
         compute=compute,
         overwrite=True,
     )
@@ -1037,7 +1037,7 @@ def write_multiscale_labels(
     scale: dict[str, float] | None = None,
     axes_units: dict[str, str] | None = None,
     compute: bool = True,
-    **metadata: JSONDict,
+    **metadata: str | JSONDict | list[JSONDict],
 ) -> list:
     """
     Write pyramidal image labels to disk.
@@ -1151,6 +1151,7 @@ def write_multiscale_labels(
         axes_units=axes_units,
         coordinate_transformations=coordinate_transformations,
         storage_options=storage_options,
+        version=cast(Literal["0.6", "0.5", "0.4"], fmt.version),
         name=name,
         compute=compute,
         **metadata,
@@ -1272,7 +1273,6 @@ def write_labels(
     `scale_factors` and `method` for all new code. Labels downsampling should avoid interpolation;
     nearest-neighbor is recommended.
     """
-    from .classes import OMEZarrImage, OMEZarrLabels
 
     group, fmt = check_group_fmt(group, fmt)
     sub_group = group.require_group(f"labels/{name}")
@@ -1324,7 +1324,7 @@ def write_labels(
     dask_delayed_jobs = multiscales.to_ome_zarr(
         group=sub_group,
         storage_options=storage_options,
-        version=fmt.version,  # type: ignore[arg-type]
+        version=cast(Literal["0.6", "0.5", "0.4"], fmt.version),
         compute=compute,
         overwrite=True,
     )
