@@ -21,7 +21,6 @@ from zarr.codecs import BloscCodec
 from ome_zarr import (
     USE_DASK_ARRAY_KWARGS,
     OMEZarrImage,
-    OMEZarrLabels,
     OMEZarrMultiscale,
 )
 from ome_zarr.format import (
@@ -1862,7 +1861,7 @@ class TestLabelWriter:
         (pytest.param(FormatV04(), id="V04"), pytest.param(FormatV05(), id="V05")),
     )
     def write_labels_class_API(self, fmt):
-        from ome_zarr import OMEZarrImage, OMEZarrMultiscale
+        from ome_zarr import OMEZarrMultiscale
 
         if fmt.version == "0.5":
             img_path = self.path_v3

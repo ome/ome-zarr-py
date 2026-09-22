@@ -6,14 +6,6 @@ import zarr
 from ome_zarr import OMEZarrImage, OMEZarrLabels, OMEZarrMultiscale
 from ome_zarr.writer import _retuple
 
-TRANSFORMATIONS = [
-    [{"scale": [1, 1, 0.5, 0.18, 0.18], "type": "scale"}],
-    [{"scale": [1, 1, 0.5, 0.36, 0.36], "type": "scale"}],
-    [{"scale": [1, 1, 0.5, 0.72, 0.72], "type": "scale"}],
-    [{"scale": [1, 1, 0.5, 1.44, 1.44], "type": "scale"}],
-    [{"scale": [1, 1, 0.5, 2.88, 2.88], "type": "scale"}],
-]
-
 # (shape, axes, scale) for image data ranging from 2D to 5D
 IMAGE_DIMS = [
     ((128, 128), "yx", {"y": 0.5, "x": 0.5}),
@@ -88,14 +80,14 @@ def test_additional_transforms(tmp_path, image_dims):
     # this call lacks the coordinate system "world"
     # needed as output for the additional transforms
     with pytest.raises(ValueError):
-        OMEZarrMultiscale.from_singlescale(
+        OMEZarrMultiscale(
             image=image,
             scale_factors=None,
             method=None,
             coordinate_transformations=(additional_transforms,),
         )
 
-    ms = OMEZarrMultiscale.from_singlescale(
+    ms = OMEZarrMultiscale(
         image=image,
         scale_factors=None,
         method=None,
@@ -114,7 +106,7 @@ def test_additional_transforms(tmp_path, image_dims):
         update={"output": CoordinateSystemIdentifier(name="nonexistent")}
     )
     with pytest.raises(ValueError):
-        OMEZarrMultiscale.from_singlescale(
+        OMEZarrMultiscale(
             image=image,
             scale_factors=None,
             method=None,
@@ -135,7 +127,7 @@ def test_image_class_versions(tmp_path, image_dims, version):
     shape, axes, scale = image_dims
     data = create_data(shape)
     image = OMEZarrImage(data=data, axes=axes, scale=scale)
-    ms = OMEZarrMultiscale.from_singlescale(
+    ms = OMEZarrMultiscale(
         image=image,
     )
     zarr_format = 2 if version == "0.4" else 3
@@ -185,14 +177,14 @@ def test_image_class_bad_args(tmp_path):
 
     # less channels then dims in channel axis
     with pytest.raises(TypeError):
-        OMEZarrMultiscale.from_singlescale(
+        OMEZarrMultiscale(
             image=image,
             channel_names=["Channel 0"],
         )
 
     # less channel_names than channel_colors
     with pytest.raises(TypeError):
-        OMEZarrMultiscale.from_singlescale(
+        OMEZarrMultiscale(
             image=image,
             channel_names=["Channel 0", "Channel 1"],
             channel_colors=["#ff0000"],
@@ -200,13 +192,13 @@ def test_image_class_bad_args(tmp_path):
 
     # less channel_names than contrast limits
     with pytest.raises(TypeError):
-        OMEZarrMultiscale.from_singlescale(
+        OMEZarrMultiscale(
             image=image,
             channel_names=["Channel 0", "Channel 1"],
             contrast_limits=[(0, 255)],
         )
 
-    multiscales = OMEZarrMultiscale.from_singlescale(
+    multiscales = OMEZarrMultiscale(
         image=image,
         scale_factors=None,
         method=None,
@@ -217,6 +209,7 @@ def test_image_class_bad_args(tmp_path):
     assert len(multiscales.images) == 5
 
     multiscales.to_ome_zarr(tmp_path / "test_bad_args.zarr", version="0.5.5")
+
 
 def test_image_class_writer_default_scale():
     """Axes with no scale given default to 1.0."""
@@ -236,7 +229,7 @@ def test_image_class_writer_array_constructor(tmp_path, array_constructor):
     scale = {"c": 1.0, "y": 0.5, "x": 0.5}
     data = array_constructor(create_data(shape))
     image = OMEZarrImage(data=data, axes=axes, scale=scale)
-    ms = OMEZarrMultiscale.from_singlescale(image=image, scale_factors=None, method=None)
+    ms = OMEZarrMultiscale(image=image, scale_factors=None, method=None)
 
     grp_path = tmp_path / "test"
     ms.to_ome_zarr(group=str(grp_path), overwrite=True)
@@ -260,11 +253,13 @@ def test_image_class_writer_storage_options(tmp_path, image_dims, storage_option
     data = create_data(shape)
     image = OMEZarrImage(data=data, axes=axes, scale=scale)
     scale_factors = [{d: 2 if d in ("x", "y") else 1 for d in axes}]
-    ms = OMEZarrMultiscale.from_singlescale(image=image, scale_factors=scale_factors)
+    ms = OMEZarrMultiscale(image=image, scale_factors=scale_factors)
 
     chunks = [tuple(min(32, s) for s in shape), tuple(min(16, s) for s in shape)]
     storage_options = (
-        [{"chunks": c} for c in chunks] if storage_options_list else {"chunks": chunks[0]}
+        [{"chunks": c} for c in chunks]
+        if storage_options_list
+        else {"chunks": chunks[0]}
     )
     grp_path = tmp_path / "test"
     ms.to_ome_zarr(group=str(grp_path), storage_options=storage_options, overwrite=True)
@@ -292,14 +287,15 @@ def test_image_class_writer_labels(tmp_path, image_dims, version):
     labels_name = "test_labels"
     image = OMEZarrImage(data=data, axes=axes, scale=scale)
     labels = OMEZarrImage(data=data_labels, axes=axes, scale=scale, name=labels_name)
-    labels_multiscales = OMEZarrLabels.from_singlescale(image=labels, scale_factors=None)
-    ms = OMEZarrMultiscale.from_singlescale(
+    labels_multiscales = OMEZarrLabels(image=labels, scale_factors=None)
+    ms = OMEZarrMultiscale(
         image=image, scale_factors=None, method=None, labels=labels_multiscales
     )
-    ms.labels = {labels_name: labels_multiscales}
 
     grp_path = (
-        tmp_path / "v3" / "test" if version.startswith(("0.5", "0.6")) else tmp_path / "test"
+        tmp_path / "v3" / "test"
+        if version.startswith(("0.5", "0.6"))
+        else tmp_path / "test"
     )
     ms.to_ome_zarr(group=str(grp_path), version=version, overwrite=True)
 
@@ -328,19 +324,30 @@ def test_image_class_writer_transformations(tmp_path, shape, version):
     """
     Check that written (and downsampled) coordinateTransformations match the expected scale.
     """
+
+    TRANSFORMATIONS = [
+        [{"scale": [1, 1, 0.5, 0.18, 0.18], "type": "scale"}],
+        [{"scale": [1, 1, 0.5, 0.36, 0.36], "type": "scale"}],
+        [{"scale": [1, 1, 0.5, 0.72, 0.72], "type": "scale"}],
+        [{"scale": [1, 1, 0.5, 1.44, 1.44], "type": "scale"}],
+        [{"scale": [1, 1, 0.5, 2.88, 2.88], "type": "scale"}],
+    ]
+
     axes = "tczyx"[-len(shape) :]
     axes_scale = TRANSFORMATIONS[0][0]["scale"][-len(shape) :]
     scale_factors = [
-        {str(d): 2**i if d in ("x", "y") else 1.0 for d in axes}
+        {str(d): 2 ** i if d in ("x", "y") else 1.0 for d in axes}
         for i in range(1, len(TRANSFORMATIONS))
     ]
 
     data = create_data(shape)
     image = OMEZarrImage(data=data, axes=axes, scale=dict(zip(axes, axes_scale)))
-    ms = OMEZarrMultiscale.from_singlescale(image=image, scale_factors=scale_factors)
+    ms = OMEZarrMultiscale(image=image, scale_factors=scale_factors)
 
     grp_path = (
-        tmp_path / "v3" / "test" if version.startswith(("0.5", "0.6")) else tmp_path / "test"
+        tmp_path / "v3" / "test"
+        if version.startswith(("0.5", "0.6"))
+        else tmp_path / "test"
     )
     ms.to_ome_zarr(group=str(grp_path), version=version, overwrite=True)
 
