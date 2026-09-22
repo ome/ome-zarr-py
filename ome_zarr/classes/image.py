@@ -190,7 +190,6 @@ class OMEZarrMultiscaleBase:
                         f"expected {ref.axes_units} (from level 0)"
                     )
 
-
         # Build pyramid from single image
         # instead of a list of pre-computed images
         elif isinstance(image, OMEZarrImage):

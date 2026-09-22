@@ -219,7 +219,8 @@ def test_multiscale_from_pyramid_sanity(image_dims):
     def _shrink(shape, axes, factor):
         """Halve spatial axes `factor` times; leave channel/time axes untouched."""
         return tuple(
-            max(1, s // factor) if a in ("z", "y", "x") else s for s, a in zip(shape, axes)
+            max(1, s // factor) if a in ("z", "y", "x") else s
+            for s, a in zip(shape, axes)
         )
 
     shape, axes, scale = image_dims
@@ -227,7 +228,10 @@ def test_multiscale_from_pyramid_sanity(image_dims):
         OMEZarrImage(
             data=create_data(_shrink(shape, axes, 2**level)),
             axes=axes,
-            scale={d: v * 2**level if d in ("z", "y", "x") else v for d, v in scale.items()},
+            scale={
+                d: v * 2 ** level if d in ("z", "y", "x") else v
+                for d, v in scale.items()
+            },
         )
         for level in range(3)
     ]
@@ -263,6 +267,7 @@ def test_multiscale_from_pyramid_axes_mismatch():
     )
     with pytest.raises(ValueError, match="axes_units"):
         OMEZarrMultiscale.from_pyramid(image=[level0, bad_units])
+
 
 def test_image_class_writer_default_scale():
     """Axes with no scale given default to 1.0."""
@@ -312,7 +317,9 @@ def test_image_class_writer_storage_options(tmp_path, image_dims, storage_option
 
     chunks = [tuple(min(32, s) for s in shape), tuple(min(16, s) for s in shape)]
     storage_options = (
-        [{"chunks": c} for c in chunks] if storage_options_list else {"chunks": chunks[0]}
+        [{"chunks": c} for c in chunks]
+        if storage_options_list
+        else {"chunks": chunks[0]}
     )
     grp_path = tmp_path / "test"
     ms.to_ome_zarr(group=str(grp_path), storage_options=storage_options, overwrite=True)
@@ -346,7 +353,9 @@ def test_image_class_writer_labels(tmp_path, image_dims, version):
     )
 
     grp_path = (
-        tmp_path / "v3" / "test" if version.startswith(("0.5", "0.6")) else tmp_path / "test"
+        tmp_path / "v3" / "test"
+        if version.startswith(("0.5", "0.6"))
+        else tmp_path / "test"
     )
     ms.to_ome_zarr(group=str(grp_path), version=version, overwrite=True)
 
@@ -387,7 +396,7 @@ def test_image_class_writer_transformations(tmp_path, shape, version):
     axes = "tczyx"[-len(shape) :]
     axes_scale = TRANSFORMATIONS[0][0]["scale"][-len(shape) :]
     scale_factors = [
-        {str(d): 2**i if d in ("x", "y") else 1.0 for d in axes}
+        {str(d): 2 ** i if d in ("x", "y") else 1.0 for d in axes}
         for i in range(1, len(TRANSFORMATIONS))
     ]
 
@@ -396,7 +405,9 @@ def test_image_class_writer_transformations(tmp_path, shape, version):
     ms = OMEZarrMultiscale.from_singlescale(image=image, scale_factors=scale_factors)
 
     grp_path = (
-        tmp_path / "v3" / "test" if version.startswith(("0.5", "0.6")) else tmp_path / "test"
+        tmp_path / "v3" / "test"
+        if version.startswith(("0.5", "0.6"))
+        else tmp_path / "test"
     )
     ms.to_ome_zarr(group=str(grp_path), version=version, overwrite=True)
 
