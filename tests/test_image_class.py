@@ -6,14 +6,6 @@ import zarr
 from ome_zarr import OMEZarrImage, OMEZarrLabels, OMEZarrMultiscale
 from ome_zarr.writer import _retuple
 
-TRANSFORMATIONS = [
-    [{"scale": [1, 1, 0.5, 0.18, 0.18], "type": "scale"}],
-    [{"scale": [1, 1, 0.5, 0.36, 0.36], "type": "scale"}],
-    [{"scale": [1, 1, 0.5, 0.72, 0.72], "type": "scale"}],
-    [{"scale": [1, 1, 0.5, 1.44, 1.44], "type": "scale"}],
-    [{"scale": [1, 1, 0.5, 2.88, 2.88], "type": "scale"}],
-]
-
 # (shape, axes, scale) for image data ranging from 2D to 5D
 IMAGE_DIMS = [
     ((128, 128), "yx", {"y": 0.5, "x": 0.5}),
@@ -327,6 +319,15 @@ def test_image_class_writer_transformations(tmp_path, shape, version):
     """
     Check that written (and downsampled) coordinateTransformations match the expected scale.
     """
+
+    TRANSFORMATIONS = [
+        [{"scale": [1, 1, 0.5, 0.18, 0.18], "type": "scale"}],
+        [{"scale": [1, 1, 0.5, 0.36, 0.36], "type": "scale"}],
+        [{"scale": [1, 1, 0.5, 0.72, 0.72], "type": "scale"}],
+        [{"scale": [1, 1, 0.5, 1.44, 1.44], "type": "scale"}],
+        [{"scale": [1, 1, 0.5, 2.88, 2.88], "type": "scale"}],
+    ]
+
     axes = "tczyx"[-len(shape) :]
     axes_scale = TRANSFORMATIONS[0][0]["scale"][-len(shape) :]
     scale_factors = [
