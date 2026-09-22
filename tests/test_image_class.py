@@ -229,7 +229,9 @@ def test_image_class_writer_array_constructor(tmp_path, array_constructor):
     scale = {"c": 1.0, "y": 0.5, "x": 0.5}
     data = array_constructor(create_data(shape))
     image = OMEZarrImage(data=data, axes=axes, scale=scale)
-    ms = OMEZarrMultiscale.from_singlescale(image=image, scale_factors=None, method=None)
+    ms = OMEZarrMultiscale.from_singlescale(
+        image=image, scale_factors=None, method=None
+    )
 
     grp_path = tmp_path / "test"
     ms.to_ome_zarr(group=str(grp_path), overwrite=True)
