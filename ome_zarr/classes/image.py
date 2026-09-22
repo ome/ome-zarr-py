@@ -175,6 +175,22 @@ class OMEZarrMultiscaleBase:
             pyramid_images = image
             self.name = pyramid_images[0].name
 
+            # all levels must agree on axes/units; scale ordering is
+            # enforced later by MultiscaleV06's own validation
+            ref = pyramid_images[0]
+            for level, img in enumerate(pyramid_images[1:], start=1):
+                if img.axes != ref.axes:
+                    raise ValueError(
+                        f"Pyramid level {level} has axes {img.axes}, "
+                        f"expected {ref.axes} (from level 0)"
+                    )
+                if img.axes_units != ref.axes_units:
+                    raise ValueError(
+                        f"Pyramid level {level} has axes_units {img.axes_units}, "
+                        f"expected {ref.axes_units} (from level 0)"
+                    )
+
+
         # Build pyramid from single image
         # instead of a list of pre-computed images
         elif isinstance(image, OMEZarrImage):
