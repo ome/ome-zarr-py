@@ -799,23 +799,6 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
             Write the multiscale image pyramid and metadata to an OME-Zarr group.
         from_ome_zarr(group)
             Load a multiscale image pyramid and metadata from an OME-Zarr group.
-
-    Examples
-    --------
-    .. code-block:: python
-
-        import numpy as np
-        from ome_zarr import OMEZarrImage, OMEZarrMultiscale
-        data = np.random.poisson(lam=10, size=(2, 10, 128, 128)).astype(np.uint8)
-        image = OMEZarrImage(
-            data=data,
-            axes="czyx",
-        )
-        multiscale = OMEZarrMultiscale(
-            image=image,
-            scale_factors=[2, 4, 8, 16],
-            channel_names=["DAPI", "GFP"]
-        )
     """
 
     def __init__(
@@ -853,6 +836,105 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
     def from_ome_zarr(cls, group: zarr.Group | str) -> OMEZarrMultiscale:
         # narrows OMEZarrMultiscaleBase.from_ome_zarr's return type for this subclass
         return cast(OMEZarrMultiscale, super().from_ome_zarr(group))
+
+    @classmethod
+    def from_singlescale(
+        cls,
+        image: OMEZarrImage,
+        scale_factors: list[int] | tuple[int, ...] | list[dict[str, int]] | None = None,
+        coordinate_transformations: tuple[AnyTransform, ...] | None = None,
+        coordinate_systems: list[CoordinateSystem] | None = None,
+        method: str | Methods | None = Methods.RESIZE,
+        default_coordinate_system_name: str = "physical",
+        channel_names: list[str] | None = None,
+        channel_colors: list[list[int]] | list[str] | None = None,
+        contrast_limits: list[tuple[float, float]] | None = None,
+    ) -> OMEZarrMultiscale:
+        """
+        Create a multiscale object from a single-scale image.
+
+        Parameters
+        ----------
+        image : ome_zarr.classes.image.OMEZarrImage
+            The single-scale image to create the multiscale object from.
+        scale_factors : list[int] | tuple[int, ...] | list[dict[str, int]] | None, optional
+            Scale factors to use when creating the multiscale image, by default None.
+        coordinate_transformations : tuple[AnyTransform, ...] | None, optional
+            Coordinate transformations to apply, by default None.
+        coordinate_systems : list[CoordinateSystem] | None, optional
+            Coordinate systems to use, by default None.
+        method : str | Methods | None, optional
+            Resampling method to use when creating the multiscale image, by default Methods.RESIZE.
+        default_coordinate_system_name : str, optional
+            Name of the default coordinate system, by default "physical".
+        channel_names : list[str] | None, optional
+            Names of the channels, by default None.
+        channel_colors : list[list[int]] | list[str] | None, optional
+            Colors of the channels, by default None.
+        contrast_limits : list[tuple[float, float]] | None, optional
+            Contrast limits for the channels, by default None.
+        
+        Examples
+        --------
+        .. code-block:: python
+
+            import numpy as np
+            from ome_zarr import OMEZarrImage, OMEZarrMultiscale
+            data = np.random.poisson(lam=10, size=(2, 10, 128, 128)).astype(np.uint8)
+            image = OMEZarrImage(
+                data=data,
+                axes="czyx",
+            )
+            multiscale = OMEZarrMultiscale.from_singlescale(
+                image=image,
+                scale_factors=(2, 4, 8, 16),
+                channel_names=["DAPI", "GFP"]
+            )
+        """
+        return cls(
+            image=image,
+            scale_factors=scale_factors,
+            coordinate_transformations=coordinate_transformations,
+            coordinate_systems=coordinate_systems,
+            method=method,
+            default_coordinate_system_name=default_coordinate_system_name,
+            channel_names=channel_names,
+            channel_colors=channel_colors,
+            contrast_limits=contrast_limits,
+        )
+
+    @classmethod
+    def from_pyramid(
+        cls,
+        image: OMEZarrImage,
+        method: str | Methods | None = Methods.RESIZE,
+        coordinate_transformations: tuple[AnyTransform, ...] | None = None,
+        coordinate_systems: list[CoordinateSystem] | None = None,
+        default_coordinate_system_name: str = "physical",
+    ) -> OMEZarrMultiscale:
+        """
+        Create an OMEZarrMultiscale object from a pre-built pyramid of label images.
+        Parameters
+        ----------
+        image : OMEZarrImage
+            A label image representing the pre-built pyramid.
+        method : str | Methods | None, optional
+            Resampling method to use when creating the multiscale image, by default Methods.RESIZE.
+        auto_parse_labels : bool, optional
+            Whether to automatically parse image-label metadata, by default True.
+
+        Returns
+        -------
+        OMEZarrMultiscale
+            An instance of OMEZarrMultiscale created from the pyramid of label images.
+        """
+        return cls(
+            image=image,
+            method=method,
+            coordinate_transformations=coordinate_transformations,
+            coordinate_systems=coordinate_systems,
+            default_coordinate_system_name=default_coordinate_system_name,
+        )
 
     def _write_additional_meta_data(
         self,
@@ -1146,6 +1228,71 @@ class OMEZarrLabels(OMEZarrMultiscaleBase):
         self._image_label = None
         if auto_parse_labels:
             self._parse_image_label_metadata()
+
+    @classmethod
+    def from_singlescale(
+        cls,
+        image: OMEZarrImage,
+        method: str | Methods | None = Methods.RESIZE,
+        scale_factors: list[int] | tuple[int, ...] | list[dict[str, int]] | None = None,
+        auto_parse_labels: bool = True,
+    ) -> OMEZarrLabels:
+        """
+        Create an OMEZarrLabels object from a single-scale labels image.
+        Parameters
+        ----------
+        image : OMEZarrImage
+            The label image at the single scale.
+        method : str | Methods | None, optional
+            Resampling method to use when creating the multiscale image, by default Methods.RESIZE.
+        scale_factors : list[int] | tuple[int, ...] | list[dict[str, int]] | None, optional
+            Scale factors for generating the multiscale image, by default None.
+        auto_parse_labels : bool, optional
+            Whether to automatically parse image-label metadata, by default True.
+
+        Returns
+        -------
+        OMEZarrLabels
+            An instance of OMEZarrLabels created from the single-scale label images.
+        """
+        return cls(
+            image=image,
+            method=method,
+            scale_factors=scale_factors,
+            auto_parse_labels=auto_parse_labels,
+        )
+
+    @classmethod
+    def from_pyramid(
+        cls,
+        images: list[OMEZarrImage],
+        method: str | Methods | None = Methods.RESIZE,
+        auto_parse_labels: bool = True,
+    ) -> OMEZarrLabels:
+        """
+        Create an OMEZarrLabels object from a pre-built pyramid of label images.
+
+        Parameters
+        ----------
+        images : list[OMEZarrImage]
+            List of label images at different scales.
+        method : str | Methods | None, optional
+            Resampling method to use when creating the multiscale image, by default Methods.RESIZE.
+        scale_factors : list[int] | tuple[int, ...] | list[dict[str, int]] | None, optional
+            Scale factors for generating the multiscale image, by default None.
+        auto_parse_labels : bool, optional
+            Whether to automatically parse image-label metadata, by default True.
+
+        Returns
+        -------
+        OMEZarrLabels
+            An instance of OMEZarrLabels created from the pyramid of label images.
+        """
+        return cls(
+            image=images,
+            method=method,
+            auto_parse_labels=auto_parse_labels,
+        )
 
     @classmethod
     def from_ome_zarr(cls, group: zarr.Group | str) -> OMEZarrLabels:
