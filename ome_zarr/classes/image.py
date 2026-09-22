@@ -849,6 +849,11 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
         self._omero = None
         self._parse_omero_metadata(channel_names, channel_colors, contrast_limits)
 
+    @classmethod
+    def from_ome_zarr(cls, group: zarr.Group | str) -> OMEZarrMultiscale:
+        # narrows OMEZarrMultiscaleBase.from_ome_zarr's return type for this subclass
+        return cast(OMEZarrMultiscale, super().from_ome_zarr(group))
+
     def _write_additional_meta_data(
         self,
         group: zarr.Group,
@@ -1078,9 +1083,7 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
                 if not isinstance(label_subgroup, zarr.Group):
                     warnings.warn(f"Label {label_name} is not a zarr.Group, skipping")
                     continue
-                label_multiscale = cast(
-                    OMEZarrLabels, OMEZarrLabels.from_ome_zarr(label_subgroup)
-                )
+                label_multiscale = OMEZarrLabels.from_ome_zarr(label_subgroup)
                 loaded_labels[label_name] = label_multiscale
             self._labels = loaded_labels
 
@@ -1143,6 +1146,11 @@ class OMEZarrLabels(OMEZarrMultiscaleBase):
         self._image_label = None
         if auto_parse_labels:
             self._parse_image_label_metadata()
+
+    @classmethod
+    def from_ome_zarr(cls, group: zarr.Group | str) -> OMEZarrLabels:
+        # narrows OMEZarrMultiscaleBase.from_ome_zarr's return type for this subclass
+        return cast(OMEZarrLabels, super().from_ome_zarr(group))
 
     def _parse_image_label_metadata(self) -> None:
         """Build image-label metadata by inspecting unique label values."""
