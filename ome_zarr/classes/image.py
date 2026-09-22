@@ -199,7 +199,7 @@ class OMEZarrMultiscaleBase:
             # image.scale is guaranteed to be a dict after NgffImage.__post_init__
             image_scale = image.scale
             if not isinstance(image_scale, dict):
-                raise ValueError(
+                raise TypeError(
                     "Expected image.scale to be a dict after initialization"
                 )
 
@@ -225,7 +225,7 @@ class OMEZarrMultiscaleBase:
                     )
                 )
         else:
-            raise ValueError("Provide 'image' as OMEZarrImage or list[OMEZarrImage]")
+            raise TypeError("Provide 'image' as OMEZarrImage or list[OMEZarrImage]")
 
         self._images: list[OMEZarrImage] = pyramid_images
 
