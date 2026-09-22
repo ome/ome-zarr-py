@@ -13,6 +13,7 @@ from numcodecs import Blosc
 
 from . import USE_DASK_ARRAY_KWARGS
 from .axes import Axes
+from .classes import OMEZarrImage, OMEZarrLabels, OMEZarrMultiscale
 from .format import CurrentFormat, Format, FormatV01, FormatV02, FormatV03, FormatV04
 from .scale import Methods, Scaler
 from .types import JSONDict
@@ -567,7 +568,6 @@ def write_image(
     The `scaler` argument is deprecated and will be removed in a future version. Use
     `scale_factors` and `method` for all new code.
     """
-    from .classes import OMEZarrImage, OMEZarrMultiscale
 
     if method is None:
         method = Methods.RESIZE
@@ -859,6 +859,7 @@ def write_multiscale_labels(
     scale: dict[str, float] | None = None,
     axes_units: dict[str, str] | None = None,
     compute: bool = True,
+    **metadata: str | JSONDict | list[JSONDict],
 ) -> list:
     """
         Write precomputed pyramidal image labels to disk.
@@ -1102,7 +1103,6 @@ def write_labels(
     `scale_factors` and `method` for all new code. Labels downsampling should avoid interpolation;
     nearest-neighbor is recommended.
     """
-    from .classes import OMEZarrImage, OMEZarrLabels
 
     group, fmt = check_group_fmt(group, fmt)
     sub_group = group.require_group(f"labels/{name}")
