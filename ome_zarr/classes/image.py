@@ -846,7 +846,9 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
         coordinate_systems: list[CoordinateSystem] | None = None,
         method: str | Methods | None = Methods.RESIZE,
         default_coordinate_system_name: str = "physical",
-        labels: OMEZarrLabels | list[OMEZarrLabels] | dict[str, OMEZarrLabels] | None = None,
+        labels: (
+            OMEZarrLabels | list[OMEZarrLabels] | dict[str, OMEZarrLabels] | None
+        ) = None,
         channel_names: list[str] | None = None,
         channel_colors: list[list[int]] | list[str] | None = None,
         contrast_limits: list[tuple[float, float]] | None = None,
