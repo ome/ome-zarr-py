@@ -846,6 +846,7 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
         coordinate_systems: list[CoordinateSystem] | None = None,
         method: str | Methods | None = Methods.RESIZE,
         default_coordinate_system_name: str = "physical",
+        labels: OMEZarrLabels | list[OMEZarrLabels] | dict[str, OMEZarrLabels] | None = None,
         channel_names: list[str] | None = None,
         channel_colors: list[list[int]] | list[str] | None = None,
         contrast_limits: list[tuple[float, float]] | None = None,
@@ -867,6 +868,8 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
             Resampling method to use when creating the multiscale image, by default Methods.RESIZE.
         default_coordinate_system_name : str, optional
             Name of the default coordinate system, by default "physical".
+        labels : OMEZarrLabels | list[OMEZarrLabels] | dict[str, OMEZarrLabels] | None, optional
+            Labels associated with the multiscale image, by default None.
         channel_names : list[str] | None, optional
             Names of the channels, by default None.
         channel_colors : list[list[int]] | list[str] | None, optional
@@ -900,6 +903,7 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
             default_coordinate_system_name=default_coordinate_system_name,
             channel_names=channel_names,
             channel_colors=channel_colors,
+            labels=labels,
             contrast_limits=contrast_limits,
         )
 
