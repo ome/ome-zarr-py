@@ -54,7 +54,7 @@ properties = [
 
 # %%
 labels_multiscales.image_label = {
-    "image-label": {"colors": colors, "properties": properties}
+    "colors": colors, "properties": properties
 }
 
 ngff_multiscales.labels = {"test_labels": labels_multiscales}
