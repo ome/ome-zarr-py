@@ -156,6 +156,7 @@ class TestInvalid:
 
     def test_invalid_version(self):
         grp = create_zarr(str(self.path))
+
         # update version to something invalid
         attrs = get_metadata(grp)
         attrs["multiscales"][0]["version"] = "invalid"

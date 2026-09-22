@@ -51,8 +51,8 @@ label_ngff2 = OMEZarrImage(
 )
 
 # create OMEZarrMultiscales for labels
-labels_multiscales1 = OMEZarrLabels(image=label_ngff1)
-labels_multiscales2 = OMEZarrLabels(image=label_ngff2)
+labels_multiscales1 = OMEZarrLabels.from_singlescale(image=label_ngff1)
+labels_multiscales2 = OMEZarrLabels.from_singlescale(image=label_ngff2)
 
 # %% [markdown]
 # We can now add the labels as an attribute of the image data and write the whole thing to disk:

@@ -35,7 +35,7 @@ write_image(
 
 # %%
 ngff_image = OMEZarrImage(data, axes="zyx")
-ngff_multiscales = OMEZarrMultiscale(ngff_image, scale_factors=scale_factors)
+ngff_multiscales = OMEZarrMultiscale.from_singlescale(ngff_image, scale_factors=scale_factors)
 
 ngff_multiscales.to_ome_zarr("test_ngff_image_multiscales.ome.zarr")
 
@@ -88,7 +88,7 @@ write_image(
 
 # %%
 ngff_image = OMEZarrImage(data, axes="zyx")
-ngff_multiscales = OMEZarrMultiscale(
+ngff_multiscales = OMEZarrMultiscale.from_singlescale(
     ngff_image, scale_factors=scale_factors, method="nearest"
 )
 
@@ -114,6 +114,6 @@ ngff_multiscales.to_ome_zarr("test_ngff_image_multiscales.ome.zarr")
 
 # %%
 ngff_image = OMEZarrImage(data, axes="zyx")
-ngff_multiscales = OMEZarrLabels(ngff_image, scale_factors=scale_factors)
+ngff_multiscales = OMEZarrLabels.from_singlescale(ngff_image, scale_factors=scale_factors)
 
 ngff_multiscales.to_ome_zarr("test_ngff_image_multiscales_labels.ome.zarr")
