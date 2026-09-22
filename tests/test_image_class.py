@@ -211,6 +211,59 @@ def test_image_class_bad_args(tmp_path):
     multiscales.to_ome_zarr(tmp_path / "test_bad_args.zarr", version="0.5.5")
 
 
+def test_multiscale_from_pyramid_sanity(image_dims):
+    """
+    Check that building an OMEZarrMultiscale from a pre-built list of images works.
+    """
+
+    def _shrink(shape, axes, factor):
+        """Halve spatial axes `factor` times; leave channel/time axes untouched."""
+        return tuple(
+            max(1, s // factor) if a in ("z", "y", "x") else s for s, a in zip(shape, axes)
+        )
+
+    shape, axes, scale = image_dims
+    levels = [
+        OMEZarrImage(
+            data=create_data(_shrink(shape, axes, 2**level)),
+            axes=axes,
+            scale={d: v * 2**level if d in ("z", "y", "x") else v for d, v in scale.items()},
+        )
+        for level in range(3)
+    ]
+
+    ms = OMEZarrMultiscale(image=levels, scale_factors=None, method=None)
+
+    assert len(ms.images) == 3
+    assert len(ms.metadata.datasets) == 3
+    assert ms.images[0].data.shape == shape
+
+
+def test_multiscale_from_pyramid_axes_mismatch():
+    """
+    Check that pyramid levels with inconsistent axes or axes_units are rejected.
+    """
+    level0 = OMEZarrImage(
+        data=create_data((64, 64)), axes="yx", scale={"y": 1.0, "x": 1.0}
+    )
+
+    bad_axes = OMEZarrImage(
+        data=create_data((32, 32, 32)),
+        axes="zyx",
+        scale={"z": 1.0, "y": 2.0, "x": 2.0},
+    )
+    with pytest.raises(ValueError, match="axes"):
+        OMEZarrMultiscale.from_pyramid(image=[level0, bad_axes])
+
+    bad_units = OMEZarrImage(
+        data=create_data((32, 32)),
+        axes="yx",
+        scale={"y": 2.0, "x": 2.0},
+        axes_units={"y": "millimeter", "x": "millimeter"},
+    )
+    with pytest.raises(ValueError, match="axes_units"):
+        OMEZarrMultiscale.from_pyramid(image=[level0, bad_units])
+
 def test_image_class_writer_default_scale():
     """Axes with no scale given default to 1.0."""
     image = OMEZarrImage(data=create_data((32, 256, 256)), axes="zyx")
