@@ -1,5 +1,11 @@
+import logging
+from collections.abc import Callable
+from typing import Any, Self
+
 import numpy as np
+import ome_zarr_models.v06.coordinate_transforms as ozmt
 import pytest
+import transformnd as tnd
 import zarr
 from ome_zarr_models.v06.coordinate_transforms import (
     AnyTransform,
@@ -9,8 +15,10 @@ from ome_zarr_models.v06.coordinate_transforms import (
 from pydantic import TypeAdapter
 
 from ome_zarr import OMEZarrImage, OMEZarrMultiscale, OMEZarrScene
+from ome_zarr.classes.tnd_utils import _ozmp_tf_to_tnd
 from ome_zarr.utils import download
 
+logger = logging.getLogger(__name__)
 transform_adapter = TypeAdapter(AnyTransform)
 
 TRANSFORMS = [
@@ -546,6 +554,115 @@ def test_scene_with_displacements(test_data_dir):
     for image in dfield_img.images:
         assert image.axes_types["c"] == "displacement"
     assert dfield_img.metadata.coordinateSystems[0].axes[0].discrete
+
+
+class CaseBuilder:
+    def __init__(
+        self, params: list[str], id_fn: Callable[[tuple], str] | None = None
+    ) -> None:
+        self.params = params
+        self.cases: list[tuple] = []
+        self.id_fn = id_fn
+        self.ids: list[str] = []
+
+    def get_id(self, args: tuple, override: str | None = None) -> str:
+        if override:
+            return override
+        if self.id_fn is None:
+            return f"case{len(self.cases)}"
+        return self.id_fn(args)
+
+    def add(self, *args, id: str | None = None) -> Self:  # noqa: A002
+        assert len(self.params) == len(args)
+        self.ids.append(self.get_id(args, id))
+        self.cases.append(args)
+        return self
+
+    def parametrize(self, test_fn: Callable):
+        return pytest.mark.parametrize(self.params, self.cases, ids=self.ids)(test_fn)
+
+
+@ (
+    CaseBuilder(["ozm_transform", "kwargs"])
+    .add(ozmt.Identity(), {"source_ndim": 3}, id="identity")
+    .add(ozmt.Scale(scale=(2, 3)), {}, id="scale")
+    .add(ozmt.Translation(translation=(2, 3)), {}, id="translation")
+    .add(ozmt.Affine(affine=((1, 0, 0), (0, 1, 0))), {}, id="affine")
+    .add(ozmt.Affine(affine=((1, 0, 0), (0, 1, 0), (0, 0, 1))), {}, id="affine_square")
+    .add(ozmt.MapAxis(mapAxis=(2, 1, 0)), {}, id="mapAxis")
+    .add(
+        ozmt.ProjectAxis(createdOutputs=(1,), droppedInputs=(0,)),
+        {"source_ndim": 3},
+        id="projectAxis",
+    )
+    .add(ozmt.Rotation(rotation=((1, 0), (0, 1))), {}, id="rotation")
+    .add(
+        ozmt.ByDimension(
+            transformations=(
+                ozmt.ByDimensionTransform(
+                    inputAxes=(0, 2), outputAxes=(0, 2), transformation=ozmt.Identity()
+                ),
+                ozmt.ByDimensionTransform(
+                    inputAxes=(1,),
+                    outputAxes=(1,),
+                    transformation=ozmt.Translation(translation=(10,)),
+                ),
+            )
+        ),
+        {},
+        id="byDimension",
+    )
+    .add(
+        ozmt.Sequence(
+            transformations=(
+                ozmt.Translation(translation=(2, 3)),
+                ozmt.Scale(scale=(10, 100)),
+            )
+        ),
+        {},
+        id="sequence",
+    )
+).parametrize
+def test_convert_transformations(
+    ozm_transform: ozmt.AnyTransform, kwargs: dict[str, Any]
+):
+    t = _ozmp_tf_to_tnd(ozm_transform, **kwargs)
+    assert t is not None
+    check_transforms_equivalent(ozm_transform, t)
+
+
+def check_transforms_equivalent(
+    ozm_transform: ozmt.AnyTransform, tnd_transform: tnd.Transform
+):
+    ndim = tnd_transform.ndims.source
+    rng = np.random.default_rng(1991)
+    in_coords = rng.uniform(-100, 100, (10, ndim))
+    tnd_results = tnd_transform.apply(in_coords)
+    try:
+        ozm_results = np.array(
+            [ozm_transform.transform_point(row) for row in in_coords]
+        )
+        assert tnd_results == pytest.approx(ozm_results)
+    except NotImplementedError:
+        logger.info(
+            "ome-zarr-models does not implement coordinate transformations for %s",
+            ozm_transform,
+        )
+    except ValueError as e:
+        if isinstance(ozm_transform, ozmt.Affine) and "dimensionality" in str(e):
+            pytest.xfail(
+                "Affine dimensionality check bug resolved in https://github.com/ome-zarr-models/ome-zarr-models-py/pull/481"
+            )
+        raise
+
+    tnd_inv = tnd_transform.invert()
+    try:
+        if ozm_transform.has_inverse:
+            assert (
+                tnd_inv is not None
+            ), "ome-zarr-models implements inversion but transformnd does not"
+    except NotImplementedError:
+        pass
 
 
 if __name__ == "__main__":
