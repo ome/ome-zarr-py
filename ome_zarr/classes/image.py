@@ -1341,21 +1341,26 @@ class OMEZarrLabels(OMEZarrMultiscaleBase):
         compute: bool = True,
         overwrite: bool = False,
     ) -> list:
-        from ome_zarr.utils import _recursive_pop_nones
 
         if self._image_label is not None and isinstance(self._image_label, Label):
             if version == "0.4":
-                image_label_meta = self._image_label.model_dump(exclude_none=True, by_alias=True)
+                image_label_meta = self._image_label.model_dump(
+                    exclude_none=True, by_alias=True
+                )
                 image_label_meta["version"] = version
                 group.attrs["image-label"] = image_label_meta
             elif version.startswith("0.5"):
                 ome = cast(dict, group.attrs.get("ome", {}))
-                ome["image-label"] = self._image_label.model_dump(exclude_none=True, by_alias=True)
+                ome["image-label"] = self._image_label.model_dump(
+                    exclude_none=True, by_alias=True
+                )
                 ome["image-label"]["version"] = version
                 group.attrs["ome"] = ome
             elif version.startswith("0.6"):
                 ome = cast(dict, group.attrs.get("ome", {}))
-                ome["image-label"] = self._image_label.model_dump(exclude_none=True, by_alias=True)
+                ome["image-label"] = self._image_label.model_dump(
+                    exclude_none=True, by_alias=True
+                )
                 group.attrs["ome"] = ome
 
         return []
