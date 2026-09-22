@@ -359,12 +359,12 @@ def write_multiscale(
         image=images,
     )
 
-    if fmt.version not in ("0.4", "0.5", "0.6.dev4"):
+    if fmt.version not in ("0.4", "0.5", "0.6"):
         raise ValueError(f"Unsupported format version: {fmt.version}")
 
     dask_delayed = ms.to_ome_zarr(
         group,
-        version=cast(Literal["0.6.dev4", "0.5", "0.4"], fmt.version),
+        version=cast(Literal["0.6", "0.5", "0.4"], fmt.version),
         compute=compute,
         storage_options=storage_options,
         overwrite=True,
@@ -644,7 +644,7 @@ def write_image(
     dask_delayed_jobs = multiscale.to_ome_zarr(
         group=group,
         storage_options=storage_options,
-        version=cast(Literal["0.6.dev4", "0.5", "0.4"], fmt.version),
+        version=cast(Literal["0.6", "0.5", "0.4"], fmt.version),
         compute=compute,
         overwrite=True,
     )
@@ -970,7 +970,7 @@ def write_multiscale_labels(
     dask_delayed_jobs = ms.to_ome_zarr(
         group=sub_group,
         storage_options=storage_options,
-        version=cast(Literal["0.6.dev4", "0.5", "0.4"], fmt.version),
+        version=cast(Literal["0.6", "0.5", "0.4"], fmt.version),
         compute=compute,
         overwrite=True,
     )
@@ -1156,7 +1156,7 @@ def write_labels(
     dask_delayed_jobs = multiscales.to_ome_zarr(
         group=sub_group,
         storage_options=storage_options,
-        version=cast(Literal["0.6.dev4", "0.5", "0.4"], fmt.version),
+        version=cast(Literal["0.6", "0.5", "0.4"], fmt.version),
         compute=compute,
         overwrite=True,
     )
