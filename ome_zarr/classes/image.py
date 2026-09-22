@@ -873,7 +873,7 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
             Colors of the channels, by default None.
         contrast_limits : list[tuple[float, float]] | None, optional
             Contrast limits for the channels, by default None.
-        
+
         Examples
         --------
         .. code-block:: python
