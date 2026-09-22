@@ -210,6 +210,7 @@ def test_image_class_bad_args(tmp_path):
 
     multiscales.to_ome_zarr(tmp_path / "test_bad_args.zarr", version="0.5.5")
 
+
 def test_image_class_writer_default_scale():
     """Axes with no scale given default to 1.0."""
     image = OMEZarrImage(data=create_data((32, 256, 256)), axes="zyx")
@@ -256,7 +257,9 @@ def test_image_class_writer_storage_options(tmp_path, image_dims, storage_option
 
     chunks = [tuple(min(32, s) for s in shape), tuple(min(16, s) for s in shape)]
     storage_options = (
-        [{"chunks": c} for c in chunks] if storage_options_list else {"chunks": chunks[0]}
+        [{"chunks": c} for c in chunks]
+        if storage_options_list
+        else {"chunks": chunks[0]}
     )
     grp_path = tmp_path / "test"
     ms.to_ome_zarr(group=str(grp_path), storage_options=storage_options, overwrite=True)
@@ -290,7 +293,9 @@ def test_image_class_writer_labels(tmp_path, image_dims, version):
     )
 
     grp_path = (
-        tmp_path / "v3" / "test" if version.startswith(("0.5", "0.6")) else tmp_path / "test"
+        tmp_path / "v3" / "test"
+        if version.startswith(("0.5", "0.6"))
+        else tmp_path / "test"
     )
     ms.to_ome_zarr(group=str(grp_path), version=version, overwrite=True)
 
@@ -331,7 +336,7 @@ def test_image_class_writer_transformations(tmp_path, shape, version):
     axes = "tczyx"[-len(shape) :]
     axes_scale = TRANSFORMATIONS[0][0]["scale"][-len(shape) :]
     scale_factors = [
-        {str(d): 2**i if d in ("x", "y") else 1.0 for d in axes}
+        {str(d): 2 ** i if d in ("x", "y") else 1.0 for d in axes}
         for i in range(1, len(TRANSFORMATIONS))
     ]
 
@@ -340,7 +345,9 @@ def test_image_class_writer_transformations(tmp_path, shape, version):
     ms = OMEZarrMultiscale(image=image, scale_factors=scale_factors)
 
     grp_path = (
-        tmp_path / "v3" / "test" if version.startswith(("0.5", "0.6")) else tmp_path / "test"
+        tmp_path / "v3" / "test"
+        if version.startswith(("0.5", "0.6"))
+        else tmp_path / "test"
     )
     ms.to_ome_zarr(group=str(grp_path), version=version, overwrite=True)
 
