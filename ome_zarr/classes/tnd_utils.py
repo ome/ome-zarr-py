@@ -29,9 +29,6 @@ def ozmp_tf_to_tnd_spaced(
     """
     Convert an OME-Zarr coordinate transformation with coordinate system information to a transformnd Spaced object.
 
-    Returns:
-        transformnd.Spaced, if the transform can be constructed and the coordinate system information is present; else None.
-
     Raises:
         UnsupportedTransformation
             Transformation cannot be recreated in transformnd, or is lacking coordinate system information.
