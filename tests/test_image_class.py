@@ -208,7 +208,7 @@ def test_image_class_bad_args(tmp_path):
     )
     assert len(multiscales.images) == 5
 
-    multiscales.to_ome_zarr(tmp_path / "test_bad_args.zarr", version="0.5")
+    multiscales.to_ome_zarr(str(tmp_path / "test_bad_args.zarr"), version="0.5")
 
 
 def test_image_class_writer_default_scale():
