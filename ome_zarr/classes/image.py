@@ -1016,7 +1016,9 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
             lbl = self.labels.get(csid.path)
             if lbl is None:
                 logger.warning(
-                    "No label multiscale found with name '%s', could not resolve %s"
+                    "No label multiscale found with name '%s', could not resolve %s",
+                    csid.name,
+                    csid,
                 )
                 return None
 
