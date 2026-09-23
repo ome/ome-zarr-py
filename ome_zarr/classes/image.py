@@ -1176,6 +1176,7 @@ class OMEZarrLabels(OMEZarrMultiscaleBase):
         compute: bool = True,
         overwrite: bool = False,
     ) -> list:
+        from ome_zarr.utils import _recursive_pop_nones
 
         if self._image_label is not None and isinstance(self._image_label, Label):
             if version == "0.4":
