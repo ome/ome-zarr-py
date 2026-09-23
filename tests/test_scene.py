@@ -15,7 +15,11 @@ from ome_zarr_models.v06.coordinate_transforms import (
 from pydantic import TypeAdapter
 
 from ome_zarr import OMEZarrImage, OMEZarrMultiscale, OMEZarrScene
-from ome_zarr.classes.tnd_utils import _ozmp_tf_to_tnd
+from ome_zarr.classes.tnd_utils import (
+    UnsupportedTransformation,
+    _ozmp_tf_to_tnd,
+    _setup_vectorfield_args,
+)
 from ome_zarr.utils import download
 
 logger = logging.getLogger(__name__)
@@ -677,6 +681,38 @@ def check_transforms_equivalent(
             ), "ome-zarr-models implements inversion but transformnd does not"
     except NotImplementedError:
         pass
+
+
+def test_setup_vectorfield():
+    t = ozmt.Displacements(
+        input=CoordinateSystemIdentifier(name="in_name", path="in_path"),
+        output=CoordinateSystemIdentifier(name="out_name", path="out_path"),
+        path="dpath",
+    )
+
+    with pytest.raises(UnsupportedTransformation):
+        _setup_vectorfield_args(t, "", dict())
+
+
+@pytest.mark.parametrize(
+    ("transform",),
+    [
+        (ozmt.Identity(),),
+        (ozmt.Sequence(transformations=tuple()),),
+        (ozmt.ProjectAxis(droppedInputs=(0,)),),
+    ],
+)
+def test_no_dimensionality(transform: AnyTransform):
+    with pytest.raises(UnsupportedTransformation):
+        _ozmp_tf_to_tnd(transform, "", None, None, dict())
+
+
+@pytest.mark.parametrize(("seq_len",), [(1,), (2,), (3,), (4,)])
+def test_convert_sequence(seq_len):
+    scale = ozmt.Scale(scale=(2, 3))
+    _ozmp_tf_to_tnd(
+        ozmt.Sequence(transformations=(scale,) * seq_len), ",", None, None, dict()
+    )
 
 
 if __name__ == "__main__":

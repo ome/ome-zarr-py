@@ -181,6 +181,8 @@ def _ozmp_tf_to_tnd(
         )
 
     elif isinstance(transform, ozmt.ProjectAxis):
+        if source_ndim is None and target_ndim is None:
+            raise UnsupportedTransformation("Could not infer dimensionality", transform)
         return tnd.transforms.ProjectAxis(
             created=_set_or_none(transform.createdOutputs),
             dropped=_set_or_none(transform.droppedInputs),
