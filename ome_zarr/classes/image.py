@@ -978,6 +978,30 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
         except ValidationError as e:
             warnings.warn(f"Failed to validate Omero metadata: {e}")
 
+    def get_coordinate_system(
+        self, csid: CoordinateSystemIdentifier
+    ) -> CoordinateSystem | None:
+        """Find a coordinate system belonging either to this image,
+        or a label below it.
+        """
+        if csid.path is None or csid.path == ".":
+            if not csid.name:
+                return None
+
+            for cs in self.metadata.coordinateSystems:
+                if cs.name == csid.name:
+                    return cs
+            return None
+        if self.labels is None:
+            return None
+        lbl = self.labels.get(csid.path)
+        if lbl is None:
+            return None
+        for cs in lbl.metadata.coordinateSystems:
+            if cs.name == csid.name:
+                return cs
+        return None
+
     @property
     def labels(self) -> dict[str, OMEZarrLabels] | None:
         return self._labels

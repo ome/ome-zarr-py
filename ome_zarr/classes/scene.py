@@ -16,7 +16,10 @@ from ome_zarr_models.v06.scene import SceneAttrs
 from zarr.storage import StoreLike
 
 from .image import OMEZarrMultiscale
-from .tnd_utils import UnsupportedTransformation, ozmp_tf_to_tnd_spaced
+from .tnd_utils import (
+    UnsupportedTransformation,
+    ozmp_tf_to_tnd_spaced,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -209,12 +212,18 @@ class OMEZarrScene:
                     continue
                 if img.metadata.coordinateTransformations:
                     for img_tf in img.metadata.coordinateTransformations:
+                        src_cs = None
+                        if img_tf.input is not None:
+                            src_cs = img.get_coordinate_system(img_tf.input)
+                        tgt_cs = None
+                        if img_tf.output is not None:
+                            tgt_cs = img.get_coordinate_system(img_tf.output)
                         try:
                             ind_transform = ozmp_tf_to_tnd_spaced(
                                 img_tf,
                                 zarr_context=subgroup,
-                                source_cs=None,
-                                target_cs=None,
+                                source_cs=src_cs,
+                                target_cs=tgt_cs,
                                 coordinate_displacements=self.coordinate_displacements,
                             )
                         except UnsupportedTransformation as e:
