@@ -106,7 +106,7 @@ def _setup_vectorfield_args(
         )
 
     # Metadata is defined from displacements to input space,
-    # but transformnd expects input space to displacemeents,
+    # but transformnd expects input space to displacements,
     # so this is inverted.
     index_transform = ~tnd.transforms.Scale(list(img.scale.values())[1:])
 
