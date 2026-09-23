@@ -1,6 +1,6 @@
 import logging
 from collections.abc import Callable
-from typing import Any, Self
+from typing import Any, Self, TypedDict
 
 import numpy as np
 import ome_zarr_models.v06.coordinate_transforms as ozmt
@@ -582,6 +582,13 @@ class CaseBuilder:
         return pytest.mark.parametrize(self.params, self.cases, ids=self.ids)(test_fn)
 
 
+class OzmpTfKwargs(TypedDict):
+    zarr_context: str
+    source_ndim: int | None
+    target_ndim: int | None
+    coordinate_displacements: dict[str, Any]
+
+
 @ (
     CaseBuilder(["ozm_transform", "kwargs"])
     .add(ozmt.Identity(), {"source_ndim": 3}, id="identity")
@@ -624,9 +631,16 @@ class CaseBuilder:
     )
 ).parametrize
 def test_convert_transformations(
-    ozm_transform: ozmt.AnyTransform, kwargs: dict[str, Any]
+    ozm_transform: ozmt.AnyTransform, kwargs: OzmpTfKwargs
 ):
-    t = _ozmp_tf_to_tnd(ozm_transform, **kwargs)
+    defaults: OzmpTfKwargs = {
+        "zarr_context": "",
+        "source_ndim": None,
+        "target_ndim": None,
+        "coordinate_displacements": dict(),
+    }
+    defaults.update(kwargs)
+    t = _ozmp_tf_to_tnd(ozm_transform, **defaults)
     assert t is not None
     check_transforms_equivalent(ozm_transform, t)
 

@@ -72,8 +72,8 @@ def ozmp_tf_to_tnd_spaced(
 
 def _setup_vectorfield_args(
     transform: ozmt.Displacements | ozmt.Coordinates,
-    zarr_context: str = "",
-    coordinate_displacements: dict[str, OMEZarrMultiscale] | None = None,
+    zarr_context: str,
+    coordinate_displacements: dict[str, OMEZarrMultiscale],
 ) -> tuple[da.Array | np.ndarray, tnd.Transform, int]:
     """Set up the arguments for vector field transformations.
 
@@ -91,8 +91,6 @@ def _setup_vectorfield_args(
         UnsupportedTransformation
             If vector field is missing or malformed
     """
-    if coordinate_displacements is None:
-        coordinate_displacements = dict()
     path_to_vfield = transform.path or ""
     if zarr_context and path_to_vfield:
         path_to_vfield = posixpath.join(zarr_context, path_to_vfield)
@@ -121,10 +119,10 @@ def _setup_vectorfield_args(
 
 def _ozmp_tf_to_tnd(
     transform: ozmt.AnyTransform,
-    zarr_context: str = "",
-    source_ndim: int | None = None,
-    target_ndim: int | None = None,
-    coordinate_displacements: dict[str, OMEZarrMultiscale] | None = None,
+    zarr_context: str,
+    source_ndim: int | None,
+    target_ndim: int | None,
+    coordinate_displacements: dict[str, OMEZarrMultiscale],
 ) -> tnd.Transform:
     """
     Convert an OME-Zarr coordinate transformation to a transformnd Transform object.
@@ -139,9 +137,6 @@ def _ozmp_tf_to_tnd(
     """
     import numpy as np
 
-    if coordinate_displacements is None:
-        coordinate_displacements = dict()
-
     # Example for an affine transformation (this will depend on the actual structure of AnyTransform)
     if isinstance(transform, ozmt.Affine):
         try:
@@ -155,7 +150,9 @@ def _ozmp_tf_to_tnd(
 
     elif isinstance(transform, ozmt.Coordinates):
         arr, index_transform, vector_axis = _setup_vectorfield_args(
-            transform, zarr_context
+            transform,
+            zarr_context,
+            coordinate_displacements,
         )
         return tnd.transforms.Coordinates(
             arr,
@@ -165,7 +162,9 @@ def _ozmp_tf_to_tnd(
 
     elif isinstance(transform, ozmt.Displacements):
         arr, index_transform, vector_axis = _setup_vectorfield_args(
-            transform, zarr_context
+            transform,
+            zarr_context,
+            coordinate_displacements,
         )
         return tnd.transforms.Displacements(
             arr,
