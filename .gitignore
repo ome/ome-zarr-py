@@ -27,3 +27,6 @@ _build
 *.zarr
 *.ipynb_checkpoints
 */jupyter_execute
+
+uv.lock
+coverage.*
