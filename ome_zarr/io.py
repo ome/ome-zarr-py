@@ -59,9 +59,7 @@ class ZarrLocation:
         if loader is None:
             loader = CurrentFormat()
         self.__store: Store = (
-            path
-            if isinstance(path, Store)
-            else loader.init_store(self.__path, mode)
+            path if isinstance(path, Store) else loader.init_store(self.__path, mode)
         )
         self.__init_metadata()
         detected = detect_format(self.__metadata, loader)
@@ -91,7 +89,10 @@ class ZarrLocation:
             # used for info, download, Spec.match() via root_attrs() etc.
             # and to check if the group exists for reading. Only need "r" mode for this.
             group = zarr.open_group(
-                store=self.__store, path=self.__prefix or "/", mode="r", zarr_format=zarr_format
+                store=self.__store,
+                path=self.__prefix or "/",
+                mode="r",
+                zarr_format=zarr_format,
             )
             self.zgroup = group.attrs.asdict()
             # For zarr v3, everything is under the "ome" namespace
@@ -104,7 +105,10 @@ class ZarrLocation:
                 # If we are creating a new group, we need to specify the zarr_format.
                 zarr_format = self.__fmt.zarr_format
                 group = zarr.open_group(
-                    store=self.__store, path=self.__prefix or "/", mode="w", zarr_format=zarr_format
+                    store=self.__store,
+                    path=self.__prefix or "/",
+                    mode="w",
+                    zarr_format=zarr_format,
                 )
             else:
                 self.__exists = False

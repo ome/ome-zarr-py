@@ -63,7 +63,9 @@ class TestStoreLocation:
 
     def test_store_without_a_path(self):
         store = MemoryStore()
-        write_image(self.image, zarr.open_group(store, mode="w"), axes="yx", scaler=None)
+        write_image(
+            self.image, zarr.open_group(store, mode="w"), axes="yx", scaler=None
+        )
 
         loc = ZarrLocation(store)
         assert loc.exists()
@@ -74,7 +76,12 @@ class TestStoreLocation:
 
     def test_prefix_inside_a_store(self):
         store = MemoryStore()
-        write_image(self.image, zarr.open_group(store, path="images/img", mode="w"), axes="yx", scaler=None)
+        write_image(
+            self.image,
+            zarr.open_group(store, path="images/img", mode="w"),
+            axes="yx",
+            scaler=None,
+        )
 
         loc = ZarrLocation(StorePath(store, "images/img"))
         assert loc.exists()
@@ -83,7 +90,9 @@ class TestStoreLocation:
         np.testing.assert_array_equal(np.asarray(loc.load(finest)), self.image)
 
         # A child location shares the store and extends the prefix.
-        assert loc.create(finest) == ZarrLocation(StorePath(store, f"images/img/{finest}"))
+        assert loc.create(finest) == ZarrLocation(
+            StorePath(store, f"images/img/{finest}")
+        )
         assert not ZarrLocation(StorePath(store, "images/other")).exists()
 
     def test_unrelated_stores_differ(self):
