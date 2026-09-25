@@ -225,8 +225,10 @@ class ZarrLocation:
 
     def _ishttp(self) -> bool:
         """
-        Return whether the current underlying implementation
-        points to a URL
+        Return whether the store points to an http or https URL.
+
+        Only these schemes resolve relative paths with ``urljoin``.
+        Object stores such as s3 join paths by concatenation.
         """
         if not isinstance(self.__store, FsspecStore):
             return False
