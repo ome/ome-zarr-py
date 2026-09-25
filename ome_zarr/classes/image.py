@@ -344,10 +344,10 @@ class OMEZarrMultiscaleBase:
 
         # Determine if store already exists
         if isinstance(group, zarr.Group):
-            store_exists = True    # zarr.Group was passed in, so it exists
+            store_exists = True  # zarr.Group was passed in, so it exists
         else:
             store_exists = os.path.exists(group)
-            
+
         # Decide whether to write main image data
         if store_exists and not overwrite:
             raise OSError("store exists but overwrite=False")
