@@ -15,8 +15,7 @@ Documentation will be automatically built with `readthedocs`.
 
 It can be built locally with::
 
-    $ pip install .[docs]
-    $ sphinx-build -b html docs/source/ docs/build/
+    $ uv run --group docs sphinx-build -b html docs/source/ docs/build/
 
 Tests
 -----
