@@ -65,6 +65,18 @@ class TestCli:
         main(["create", "--method=astronaut", filename])
         main(["info", filename])
 
+    def test_export_tiff_stack(self, tmpdir):
+        filename = f"{self.path}-export"
+        main(["create", "--method=coins", filename])
+        out = Path(tmpdir) / "tiffs"
+        args = ["export", filename, str(out), "--format=tiff-stack", "--no-progress"]
+        main(args + ["--level", "-1"])
+        assert len(list(out.glob("*.tif"))) > 0
+
+        with pytest.raises(FileExistsError):
+            main(args)
+        main(args + ["--overwrite"])
+
     @pytest.mark.parametrize(
         "fmt",
         (
