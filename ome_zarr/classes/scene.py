@@ -263,7 +263,10 @@ class OMEZarrScene:
         # Always update scene metadata
         metadata_dict = self.metadata.model_dump(exclude_none=True)
 
-        zarr_group.attrs["ome"] = {"scene": metadata_dict, "version": "0.6"}
+        # Preserve existing ome metadata, update only scene field
+        ome: dict = zarr_group.attrs.get("ome", {})
+        ome.update({"scene": metadata_dict, "version": "0.6"})
+        zarr_group.attrs["ome"] = ome
 
         return delayed
 
