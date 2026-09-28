@@ -1000,10 +1000,11 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
 
     @omero.setter
     def omero(self, value: Omero | dict[str, Any] | None):
-        if isinstance(value, dict):
-            self._omero = Omero.model_validate(value)
-        else:
-            self._omero = value
+        if value is not None and not isinstance(value, Omero):
+            raise TypeError(
+                f"Expected an instance of Omero or None, received {type(value)}"
+            )
+        self._omero = value
 
     @staticmethod
     def _parse_labels(
@@ -1159,14 +1160,29 @@ class OMEZarrLabels(OMEZarrMultiscaleBase):
 
     @property
     def image_label(self) -> Label | None:
+        """
+        Get the image label metadata associated with this multiscale image.
+
+        Returns
+        -------
+        ome_zarr_models.common.image_label_types.LabelBase | None
+            The image label metadata if available, otherwise `None`.
+        """
         return self._image_label
 
     @image_label.setter
-    def image_label(self, value: Label | dict[str, Any] | None):
-        if isinstance(value, dict):
-            self._image_label = Label.model_validate(value)
-        else:
-            self._image_label = value
+    def image_label(self, value: Label | None):
+        """
+        Set the image label metadata.
+
+        Parameters
+        ----------
+        value : ome_zarr_models.common.image_label_types.LabelBase | None
+            The new image label metadata to set. Must be an instance of `LabelBase` or `None`.
+        """
+        if value is not None and not isinstance(value, Label):
+            raise TypeError(f"Expected an instance of Label or None, received {type(value)}")
+        self._image_label = value
 
     def _write_additional_meta_data(
         self,
