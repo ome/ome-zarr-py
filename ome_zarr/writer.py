@@ -232,7 +232,7 @@ def check_group_fmt(
     Create group if string, according to fmt
     OR check fmt is compatible with group
     """
-    if isinstance(group, str) or isinstance(group, Path):
+    if isinstance(group, (str, Path)):
         if not fmt:
             group = zarr.open_group(group, mode=mode)
         else:
