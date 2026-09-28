@@ -999,11 +999,12 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
         return self._omero
 
     @omero.setter
-    def omero(self, value: Omero | dict[str, Any] | None):
-        if isinstance(value, dict):
-            self._omero = Omero.model_validate(value)
-        else:
-            self._omero = value
+    def omero(self, value: Omero | None):
+        if not isinstance(value, Omero) and value is not None:
+            raise TypeError(
+                "Invalid type for omero. Expected Omero but received {type(value)}."
+            )
+        self._omero = value
 
     @staticmethod
     def _parse_labels(
@@ -1104,7 +1105,7 @@ class OMEZarrLabels(OMEZarrMultiscaleBase):
     ----------
     images : list[OMEZarrImage]
         List of label images at each pyramid level.
-    image_label : Label | None
+    image_label : ome_zarr_models.common.image_label_types.LabelBase | None
         Optional image-label metadata for rendering label images, or None if not provided.
     metadata : ome_zarr_models.v05.multiscales.Multiscale
         The OME-Zarr metadata associated with this multiscale image,
@@ -1159,14 +1160,24 @@ class OMEZarrLabels(OMEZarrMultiscaleBase):
 
     @property
     def image_label(self) -> Label | None:
+        if not isinstance(self._image_label, Label):
+            raise TypeError(
+                "Invalid type for image_label"
+                f" Expected Label but received {type(self._image_label)}."
+            )
         return self._image_label
 
     @image_label.setter
-    def image_label(self, value: Label | dict[str, Any] | None):
-        if isinstance(value, dict):
-            self._image_label = Label.model_validate(value)
-        else:
-            self._image_label = value
+    def image_label(self, value: Label | None):
+        """
+        Set the image-label metadata.
+
+        Parameters
+        ----------
+        value : ome_zarr_models.common.image_label_types.LabelBase
+            The new image-label metadata to set.
+        """
+        self._image_label = value
 
     def _write_additional_meta_data(
         self,
