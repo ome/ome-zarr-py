@@ -866,7 +866,9 @@ class TestWriter:
         # attempt to write twice with overwrite = False
         ms.to_ome_zarr(self.path / "overwrite")
         with pytest.raises(OSError):
-            ms.to_ome_zarr(self.path / "overwrite", overwrite=False)
+            ms.to_ome_zarr(self.path / "overwrite")
+
+        ms.to_ome_zarr(self.path / "overwrite", overwrite=True)
 
 
 class TestMultiscalesMetadata:
