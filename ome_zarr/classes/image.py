@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 import warnings
 from abc import abstractmethod
 from collections.abc import Sequence
@@ -36,8 +35,6 @@ from ome_zarr_models.v06.multiscales import (
 from pydantic import ValidationError
 
 from ome_zarr.scale import Methods
-
-logger = logging.getLogger(__name__)
 
 DISCRETE_DIMS = ["coordinate", "displacement", "channel"]
 DEFAULT_VERSION: Literal["0.6", "0.5", "0.4"] = "0.6"
@@ -623,7 +620,6 @@ class OMEZarrMultiscaleBase:
         for cs in self.metadata.coordinateSystems:
             if cs.name == name:
                 return cs
-        logger.warning("Multiscale '%s' has no coordinate system '%s'", self.name, name)
         return None
 
     @abstractmethod
@@ -1004,22 +1000,13 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
         Must be named.
         """
         if csid.name is None:
-            logger.warning("Could not resolve nameless coordinate system %s", csid)
             return None
 
         if csid.path is not None and csid.path != ".":
             if self.labels is None:
-                logger.warning(
-                    "Multiscale array has no labels, could not resolve %s", csid
-                )
                 return None
             lbl = self.labels.get(csid.path)
             if lbl is None:
-                logger.warning(
-                    "No label multiscale found with name '%s', could not resolve %s",
-                    csid.name,
-                    csid,
-                )
                 return None
 
             return lbl.get_local_coordinate_system(csid.name)
@@ -1205,10 +1192,8 @@ class OMEZarrLabels(OMEZarrMultiscaleBase):
         Must have a name and a trivial path.
         """
         if csid.name is None:
-            logger.debug("Could not resolve nameless coordinate system %s", csid)
             return None
         if csid.path is not None or csid.path != ".":
-            logger.debug("Could not resolve nonlocal coordinate system %s", csid)
             return None
         return self.get_local_coordinate_system(csid.name)
 

@@ -1,7 +1,6 @@
 # the class for storage representation, not exposed to the user
 from __future__ import annotations
 
-import logging
 import os
 from collections.abc import Sequence
 from typing import Any, cast
@@ -17,11 +16,8 @@ from zarr.storage import StoreLike
 
 from .image import OMEZarrMultiscale
 from .tnd_utils import (
-    UnsupportedTransformation,
     ozmp_tf_to_tnd_spaced,
 )
-
-logger = logging.getLogger(__name__)
 
 VECTOR_FIELD_AXIS = 0
 """Which dimension of a vector field array contains the vectors."""
@@ -179,18 +175,13 @@ class OMEZarrScene:
             # convert to transformnd transform and add to graph
             target_cs_dict = self.get_coordinate_system(tf.output.path, tf.output.name)
             target_cs = target_cs_dict[(tf.output.path or "", tf.output.name)]
-            try:
-                tnd_transform = ozmp_tf_to_tnd_spaced(
-                    tf,
-                    zarr_context="",
-                    source_cs=source_cs,
-                    target_cs=target_cs,
-                    coordinate_displacements=self.coordinate_displacements,
-                )
-            except UnsupportedTransformation as e:
-                # error message contains transform info
-                logger.warning("Skipping unsupported transformation: %s", e)
-                continue
+            tnd_transform = ozmp_tf_to_tnd_spaced(
+                tf,
+                zarr_context="",
+                source_cs=source_cs,
+                target_cs=target_cs,
+                coordinate_displacements=self.coordinate_displacements,
+            )
             g.add_transform(tnd_transform)
 
             # Add inverse edge if transform is invertible
@@ -218,17 +209,13 @@ class OMEZarrScene:
                         tgt_cs = None
                         if img_tf.output is not None:
                             tgt_cs = img.get_coordinate_system(img_tf.output)
-                        try:
-                            ind_transform = ozmp_tf_to_tnd_spaced(
-                                img_tf,
-                                zarr_context=subgroup,
-                                source_cs=src_cs,
-                                target_cs=tgt_cs,
-                                coordinate_displacements=self.coordinate_displacements,
-                            )
-                        except UnsupportedTransformation as e:
-                            logger.warning("Skipping unsupported transformation: %s", e)
-                            continue
+                        ind_transform = ozmp_tf_to_tnd_spaced(
+                            img_tf,
+                            zarr_context=subgroup,
+                            source_cs=src_cs,
+                            target_cs=tgt_cs,
+                            coordinate_displacements=self.coordinate_displacements,
+                        )
 
                         g.add_transform(ind_transform)
                         # Add inverse edge if transform is invertible
