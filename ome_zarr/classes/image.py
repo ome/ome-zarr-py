@@ -1181,7 +1181,9 @@ class OMEZarrLabels(OMEZarrMultiscaleBase):
             The new image label metadata to set. Must be an instance of `LabelBase` or `None`.
         """
         if value is not None and not isinstance(value, Label):
-            raise TypeError(f"Expected an instance of Label or None, received {type(value)}")
+            raise TypeError(
+                f"Expected an instance of Label or None, received {type(value)}"
+            )
         self._image_label = value
 
     def _write_additional_meta_data(
