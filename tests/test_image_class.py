@@ -314,6 +314,24 @@ def test_image_class_writer_labels(tmp_path, image_dims, version):
     assert ms_read.labels[labels_name].image_label is not None
 
 
+def test_bad_image_label_metadata():
+    """
+    The `image_label` field of OMEZarrLabels
+    """
+    shape, axes, scale = (256, 256), "yx", {"y": 1.0, "x": 1.0}
+    data = create_data(shape)
+    data_labels = (data > data.mean()).astype(np.uint8)
+
+    labels_name = "test_labels"
+    labels = OMEZarrImage(data=data_labels, axes=axes, scale=scale, name=labels_name)
+    labels_multiscales = OMEZarrLabels(image=labels, scale_factors=None)
+
+    label_dict = {"colors": [1, 2, 3, 4], "properties": {"prop1": "value1"}}
+
+    with pytest.raises(TypeError):
+        labels_multiscales.image_label = label_dict
+
+
 @pytest.mark.parametrize("version", ["0.4", "0.5", "0.6"], ids=["V04", "V05", "V06"])
 @pytest.mark.parametrize(
     "shape",

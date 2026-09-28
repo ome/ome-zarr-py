@@ -1160,11 +1160,15 @@ class OMEZarrLabels(OMEZarrMultiscaleBase):
 
     @property
     def image_label(self) -> Label | None:
-        if not isinstance(self._image_label, Label):
-            raise TypeError(
-                "Invalid type for image_label"
-                f" Expected Label but received {type(self._image_label)}."
-            )
+        """
+        Get the image-label metadata.
+
+        Returns
+        -------
+        ome_zarr_models.common.image_label_types.LabelBase | None
+            The image-label metadata if available, otherwise None.
+        """
+
         return self._image_label
 
     @image_label.setter
@@ -1177,6 +1181,11 @@ class OMEZarrLabels(OMEZarrMultiscaleBase):
         value : ome_zarr_models.common.image_label_types.LabelBase
             The new image-label metadata to set.
         """
+        if not isinstance(value, Label) and value is not None:
+            raise TypeError(
+                "Invalid type for image_label"
+                f" Expected Label but received {type(value)}."
+            )
         self._image_label = value
 
     def _write_additional_meta_data(
