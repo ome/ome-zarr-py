@@ -868,6 +868,7 @@ class TestWriter:
         with pytest.raises(OSError):
             ms.to_ome_zarr(self.path / "overwrite", overwrite=False)
 
+
 class TestMultiscalesMetadata:
     @pytest.fixture(autouse=True)
     def initdir(self, tmpdir):
