@@ -3,8 +3,8 @@ from __future__ import annotations
 import warnings
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Any, Literal, cast
 from pathlib import Path
+from typing import Any, Literal, cast
 
 import dask.array as da
 import numpy as np
