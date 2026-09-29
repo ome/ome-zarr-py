@@ -24,7 +24,7 @@ def test_get_local_coordinate_system():
     assert img.get_local_coordinate_system("notacoordinatesystem") is None
 
 
-def test_get_coordinate_system():
+def test_get_descendant_coordinate_system():
     cs1 = CoordinateSystem(
         name="cs1", axes=(Axis(name="y", type="space"), Axis(name="x", type="space"))
     )
@@ -35,25 +35,28 @@ def test_get_coordinate_system():
         OMEZarrImage(np.zeros((32, 64), float), axes=["y", "x"]),
         coordinate_systems=[cs1, cs2],
     )
-    assert img.get_coordinate_system(CoordinateSystemIdentifier(name="cs2")) == cs2
     assert (
-        img.get_coordinate_system(
+        img._get_descendant_coordinate_system(CoordinateSystemIdentifier(name="cs2"))
+        == cs2
+    )
+    assert (
+        img._get_descendant_coordinate_system(
             CoordinateSystemIdentifier(name="notacoordinatesystem")
         )
         is None
     )
 
 
-def test_get_coordinate_system_no_labels():
+def test_get_descendant_coordinate_system_no_labels():
     img = OMEZarrMultiscale(
         OMEZarrImage(np.zeros((32, 64), float), axes=["y", "x"]),
     )
-    cs = img.get_coordinate_system(
+    cs = img._get_descendant_coordinate_system(
         CoordinateSystemIdentifier(name="lbl", path="labels/fake")
     )
     assert cs is None
     img.labels = dict()
-    cs2 = img.get_coordinate_system(
+    cs2 = img._get_descendant_coordinate_system(
         CoordinateSystemIdentifier(name="lbl", path="labels/fake")
     )
     assert cs2 is None
@@ -68,7 +71,7 @@ def test_get_coordinate_system_no_labels():
     lbls.metadata = metadata
     labels = {"labels/real": lbls}
     img.labels = labels
-    cs = img.get_coordinate_system(
+    cs = img._get_descendant_coordinate_system(
         CoordinateSystemIdentifier(name="physical", path="labels/real")
     )
     assert cs == realcs

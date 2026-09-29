@@ -619,7 +619,7 @@ class OMEZarrMultiscaleBase:
         return None
 
     @abstractmethod
-    def get_coordinate_system(
+    def _get_descendant_coordinate_system(
         self, csid: CoordinateSystemIdentifier
     ) -> CoordinateSystem | None: ...
 
@@ -796,6 +796,8 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
             Write the multiscale image pyramid and metadata to an OME-Zarr group.
         from_ome_zarr(group)
             Load a multiscale image pyramid and metadata from an OME-Zarr group.
+        get_local_coordinate_system(name)
+            Get information about a coordinate system defined on this multiscale.
 
     Examples
     --------
@@ -992,7 +994,7 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
         except ValidationError as e:
             warnings.warn(f"Failed to validate Omero metadata: {e}")
 
-    def get_coordinate_system(
+    def _get_descendant_coordinate_system(
         self, csid: CoordinateSystemIdentifier
     ) -> CoordinateSystem | None:
         """Find a coordinate system belonging either to this image,
@@ -1132,7 +1134,7 @@ class OMEZarrLabels(OMEZarrMultiscaleBase):
         to the metadata. This can be time consuming for large datasets, so it is optional.
         Default is True.
 
-     Attributes
+    Attributes
     ----------
     images : list[OMEZarrImage]
         List of label images at each pyramid level.
@@ -1142,6 +1144,11 @@ class OMEZarrLabels(OMEZarrMultiscaleBase):
         The OME-Zarr metadata associated with this multiscale image,
         stored as a Pydantic model instance.
         Automatically created upon instantiation of the class.
+
+    Methods
+    -------
+        get_local_coordinate_system(name)
+            Get information about a coordinate system defined on this multiscale.
     """
 
     _image_label: Label | None
@@ -1189,7 +1196,7 @@ class OMEZarrLabels(OMEZarrMultiscaleBase):
             }
         )
 
-    def get_coordinate_system(
+    def _get_descendant_coordinate_system(
         self, csid: CoordinateSystemIdentifier
     ) -> CoordinateSystem | None:
         """Get a coordinate system.

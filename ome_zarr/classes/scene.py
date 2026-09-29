@@ -62,8 +62,7 @@ class OMEZarrScene:
         from_ome_zarr(store: StoreLike)
             Load an existing scene from OME-Zarr format in the specified store.
         get_coordinate_system(path: str | None, name: str | None = None)
-            Retrieve a coordinate system by path or name.
-            If neither is
+            Retrieve coordinate systems matching the path (if given) and name (if given).
 
         """
         # Coerce list to dict keyed by metadata.name
@@ -205,10 +204,12 @@ class OMEZarrScene:
                     for img_tf in img.metadata.coordinateTransformations:
                         src_cs = None
                         if img_tf.input is not None:
-                            src_cs = img.get_coordinate_system(img_tf.input)
+                            src_cs = img._get_descendant_coordinate_system(img_tf.input)
                         tgt_cs = None
                         if img_tf.output is not None:
-                            tgt_cs = img.get_coordinate_system(img_tf.output)
+                            tgt_cs = img._get_descendant_coordinate_system(
+                                img_tf.output
+                            )
                         ind_transform = ozmp_tf_to_tnd_spaced(
                             img_tf,
                             zarr_context=subgroup,
