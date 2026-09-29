@@ -12,6 +12,7 @@ import numpy as np
 from skimage.data import binary_blobs
 
 from ome_zarr import OMEZarrImage, OMEZarrLabels, OMEZarrMultiscale
+from ome_zarr_models.common.image_label_types import LabelBase as Label
 
 # %%
 rng = np.random.default_rng(0)
@@ -53,9 +54,9 @@ properties = [
 # We can now pass this metadata to the respective field of the {py:class}`ome_zarr.classes.image.OMEZarrLabels` object and write it to disk:
 
 # %%
-labels_multiscales.image_label = {
-    "image-label": {"colors": colors, "properties": properties}
-}
+labels_multiscales.image_label = Label.model_validate({
+    "colors": colors, "properties": properties
+})
 
 ngff_multiscales.labels = {"test_labels": labels_multiscales}
 
