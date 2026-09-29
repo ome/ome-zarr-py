@@ -4,6 +4,7 @@ import warnings
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, Literal, cast
+from pathlib import Path
 
 import dask.array as da
 import numpy as np
@@ -326,7 +327,7 @@ class OMEZarrMultiscaleBase:
 
     def to_ome_zarr(
         self,
-        group: zarr.Group | str,
+        group: zarr.Group | str | Path,
         storage_options: list[dict[str, Any]] | dict[str, Any] | None = None,
         version: Literal["0.6", "0.5", "0.4"] = DEFAULT_VERSION,
         compute: bool = True,
@@ -346,6 +347,7 @@ class OMEZarrMultiscaleBase:
         if isinstance(group, zarr.Group):
             store_exists = True  # zarr.Group was passed in, so it exists
         else:
+            group = str(group)
             store_exists = os.path.exists(group)
 
         # Decide whether to write main image data
