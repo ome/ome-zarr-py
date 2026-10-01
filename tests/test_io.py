@@ -56,44 +56,41 @@ class TestIO:
         assert attrs.get("multiscales") is not None
 
 
-class TestStoreLocation:
-    """A location on a store that has no path of its own."""
+# An image to write on a store that has no path of its own.
+IMAGE = np.arange(64 * 64, dtype="uint16").reshape(64, 64)
 
-    image = np.arange(64 * 64, dtype="uint16").reshape(64, 64)
 
-    def test_store_without_a_path(self):
-        store = MemoryStore()
-        write_image(
-            self.image, zarr.open_group(store, mode="w"), axes="yx", scaler=None
-        )
+def test_store_without_a_path():
+    store = MemoryStore()
+    write_image(IMAGE, zarr.open_group(store, mode="w"), axes="yx", scaler=None)
 
-        loc = ZarrLocation(store)
-        assert loc.exists()
-        assert loc.store is store
-        nodes = list(Reader(loc)())
-        assert nodes, "the reader found no node on the store"
-        np.testing.assert_array_equal(np.asarray(nodes[0].data[0]), self.image)
+    loc = ZarrLocation(store)
+    assert loc.exists()
+    assert loc.store is store
+    nodes = list(Reader(loc)())
+    assert nodes, "the reader found no node on the store"
+    np.testing.assert_array_equal(np.asarray(nodes[0].data[0]), IMAGE)
 
-    def test_prefix_inside_a_store(self):
-        store = MemoryStore()
-        write_image(
-            self.image,
-            zarr.open_group(store, path="images/img", mode="w"),
-            axes="yx",
-            scaler=None,
-        )
 
-        loc = ZarrLocation(StorePath(store, "images/img"))
-        assert loc.exists()
-        assert loc.basename() == "img"
-        finest = loc.root_attrs["multiscales"][0]["datasets"][0]["path"]
-        np.testing.assert_array_equal(np.asarray(loc.load(finest)), self.image)
+def test_prefix_inside_a_store():
+    store = MemoryStore()
+    write_image(
+        IMAGE,
+        zarr.open_group(store, path="images/img", mode="w"),
+        axes="yx",
+        scaler=None,
+    )
 
-        # A child location shares the store and extends the prefix.
-        assert loc.create(finest) == ZarrLocation(
-            StorePath(store, f"images/img/{finest}")
-        )
-        assert not ZarrLocation(StorePath(store, "images/other")).exists()
+    loc = ZarrLocation(StorePath(store, "images/img"))
+    assert loc.exists()
+    assert loc.basename() == "img"
+    finest = loc.root_attrs["multiscales"][0]["datasets"][0]["path"]
+    np.testing.assert_array_equal(np.asarray(loc.load(finest)), IMAGE)
 
-    def test_unrelated_stores_differ(self):
-        assert ZarrLocation(MemoryStore()) != ZarrLocation(MemoryStore())
+    # A child location shares the store and extends the prefix.
+    assert loc.create(finest) == ZarrLocation(StorePath(store, f"images/img/{finest}"))
+    assert not ZarrLocation(StorePath(store, "images/other")).exists()
+
+
+def test_unrelated_stores_differ():
+    assert ZarrLocation(MemoryStore()) != ZarrLocation(MemoryStore())
