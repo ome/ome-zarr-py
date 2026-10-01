@@ -5,6 +5,7 @@ import pytest
 import zarr
 from zarr.storage import LocalStore, MemoryStore, StorePath
 
+from ome_zarr import OMEZarrImage, OMEZarrMultiscale
 from ome_zarr.data import create_zarr
 from ome_zarr.io import ZarrLocation, parse_url
 from ome_zarr.reader import Reader
@@ -94,3 +95,25 @@ def test_prefix_inside_a_store():
 
 def test_unrelated_stores_differ():
     assert ZarrLocation(MemoryStore()) != ZarrLocation(MemoryStore())
+
+
+def test_class_writer_on_a_store():
+    """The class-based writer and ZarrLocation share a store without a path."""
+    store = MemoryStore()
+    multiscale = OMEZarrMultiscale(
+        image=OMEZarrImage(data=IMAGE, axes="yx"), scale_factors=None, method=None
+    )
+    multiscale.to_ome_zarr(
+        zarr.open_group(store, path="images/img", mode="w"), overwrite=True
+    )
+
+    loc = ZarrLocation(StorePath(store, "images/img"))
+    assert loc.exists()
+    nodes = list(Reader(loc)())
+    assert nodes, "the reader found no node on the store"
+    np.testing.assert_array_equal(np.asarray(nodes[0].data[0]), IMAGE)
+
+    read_back = OMEZarrMultiscale.from_ome_zarr(
+        zarr.open_group(store, path="images/img", mode="r")
+    )
+    np.testing.assert_array_equal(np.asarray(read_back.images[0].data), IMAGE)
