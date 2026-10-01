@@ -1,9 +1,10 @@
+import zipfile
 from pathlib import Path
 
 import numpy as np
 import pytest
 import zarr
-from zarr.storage import LocalStore, MemoryStore, StorePath
+from zarr.storage import LocalStore, MemoryStore, StorePath, ZipStore
 
 from ome_zarr import OMEZarrImage, OMEZarrMultiscale
 from ome_zarr.data import create_zarr
@@ -117,3 +118,24 @@ def test_class_writer_on_a_store():
         zarr.open_group(store, path="images/img", mode="r")
     )
     np.testing.assert_array_equal(np.asarray(read_back.images[0].data), IMAGE)
+
+
+def test_read_from_a_zip(tmp_path):
+    """A zipped OME-Zarr reads through ZarrLocation on a ZipStore."""
+    # Dask writes to a ZipStore corrupt the archive (zarr-python#3516),
+    # so the test zips a directory store instead of writing to the ZipStore.
+    directory = tmp_path / "img.zarr"
+    write_image(IMAGE, zarr.open_group(directory, mode="w"), axes="yx", scaler=None)
+    archive = tmp_path / "img.zarr.zip"
+    with zipfile.ZipFile(archive, mode="w") as zf:
+        for file in directory.rglob("*"):
+            if file.is_file():
+                zf.write(file, file.relative_to(directory).as_posix())
+
+    store = ZipStore(archive, mode="r")
+    loc = ZarrLocation(store)
+    assert loc.exists()
+    nodes = list(Reader(loc)())
+    assert nodes, "the reader found no node in the archive"
+    np.testing.assert_array_equal(np.asarray(nodes[0].data[0]), IMAGE)
+    store.close()
