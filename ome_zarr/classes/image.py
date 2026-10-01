@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import warnings
+from abc import abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -610,6 +611,18 @@ class OMEZarrMultiscaleBase:
         """
         return self._images
 
+    def get_local_coordinate_system(self, name: str) -> CoordinateSystem | None:
+        """Get a coordinate system defined on this multiscale by its name."""
+        for cs in self.metadata.coordinateSystems:
+            if cs.name == name:
+                return cs
+        return None
+
+    @abstractmethod
+    def _get_descendant_coordinate_system(
+        self, csid: CoordinateSystemIdentifier
+    ) -> CoordinateSystem | None: ...
+
     def _write_additional_meta_data(
         self,
         group: zarr.Group,
@@ -783,6 +796,8 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
             Write the multiscale image pyramid and metadata to an OME-Zarr group.
         from_ome_zarr(group)
             Load a multiscale image pyramid and metadata from an OME-Zarr group.
+        get_local_coordinate_system(name)
+            Get information about a coordinate system defined on this multiscale.
 
     Examples
     --------
@@ -979,6 +994,28 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
         except ValidationError as e:
             warnings.warn(f"Failed to validate Omero metadata: {e}")
 
+    def _get_descendant_coordinate_system(
+        self, csid: CoordinateSystemIdentifier
+    ) -> CoordinateSystem | None:
+        """Find a coordinate system belonging either to this image,
+        or a label below it.
+
+        Must be named.
+        """
+        if csid.name is None:
+            return None
+
+        if csid.path is not None and csid.path != ".":
+            if self.labels is None:
+                return None
+            lbl = self.labels.get(csid.path)
+            if lbl is None:
+                return None
+
+            return lbl.get_local_coordinate_system(csid.name)
+
+        return self.get_local_coordinate_system(csid.name)
+
     @property
     def labels(self) -> dict[str, OMEZarrLabels] | None:
         return self._labels
@@ -1097,7 +1134,7 @@ class OMEZarrLabels(OMEZarrMultiscaleBase):
         to the metadata. This can be time consuming for large datasets, so it is optional.
         Default is True.
 
-     Attributes
+    Attributes
     ----------
     images : list[OMEZarrImage]
         List of label images at each pyramid level.
@@ -1107,6 +1144,11 @@ class OMEZarrLabels(OMEZarrMultiscaleBase):
         The OME-Zarr metadata associated with this multiscale image,
         stored as a Pydantic model instance.
         Automatically created upon instantiation of the class.
+
+    Methods
+    -------
+        get_local_coordinate_system(name)
+            Get information about a coordinate system defined on this multiscale.
     """
 
     _image_label: Label | None
@@ -1153,6 +1195,19 @@ class OMEZarrLabels(OMEZarrMultiscaleBase):
                 "properties": [{"label-value": i} for i in label_values],
             }
         )
+
+    def _get_descendant_coordinate_system(
+        self, csid: CoordinateSystemIdentifier
+    ) -> CoordinateSystem | None:
+        """Get a coordinate system.
+
+        Must have a name and a trivial path.
+        """
+        if csid.name is None:
+            return None
+        if csid.path is not None or csid.path != ".":
+            return None
+        return self.get_local_coordinate_system(csid.name)
 
     @property
     def image_label(self) -> Label | None:
