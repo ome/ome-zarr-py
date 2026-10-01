@@ -587,6 +587,8 @@ class CaseBuilder:
 
 
 class OzmpTfKwargs(TypedDict):
+    """Ome-Zarr-Models-Py TransForm KeyWord ARGumentS"""
+
     zarr_context: str
     source_ndim: int | None
     target_ndim: int | None
