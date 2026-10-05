@@ -634,6 +634,8 @@ def write_image(
     storage_options : dict or list of dict, optional
         Options to be passed on to the storage backend. A list must match the number of datasets
         in a multiresolution pyramid. Allows different chunk sizes for each level.
+        With Zarr format 3 and Dask >=2026.3.0, ``shards="auto"`` lets Zarr choose
+        the shard shape. Dask writes are then aligned to the resolved shards.
         Regarding the key, value pairs in the dictionar(y)(ies), these depend both on the zarr_format used
         for writing and the dask version being used. For dask version <=2025.11.0, please refer to
         https://zarr.readthedocs.io/en/stable/api/zarr/create/#zarr.create for arguments that can be passed on.
@@ -831,6 +833,9 @@ def _write_pyramid_to_zarr(
 
         chunks_opt = options.get("chunks", None)
         shards_opt = options.get("shards", None)
+        auto_shards = shards_opt == "auto"
+        if auto_shards and not USE_DASK_ARRAY_KWARGS:
+            raise ValueError("Automatic sharding requires Dask >= 2026.3.0.")
 
         # If shards are defined, one dask chunk should correspond to 1 shard to prevent concurrent writes to 1 shard.
         # In this case user defined chunks will correspond to zarr chunks and not dask chunks.
@@ -852,8 +857,12 @@ def _write_pyramid_to_zarr(
                     )
                 chunks_opt = level.chunksize
             chunks_opt = _retuple(chunks_opt, level.shape)
-            shards_opt = _retuple(shards_opt, level.shape)
-            level_image = da.array(level).rechunk(shards_opt)
+            if auto_shards:
+                # Zarr must resolve the shard shape before we can align Dask writes.
+                level_image = level
+            else:
+                shards_opt = _retuple(shards_opt, level.shape)
+                level_image = da.array(level).rechunk(shards_opt)
         else:
             if chunks_opt == "auto":
                 warnings.warn(
@@ -891,15 +900,27 @@ def _write_pyramid_to_zarr(
             zarr_array_kwargs_copy.pop("shards", None)
             zarr_array_kwargs_copy.pop("serializer", None)
 
-        delayed.append(
-            da.to_zarr(
+        if auto_shards:
+            target = zarr.create_array(
+                store=group.store,
+                name=str(Path(group.path, f"s{idx}")),
+                shape=level_image.shape,
+                dtype=level_image.dtype,
+                **zarr_array_kwargs_copy,
+            )
+            # Use the actual target layout, including the user's Zarr config.
+            # Store directly so Dask does not auto-rechunk the aligned blocks again.
+            level_image = level_image.rechunk(target.shards or target.chunks)
+            job = da.store(level_image, target, lock=False, compute=False)
+        else:
+            job = da.to_zarr(
                 arr=level_image,
                 url=group.store,
                 component=str(Path(group.path, f"s{idx}")),
                 compute=False,
                 **zarr_array_kwargs_copy,
             )
-        )
+        delayed.append(job)
         datasets.append({"path": f"s{idx}"})
 
     # Computing delayed jobs if necessary
