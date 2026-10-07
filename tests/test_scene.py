@@ -300,6 +300,67 @@ def test_create_scene_with_coordinate_systems(test_data_dir, transform):
     assert len(ome_metadata["scene"]["coordinateSystems"]) == 2
 
 
+@pytest.mark.parametrize("as_sequence", [False, True], ids=["graph-edges", "sequence"])
+@pytest.mark.parametrize("roundtrip", [False, True], ids=["in-memory", "roundtrip"])
+def test_scene_composed_transform_coordinates(tmp_path, as_sequence, roundtrip):
+    """Check transform order and inverse traversal, including after serialization."""
+    images = [
+        OMEZarrMultiscale(
+            image=OMEZarrImage(
+                data=np.zeros((4, 4), dtype=np.uint8),
+                name=name,
+                axes=["y", "x"],
+                scale={"y": 1.0, "x": 1.0},
+            )
+        )
+        for name in ("imageA", "imageB")
+    ]
+    source = {"path": "imageA", "name": "physical"}
+    target = {"path": "imageB", "name": "physical"}
+    scale = {"type": "scale", "scale": [2.0, 3.0]}
+    translation = {"type": "translation", "translation": [5.0, -7.0]}
+    world = CoordinateSystem(
+        name="world", axes=images[0].metadata.coordinateSystems[0].axes
+    )
+
+    if as_sequence:
+        transforms = [
+            {
+                "type": "sequence",
+                "input": source,
+                "output": target,
+                "transformations": [scale, translation],
+            }
+        ]
+    else:
+        transforms = [
+            {**scale, "input": source, "output": {"name": "world"}},
+            {**translation, "input": {"name": "world"}, "output": target},
+        ]
+
+    scene = OMEZarrScene(
+        images=images,
+        coordinate_transformations=[
+            transform_adapter.validate_python(transform) for transform in transforms
+        ],
+        coordinate_systems=[world],
+    )
+    if roundtrip:
+        store = tmp_path / "composed_scene.zarr"
+        scene.to_ome_zarr(store)
+        scene = OMEZarrScene.from_ome_zarr(store)
+
+    points = np.array([[0.0, 0.0], [1.0, -2.0], [-3.0, 4.0]])
+    # Scaling then translating differs from translating then scaling.
+    expected = points * np.array([2.0, 3.0]) + np.array([5.0, -7.0])
+    forward = scene._graph.get_sequence(("imageA", "physical"), ("imageB", "physical"))
+    backward = scene._graph.get_sequence(("imageB", "physical"), ("imageA", "physical"))
+    assert forward is not None
+    assert backward is not None
+    np.testing.assert_allclose(forward.apply(points), expected)
+    np.testing.assert_allclose(backward.apply(expected), points)
+
+
 def test_coordinate_system_retrieval(test_data_dir):
     """
     Create a scene with two images and three coordinate transformations
