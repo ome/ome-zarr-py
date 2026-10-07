@@ -19,6 +19,7 @@ from ome_zarr_models.v05.well import Well as Models05Well
 from skimage.data import binary_blobs
 from zarr.abc.codec import BytesBytesCodec
 from zarr.codecs import BloscCodec
+from zarr.storage import MemoryStore, StorePath
 
 from ome_zarr import (
     USE_DASK_ARRAY_KWARGS,
@@ -340,6 +341,14 @@ class TestWriter:
         ds_path = get_metadata(path)["multiscales"][0]["datasets"][0]["path"]
         arr = da.from_zarr(f"{path}/{ds_path}")
         assert np.allclose(data, arr[...].compute())
+
+    def test_group_from_store(self):
+        data = self.create_data((16, 16))
+        store = StorePath(MemoryStore(), "nested/image")
+        write_multiscale([data], store, axes="yx")
+        out = zarr.open_group(store, mode="r")
+        assert "multiscales" in out.attrs["ome"]
+        assert np.array_equal(data, out["s0"][...])
 
     @pytest.mark.parametrize("zarr_format", [2, 3])
     def test_write_image_current(self, array_constructor, zarr_format):
