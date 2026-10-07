@@ -7,7 +7,7 @@ import pytest
 import zarr
 from dask.callbacks import Callback
 
-from ome_zarr import USE_DASK_ARRAY_KWARGS
+from ome_zarr import USE_DASK_ARRAY_KWARGS, OMEZarrImage, OMEZarrMultiscale
 from ome_zarr.format import FormatV04, FormatV05
 from ome_zarr.writer import write_image
 
@@ -22,7 +22,10 @@ def shard_config(request):
 @pytest.mark.parametrize("compute", [False, True])
 @pytest.mark.parametrize("chunks", [(1, 8, 8), 4, None])
 @pytest.mark.parametrize("per_level", [False, True])
-def test_auto_sharding_roundtrip(tmp_path, compute, chunks, per_level, shard_config):
+@pytest.mark.parametrize("writer", ["write_image", "to_ome_zarr"])
+def test_auto_sharding_roundtrip(
+    tmp_path, compute, chunks, per_level, shard_config, writer
+):
     data = np.arange(5 * 34 * 38, dtype=np.uint16).reshape(5, 34, 38)
     image = da.from_array(data, chunks=(2, 7, 9))
     options = {
@@ -48,13 +51,34 @@ def test_auto_sharding_roundtrip(tmp_path, compute, chunks, per_level, shard_con
     )
     executed = []
     with Callback(posttask=lambda key, *args: executed.append(key)):
-        jobs = write_image(
-            image,
-            str(tmp_path / "auto.zarr"),
-            storage_options=options,
-            compute=compute,
-            **kwargs,
-        )
+        if writer == "write_image":
+            jobs = write_image(
+                image,
+                str(tmp_path / "auto.zarr"),
+                storage_options=options,
+                compute=compute,
+                **kwargs,
+            )
+        else:
+            multiscale = OMEZarrMultiscale(
+                image=OMEZarrImage(
+                    data=image,
+                    axes=kwargs["axes"],
+                    scale=kwargs["scale"],
+                    axes_units=kwargs["axes_units"],
+                    name=kwargs["name"],
+                ),
+                scale_factors=kwargs["scale_factors"],
+                method=kwargs["method"],
+            )
+            # Match write_image's default omission of optional OMERO metadata.
+            multiscale.omero = None
+            jobs = multiscale.to_ome_zarr(
+                str(tmp_path / "auto.zarr"),
+                storage_options=options,
+                version="0.5",
+                compute=compute,
+            )
     if not compute:
         assert not executed
         assert len(jobs) == 2
