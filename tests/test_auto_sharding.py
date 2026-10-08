@@ -18,13 +18,19 @@ def shard_config(request):
         yield
 
 
+@pytest.fixture(params=["128 B", "128 MiB"])
+def dask_chunk_config(request):
+    with dask.config.set({"array.chunk-size": request.param}):
+        yield
+
+
 @pytest.mark.skipif(not USE_DASK_ARRAY_KWARGS, reason="Requires Dask array kwargs")
 @pytest.mark.parametrize("compute", [False, True])
 @pytest.mark.parametrize("chunks", [(1, 8, 8), 4, None])
 @pytest.mark.parametrize("per_level", [False, True])
 @pytest.mark.parametrize("writer", ["write_image", "to_ome_zarr"])
 def test_auto_sharding_roundtrip(
-    tmp_path, compute, chunks, per_level, shard_config, writer
+    tmp_path, compute, chunks, per_level, shard_config, dask_chunk_config, writer
 ):
     data = np.arange(5 * 34 * 38, dtype=np.uint16).reshape(5, 34, 38)
     image = da.from_array(data, chunks=(2, 7, 9))
@@ -71,7 +77,7 @@ def test_auto_sharding_roundtrip(
                 scale_factors=kwargs["scale_factors"],
                 method=kwargs["method"],
             )
-            # Match write_image's default omission of optional OMERO metadata.
+            # Leave out OMERO metadata, as write_image() does by default.
             multiscale.omero = None
             jobs = multiscale.to_ome_zarr(
                 str(tmp_path / "auto.zarr"),
@@ -110,7 +116,7 @@ def test_auto_sharding_roundtrip(
         )
         assert array.shards == direct.shards
         if not compute:
-            # Every interior write boundary must be a shard boundary.
+            # Check that write blocks end at shard boundaries, except the last edge.
             for axis_chunks, shard in zip(jobs[index].chunks, array.shards):
                 assert all(size == shard for size in axis_chunks[:-1])
 
@@ -138,8 +144,7 @@ def test_auto_sharding_issue640(tmp_path):
         "shards": "auto",
         "config": {"array.target_shard_size_bytes": 1000},
     }
-    # Preserve the issue's options, including its per-array config. Zarr decides
-    # which settings it recognizes; OME-Zarr must not reinterpret them.
+    # Keep the options from #640 unchanged and let Zarr handle its own config.
     direct = zarr.create_array(
         zarr.storage.MemoryStore(), shape=data.shape, dtype=data.dtype, **options
     )
