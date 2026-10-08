@@ -30,3 +30,10 @@ _build
 
 uv.lock
 coverage.*
+
+# Keep local HPC validation scripts and private artifacts out of commits.
+*.slurm
+/outputs/
+/private-validation/
+/linux*validation*.sh
+/run_validated_tests.sh
