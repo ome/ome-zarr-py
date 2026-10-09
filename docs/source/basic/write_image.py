@@ -49,6 +49,17 @@ multiscales = OMEZarrMultiscale(
     )
 multiscales.to_ome_zarr("test_ngff.ome.zarr", version="0.6")
 
+# %% tags=["remove-input"]
+import napari
+from napari.utils import nbscreenshot
+
+viewer = napari.Viewer()
+viewer.open("test_ngff.ome.zarr", plugin="napari-ome-zarr")
+nbscreenshot(viewer)
+
+# %% tags=["remove-cell"]
+viewer.close()
+
 # %%
 multiscales.images
 
