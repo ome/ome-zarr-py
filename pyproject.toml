@@ -30,7 +30,7 @@ dependencies = [
     "scikit-image>=0.19.0",
     "toolz",
     "rangehttpserver",
-    "transformnd>=0.9.1,<0.10.0",
+    "transformnd>=0.9.2,<0.10.0",
     "ome-zarr-models>=1.8.1",
     "Deprecated",
 ]

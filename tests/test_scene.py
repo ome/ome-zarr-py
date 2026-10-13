@@ -635,6 +635,17 @@ class OzmpTfKwargs(TypedDict):
         {},
         id="sequence",
     )
+    .add(
+        # slice (2D) -> volume (3D): project a new axis, then translate into place
+        ozmt.Sequence(
+            transformations=(
+                ozmt.ProjectAxis(createdOutputs=(0,)),
+                ozmt.Translation(translation=(30, 0, 0)),
+            )
+        ),
+        {"source_ndim": 2},
+        id="sequence_projectAxis_translation",
+    )
 ).parametrize
 def test_convert_transformations(
     ozm_transform: ozmt.AnyTransform, kwargs: OzmpTfKwargs

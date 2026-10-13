@@ -9,7 +9,8 @@ from urllib.parse import urljoin
 
 import dask.array as da
 import zarr
-from zarr.storage import FsspecStore, LocalStore, StoreLike
+from zarr.abc.store import Store
+from zarr.storage import FsspecStore, LocalStore, StoreLike, StorePath
 
 from .format import CurrentFormat, Format, detect_format
 from .types import JSONDict
@@ -35,6 +36,9 @@ class ZarrLocation:
         LOGGER.debug("ZarrLocation.__init__ path: %s, fmt: %s", path, fmt.version)
         self.__fmt = fmt
         self.__mode = mode
+        # A store passed in directly has no path of its own. The location is then the store plus a
+        # prefix inside it. Child locations share the store.
+        self.__prefix: str | None = None
         if isinstance(path, Path):
             self.__path = str(path.resolve())
         elif isinstance(path, str):
@@ -43,16 +47,19 @@ class ZarrLocation:
             self.__path = path.path
         elif isinstance(path, LocalStore):
             self.__path = str(path.root)
+        elif isinstance(path, StorePath):
+            self.__prefix = self.__path = path.path
+            path = path.store
+        elif isinstance(path, Store):
+            self.__prefix = self.__path = ""
         else:
             raise TypeError(f"not expecting: {type(path)}")
 
         loader = fmt
         if loader is None:
             loader = CurrentFormat()
-        self.__store: FsspecStore = (
-            path
-            if isinstance(path, (FsspecStore, LocalStore))
-            else loader.init_store(self.__path, mode)
+        self.__store: Store = (
+            path if isinstance(path, Store) else loader.init_store(self.__path, mode)
         )
         self.__init_metadata()
         detected = detect_format(self.__metadata, loader)
@@ -62,7 +69,8 @@ class ZarrLocation:
                 "version mismatch: detected: %s, requested: %s", detected, fmt
             )
             self.__fmt = detected
-            self.__store = detected.init_store(self.__path, mode)
+            if self.__prefix is None:
+                self.__store = detected.init_store(self.__path, mode)
             self.__init_metadata()
 
     def __init_metadata(self) -> None:
@@ -81,7 +89,10 @@ class ZarrLocation:
             # used for info, download, Spec.match() via root_attrs() etc.
             # and to check if the group exists for reading. Only need "r" mode for this.
             group = zarr.open_group(
-                store=self.__store, path="/", mode="r", zarr_format=zarr_format
+                store=self.__store,
+                path=self.__prefix or "/",
+                mode="r",
+                zarr_format=zarr_format,
             )
             self.zgroup = group.attrs.asdict()
             # For zarr v3, everything is under the "ome" namespace
@@ -94,7 +105,10 @@ class ZarrLocation:
                 # If we are creating a new group, we need to specify the zarr_format.
                 zarr_format = self.__fmt.zarr_format
                 group = zarr.open_group(
-                    store=self.__store, path="/", mode="w", zarr_format=zarr_format
+                    store=self.__store,
+                    path=self.__prefix or "/",
+                    mode="w",
+                    zarr_format=zarr_format,
                 )
             else:
                 self.__exists = False
@@ -130,7 +144,7 @@ class ZarrLocation:
         return self.__path
 
     @property
-    def store(self) -> FsspecStore:
+    def store(self) -> Store:
         """Return the initialized store for this location"""
         assert self.__store is not None
         return self.__store
@@ -142,13 +156,19 @@ class ZarrLocation:
 
     def load(self, subpath: str = "") -> da.core.Array:
         """Use dask.array.from_zarr to load the subpath."""
-        return da.from_zarr(self.__store, subpath)
+        return da.from_zarr(self.__store, self._inner(subpath))
+
+    def _inner(self, subpath: str) -> str:
+        """The path of ``subpath`` inside the store, below this location's prefix."""
+        return "/".join(p for p in (self.__prefix, subpath) if p)
 
     def __eq__(self, rhs: object) -> bool:
         if type(self) is not type(rhs):
             return False
         if not isinstance(rhs, ZarrLocation):
             return False
+        if self.__prefix is not None or rhs.__prefix is not None:
+            return self.__store is rhs.__store and self.__prefix == rhs.__prefix
         return self.subpath() == rhs.subpath()
 
     def basename(self) -> str:
@@ -167,6 +187,9 @@ class ZarrLocation:
     # TODO: update to from __future__ import annotations with 3.7+
     def create(self, path: str) -> "ZarrLocation":
         """Create a new Zarr location for the given path."""
+        if self.__prefix is not None:
+            child = StorePath(self.__store, self._inner(path))
+            return self.__class__(child, mode=self.__mode, fmt=self.__fmt)
         subpath = self.subpath(path)
         LOGGER.debug("open(%s(%s))", self.__class__.__name__, subpath)
         return self.__class__(subpath, mode=self.__mode, fmt=self.__fmt)
@@ -202,9 +225,13 @@ class ZarrLocation:
 
     def _ishttp(self) -> bool:
         """
-        Return whether the current underlying implementation
-        points to a URL
+        Return whether the store points to an http or https URL.
+
+        Only these schemes resolve relative paths with ``urljoin``.
+        Object stores such as s3 join paths by concatenation.
         """
+        if not isinstance(self.__store, FsspecStore):
+            return False
         if isinstance(self.__store.fs.protocol, tuple):
             return any(proto in ["http", "https"] for proto in self.__store.fs.protocol)
         return self.__store.fs.protocol in ["http", "https"]
