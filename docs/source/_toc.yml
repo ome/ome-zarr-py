@@ -43,6 +43,7 @@ parts:
       sections:
       - file: api/classes
       - file: api/writer
+      - file: api/export
       - file: api/reader
       - file: api/io
       - file: api/scale
