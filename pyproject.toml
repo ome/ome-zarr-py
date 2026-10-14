@@ -62,6 +62,7 @@ docs = [
     "napari",
     "pyqt6",
     "napari-ome-zarr",
+    "pyvirtualdisplay",
 ]
 
 [project.urls]
