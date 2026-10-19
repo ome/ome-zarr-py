@@ -19,14 +19,14 @@ repos:
           - --autofix
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.16.10
+    rev: v0.17.1
     hooks:
     - id: ruff-check
       args: ["--fix", "--show-fixes"]
       exclude: ^docs/
 
   - repo: https://github.com/psf/black-pre-commit-mirror
-    rev: 26.10.0
+    rev: 26.10.1
     hooks:
       - id: black
         exclude: ^docs/
