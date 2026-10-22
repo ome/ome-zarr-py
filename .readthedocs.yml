@@ -30,6 +30,10 @@ build:
     - libxcb-xinerama0
     - libxcb-xinput0
     - libxcb-xfixes0
+  jobs:
+    build:
+      html:
+        - xvfb-run -a python -m sphinx -T -b html docs/source $READTHEDOCS_OUTPUT/html
 
 # Build documentation in the docs/ directory with Sphinx
 sphinx:
