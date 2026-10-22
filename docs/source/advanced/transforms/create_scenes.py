@@ -102,6 +102,17 @@ scene = OMEZarrScene(
 
 scene.to_ome_zarr("test_example_scene.zarr", overwrite=True)
 
+# %% tags=["remove-input"]
+import napari
+
+viewer = napari.Viewer()
+for layer in viewer.open("test_example_scene.zarr", plugin="napari-ome-zarr"):
+    layer.visible = True
+    if isinstance(layer, napari.layers.Image):
+        level = layer.data[-1]
+        layer.contrast_limits = float(level.min()), float(level.max())
+napari.utils.nbscreenshot(viewer)
+
 # %% [markdown]
 # ....and load it back like this:
 

@@ -49,6 +49,17 @@ multiscales = OMEZarrMultiscale(
     )
 multiscales.to_ome_zarr("test_ngff.ome.zarr", version="0.6")
 
+# %% tags=["remove-input"]
+import napari
+
+viewer = napari.Viewer()
+for layer in viewer.open("test_ngff.ome.zarr", plugin="napari-ome-zarr"):
+    layer.visible = True
+    if isinstance(layer, napari.layers.Image):
+        level = layer.data[0]
+        layer.contrast_limits = float(level.min()), float(level.max())
+napari.utils.nbscreenshot(viewer)
+
 # %%
 multiscales.images
 
