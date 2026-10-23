@@ -47,3 +47,4 @@ jobs:
         with:
           file: ./coverage.xml
           fail_ci_if_error: true
+          os: ${{ matrix.os == 'ubuntu-24.04-arm' && 'linux-arm64' || '' }}
