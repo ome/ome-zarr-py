@@ -171,6 +171,12 @@ class TestScaler:
                 ["t", "c", "z", "y", "x"],
             ),
             (
+                # integer scale factors that are not powers of two
+                (1, 2, 1, 243, 243),
+                [3, 9, 27],
+                ["t", "c", "z", "y", "x"],
+            ),
+            (
                 #  check that missing t and c dimensions should be coerced to 1 and preserved
                 (1, 2, 1, 256, 256),
                 [
