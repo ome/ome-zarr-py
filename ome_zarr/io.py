@@ -198,7 +198,7 @@ class ZarrLocation:
         if self._isfile():
             return list(Path(self.__path).parts)
         else:
-            return self.__path.split("/")
+            return self.__path.rstrip("/").split("/")
 
     def subpath(self, subpath: str = "") -> str:
         if self._isfile():
