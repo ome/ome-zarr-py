@@ -1,34 +1,33 @@
 """Functions for generating synthetic data."""
 
 from collections.abc import Callable
-from random import randrange
+from typing import Literal, cast
 
+import dask.array as da
 import numpy as np
 import zarr
-from scipy.ndimage import zoom
 from skimage import data
 from skimage.filters import threshold_otsu
 from skimage.measure import label
 from skimage.segmentation import clear_border
 
+from ome_zarr import OMEZarrImage, OMEZarrLabels, OMEZarrMultiscale
+
 from .format import CurrentFormat, Format
-from .io import parse_url
-from .scale import Scaler
-from .writer import add_metadata, write_multiscale
 
 CHANNEL_DIMENSION = 1
 
 
-def coins() -> tuple[list, list]:
+def coins() -> tuple[OMEZarrMultiscale, OMEZarrLabels]:
     """
     Sample data from skimage.
 
     Returns
     -------
-    pyramids :
-        List of pyramid arrays.
-    labels :
-        List of labels.
+    image : OMEZarrMultiscale
+        Image array.
+    labels : OMEZarrLabels
+        Label array.
     """
     from skimage.morphology import closing, footprint_rectangle, remove_small_objects
 
@@ -38,15 +37,27 @@ def coins() -> tuple[list, list]:
     thresh = threshold_otsu(image)
     bw = closing(image > thresh, footprint_rectangle((4, 4)))
     cleared = remove_small_objects(clear_border(bw), max_size=20)
-    label_image = label(cleared)
+    label_image = np.asarray(label(cleared))
+    chunks = [s // 8 if s > 8 else 1 for s in image.shape]
 
-    pyramid = list(reversed([zoom(image, 2**i, order=3) for i in range(4)]))
-    labels = list(reversed([zoom(label_image, 2**i, order=0) for i in range(4)]))
+    img = OMEZarrImage(
+        data=da.from_array(image, chunks=chunks), axes="yx", name="coins"
+    )
+    lbl = OMEZarrImage(
+        data=da.from_array(label_image, chunks=chunks), axes="yx", name="coins"
+    )
 
-    return pyramid, labels
+    img_ms = OMEZarrMultiscale(
+        image=img,
+        contrast_limits=[(0, 255)],
+        channel_colors=["FF0000"],
+    )
+    lbl_ms = OMEZarrLabels(image=lbl)
+
+    return img_ms, lbl_ms
 
 
-def astronaut() -> tuple[list, list]:
+def astronaut() -> tuple[OMEZarrMultiscale, OMEZarrLabels]:
     """
     Sample data from skimage.
 
@@ -57,24 +68,40 @@ def astronaut() -> tuple[list, list]:
     labels :
         List of labels.
     """
-    scaler = Scaler()
-
     astro = data.astronaut()
     red = astro[:, :, 0]
     green = astro[:, :, 1]
     blue = astro[:, :, 2]
     astro = np.array([red, green, blue])
     pixels = np.tile(astro, (1, 2, 2))
-    pyramid = scaler.nearest(pixels)
 
-    shape = list(pyramid[0].shape)
+    shape = list(pixels.shape)
     _c, y, x = shape
     label = np.zeros((y, x), dtype=np.int8)
     make_circle(100, 100, 1, label[200:300, 200:300])
     make_circle(150, 150, 2, label[250:400, 250:400])
-    labels = scaler.nearest(label)
 
-    return pyramid, labels
+    chunks = [s // 8 if s > 8 else 1 for s in pixels.shape]
+    chunks_labels = [s // 8 if s > 8 else 1 for s in label.shape]
+
+    img = OMEZarrImage(
+        data=da.from_array(pixels, chunks=chunks), axes="cyx", name="astronaut"
+    )
+    lbl = OMEZarrImage(
+        data=da.from_array(label, chunks=chunks_labels),
+        axes="yx",
+        name="astronaut_labels",
+    )
+
+    img_ms = OMEZarrMultiscale(
+        image=img,
+        contrast_limits=[(0, 255), (0, 255), (0, 255)],
+        channel_colors=["FF0000", "00FF00", "0000FF"],
+        channel_names=["Red", "Green", "Blue"],
+    )
+    lbl_ms = OMEZarrLabels(image=lbl)
+
+    return img_ms, lbl_ms
 
 
 def make_circle(h: int, w: int, value: int, target: np.ndarray) -> None:
@@ -120,112 +147,19 @@ def rgb_to_5d(pixels: np.ndarray) -> list:
 
 def create_zarr(
     zarr_directory: str,
-    method: Callable[..., tuple[list, list]] = coins,
+    method: Callable[..., tuple[OMEZarrMultiscale, OMEZarrLabels]] = coins,
     label_name: str = "coins",
     fmt: Format = CurrentFormat(),
     chunks: tuple | list | None = None,
 ) -> zarr.Group:
     """Generate a synthetic image pyramid with labels."""
-    pyramid, labels = method()
-
-    loc = parse_url(zarr_directory, mode="w", fmt=fmt)
-    assert loc
-    grp = zarr.group(loc.store)
-    axes = None
-    if fmt.version not in ("0.1", "0.2"):
-        if pyramid[0].ndim == 3:
-            axes = "cyx"
-            size_c = 3
-        else:
-            axes = "tczyx"[-pyramid[0].ndim :]
-            size_c = 1
-    else:
-        # v0.1 and v0.2 must be 5D
-        pyramid = [rgb_to_5d(layer) for layer in pyramid]
-        if labels:
-            labels = [rgb_to_5d(layer) for layer in labels]
-        size_c = pyramid[0].shape[CHANNEL_DIMENSION]
-
-    if chunks is None:
-        # Use smallest pyramid as chunk size...
-        chunks = list(pyramid[-1].shape)
-        # setting any z, c, t sizes to 1
-        for zct in range(3):
-            if zct + 2 < len(chunks):
-                chunks[zct] = 1
-
-    storage_options = dict(chunks=tuple(chunks))
-
-    if size_c == 1:
-        image_data = {
-            "channels": [
-                {
-                    "window": {"start": 0, "end": 255, "min": 0, "max": 255},
-                    "color": "FF0000",
-                    "active": True,
-                }
-            ],
-            "rdefs": {"model": "greyscale"},
-        }
-    else:
-        image_data = {
-            "channels": [
-                {
-                    "color": "FF0000",
-                    "window": {"start": 0, "end": 255, "min": 0, "max": 255},
-                    "label": "Red",
-                    "active": True,
-                },
-                {
-                    "color": "00FF00",
-                    "window": {"start": 0, "end": 255, "min": 0, "max": 255},
-                    "label": "Green",
-                    "active": True,
-                },
-                {
-                    "color": "0000FF",
-                    "window": {"start": 0, "end": 255, "min": 0, "max": 255},
-                    "label": "Blue",
-                    "active": True,
-                },
-            ],
-            "rdefs": {"model": "color"},
-        }
-    write_multiscale(
-        pyramid,
-        grp,
-        axes=axes,
-        storage_options=storage_options,
-        metadata={"omero": image_data},
-        fmt=fmt,
+    image, label = method()
+    image.labels = {label.name: label}
+    version = cast(Literal["0.4", "0.5", "0.6"], fmt.version)
+    image.to_ome_zarr(
+        zarr_directory,
+        version=version,
+        overwrite=True,
     )
 
-    if labels:
-        labels_grp = grp.create_group("labels")
-        add_metadata(labels_grp, {"labels": [label_name]})
-
-        label_grp = labels_grp.create_group(label_name)
-        if axes is not None:
-            # remove channel axis for masks
-            axes = axes.replace("c", "")
-        write_multiscale(labels, label_grp, axes=axes, fmt=fmt)
-
-        colors = []
-        properties = []
-        for x in range(1, 9):
-            rgba = [randrange(0, 256) for i in range(4)]
-            colors.append({"label-value": x, "rgba": rgba})
-            properties.append({"label-value": x, "class": f"class {x}"})
-        add_metadata(
-            label_grp,
-            {
-                "image-label": {
-                    "version": fmt.version,
-                    "colors": colors,
-                    "properties": properties,
-                    "source": {"image": "../../"},
-                }
-            },
-        )
-
-    return grp
+    return zarr.open(zarr_directory, mode="a")

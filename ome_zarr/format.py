@@ -184,11 +184,11 @@ class FormatV01(Format):
             LOGGER.debug("%s contains unspecified keys", well)
         for key, key_type in self.REQUIRED_PLATE_WELL_KEYS.items():
             if key not in well:
-                raise ValueError(
+                raise TypeError(
                     "%s must contain a %s key of type %s", well, key, key_type
                 )
             if not isinstance(well[key], key_type):
-                raise ValueError("%s path must be of %s type", well, key_type)
+                raise TypeError("%s path must be of %s type", well, key_type)
 
     def generate_coordinate_transformations(
         self, shapes: list[tuple]
@@ -277,12 +277,19 @@ class FormatV04(FormatV03):
         self, shapes: list[tuple]
     ) -> list[list[dict[str, Any]]] | None:
         data_shape = shapes[0]
+        scale0 = [1.0] * len(data_shape)
         coordinate_transformations: list[list[dict[str, Any]]] = []
         # calculate minimal 'scale' transform based on pyramid dims
         for shape in shapes:
             assert len(shape) == len(data_shape)
             scale = [full / level for full, level in zip(data_shape, shape)]
-            coordinate_transformations.append([{"type": "scale", "scale": scale}])
+            trans = [s / 2 - s0 / 2 for s, s0 in zip(scale, scale0)]
+            coordinate_transformations.append(
+                [
+                    {"type": "scale", "scale": scale},
+                    {"type": "translation", "translation": trans},
+                ]
+            )
 
         return coordinate_transformations
 
@@ -332,7 +339,7 @@ class FormatV04(FormatV03):
                 )
             for value in scale:
                 if not isinstance(value, (float, int)):
-                    raise ValueError(f"'scale' values must all be numbers: {scale}")
+                    raise TypeError(f"'scale' values must all be numbers: {scale}")
 
             # validate translations...
             translation_types = [t == "translation" for t in types]
@@ -353,7 +360,7 @@ class FormatV04(FormatV03):
                     )
                 for value in translation:
                     if not isinstance(value, (float, int)):
-                        raise ValueError(
+                        raise TypeError(
                             f"'translation' values must all be numbers: {translation}"
                         )
 

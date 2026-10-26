@@ -107,7 +107,7 @@ def dict_to_zarr(
     plate_attrs = root_attrs.get("plate", None)
     multiscales = "multiscales" in root_attrs
     if plate_attrs is None and not multiscales:
-        raise Exception("zarr_path must be to plate.zarr or image.zarr")
+        raise TypeError("zarr_path must be to plate.zarr or image.zarr")
 
     if plate_attrs is not None:
         # look for 'label/0' under the first field of each Well

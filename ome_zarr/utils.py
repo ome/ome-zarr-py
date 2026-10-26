@@ -8,7 +8,7 @@ import urllib
 import webbrowser
 import xml.etree.ElementTree as ET
 from collections.abc import Iterator
-from datetime import datetime
+from datetime import UTC, datetime
 from http.server import (  # type: ignore[attr-defined]
     HTTPServer,
     SimpleHTTPRequestHandler,
@@ -24,7 +24,7 @@ from dask.diagnostics import ProgressBar
 # Not needed with python 3.15+? https://github.com/python/cpython/issues/86809
 from RangeHTTPServer import RangeRequestHandler
 
-from . import USE_DASK_ARRAY_KWARGS
+from . import USE_DASK_ARRAY_KWARGS, OMEZarrScene
 from .format import format_from_version
 from .io import parse_url
 from .reader import Multiscales, Node, Reader
@@ -154,10 +154,20 @@ def find_multiscales(path_to_zattrs):
         if len(wells) > 0:
             path_to_zarr = path_to_zattrs / wells[0].get("path") / field
             plate_name = os.path.basename(path_to_zattrs)
+            # when used for "finder", show the plate as a single entry with thumbnail
             return [[path_to_zarr, plate_name, os.path.dirname(path_to_zattrs)]]
         else:
             LOGGER.info("No wells found in plate%s", path_to_zattrs)
             return []
+    elif "scene" in zattrs:
+        # use first input image as the representative for the scene
+        path_to_zarr = path_to_zattrs
+        for ct in zattrs["scene"].get("coordinateTransformations", []):
+            input_path = ct.get("input", {}).get("path")
+            if input_path is not None:
+                path_to_zarr = path_to_zattrs / input_path
+                break
+        return [[path_to_zarr, path_to_zattrs.name, os.path.dirname(path_to_zattrs)]]
     elif zattrs.get("bioformats2raw.layout") == 3:
         # Open OME/METADATA.ome.xml
         try:
@@ -274,7 +284,7 @@ def finder(input_path: str, port: int = 8000, dry_run=False) -> None:
                 try:
                     mtime = os.path.getmtime(zarr_img[0])
                     # format mtime as "YYYY-MM-DD HH:MM:SS.Z"
-                    timestamp = datetime.fromtimestamp(mtime).strftime(
+                    timestamp = datetime.fromtimestamp(mtime, tz=UTC).strftime(
                         "%Y-%m-%d %H:%M:%S.%Z"
                     )
                 except OSError:
@@ -322,6 +332,14 @@ def download(input_path: str, output_dir: str = ".") -> None:
     """
     location = parse_url(input_path)
     assert location, f"not a zarr: {location}"
+
+    if "scene" in location.root_attrs:
+        # ponytail: scene coordinate systems/axes vary by version; the
+        # ome_zarr_models-backed OMEZarrScene already handles this round-trip.
+        name = Path(location.path).name or "scene.zarr"
+        scene = OMEZarrScene.from_ome_zarr(location.store)
+        scene.to_ome_zarr(Path(output_dir) / name, overwrite=True)
+        return
 
     reader = Reader(location)
     nodes: list[Node] = list()
@@ -421,7 +439,7 @@ def strip_common_prefix(parts: list[list[str]]) -> str:
         msg = "No common prefix:\n"
         for path in parts:
             msg += f"{path}\n"
-        raise Exception(msg)
+        raise ValueError(msg)
     else:
         common = parts[0][first_mismatch - 1]
 
@@ -429,3 +447,66 @@ def strip_common_prefix(parts: list[list[str]]) -> str:
         parts[idx] = parts[idx][first_mismatch - 1 :]
 
     return common
+
+
+def _get_version(group: zarr.Group) -> str:
+    """
+    Safely extract version from OME-Zarr group attributes.
+
+    Checks for version in known locations:
+    - group.attrs["ome"]["version"] for v0.5+
+    - group.attrs["multiscales"][0]["version"] for v0.4 or lower
+
+    Returns
+    -------
+    str
+        The OME-Zarr format version.
+
+    Raises
+    ------
+    ValueError
+        If version cannot be found in expected locations.
+    """
+    # Try v0.5+ format first
+    ome_attrs = group.attrs.get("ome")
+    if isinstance(ome_attrs, dict) and "version" in ome_attrs:
+        return ome_attrs["version"]
+
+    # Try v0.4 or lower format
+    multiscales = group.attrs.get("multiscales")
+    if isinstance(multiscales, list) and len(multiscales) > 0:
+        multiscale = multiscales[0]
+        if isinstance(multiscale, dict) and "version" in multiscale:
+            return multiscale["version"]
+
+    raise ValueError(
+        "Could not find 'version' in group attributes. "
+        "Expected location: group.attrs['ome']['version'] (v0.5+) "
+        "or group.attrs['multiscales'][0]['version'] (v0.4 or lower)"
+    )
+
+
+def _recursive_pop_nones(data: dict) -> dict:
+    """
+    Recursively remove None values from a nested dictionary.
+    """
+    output: dict = {}
+    for key, value in data.items():
+        if isinstance(value, dict):
+            nested = _recursive_pop_nones(value)
+            if nested:
+                output[key] = nested
+        elif isinstance(value, (list, tuple)):
+            nested_list = []
+            for item in value:
+                if isinstance(item, dict):
+                    nested_item = _recursive_pop_nones(item)
+                    if nested_item:
+                        nested_list.append(nested_item)
+                elif item is not None:
+                    nested_list.append(item)
+            if nested_list:
+                output[key] = nested_list
+        elif value is not None:
+            output[key] = value
+    return output
