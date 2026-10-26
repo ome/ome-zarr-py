@@ -27,6 +27,7 @@ def test_download_validation(optimized, existing_output, tmp_path):
             f"{output / 'image.zarr'} already exists!"
             if existing else "not a zarr: None"
         )
+        expected_type = FileExistsError if existing else ValueError
         with (
             patch("ome_zarr.utils.parse_url", return_value=location),
             patch("ome_zarr.utils.Reader", reader),
@@ -36,7 +37,7 @@ def test_download_validation(optimized, existing_output, tmp_path):
         ):
             try:
                 download("image.zarr", str(output))
-            except AssertionError as error:
+            except expected_type as error:
                 if str(error) != expected:
                     raise RuntimeError(f"Unexpected message: {error}") from error
             else:
