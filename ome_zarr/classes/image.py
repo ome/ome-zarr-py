@@ -34,6 +34,7 @@ from ome_zarr_models.v06.multiscales import (
     Multiscale as MultiscaleV06,
 )
 from pydantic import ValidationError
+from zarr.storage import StoreLike
 
 from ome_zarr.scale import Methods
 
@@ -328,7 +329,7 @@ class OMEZarrMultiscaleBase:
 
     def to_ome_zarr(
         self,
-        group: zarr.Group | str | Path,
+        group: zarr.Group | StoreLike,
         storage_options: list[dict[str, Any]] | dict[str, Any] | None = None,
         version: Literal["0.6", "0.5", "0.4"] = DEFAULT_VERSION,
         compute: bool = True,
@@ -345,11 +346,16 @@ class OMEZarrMultiscaleBase:
         delayed = []
 
         # Determine if store already exists
+        mode = "a"
         if isinstance(group, zarr.Group):
             store_exists = True  # zarr.Group was passed in, so it exists
-        else:
+        elif isinstance(group, (str, Path)):
             group = str(group)
             store_exists = os.path.exists(group)
+        else:
+            # A store has no local path. Mode "w-" raises FileExistsError on an existing group.
+            store_exists = False
+            mode = "w" if overwrite else "w-"
 
         # Decide whether to write main image data
         if store_exists and not overwrite:
@@ -367,7 +373,7 @@ class OMEZarrMultiscaleBase:
         else:
             raise ValueError(f"Unsupported OME-Zarr version: {version}")
 
-        group, fmt = check_group_fmt(group, fmt)
+        group, fmt = check_group_fmt(group, fmt, mode=mode)
 
         # Coerce data to dask arrays for writing
         pyramid = [

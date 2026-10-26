@@ -10,6 +10,7 @@ import dask.array as da
 import numpy as np
 import zarr
 from numcodecs import Blosc
+from zarr.storage import StoreLike
 
 from . import USE_DASK_ARRAY_KWARGS
 from .axes import Axes
@@ -224,15 +225,15 @@ def _blosc_compressor() -> Blosc:
 
 
 def check_group_fmt(
-    group: zarr.Group | str | Path,
+    group: zarr.Group | StoreLike,
     fmt: Format | None = None,
     mode: str = "a",
 ) -> tuple[zarr.Group, Format]:
     """
-    Create group if string, according to fmt
+    Create group if path or store, according to fmt
     OR check fmt is compatible with group
     """
-    if isinstance(group, (str, Path)):
+    if not isinstance(group, zarr.Group):
         if not fmt:
             group = zarr.open_group(group, mode=mode)
         else:
