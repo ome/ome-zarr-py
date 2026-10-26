@@ -62,6 +62,34 @@ Specify a different output directory:
 ome_zarr download https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.5/idr0062A/6001240_labels.zarr --output image_dir
 ```
 
+## export
+
+Use the `ome_zarr export` command to export an OME-Zarr image to another file format.
+Currently, images can be exported as a stack of 2D TIFF files, one file per plane:
+
+- `tiff-stack`: TIFF files with ImageJ metadata, for ImageJ/Fiji and Bio-Formats.
+  Supports `uint8`, `uint16`, `int16` and `float32` data.
+- `ome-tiff-stack`: OME-TIFF files (`.ome.tif`) with OME-XML metadata.
+  Supports all data types except 64-bit integers.
+
+The pixel size, z-spacing and time interval are carried over from the OME-Zarr metadata.
+
+```bash
+ome_zarr export https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.5/idr0062A/6001240_labels.zarr/ --format tiff-stack 6001240_tiffs/ --level 2
+```
+
+This writes files named e.g. `image_c0_z000.tif` into `6001240_tiffs/`, with one index per
+t, c and z axis present in the image.
+
+Options:
+
+- `--format`: The output format, `tiff-stack` or `ome-tiff-stack` (required)
+- `--level`: Pyramid level to export (default: 0, the full resolution).
+  Negative values count from the lowest resolution, e.g. `-1` is the smallest level.
+- `--overwrite`: Replace an existing export of the same image
+- `--no-progress`: Don't show a progress bar
+
+
 ## scale
 
 Use the `ome_zarr scale` command to generate a multiscale pyramid from a Zarr array.
