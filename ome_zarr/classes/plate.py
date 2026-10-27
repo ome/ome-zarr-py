@@ -15,10 +15,10 @@ class OMEZarrHCSPlate:
     """
     A plate in the HCS specification.
 
-    ``images`` maps (row, column) keys, e.g. ("A", "1"), to the images of that well.
+    ``images`` maps well paths "row/column", e.g. "A/1", to the images of that well.
     """
 
-    images: dict[tuple[str, str], list[OMEZarrMultiscale]]
+    images: dict[str, list[OMEZarrMultiscale]]
 
     def __post_init__(self):
 
@@ -26,17 +26,18 @@ class OMEZarrHCSPlate:
         self.images = dict(
             sorted(
                 self.images.items(),
-                key=lambda x: (x[0][0], int(x[0][1]) if x[0][1].isdigit() else x[0][1]),
+                key=lambda x: [int(p) if p.isdigit() else p for p in x[0].split("/")],
             )
         )
         self.rows = []
         self.columns = []
         self.wells = []
         for key, value in self.images.items():
-            if key[0] not in self.rows:
-                self.rows.append(key[0])
-            if key[1] not in self.columns:
-                self.columns.append(key[1])
+            row_name, column_name = key.split("/")
+            if row_name not in self.rows:
+                self.rows.append(row_name)
+            if column_name not in self.columns:
+                self.columns.append(column_name)
 
                 # make sure we have a list of OMEZarrMultiscale
             if not all(isinstance(item, OMEZarrMultiscale) for item in value):
@@ -50,13 +51,16 @@ class OMEZarrHCSPlate:
 
         # iterate over images again to find correct rowIndex and columnIndex for each well
         for key, value in self.images.items():
-            row_index = next(i for i, row in enumerate(self.rows) if row.name == key[0])
+            row_name, column_name = key.split("/")
+            row_index = next(
+                i for i, row in enumerate(self.rows) if row.name == row_name
+            )
             column_index = next(
-                i for i, column in enumerate(self.columns) if column.name == key[1]
+                i for i, column in enumerate(self.columns) if column.name == column_name
             )
             self.wells.append(
                 WellInPlate(
-                    path=f"{key[0]}/{key[1]}",
+                    path=key,
                     rowIndex=row_index,
                     columnIndex=column_index,
                 )
@@ -110,7 +114,7 @@ class OMEZarrHCSPlate:
         delayed: list = []
 
         for key, images_in_well in self.images.items():
-            well_group = group.require_group(f"{key[0]}/{key[1]}")
+            well_group = group.require_group(key)
             well_images = []
             for i, image in enumerate(images_in_well):
                 image_group = well_group.require_group(str(i))
