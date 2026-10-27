@@ -1,7 +1,13 @@
 from dask import __version__ as dask_version
 from packaging.version import Version
 
-from .classes import OMEZarrImage, OMEZarrLabels, OMEZarrMultiscale, OMEZarrScene
+from .classes import (
+    OMEZarrHCSPlate,
+    OMEZarrImage,
+    OMEZarrLabels,
+    OMEZarrMultiscale,
+    OMEZarrScene,
+)
 
 # Expose __version__ and fallback when _version.py doesn't exist.
 try:
@@ -13,6 +19,7 @@ except ImportError:
 USE_DASK_ARRAY_KWARGS = Version(dask_version) >= Version("2026.3.0")
 
 __all__ = [
+    "OMEZarrHCSPlate",
     "OMEZarrImage",
     "OMEZarrLabels",
     "OMEZarrMultiscale",
