@@ -33,6 +33,7 @@ dependencies = [
     "transformnd>=0.9.2,<0.10.0",
     "ome-zarr-models>=1.8.1",
     "Deprecated",
+    "imagecodecs-zarr>=2026.8.16",
 ]
 
 [project.scripts]
