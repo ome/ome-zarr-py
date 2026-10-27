@@ -412,7 +412,9 @@ class OMEZarrMultiscaleBase:
             )
             write_datasets.append(dataset)
 
-        write_metadata = self.metadata.model_copy(update={"datasets": write_datasets})
+        write_metadata = self.metadata.model_copy(
+            update={"datasets": tuple(write_datasets)}
+        )
 
         if version == "0.4":
             # in v0.4, metadata is stored under "multiscales" attribute
