@@ -581,6 +581,7 @@ class Reader:
         self.seen: list[ZarrLocation] = [zarr]
 
     def __call__(self) -> Iterator[Node]:
+        self.seen = [self.zarr]
         node = Node(self.zarr, self)
         if node.specs:  # Something has matched
             LOGGER.debug("treating %s as ome-zarr", self.zarr)
