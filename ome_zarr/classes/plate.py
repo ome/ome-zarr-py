@@ -14,6 +14,8 @@ from .image import OMEZarrMultiscale
 class OMEZarrHCSPlate:
     """
     A plate in the HCS specification.
+
+    ``images`` maps (row, column) keys, e.g. ("A", "1"), to the images of that well.
     """
 
     images: dict[tuple[str, str], list[OMEZarrMultiscale]]
@@ -24,17 +26,17 @@ class OMEZarrHCSPlate:
         self.images = dict(
             sorted(
                 self.images.items(),
-                key=lambda x: (x[0][1], int(x[0][0]) if x[0][0].isdigit() else x[0][0]),
+                key=lambda x: (x[0][0], int(x[0][1]) if x[0][1].isdigit() else x[0][1]),
             )
         )
         self.rows = []
         self.columns = []
         self.wells = []
         for key, value in self.images.items():
-            if key[1] not in self.rows:
-                self.rows.append(key[1])
-            if key[0] not in self.columns:
-                self.columns.append(key[0])
+            if key[0] not in self.rows:
+                self.rows.append(key[0])
+            if key[1] not in self.columns:
+                self.columns.append(key[1])
 
                 # make sure we have a list of OMEZarrMultiscale
             if not all(isinstance(item, OMEZarrMultiscale) for item in value):
@@ -48,13 +50,13 @@ class OMEZarrHCSPlate:
 
         # iterate over images again to find correct rowIndex and columnIndex for each well
         for key, value in self.images.items():
-            row_index = next(i for i, row in enumerate(self.rows) if row.name == key[1])
+            row_index = next(i for i, row in enumerate(self.rows) if row.name == key[0])
             column_index = next(
-                i for i, column in enumerate(self.columns) if column.name == key[0]
+                i for i, column in enumerate(self.columns) if column.name == key[1]
             )
             self.wells.append(
                 WellInPlate(
-                    path=f"{key[1]}/{key[0]}",
+                    path=f"{key[0]}/{key[1]}",
                     rowIndex=row_index,
                     columnIndex=column_index,
                 )
@@ -75,6 +77,7 @@ class OMEZarrHCSPlate:
         self,
         group: zarr.Group | str,
         storage_options: list[dict[str, Any]] | dict[str, Any] | None = None,
+        # TODO: add support for 0.4 and 0.5
         version: Literal["0.4", "0.5", "0.6"] = "0.6",
         overwrite: bool = False,
         compute: bool = True,
@@ -107,7 +110,7 @@ class OMEZarrHCSPlate:
         delayed: list = []
 
         for key, images_in_well in self.images.items():
-            well_group = group.require_group(f"{key[1]}/{key[0]}")
+            well_group = group.require_group(f"{key[0]}/{key[1]}")
             well_images = []
             for i, image in enumerate(images_in_well):
                 image_group = well_group.require_group(str(i))
