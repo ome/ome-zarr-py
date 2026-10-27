@@ -974,7 +974,6 @@ def write_multiscale_labels(
         group=sub_group,
         storage_options=storage_options,
         version=cast(Literal["0.6", "0.5", "0.4"], fmt.version),
-        name=name,
         compute=compute,
         overwrite=True,
     )
