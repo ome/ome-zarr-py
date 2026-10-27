@@ -17,6 +17,7 @@ from ome_zarr_models.v05.well import Well as Models05Well
 from skimage.data import binary_blobs
 from zarr.abc.codec import BytesBytesCodec
 from zarr.codecs import BloscCodec
+from zarr.storage import MemoryStore, StorePath
 
 from ome_zarr import (
     USE_DASK_ARRAY_KWARGS,
@@ -336,6 +337,14 @@ class TestWriter:
         ds_path = get_metadata(path)["multiscales"][0]["datasets"][0]["path"]
         arr = da.from_zarr(f"{path}/{ds_path}")
         assert np.allclose(data, arr[...].compute())
+
+    def test_group_from_store(self):
+        data = self.create_data((16, 16))
+        store = StorePath(MemoryStore(), "nested/image")
+        write_multiscale([data], store, axes="yx")
+        out = zarr.open_group(store, mode="r")
+        assert "multiscales" in out.attrs["ome"]
+        assert np.array_equal(data, out["s0"][...])
 
     @pytest.mark.parametrize("zarr_format", [2, 3])
     def test_write_image_current(self, array_constructor, zarr_format):
@@ -849,6 +858,22 @@ class TestWriter:
             assert d["path"] == f"s{i}"
             assert d["coordinateTransformations"][0]["input"]["path"] == f"s{i}"
             assert d["coordinateTransformations"][0]["output"]["name"] == "physical"
+
+    def test_writer_fails_if_existing(self):
+        # create dummy data
+        image_data = np.random.randint(0, 1000, size=(1, 1, 1, 32, 32))
+
+        # create single-scale object
+        singlescale = OMEZarrImage(data=image_data, axes="tczyx")
+
+        # create multiscale object
+        ms = OMEZarrMultiscale(image=singlescale, method="nearest")
+        # attempt to write twice with overwrite = False
+        ms.to_ome_zarr(self.path / "overwrite")
+        with pytest.raises(OSError):
+            ms.to_ome_zarr(self.path / "overwrite")
+
+        ms.to_ome_zarr(self.path / "overwrite", overwrite=True)
 
 
 class TestPlateMetadata:

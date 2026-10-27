@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import warnings
+from abc import abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Literal, cast
 
 import dask.array as da
@@ -32,6 +34,7 @@ from ome_zarr_models.v06.multiscales import (
     Multiscale as MultiscaleV06,
 )
 from pydantic import ValidationError
+from zarr.storage import StoreLike
 
 from ome_zarr.scale import Methods
 
@@ -356,7 +359,7 @@ class OMEZarrMultiscaleBase:
 
     def to_ome_zarr(
         self,
-        group: zarr.Group | str,
+        group: zarr.Group | StoreLike,
         storage_options: list[dict[str, Any]] | dict[str, Any] | None = None,
         version: Literal["0.6", "0.5", "0.4"] = DEFAULT_VERSION,
         compute: bool = True,
@@ -373,107 +376,107 @@ class OMEZarrMultiscaleBase:
         delayed = []
 
         # Determine if store already exists
-        if isinstance(group, str):
+        mode = "a"
+        if isinstance(group, zarr.Group):
+            store_exists = True  # zarr.Group was passed in, so it exists
+        elif isinstance(group, (str, Path)):
+            group = str(group)
             store_exists = os.path.exists(group)
         else:
-            store_exists = True  # zarr.Group was passed in, so it exists
+            # A store has no local path. Mode "w-" raises FileExistsError on an existing group.
+            store_exists = False
+            mode = "w" if overwrite else "w-"
 
-            # Decide whether to write main image data
-        write_image_data = not store_exists or overwrite
+        # Decide whether to write main image data
+        if store_exists and not overwrite:
+            raise OSError("store exists but overwrite=False")
 
-        if write_image_data:
-            # Delete existing store if overwriting
-            if overwrite and isinstance(group, str) and os.path.exists(group):
-                shutil.rmtree(group)
+        # Delete existing store if overwriting
+        if overwrite and isinstance(group, str) and os.path.exists(group):
+            shutil.rmtree(group)
 
-            fmt: Format | None = None
-            if version in {"0.5", "0.6"}:
-                fmt = FormatV05()
-            elif version == "0.4":
-                fmt = FormatV04()
-            else:
-                raise ValueError(f"Unsupported OME-Zarr version: {version}")
+        fmt: Format | None = None
+        if version in {"0.5", "0.6"}:
+            fmt = FormatV05()
+        elif version == "0.4":
+            fmt = FormatV04()
+        else:
+            raise ValueError(f"Unsupported OME-Zarr version: {version}")
 
-            group, fmt = check_group_fmt(group, fmt)
+        group, fmt = check_group_fmt(group, fmt, mode=mode)
 
-            # Coerce data to dask arrays for writing
-            pyramid = [
-                img.data if isinstance(img.data, da.Array) else da.from_array(img.data)
-                for img in self.images
-            ]
+        # Coerce data to dask arrays for writing
+        pyramid = [
+            img.data if isinstance(img.data, da.Array) else da.from_array(img.data)
+            for img in self.images
+        ]
 
-            default_cs = self.metadata.intrinsic_coordinate_system
+        default_cs = self.metadata.intrinsic_coordinate_system
 
-            # write the actual image to disk
-            delayed += _write_pyramid_to_zarr(
-                pyramid=pyramid,
-                group=group,
-                fmt=fmt,
-                storage_options=storage_options,
-                axes=tuple([ax.name for ax in default_cs.axes]),
-                scale=cast(dict[str, float], self.images[0].scale),
-                compute=compute,
-                name=self.name,
-            )
+        # write the actual image to disk
+        delayed += _write_pyramid_to_zarr(
+            pyramid=pyramid,
+            group=group,
+            fmt=fmt,
+            storage_options=storage_options,
+            axes=tuple([ax.name for ax in default_cs.axes]),
+            scale=cast(dict[str, float], self.images[0].scale),
+            compute=compute,
+            name=self.name,
+        )
 
         # write the metadata to disk
         if isinstance(group, str):
             group = zarr.open(group, mode="r+")
 
-        # Only write full metadata if we wrote image data, otherwise just update labels
-        if write_image_data:
-            # Create a copy of metadata with normalized paths (s0, s1, etc.)
-            # to match the paths used by _write_pyramid_to_zarr
-            write_datasets = []
-            for idx, ds in enumerate(self.metadata.datasets):
-                path = f"s{idx}"
-                transform = ds.coordinateTransformations[0]
-                if transform.input is None:
-                    raise ValueError(
-                        f"Transform input cannot be None in dataset {idx} "
-                        f"transform {transform}"
-                    )
-                transform = transform.model_copy(
-                    update={"input": transform.input.model_copy(update={"path": path})}
+        # Create a copy of metadata with normalized paths (s0, s1, etc.)
+        # to match the paths used by _write_pyramid_to_zarr
+        write_datasets = []
+        for idx, ds in enumerate(self.metadata.datasets):
+            path = f"s{idx}"
+            transform = ds.coordinateTransformations[0]
+            if transform.input is None:
+                raise ValueError(
+                    f"Transform input cannot be None in dataset {idx} "
+                    f"transform {transform}"
                 )
-                dataset = ds.model_copy(
-                    update={"path": path, "coordinateTransformations": (transform,)}
-                )
-                write_datasets.append(dataset)
-
-            write_metadata = self.metadata.model_copy(
-                update={"datasets": write_datasets}
+            transform = transform.model_copy(
+                update={"input": transform.input.model_copy(update={"path": path})}
             )
+            dataset = ds.model_copy(
+                update={"path": path, "coordinateTransformations": (transform,)}
+            )
+            write_datasets.append(dataset)
 
-            if version == "0.4":
-                # in v0.4, metadata is stored under "multiscales" attribute
-                metadata_dict = write_metadata.to_version("0.4").model_dump(
-                    by_alias=True
-                )
-                metadata_dict = _recursive_pop_nones(metadata_dict)
-                metadata_dict["version"] = version
-                group.attrs["multiscales"] = [metadata_dict]
+        write_metadata = self.metadata.model_copy(update={"datasets": write_datasets})
 
-            elif version == "0.5":
-                metadata_dict = {
-                    "version": version,
-                    "multiscales": [
-                        _recursive_pop_nones(
-                            write_metadata.to_version("0.5").model_dump(by_alias=True)
-                        )
-                    ],
-                }
+        if version == "0.4":
+            # in v0.4, metadata is stored under "multiscales" attribute
+            metadata_dict = write_metadata.to_version("0.4").model_dump(by_alias=True)
+            metadata_dict = _recursive_pop_nones(metadata_dict)
+            metadata_dict["version"] = version
+            group.attrs["multiscales"] = [metadata_dict]
 
-                group.attrs["ome"] = metadata_dict
+        elif version == "0.5":
+            metadata_dict = {
+                "version": version,
+                "multiscales": [
+                    _recursive_pop_nones(
+                        write_metadata.to_version("0.5").model_dump(by_alias=True)
+                    )
+                ],
+            }
 
-            elif version == "0.6":
-                metadata_dict = {
-                    "version": version,
-                    "multiscales": [
-                        _recursive_pop_nones(write_metadata.model_dump(by_alias=True))
-                    ],
-                }
-                group.attrs["ome"] = metadata_dict
+            group.attrs["ome"] = metadata_dict
+
+        elif version == "0.6":
+            metadata_dict = {
+                "version": version,
+                "multiscales": [
+                    _recursive_pop_nones(write_metadata.model_dump(by_alias=True))
+                ],
+            }
+            group.attrs["ome"] = metadata_dict
 
         delayed += self._write_additional_meta_data(
             group=group,
@@ -638,6 +641,18 @@ class OMEZarrMultiscaleBase:
         List of images at each pyramid level.
         """
         return self._images
+
+    def get_local_coordinate_system(self, name: str) -> CoordinateSystem | None:
+        """Get a coordinate system defined on this multiscale by its name."""
+        for cs in self.metadata.coordinateSystems:
+            if cs.name == name:
+                return cs
+        return None
+
+    @abstractmethod
+    def _get_descendant_coordinate_system(
+        self, csid: CoordinateSystemIdentifier
+    ) -> CoordinateSystem | None: ...
 
     def _write_additional_meta_data(
         self,
@@ -814,6 +829,25 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
             Write the multiscale image pyramid and metadata to an OME-Zarr group.
         from_ome_zarr(group)
             Load a multiscale image pyramid and metadata from an OME-Zarr group.
+        get_local_coordinate_system(name)
+            Get information about a coordinate system defined on this multiscale.
+
+    Examples
+    --------
+    .. code-block:: python
+
+        import numpy as np
+        from ome_zarr import OMEZarrImage, OMEZarrMultiscale
+        data = np.random.poisson(lam=10, size=(2, 10, 128, 128)).astype(np.uint8)
+        image = OMEZarrImage(
+            data=data,
+            axes="czyx",
+        )
+        multiscale = OMEZarrMultiscale(
+            image=image,
+            scale_factors=[2, 4, 8, 16],
+            channel_names=["DAPI", "GFP"]
+        )
     """
 
     def __init__(
@@ -1098,6 +1132,28 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
         except ValidationError as e:
             warnings.warn(f"Failed to validate Omero metadata: {e}")
 
+    def _get_descendant_coordinate_system(
+        self, csid: CoordinateSystemIdentifier
+    ) -> CoordinateSystem | None:
+        """Find a coordinate system belonging either to this image,
+        or a label below it.
+
+        Must be named.
+        """
+        if csid.name is None:
+            return None
+
+        if csid.path is not None and csid.path != ".":
+            if self.labels is None:
+                return None
+            lbl = self.labels.get(csid.path)
+            if lbl is None:
+                return None
+
+            return lbl.get_local_coordinate_system(csid.name)
+
+        return self.get_local_coordinate_system(csid.name)
+
     @property
     def labels(self) -> dict[str, OMEZarrLabels] | None:
         return self._labels
@@ -1115,10 +1171,11 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
 
     @omero.setter
     def omero(self, value: Omero | dict[str, Any] | None):
-        if isinstance(value, dict):
-            self._omero = Omero.model_validate(value)
-        else:
-            self._omero = value
+        if value is not None and not isinstance(value, Omero):
+            raise TypeError(
+                f"Expected an instance of Omero or None, received {type(value)}"
+            )
+        self._omero = value
 
     @staticmethod
     def _parse_labels(
@@ -1217,7 +1274,7 @@ class OMEZarrLabels(OMEZarrMultiscaleBase):
         to the metadata. This can be time consuming for large datasets, so it is optional.
         Default is True.
 
-     Attributes
+    Attributes
     ----------
     images : list[OMEZarrImage]
         List of label images at each pyramid level.
@@ -1227,6 +1284,11 @@ class OMEZarrLabels(OMEZarrMultiscaleBase):
         The OME-Zarr metadata associated with this multiscale image,
         stored as a Pydantic model instance.
         Automatically created upon instantiation of the class.
+
+    Methods
+    -------
+        get_local_coordinate_system(name)
+            Get information about a coordinate system defined on this multiscale.
     """
 
     _image_label: Label | None
@@ -1339,16 +1401,46 @@ class OMEZarrLabels(OMEZarrMultiscaleBase):
             }
         )
 
+    def _get_descendant_coordinate_system(
+        self, csid: CoordinateSystemIdentifier
+    ) -> CoordinateSystem | None:
+        """Get a coordinate system.
+
+        Must have a name and a trivial path.
+        """
+        if csid.name is None:
+            return None
+        if csid.path is not None or csid.path != ".":
+            return None
+        return self.get_local_coordinate_system(csid.name)
+
     @property
     def image_label(self) -> Label | None:
+        """
+        Get the image label metadata associated with this multiscale image.
+
+        Returns
+        -------
+        ome_zarr_models.common.image_label_types.LabelBase | None
+            The image label metadata if available, otherwise `None`.
+        """
         return self._image_label
 
     @image_label.setter
-    def image_label(self, value: Label | dict[str, Any] | None):
-        if isinstance(value, dict):
-            self._image_label = Label.model_validate(value)
-        else:
-            self._image_label = value
+    def image_label(self, value: Label | None):
+        """
+        Set the image label metadata.
+
+        Parameters
+        ----------
+        value : ome_zarr_models.common.image_label_types.LabelBase | None
+            The new image label metadata to set. Must be an instance of `LabelBase` or `None`.
+        """
+        if value is not None and not isinstance(value, Label):
+            raise TypeError(
+                f"Expected an instance of Label or None, received {type(value)}"
+            )
+        self._image_label = value
 
     def _write_additional_meta_data(
         self,

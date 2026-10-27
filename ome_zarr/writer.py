@@ -10,6 +10,7 @@ import dask.array as da
 import numpy as np
 import zarr
 from numcodecs import Blosc
+from zarr.storage import StoreLike
 
 from . import USE_DASK_ARRAY_KWARGS
 from .axes import Axes
@@ -224,15 +225,15 @@ def _blosc_compressor() -> Blosc:
 
 
 def check_group_fmt(
-    group: zarr.Group | str,
+    group: zarr.Group | StoreLike,
     fmt: Format | None = None,
     mode: str = "a",
 ) -> tuple[zarr.Group, Format]:
     """
-    Create group if string, according to fmt
+    Create group if path or store, according to fmt
     OR check fmt is compatible with group
     """
-    if isinstance(group, str):
+    if not isinstance(group, zarr.Group):
         if not fmt:
             group = zarr.open_group(group, mode=mode)
         else:
@@ -555,7 +556,8 @@ def write_image(
         e.g. {"t": "millisecond", "z": "micrometer", "y": "micrometer", "x": "micrometer"}.
         For a list of recommended units, see [ngff specification](https://ngff.openmicroscopy.org/specifications/0.5/index.html#axes-metadata).
     `**metadata` : dict
-        Additional metadata to store, i.e. {"omero": {...}}. This is passed through to the multiscales metadata.
+        Additional metadata to store.
+        Use the `metadata` kwarg, e.g., `metadata={"omero": {"name": "My image"}}`.
 
     Returns
     -------
@@ -972,6 +974,7 @@ def write_multiscale_labels(
         group=sub_group,
         storage_options=storage_options,
         version=cast(Literal["0.6", "0.5", "0.4"], fmt.version),
+        name=name,
         compute=compute,
         overwrite=True,
     )

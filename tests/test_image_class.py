@@ -2,6 +2,7 @@ import dask.array as da
 import numpy as np
 import pytest
 import zarr
+from zarr.storage import MemoryStore, StorePath
 
 from ome_zarr import OMEZarrImage, OMEZarrLabels, OMEZarrMultiscale
 from ome_zarr.writer import _retuple
@@ -208,7 +209,7 @@ def test_image_class_bad_args(tmp_path):
     )
     assert len(multiscales.images) == 5
 
-    multiscales.to_ome_zarr(tmp_path / "test_bad_args.zarr", version="0.5.5")
+    multiscales.to_ome_zarr(str(tmp_path / "test_bad_args.zarr"), version="0.5")
 
 
 def test_multiscale_from_pyramid_sanity(image_dims):
@@ -304,6 +305,46 @@ def test_image_class_writer_array_constructor(tmp_path, array_constructor):
     assert np.allclose(data, written[...].compute())
 
 
+def _small_multiscale():
+    image = OMEZarrImage(data=create_data((16, 16)), axes="yx")
+    return OMEZarrMultiscale(image=image, scale_factors=None, method=None)
+
+
+def test_image_class_writer_on_a_store():
+    """The writer puts data in the given store, not at a path made from it."""
+    store = MemoryStore()
+    ms = _small_multiscale()
+    ms.to_ome_zarr(store)
+
+    out = zarr.open_group(store, mode="r")
+    assert "ome" in out.attrs
+    assert np.array_equal(out["s0"][...], np.asarray(ms.images[0].data))
+
+
+def test_image_class_writer_on_a_store_path():
+    """The writer puts data under the prefix of a StorePath."""
+    store = MemoryStore()
+    ms = _small_multiscale()
+    ms.to_ome_zarr(StorePath(store, "nested/image"))
+
+    out = zarr.open_group(store, path="nested/image", mode="r")
+    assert np.array_equal(out["s0"][...], np.asarray(ms.images[0].data))
+
+
+def test_image_class_writer_on_a_store_overwrite():
+    """An existing group in a store needs overwrite=True."""
+    store = MemoryStore()
+    zarr.open_group(store, mode="w")
+    ms = _small_multiscale()
+
+    with pytest.raises(OSError):
+        ms.to_ome_zarr(store)
+
+    ms.to_ome_zarr(store, overwrite=True)
+    out = zarr.open_group(store, mode="r")
+    assert np.array_equal(out["s0"][...], np.asarray(ms.images[0].data))
+
+
 @pytest.mark.parametrize("storage_options_list", [True, False])
 def test_image_class_writer_storage_options(tmp_path, image_dims, storage_options_list):
     """
@@ -372,6 +413,24 @@ def test_image_class_writer_labels(tmp_path, image_dims, version):
     if "c" in axes:
         assert ms_read.omero is not None
     assert ms_read.labels[labels_name].image_label is not None
+
+
+def test_bad_image_label_metadata():
+    """
+    The `image_label` field of OMEZarrLabels
+    """
+    shape, axes, scale = (256, 256), "yx", {"y": 1.0, "x": 1.0}
+    data = create_data(shape)
+    data_labels = (data > data.mean()).astype(np.uint8)
+
+    labels_name = "test_labels"
+    labels = OMEZarrImage(data=data_labels, axes=axes, scale=scale, name=labels_name)
+    labels_multiscales = OMEZarrLabels(image=labels, scale_factors=None)
+
+    label_dict = {"colors": [1, 2, 3, 4], "properties": {"prop1": "value1"}}
+
+    with pytest.raises(TypeError):
+        labels_multiscales.image_label = label_dict
 
 
 @pytest.mark.parametrize("version", ["0.4", "0.5", "0.6"], ids=["V04", "V05", "V06"])
