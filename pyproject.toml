@@ -61,6 +61,7 @@ docs = [
     "linkify-it-py",
     "napari",
     "pyqt6",
+    "napari-ome-zarr",
 ]
 
 [project.urls]
