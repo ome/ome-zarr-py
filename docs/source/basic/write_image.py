@@ -39,7 +39,7 @@ image = OMEZarrImage(
   axes_units={"z": "micrometer", "y": "micrometer", "x": "micrometer"},
 )
 
-multiscales = OMEZarrMultiscale(
+multiscales = OMEZarrMultiscale.from_singlescale(
     image=image,
     scale_factors=(2, 4, 8),
     method="resize",
