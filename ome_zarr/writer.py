@@ -350,7 +350,11 @@ def write_multiscale(
     group, fmt = check_group_fmt(group, fmt)
     dims = len(pyramid[0].shape)
     axes = _get_valid_axes(dims, axes, axes_units=axes_units, fmt=fmt)
-
+    if axes_units is None:
+        axes_units = {}
+        for a in axes or []:
+            if isinstance(a, dict) and "name" in a and "unit" in a:
+                axes_units[a["name"]] = a["unit"]
     if scale is None:
         scale = dict.fromkeys(_extract_dims_from_axes(axes), 1.0)
 
@@ -685,6 +689,11 @@ def write_image(
         )
 
     axes = _get_valid_axes(len(image.shape), axes, axes_units=axes_units, fmt=fmt)
+    if axes_units is None:
+        axes_units = {}
+        for a in axes or []:
+            if isinstance(a, dict) and "name" in a and "unit" in a:
+                axes_units[a["name"]] = a["unit"]
     dims = _extract_dims_from_axes(axes)
 
     if scale is None:
