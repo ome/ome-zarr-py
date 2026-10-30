@@ -1,6 +1,7 @@
 import json
 import pathlib
 import re
+import tempfile
 from typing import Any
 
 import dask.array as da
@@ -400,6 +401,56 @@ class TestWriter:
                 else:
                     # non-spatial dimensions (t, c) are not downsampled
                     assert value == 1.0
+
+    def test_write_multiscale_transforms(self):
+        ct = [
+            [
+                {"type": "scale", "scale": [0.5, 0.25, 0.25]},
+                {"type": "translation", "translation": [10.0, 20.0, 30.0]},
+            ],
+            [
+                {"type": "scale", "scale": [0.5, 0.5, 0.5]},
+                {"type": "translation", "translation": [10.0, 20.125, 30.125]},
+            ],
+        ]
+        axes = [{"name": d, "type": "space", "unit": "micrometer"} for d in "zyx"]
+        img = np.zeros((16, 64, 64), "uint16")
+
+        for name, write in [
+            (
+                "write_multiscale",
+                lambda g: write_multiscale(
+                    [img, img[:, ::2, ::2]], g, axes=axes, coordinate_transformations=ct
+                ),
+            ),
+            (
+                "write_image",
+                lambda g: write_image(
+                    img,
+                    g,
+                    scale_factors=[{"z": 1, "y": 2, "x": 2}],
+                    axes=axes,
+                    coordinate_transformations=ct,
+                ),
+            ),
+        ]:
+            print("Testing:", name)
+            with tempfile.TemporaryDirectory() as d:
+                write(d)
+                json_text = (pathlib.Path(d) / "zarr.json").read_text(encoding="utf-8")
+                ome_attrs = json.loads(json_text).get("attributes", {}).get("ome", {})
+                ms = ome_attrs.get("multiscales", [])[0]
+                for a in ms["axes"]:
+                    assert a.get("unit") == "micrometer"
+                    assert a.get("name") in "zyx"
+                    assert a.get("type") == "space"
+                for i, ds in enumerate(ms["datasets"]):
+                    print("  ", ds["path"], ds["coordinateTransformations"])
+                    # check 'scale' transformation
+                    assert ds["coordinateTransformations"][0] == ct[i][0]
+                    # check 'translation' transformation
+                    assert ds["coordinateTransformations"][1] == ct[i][1]
+        assert False, "Check the printed output for verification"
 
     @pytest.mark.parametrize("read_from_zarr", [True, False])
     @pytest.mark.parametrize("compute", [True, False])
