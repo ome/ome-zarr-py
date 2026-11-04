@@ -412,7 +412,9 @@ class OMEZarrMultiscaleBase:
             )
             write_datasets.append(dataset)
 
-        write_metadata = self.metadata.model_copy(update={"datasets": write_datasets})
+        write_metadata = self.metadata.model_copy(
+            update={"datasets": tuple(write_datasets)}
+        )
 
         if version == "0.4":
             # in v0.4, metadata is stored under "multiscales" attribute
@@ -1183,7 +1185,12 @@ class OMEZarrLabels(OMEZarrMultiscaleBase):
         colors = [
             {
                 "label-value": label,
-                "rgba": [np.random.randint(0, 255) for _ in range(3)] + [255],
+                # label 0 is the background, so keep it transparent
+                "rgba": (
+                    [0, 0, 0, 0]
+                    if label == 0
+                    else [np.random.randint(0, 255) for _ in range(3)] + [255]
+                ),
             }
             for label in label_values
         ]
