@@ -8,11 +8,12 @@
 # %%
 import numpy as np
 from ome_zarr_models.v06.coordinate_transforms import CoordinateSystem, Rotation
+from skimage.data import human_mitosis
 
 from ome_zarr import OMEZarrImage, OMEZarrMultiscale
 
 # %%
-data = np.random.rand(256, 256)
+data = human_mitosis()
 image = OMEZarrImage(data=data, axes="yx", name="My Image")
 
 ms = OMEZarrMultiscale(image=image)
