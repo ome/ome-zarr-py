@@ -331,7 +331,8 @@ def download(input_path: str, output_dir: str = ".") -> None:
     be included in the download.
     """
     location = parse_url(input_path)
-    assert location, f"not a zarr: {location}"
+    if not location:
+        raise ValueError(f"not a zarr: {location}")
 
     if "scene" in location.root_attrs:
         # ponytail: scene coordinate systems/axes vary by version; the
@@ -352,7 +353,8 @@ def download(input_path: str, output_dir: str = ".") -> None:
     output_path = Path(output_dir)
     root_path = output_path / common
 
-    assert not root_path.exists(), f"{root_path} already exists!"
+    if root_path.exists():
+        raise FileExistsError(f"{root_path} already exists!")
     print("downloading...")
     for path in paths:
         print("  ", Path(*path))

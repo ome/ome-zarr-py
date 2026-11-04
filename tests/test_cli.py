@@ -1,15 +1,19 @@
 import json
 import os
 from collections import deque
+from functools import partial
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from threading import Thread
 
+import numpy as np
 import pytest
 import zarr
 
 from ome_zarr.cli import main
 from ome_zarr.format import CurrentFormat, FormatV04, FormatV05
 from ome_zarr.utils import find_multiscales, finder, strip_common_prefix, view
-from ome_zarr.writer import write_plate_metadata
+from ome_zarr.writer import write_image, write_plate_metadata
 
 
 def directory_items(directory: Path):
@@ -95,6 +99,38 @@ class TestCli:
                 assert (Path(out) / basename / item).exists()
             for item in ["c", "zarr.json"]:
                 assert (Path(out) / basename / "s1" / item).exists()
+
+    @pytest.mark.parametrize("trailing_slash", [False, True])
+    @pytest.mark.parametrize("explicit_output", [False, True])
+    def test_download_http(
+        self, tmp_path, monkeypatch, trailing_slash, explicit_output
+    ):
+        source = tmp_path / "source"
+        image = np.arange(16, dtype=np.uint8).reshape(4, 4)
+        write_image(image, str(source / "image.zarr"), axes="yx", scale_factors=[])
+        output = tmp_path / "output"
+        output.mkdir()
+        monkeypatch.chdir(output)
+
+        handler = partial(SimpleHTTPRequestHandler, directory=str(source))
+        server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+        thread = Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            url = f"http://127.0.0.1:{server.server_port}/image.zarr"
+            if trailing_slash:
+                url += "/"
+            args = ["download", url]
+            if explicit_output:
+                args += ["--output", str(output)]
+            main(args)
+        finally:
+            server.shutdown()
+            thread.join()
+            server.server_close()
+
+        result = zarr.open_array(output / "image.zarr" / "s0", mode="r")
+        np.testing.assert_array_equal(result[:], image)
 
     def test_s3_info(self, s3_address):
         main(["info", s3_address])

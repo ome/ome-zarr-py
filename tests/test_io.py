@@ -104,9 +104,7 @@ def test_class_writer_on_a_store():
     multiscale = OMEZarrMultiscale(
         image=OMEZarrImage(data=IMAGE, axes="yx"), scale_factors=None, method=None
     )
-    multiscale.to_ome_zarr(
-        zarr.open_group(store, path="images/img", mode="w"), overwrite=True
-    )
+    multiscale.to_ome_zarr(StorePath(store, "images/img"))
 
     loc = ZarrLocation(StorePath(store, "images/img"))
     assert loc.exists()

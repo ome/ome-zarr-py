@@ -87,6 +87,14 @@ class TestReader:
         reader = Reader(parse_url(str(self.path)))
         assert len(list(reader())) == 3
 
+    def test_repeat_read(self):
+        location = parse_url(str(self.path))
+        assert location is not None
+        reader = Reader(location)
+        first = [node.zarr for node in reader()]
+        assert len(first) == 3
+        assert [node.zarr for node in reader()] == first
+
     def test_labels(self):
         filename = str(self.path.join("labels"))
         reader = Reader(parse_url(filename))

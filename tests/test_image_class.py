@@ -2,6 +2,7 @@ import dask.array as da
 import numpy as np
 import pytest
 import zarr
+from zarr.storage import MemoryStore, StorePath
 
 from ome_zarr import OMEZarrImage, OMEZarrLabels, OMEZarrMultiscale
 from ome_zarr.writer import _retuple
@@ -242,6 +243,46 @@ def test_image_class_writer_array_constructor(tmp_path, array_constructor):
     # Written pixel data should match the input,
     # whether given as numpy or dask.
     assert np.allclose(data, written[...].compute())
+
+
+def _small_multiscale():
+    image = OMEZarrImage(data=create_data((16, 16)), axes="yx")
+    return OMEZarrMultiscale(image=image, scale_factors=None, method=None)
+
+
+def test_image_class_writer_on_a_store():
+    """The writer puts data in the given store, not at a path made from it."""
+    store = MemoryStore()
+    ms = _small_multiscale()
+    ms.to_ome_zarr(store)
+
+    out = zarr.open_group(store, mode="r")
+    assert "ome" in out.attrs
+    assert np.array_equal(out["s0"][...], np.asarray(ms.images[0].data))
+
+
+def test_image_class_writer_on_a_store_path():
+    """The writer puts data under the prefix of a StorePath."""
+    store = MemoryStore()
+    ms = _small_multiscale()
+    ms.to_ome_zarr(StorePath(store, "nested/image"))
+
+    out = zarr.open_group(store, path="nested/image", mode="r")
+    assert np.array_equal(out["s0"][...], np.asarray(ms.images[0].data))
+
+
+def test_image_class_writer_on_a_store_overwrite():
+    """An existing group in a store needs overwrite=True."""
+    store = MemoryStore()
+    zarr.open_group(store, mode="w")
+    ms = _small_multiscale()
+
+    with pytest.raises(OSError):
+        ms.to_ome_zarr(store)
+
+    ms.to_ome_zarr(store, overwrite=True)
+    out = zarr.open_group(store, mode="r")
+    assert np.array_equal(out["s0"][...], np.asarray(ms.images[0].data))
 
 
 @pytest.mark.parametrize("storage_options_list", [True, False])

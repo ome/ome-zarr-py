@@ -30,6 +30,7 @@ parts:
     - file: advanced/sharding
     - file: advanced/build_custom_pyramid
     - file: advanced/write_hcs_plate
+    - file: advanced/delayed_writing_demo
 
   - caption: Explanation
     chapters:
