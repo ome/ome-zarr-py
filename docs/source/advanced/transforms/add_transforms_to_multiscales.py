@@ -84,7 +84,16 @@ ms = OMEZarrMultiscale(
 # %% [markdown]
 # And that's it! A viewer could now choose to show your image in the "world" coordinate system,
 # which would apply the rotation transformation to the image data, such as this:
-#
+
+# %% tags=["remove-input"]
+import napari
+
+viewer = napari.Viewer()
+viewer.add_image(data, rotate=rotation_transform.rotation, colormap="cyan")
+viewer.reset_view()
+napari.utils.nbscreenshot(viewer)
+
+# %% [markdown]
 # For more information of how to construct transformations, see the [respective section of the specification](https://ngff.openmicroscopy.org/specifications/dev/index.html#coordinatetransformations-metadata).
 
 # %%
@@ -100,9 +109,7 @@ import napari
 viewer = napari.Viewer()
 for layer in viewer.open("multiscale_with_transforms.ome.zarr", plugin="napari-ome-zarr"):
     layer.visible = True
-    layer.rotate = rotation_transform.rotation
     if isinstance(layer, napari.layers.Image):
         level = layer.data[0]
         layer.contrast_limits = float(level.min()), float(level.max())
-viewer.reset_view()
 napari.utils.nbscreenshot(viewer)
