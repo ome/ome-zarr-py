@@ -5,19 +5,15 @@
 # Writing ome-zarr images is primarily exposed through the {py:class}`ome_zarr.classes.image.OMEZarrImage` and {py:class}`ome_zarr.classes.image.OMEZarrMultiscales` classes, which provide a high-level API for creating and manipulating OME-ZARR images and pyramids.
 
 # %%
-import numpy as np
+from skimage.data import cells3d
 
 from ome_zarr import OMEZarrImage, OMEZarrMultiscale
 
 # %% [markdown]
-# Let's first create some random data to write:
+# Let's first load some sample data to write, a 3D image of cells with two channels (membranes and nuclei):
 
 # %%
-# create some random data to write
-size_xy = 128
-size_z = 10
-rng = np.random.default_rng(0)
-data = rng.poisson(lam=10, size=(2, size_z, size_xy, size_xy)).astype(np.uint8)
+data = cells3d().transpose((1, 0, 2, 3))  # (z, c, y, x) -> (c, z, y, x)
 
 # %% [markdown]
 # We then create an {py:class}`OMEZarrImage` from our data,
@@ -35,7 +31,7 @@ data = rng.poisson(lam=10, size=(2, size_z, size_xy, size_xy)).astype(np.uint8)
 image = OMEZarrImage(
   data=data,
   axes=["c", "z", "y", "x"],
-  scale={"c": 1.0, "z": 0.5, "y": 0.1, "x": 0.1},
+  scale={"c": 1.0, "z": 0.29, "y": 0.26, "x": 0.26},
   axes_units={"z": "micrometer", "y": "micrometer", "x": "micrometer"},
 )
 
@@ -43,11 +39,22 @@ multiscales = OMEZarrMultiscale(
     image=image,
     scale_factors=(2, 4, 8),
     method="resize",
-    channel_names=["DAPI", "GFP"],  # optional
+    channel_names=["membranes", "nuclei"],  # optional
     channel_colors=["00FFFF", "FF00FF"],  # optional
-    contrast_limits=[(0, 255), (0, 255)]  # optional
+    contrast_limits=[(0, 65535), (0, 65535)]  # optional
     )
 multiscales.to_ome_zarr("test_ngff.ome.zarr", version="0.6")
+
+# %% tags=["remove-input"]
+import napari
+
+viewer = napari.Viewer()
+for layer in viewer.open("test_ngff.ome.zarr", plugin="napari-ome-zarr"):
+    layer.visible = True
+    if isinstance(layer, napari.layers.Image):
+        level = layer.data[0]
+        layer.contrast_limits = float(level.min()), float(level.max())
+napari.utils.nbscreenshot(viewer)
 
 # %%
 multiscales.images
