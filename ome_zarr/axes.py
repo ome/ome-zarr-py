@@ -87,11 +87,15 @@ class Axes:
                 ax["unit"] = axes_units[ax["name"]]
                 if ax.get("type") == "space" and ax["unit"] not in KNOWN_SPATIAL_UNITS:
                     LOGGER.warning(
-                        f"Unit {ax['unit']} for axis {ax['name']} is not a known spatial unit"
+                        "Unit %s for axis %s is not a known spatial unit",
+                        ax["unit"],
+                        ax["name"],
                     )
                 if ax.get("type") == "time" and ax["unit"] not in KNOWN_TEMPORAL_UNITS:
                     LOGGER.warning(
-                        f"Unit {ax['unit']} for axis {ax['name']} is not a known temporal unit"
+                        "Unit %s for axis %s is not a known temporal unit",
+                        ax["unit"],
+                        ax["name"],
                     )
         self.fmt = fmt
         self.validate()
