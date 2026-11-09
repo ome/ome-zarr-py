@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import warnings
 from abc import abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass, field
@@ -135,8 +134,8 @@ class OMEZarrImage:
                 )
 
             LOGGER.warning(
-                f"Scale value not provided for ax(i)(e)s '{axes_set.difference(scale_set)}'. "
-                f"Using default scale of 1.0.",
+                "Scale value not provided for ax(i)(e)s '%s'. Using default scale of 1.0.",
+                axes_set.difference(scale_set),
             )
 
         # rebuild scale dict with defaults for missing axes
