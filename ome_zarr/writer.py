@@ -719,10 +719,9 @@ def write_image(
             method = Methods.RESIZE
         elif scaler.method == "laplacian":
             method = Methods.RESIZE
-            warnings.warn(
+            LOGGER.warning(
                 "Laplacian downsampling is not supported anymore."
                 "Falling back to `resize`",
-                UserWarning,
             )
         elif scaler.method == "zoom":
             method = Methods.ZOOM
@@ -846,7 +845,7 @@ def _write_pyramid_to_zarr(
                 # Technically not needed as ultimately in this case dask chunks will correspond to shards.
                 # Simply adding this warning here to make the user used to not using "auto".
                 if chunks_opt == "auto":
-                    warnings.warn(
+                    LOGGER.warning(
                         f"Setting `chunks` to `auto` is not allowed. Defaulting to the chunksize "
                         f"of dask array: {level.chunksize}."
                     )
@@ -856,7 +855,7 @@ def _write_pyramid_to_zarr(
             level_image = da.array(level).rechunk(shards_opt)
         else:
             if chunks_opt == "auto":
-                warnings.warn(
+                LOGGER.warning(
                     f"Setting `chunks` to `auto` is not allowed. Defaulting to the chunksize "
                     f"of dask array: {level.chunksize}."
                 )

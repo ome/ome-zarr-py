@@ -133,10 +133,9 @@ class OMEZarrImage:
                     f"Scale contains invalid ax(i)(e)s: {diff}. Valid axes are: {axes_set}"
                 )
 
-            warnings.warn(
+            LOGGER.warning(
                 f"Scale value not provided for ax(i)(e)s '{axes_set.difference(scale_set)}'. "
                 f"Using default scale of 1.0.",
-                stacklevel=2,
             )
 
         # rebuild scale dict with defaults for missing axes

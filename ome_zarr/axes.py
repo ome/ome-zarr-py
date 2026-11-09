@@ -1,9 +1,11 @@
 """Axes class for validating and transforming axes"""
 
-import warnings
+import logging
 from typing import Any
 
 from .format import CurrentFormat, Format
+
+LOGGER = logging.getLogger("ome_zarr.axes")
 
 KNOWN_AXES = {"x": "space", "y": "space", "z": "space", "c": "channel", "t": "time"}
 KNOWN_SPATIAL_UNITS = [
@@ -84,11 +86,11 @@ class Axes:
             if axes_units and ax["name"] in axes_units:
                 ax["unit"] = axes_units[ax["name"]]
                 if ax.get("type") == "space" and ax["unit"] not in KNOWN_SPATIAL_UNITS:
-                    warnings.warn(
+                    LOGGER.warning(
                         f"Unit {ax['unit']} for axis {ax['name']} is not a known spatial unit"
                     )
                 if ax.get("type") == "time" and ax["unit"] not in KNOWN_TEMPORAL_UNITS:
-                    warnings.warn(
+                    LOGGER.warning(
                         f"Unit {ax['unit']} for axis {ax['name']} is not a known temporal unit"
                     )
         self.fmt = fmt
