@@ -436,7 +436,7 @@ def _build_pyramid(
         isinstance(s, int) for s in scale_factors
     ):
         scales: list[dict[str, int]] = []
-        for factor in scale_factors:
+        for factor in cast("list[int]", scale_factors):
             scale = {d: factor if d in SPATIAL_DIMS else 1 for d in dims}
             if "z" in dims:
                 scale["z"] = 1
