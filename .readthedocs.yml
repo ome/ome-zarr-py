@@ -32,7 +32,7 @@ build:
     - libxcb-xfixes0
   jobs:
     # we need the tags to get the checked out version
-    # uv the build and uv need to be able to resolve the version
+    # the build and uv need to be able to resolve the version
     post_checkout:
       - git fetch --unshallow --tags
     build:
