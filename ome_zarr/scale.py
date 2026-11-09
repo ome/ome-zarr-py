@@ -437,8 +437,8 @@ def _build_pyramid(
         isinstance(s, int) for s in scale_factors
     ):
         scales: list[dict[str, int]] = []
-        for factor in cast("list[int]", scale_factors):
-            scale = {d: factor if d in SPATIAL_DIMS else 1 for d in dims}
+        for scale_factor in cast(list[int], scale_factors):
+            scale = {d: scale_factor if d in SPATIAL_DIMS else 1 for d in dims}
             if "z" in dims:
                 scale["z"] = 1
             scales.append(scale)
@@ -451,7 +451,6 @@ def _build_pyramid(
     # are set to a default of 1 (i.e. not downsampled)
     for i, level in enumerate(scale_factors):
         scale_factors[i] = {d: level.get(d, 1) for d in dims}
-    scale_factors = cast(list[dict[str, int]], scale_factors)
 
     images: list[da.Array] = [image]
 
