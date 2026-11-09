@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import warnings
 from abc import abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass, field
