@@ -451,6 +451,7 @@ def _build_pyramid(
     # are set to a default of 1 (i.e. not downsampled)
     for i, level in enumerate(scale_factors):
         scale_factors[i] = {d: level.get(d, 1) for d in dims}
+    scale_factors = cast(list[dict[str, int]], scale_factors)
 
     images: list[da.Array] = [image]
 
