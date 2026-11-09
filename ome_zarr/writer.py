@@ -848,8 +848,8 @@ def _write_pyramid_to_zarr(
                 # Simply adding this warning here to make the user used to not using "auto".
                 if chunks_opt == "auto":
                     LOGGER.warning(
-                        f"Setting `chunks` to `auto` is not allowed. Defaulting to the chunksize "
-                        f"of dask array: {level.chunksize}."
+                        "Setting `chunks` to `auto` is not allowed. Defaulting to the chunksize of dask array: %s.",
+                        level.chunksize,
                     )
                 chunks_opt = level.chunksize
             chunks_opt = _retuple(chunks_opt, level.shape)
@@ -858,8 +858,8 @@ def _write_pyramid_to_zarr(
         else:
             if chunks_opt == "auto":
                 LOGGER.warning(
-                    f"Setting `chunks` to `auto` is not allowed. Defaulting to the chunksize "
-                    f"of dask array: {level.chunksize}."
+                    "Setting `chunks` to `auto` is not allowed. Defaulting to the chunksize of dask array: %s.",
+                    level.chunksize,
                 )
             chunks_opt = level.chunksize
             level_image = level
