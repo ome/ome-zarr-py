@@ -5,7 +5,6 @@ See the :class:`~ome_zarr.scale.Scaler` class for details.
 
 import inspect
 import logging
-import warnings
 from collections.abc import Callable, Iterator, Sequence
 from dataclasses import dataclass
 from enum import Enum
@@ -470,10 +469,8 @@ def _build_pyramid(
             if d in SPATIAL_DIMS:
                 if s // f == 0:
                     target_shape.append(1)
-                    warnings.warn(
-                        f"Dimension {d} is too small to downsample further.",
-                        UserWarning,
-                        stacklevel=3,
+                    LOGGER.warning(
+                        "Dimension %s is too small to downsample further.", d
                     )
                 else:
                     target_shape.append(int(s // f))

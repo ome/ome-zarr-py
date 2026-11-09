@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import warnings
 from abc import abstractmethod
 from collections.abc import Sequence
@@ -37,6 +38,8 @@ from pydantic import ValidationError
 from zarr.storage import StoreLike
 
 from ome_zarr.scale import Methods
+
+LOGGER = logging.getLogger("ome_zarr.classes.image")
 
 DISCRETE_DIMS = ["coordinate", "displacement", "channel"]
 DEFAULT_VERSION: Literal["0.6", "0.5", "0.4"] = "0.6"
@@ -131,10 +134,9 @@ class OMEZarrImage:
                     f"Scale contains invalid ax(i)(e)s: {diff}. Valid axes are: {axes_set}"
                 )
 
-            warnings.warn(
+            LOGGER.warning(
                 f"Scale value not provided for ax(i)(e)s '{axes_set.difference(scale_set)}'. "
                 f"Using default scale of 1.0.",
-                stacklevel=2,
             )
 
         # rebuild scale dict with defaults for missing axes
@@ -901,9 +903,10 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
 
                 # Skip if label already exists and overwrite=False
                 if label_name in label_group and not overwrite:
-                    warnings.warn(
-                        f"Label group {label_name} already exists in store. "
-                        f"Skipping writing this label since overwrite=False."
+                    LOGGER.warning(
+                        "Label group %s already exists in store. "
+                        "Skipping writing this label since overwrite=False.",
+                        label_name,
                     )
                     continue
 
@@ -1000,7 +1003,7 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
         try:
             self._omero = Omero.model_validate({"channels": channel_metadata})
         except ValidationError as e:
-            warnings.warn(f"Failed to validate Omero metadata: {e}")
+            LOGGER.warning("Failed to validate Omero metadata: %s", e)
 
     def _get_descendant_coordinate_system(
         self, csid: CoordinateSystemIdentifier
@@ -1089,7 +1092,7 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
             try:
                 self._omero = Omero.model_validate(omero_dict)
             except ValidationError as e:
-                warnings.warn(f"Invalid Omero metadata: {e}")
+                LOGGER.warning("Invalid Omero metadata: %s", e)
 
         # Read labels list
         list_of_labels: list[str] = []
@@ -1111,7 +1114,7 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
             for label_name in list_of_labels:
                 label_subgroup = group[f"labels/{label_name}"]
                 if not isinstance(label_subgroup, zarr.Group):
-                    warnings.warn(f"Label {label_name} is not a zarr.Group, skipping")
+                    LOGGER.warning("Label %s is not a zarr.Group, skipping", label_name)
                     continue
                 label_multiscale = OMEZarrLabels.from_ome_zarr(label_subgroup)
                 loaded_labels[label_name] = label_multiscale
@@ -1309,4 +1312,4 @@ class OMEZarrLabels(OMEZarrMultiscaleBase):
             try:
                 self._image_label = Label.model_validate(image_label_dict)
             except ValidationError as e:
-                warnings.warn(f"Invalid image-label metadata: {e}")
+                LOGGER.warning("Invalid image-label metadata: %s", e)
