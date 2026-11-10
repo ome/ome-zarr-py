@@ -16,7 +16,7 @@ from . import USE_DASK_ARRAY_KWARGS
 from .axes import Axes
 from .classes import OMEZarrImage, OMEZarrLabels, OMEZarrMultiscale
 from .format import CurrentFormat, Format, FormatV01, FormatV02, FormatV03, FormatV04
-from .scale import Methods, Scaler
+from .scale import Methods
 from .types import JSONDict
 
 LOGGER = logging.getLogger("ome_zarr.writer")
@@ -574,7 +574,6 @@ def write_image(
     ),
     name: str = "image",
     method: Methods | None = Methods.RESIZE,
-    scaler: Scaler | None = None,
     fmt: Format | None = None,
     axes: AxesType = None,
     coordinate_transformations: list[list[dict[str, Any]]] | None = None,
@@ -620,10 +619,6 @@ def write_image(
         - `laplacian`: Laplacian pyramid downsampling using `skimage.transform.pyramid_laplacian`.
         - `local_mean`: Local mean downsampling using `skimage.transform.downscale_local_mean`.
         - `zoom`: Zoom-based downsampling using `scipy.ndimage.zoom`.
-    scaler : ome_zarr.scale.Scaler, optional
-        [DEPRECATED] Scaler implementation for downsampling the image. Passing this
-        argument will raise a warning and is no longer supported. Use `scale_factors` and
-        `method` instead.
     fmt : ome_zarr.format.Format, optional
         The format of the ome_zarr data which should be used. Defaults to the most current.
     axes : list of str or list of dicts, optional
@@ -664,11 +659,6 @@ def write_image(
     list
         Empty list if `compute` is True, otherwise a list of dask.delayed.Delayed objects
         representing the value to be computed by dask.
-
-    Notes
-    -----
-    The `scaler` argument is deprecated and will be removed in a future version. Use
-    `scale_factors` and `method` for all new code.
     """
 
     if method is None:
@@ -697,38 +687,6 @@ def write_image(
             "to specify the physical pixel size for each dimension instead. "
         )
         warnings.warn(msg, DeprecationWarning)
-
-    # parse scale_factors
-    # if scaler is provided, we ignore scale_factors and infer the scale_factors
-    # from the Scaler attributes instead.
-    # for path, data in enumerate(pyramid):
-    if scaler is not None:
-        msg = """
-            The 'scaler' argument is deprecated and will be removed in a future version.
-            Please use the 'scale_factors' argument instead.
-            """
-        warnings.warn(msg, DeprecationWarning)
-
-        scale_factors = [
-            {d: 2 ** i if d in ("y", "x") else 1 for d in dims}
-            for i in range(1, scaler.max_layer + 1)
-        ]
-        if scaler.method == "local_mean":
-            method = Methods.LOCAL_MEAN
-        elif scaler.method == "nearest":
-            method = Methods.NEAREST
-        elif scaler.method == "resize_image":
-            method = Methods.RESIZE
-        elif scaler.method == "laplacian":
-            method = Methods.RESIZE
-            LOGGER.warning(
-                "Laplacian downsampling is not supported anymore."
-                "Falling back to `resize`",
-            )
-        elif scaler.method == "zoom":
-            method = Methods.ZOOM
-        else:
-            method = Methods.RESIZE
 
     omero = metadata.get("omero")
 
@@ -1171,7 +1129,6 @@ def write_labels(
     labels: np.ndarray | da.Array,
     group: zarr.Group | str,
     name: str = "labels",
-    scaler: Scaler | None = None,
     scale_factors: list[int] | tuple[int, ...] | list[dict[str, int]] = (2, 4, 8, 16),
     method: Methods = Methods.NEAREST,
     fmt: Format | None = None,
@@ -1206,10 +1163,6 @@ def write_labels(
         The physical pixel size for each dimension, e.g. {"z": 0.1, "y": 0.1, "x": 0.5}.
         The pixel sizes for every resolution level are calculated directly from the defined `scale` and
         `scale_factors` for each level.
-    scaler : ome_zarr.scale.Scaler, optional
-        [DEPRECATED] Scaler implementation for downsampling the label data. Passing this
-        argument will raise a warning and is no longer supported. Use `scale_factors` and
-        `method` instead.
     scale_factors : Sequence[int] | tuple[int, ...] | list[dict[str, int]], optional
         The downsampling factors for each pyramid level. Default: (2, 4, 8, 16).
         Passing a list of integers (i.e., [2, 4, 8]) will apply the downsampling in all
@@ -1270,9 +1223,7 @@ def write_labels(
 
     Notes
     -----
-    The `scaler` argument is deprecated and will be removed in a future version. Use
-    `scale_factors` and `method` for all new code. Labels downsampling should avoid interpolation;
-    nearest-neighbor is recommended.
+    Labels downsampling should avoid interpolation; nearest-neighbor is recommended.
     """
 
     group, fmt = check_group_fmt(group, fmt)
@@ -1293,17 +1244,6 @@ def write_labels(
         method = Methods.NEAREST
 
     image_label = metadata.get("image-label")
-
-    if scaler is not None:
-        msg = """
-        The 'scaler' argument is deprecated and will be removed in version 0.13.0.
-        Please use the 'scale_factors' argument instead.
-        """
-        scale_factors = [
-            {d: 2 ** i if d in ("y", "x") else 1 for d in dims}
-            for i in range(1, scaler.max_layer + 1)
-        ]
-        warnings.warn(msg, DeprecationWarning)
 
     if coordinate_transformations is not None:
         msg = (
