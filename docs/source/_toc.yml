@@ -29,6 +29,7 @@ parts:
 
     - file: advanced/sharding
     - file: advanced/build_custom_pyramid
+    - file: advanced/bring_your_own_pyramid
     - file: advanced/write_hcs_plate
 
   - caption: Explanation
