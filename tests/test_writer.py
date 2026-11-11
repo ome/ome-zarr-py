@@ -875,6 +875,18 @@ class TestWriter:
 
         ms.to_ome_zarr(self.path / "overwrite", overwrite=True)
 
+    def test_write_with_unset_scale(self):
+        """
+        Test whether leaving scale values unset results in the correct default behavior.
+        """
+
+        data = np.random.randint(0, 1000, size=(32, 32))
+        write_image(group=str(self.path / "unset_scale"), image=data, axes="yx", scale=None)
+
+        # scales should default to 1 for every axis
+        oz_ms = OMEZarrMultiscale.from_ome_zarr(str(self.path / "unset_scale"))
+        assert oz_ms.images[0].scale == {"y": 1.0, "x": 1.0}
+
 
 class TestPlateMetadata:
     @pytest.fixture(autouse=True)
