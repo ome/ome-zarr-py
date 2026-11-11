@@ -64,7 +64,7 @@ IMAGE = np.arange(64 * 64, dtype="uint16").reshape(64, 64)
 
 def test_store_without_a_path():
     store = MemoryStore()
-    write_image(IMAGE, zarr.open_group(store, mode="w"), axes="yx", scaler=None)
+    write_image(IMAGE, zarr.open_group(store, mode="w"), axes="yx")
 
     loc = ZarrLocation(store)
     assert loc.exists()
@@ -80,7 +80,6 @@ def test_prefix_inside_a_store():
         IMAGE,
         zarr.open_group(store, path="images/img", mode="w"),
         axes="yx",
-        scaler=None,
     )
 
     loc = ZarrLocation(StorePath(store, "images/img"))
@@ -123,7 +122,7 @@ def test_read_from_a_zip(tmp_path):
     # Dask writes to a ZipStore corrupt the archive (zarr-python#3516),
     # so the test zips a directory store instead of writing to the ZipStore.
     directory = tmp_path / "img.zarr"
-    write_image(IMAGE, zarr.open_group(directory, mode="w"), axes="yx", scaler=None)
+    write_image(IMAGE, zarr.open_group(directory, mode="w"), axes="yx")
     archive = tmp_path / "img.zarr.zip"
     with zipfile.ZipFile(archive, mode="w") as zf:
         for file in directory.rglob("*"):
