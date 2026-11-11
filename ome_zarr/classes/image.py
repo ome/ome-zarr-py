@@ -969,6 +969,12 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
         coordinate_transformations: tuple[AnyTransform, ...] | None = None,
         coordinate_systems: list[CoordinateSystem] | None = None,
         default_coordinate_system_name: str = "physical",
+        channel_names: list[str] | None = None,
+        channel_colors: list[list[int]] | None = None,
+        contrast_limits: list[tuple[float, float]] | None = None,
+        labels: (
+            OMEZarrLabels | list[OMEZarrLabels] | dict[str, OMEZarrLabels] | None
+        ) = None,
     ) -> OMEZarrMultiscale:
         """
         Create an OMEZarrMultiscale object from a pre-built pyramid of label images.
@@ -984,6 +990,14 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
             Coordinate systems to apply to the pyramid levels, by default None.
         default_coordinate_system_name : str, optional
             The name of the default coordinate system, by default "physical".
+        channel_names : list[str] | None, optional
+            Names of the channels, by default None.
+        channel_colors : list[list[int]] | None, optional
+            Colors of the channels in RGBA format, by default None.
+        contrast_limits : list[tuple[float, float]] | None, optional
+            Contrast limits for the channels, by default None.
+        labels : OMEZarrLabels | list[OMEZarrLabels] | dict[str, OMEZarrLabels] | None, optional
+            Labels associated with the multiscale image, by default None.
 
         Returns
         -------
@@ -996,6 +1010,10 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
             coordinate_transformations=coordinate_transformations,
             coordinate_systems=coordinate_systems,
             default_coordinate_system_name=default_coordinate_system_name,
+            channel_names=channel_names,
+            channel_colors=channel_colors,
+            contrast_limits=contrast_limits,
+            labels=labels,
         )
 
     def _write_additional_meta_data(
