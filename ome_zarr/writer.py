@@ -926,6 +926,7 @@ def write_multiscale_labels(
     ms = OMEZarrLabels.from_pyramid(images=images)
     if label_metadata is not None:
         from ome_zarr_models.common.image_label_types import LabelBase as Label
+
         ms.image_label = Label.model_validate(label_metadata)
 
     dask_delayed_jobs = ms.to_ome_zarr(
@@ -1096,6 +1097,7 @@ def write_labels(
     label_metadata = metadata.get("image-label")
     if label_metadata is not None:
         from ome_zarr_models.common.image_label_types import LabelBase as Label
+
         multiscales.image_label = Label.model_validate(label_metadata)
 
     dask_delayed_jobs = multiscales.to_ome_zarr(

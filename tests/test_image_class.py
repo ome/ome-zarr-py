@@ -277,6 +277,7 @@ def test_multiscale_from_pyramid_empty_input():
     with pytest.raises(ValueError, match="empty"):
         OMEZarrMultiscale.from_pyramid(images=[])
 
+
 def test_image_class_writer_default_scale():
     """Axes with no scale given default to 1.0."""
     image = OMEZarrImage(data=create_data((32, 256, 256)), axes="zyx")
@@ -431,7 +432,9 @@ def test_label_class_from_singlescale():
     data[:128, :128] = 1
     labels_name = "test_labels"
     labels = OMEZarrImage(data=data, axes=axes, scale=scale, name=labels_name)
-    labels_multiscales = OMEZarrLabels.from_singlescale(image=labels, scale_factors=[2, 4, 8])
+    labels_multiscales = OMEZarrLabels.from_singlescale(
+        image=labels, scale_factors=[2, 4, 8]
+    )
 
     # make sure the base resolution matches the input image
     # and that we have base +3 resolution levels in total
@@ -443,14 +446,18 @@ def test_label_class_from_pyramid():
     """
     Check that OMEZarrLabels can be created from a pyramid of label images.
     """
-    axes= "yx"
+    axes = "yx"
     level0 = np.zeros((256, 256), dtype=np.uint8)
     level0[:128, :128] = 1
     level1 = level0[::2, ::2]
 
     labels_name = "test_labels"
-    labels_lvl0 = OMEZarrImage(data=level0, axes=axes, scale={"y": 1.0, "x": 1.0}, name=labels_name)
-    labels_lvl1 = OMEZarrImage(data=level1, axes=axes, scale={"y": 2.0, "x": 2.0}, name=labels_name)
+    labels_lvl0 = OMEZarrImage(
+        data=level0, axes=axes, scale={"y": 1.0, "x": 1.0}, name=labels_name
+    )
+    labels_lvl1 = OMEZarrImage(
+        data=level1, axes=axes, scale={"y": 2.0, "x": 2.0}, name=labels_name
+    )
     pyramid = [labels_lvl0, labels_lvl1]
     labels_multiscales = OMEZarrLabels.from_pyramid(images=pyramid)
 
@@ -462,8 +469,14 @@ def test_label_class_from_pyramid():
 
     # make sure the transforms in the metadata check out
     datasets = labels_multiscales.metadata.datasets
-    assert datasets[0].coordinateTransformations[0].transformations[0].scale == (1.0, 1.0)
-    assert datasets[1].coordinateTransformations[0].transformations[0].scale == (2.0, 2.0)
+    assert datasets[0].coordinateTransformations[0].transformations[0].scale == (
+        1.0,
+        1.0,
+    )
+    assert datasets[1].coordinateTransformations[0].transformations[0].scale == (
+        2.0,
+        2.0,
+    )
 
 
 def test_bad_image_label_metadata():

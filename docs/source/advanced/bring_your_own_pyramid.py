@@ -7,7 +7,7 @@
 # This can be the case if you:
 # - Want to use a particular downsampling algorithm that's not part of ome-zarr-py
 # - Already have the pyramid generated from another source and want to avoid recomputation
-# 
+#
 # In these cases, you can construct the {py:func}`ome_zarr.classes.image.OMEZarrMultiscale` class directly from your pre-computed pyramid.
 
 # %%

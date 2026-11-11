@@ -1829,10 +1829,10 @@ class TestLabelWriter:
             name="test_labels",
             fmt=fmt,
             axes="yx",
-            label_metadata={"image-label": {}}
+            label_metadata={"image-label": {}},
         )
 
-        # check that ome metadata is present in labels group 
+        # check that ome metadata is present in labels group
         # and contains the label information
         if fmt.version == "0.5":
             assert "ome" in group["labels"].attrs
