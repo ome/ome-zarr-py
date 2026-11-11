@@ -961,7 +961,7 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
     @classmethod
     def from_pyramid(
         cls,
-        image: OMEZarrImage,
+        images: list[OMEZarrImage],
         method: str | Methods | None = Methods.RESIZE,
         coordinate_transformations: tuple[AnyTransform, ...] | None = None,
         coordinate_systems: list[CoordinateSystem] | None = None,
@@ -971,12 +971,16 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
         Create an OMEZarrMultiscale object from a pre-built pyramid of label images.
         Parameters
         ----------
-        image : OMEZarrImage
-            A label image representing the pre-built pyramid.
+        images : list[OMEZarrImage]
+            A list of label images representing the pre-built pyramid.
         method : str | Methods | None, optional
             Resampling method to use when creating the multiscale image, by default Methods.RESIZE.
-        auto_parse_labels : bool, optional
-            Whether to automatically parse image-label metadata, by default True.
+        coordinate_transformations : tuple[AnyTransform, ...] | None, optional
+            Coordinate transformations to apply to the pyramid levels, by default None.
+        coordinate_systems : list[CoordinateSystem] | None, optional
+            Coordinate systems to apply to the pyramid levels, by default None.
+        default_coordinate_system_name : str, optional
+            The name of the default coordinate system, by default "physical".
 
         Returns
         -------
@@ -984,7 +988,7 @@ class OMEZarrMultiscale(OMEZarrMultiscaleBase):
             An instance of OMEZarrMultiscale created from the pyramid of label images.
         """
         return cls(
-            image=image,
+            image=images,
             method=method,
             coordinate_transformations=coordinate_transformations,
             coordinate_systems=coordinate_systems,
