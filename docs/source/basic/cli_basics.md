@@ -2,12 +2,23 @@
 (basics:cli)
 
 Open Zarr filesets containing images with associated OME metadata.
-The examples below use the image at http://idr.openmicroscopy.org/webclient/?show=image-6001240.
+The examples below use the image at <http://idr.openmicroscopy.org/webclient/?show=image-6001240>.
 
 All examples can be made more or less verbose by passing `-v` or `-q` one or more times:
 
 ```bash
 ome_zarr -vvv ...
+```
+
+You can use the CLI without managing your own python environment with `uv`:
+
+```sh
+# ephemeral environment; always prefix with `uvx`
+uvx ome_zarr ...
+
+# install once and then use normally
+uv tool install ome_zarr
+ome_zarr ...
 ```
 
 ## info

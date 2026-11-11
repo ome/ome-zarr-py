@@ -2,8 +2,10 @@
 
 Tools for reading and writing multi-resolution images stored in Zarr filesets, according to the [OME NGFF spec](https://github.com/ome/ngff).
 
-Note: The default version of OME-Zarr written by ``ome-zarr-py`` is ``v0.5``, which uses ``zarr v3``. OME-Zarr v0.5
-is not yet supported by all OME-Zarr tools. See the documentation for more information on how to write other versions.
+Note: The default version of OME-Zarr written by ``ome-zarr-py`` is ``v0.5``, which uses ``zarr v3``.
+See the documentation for more information on how to write other versions.
+
+The source code is at [github.com/ome/ome-zarr-py](https://github.com/ome/ome-zarr-py).
 
 ## Features
 
@@ -17,8 +19,11 @@ is not yet supported by all OME-Zarr tools. See the documentation for more infor
 Install the latest release of [`ome-zarr`](https://pypi.org/project/ome-zarr/) from PyPI:
 
 ```bash
+uv add ome-zarr
+# or if you are not yet using uv
 pip install ome-zarr
 ```
+
 or from conda-forge:
 
 ```bash
