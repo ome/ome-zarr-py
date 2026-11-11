@@ -6,16 +6,12 @@
 # First, let's create some image data:
 
 # %%
-import numpy as np
-from skimage.data import binary_blobs
+from skimage.data import binary_blobs, cells3d
 
 from ome_zarr import OMEZarrImage, OMEZarrLabels, OMEZarrMultiscale
 
 # %%
-mean_val = 10
-size = 64
-rng = np.random.default_rng(0)
-data = rng.poisson(mean_val, size=(size, size, size)).astype(np.uint8)
+data = cells3d()[:, 1]  # nuclei channel, (z, y, x) = (60, 256, 256)
 
 # %% [markdown]
 # We can directly turn this into an {py:class}`ome_zarr.classes.image.OMEZarrMultiscales` object:
@@ -32,8 +28,8 @@ ngff_multiscales = OMEZarrMultiscale(image=ngff_image)
 
 # %%
 # add labels...
-blobs = binary_blobs(length=size, volume_fraction=0.1, n_dim=3).astype("int8")
-blobs2 = binary_blobs(length=size, volume_fraction=0.1, n_dim=3).astype("int8")
+blobs = binary_blobs(length=256, volume_fraction=0.1, n_dim=3)[:60].astype("int8")
+blobs2 = binary_blobs(length=256, volume_fraction=0.1, n_dim=3)[:60].astype("int8")
 # blobs will contain values of 1, 2 and 0 (background)
 blobs += 2 * blobs2
 
@@ -64,6 +60,17 @@ ngff_multiscales.labels = {
 }
 
 ngff_multiscales.to_ome_zarr("ngff_multiscales_with_labels.zarr", overwrite=True)
+
+# %% tags=["remove-input"]
+import napari
+
+viewer = napari.Viewer()
+for layer in viewer.open("ngff_multiscales_with_labels.zarr", plugin="napari-ome-zarr"):
+    layer.visible = True
+    if isinstance(layer, napari.layers.Image):
+        level = layer.data[0]
+        layer.contrast_limits = float(level.min()), float(level.max())
+napari.utils.nbscreenshot(viewer)
 
 # %% [markdown]
 # This automatically creates the following file structure on disk:

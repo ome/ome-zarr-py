@@ -31,6 +31,7 @@ parts:
     - file: advanced/build_custom_pyramid
     - file: advanced/bring_your_own_pyramid
     - file: advanced/write_hcs_plate
+    - file: advanced/delayed_writing_demo
 
   - caption: Explanation
     chapters:
