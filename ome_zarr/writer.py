@@ -176,27 +176,6 @@ def _validate_plate_rows_columns(
     return validated_list
 
 
-def _validate_datasets(
-    datasets: list[dict], dims: int, fmt: Format = CurrentFormat()
-) -> list[dict]:
-    if datasets is None or len(datasets) == 0:
-        raise ValueError("Empty datasets list")
-    transformations = []
-    for dataset in datasets:
-        if isinstance(dataset, dict):
-            if not dataset.get("path"):
-                raise ValueError("no 'path' in dataset")
-            transformation = dataset.get("coordinateTransformations")
-            # transformation may be None for < 0.4 - validated below
-            if transformation is not None:
-                transformations.append(transformation)
-        else:
-            raise TypeError(f"Unrecognized type for {dataset}")
-
-    fmt.validate_coordinate_transformations(dims, len(datasets), transformations)
-    return datasets
-
-
 def _validate_plate_wells(
     wells: list[str | dict],
     rows: list[str],
