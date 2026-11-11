@@ -270,6 +270,13 @@ def test_multiscale_from_pyramid_axes_mismatch():
         OMEZarrMultiscale.from_pyramid(images=[level0, bad_units])
 
 
+def test_multiscale_from_pyramid_empty_input():
+    """
+    Check that an empty list of pyramid levels is rejected.
+    """
+    with pytest.raises(ValueError, match="empty"):
+        OMEZarrMultiscale.from_pyramid(images=[])
+
 def test_image_class_writer_default_scale():
     """Axes with no scale given default to 1.0."""
     image = OMEZarrImage(data=create_data((32, 256, 256)), axes="zyx")
@@ -413,6 +420,50 @@ def test_image_class_writer_labels(tmp_path, image_dims, version):
     if "c" in axes:
         assert ms_read.omero is not None
     assert ms_read.labels[labels_name].image_label is not None
+
+
+def test_label_class_from_singlescale():
+    """
+    Check that OMEZarrLabels can be created from a single-scale label image.
+    """
+    shape, axes, scale = (256, 256), "yx", {"y": 1.0, "x": 1.0}
+    data = np.zeros(shape, dtype=np.uint8)
+    data[:128, :128] = 1
+    labels_name = "test_labels"
+    labels = OMEZarrImage(data=data, axes=axes, scale=scale, name=labels_name)
+    labels_multiscales = OMEZarrLabels.from_singlescale(image=labels, scale_factors=[2, 4, 8])
+
+    # make sure the base resolution matches the input image
+    # and that we have base +3 resolution levels in total
+    assert labels_multiscales.images[0] == labels
+    assert len(labels_multiscales.images) == 4
+
+
+def test_label_class_from_pyramid():
+    """
+    Check that OMEZarrLabels can be created from a pyramid of label images.
+    """
+    axes= "yx"
+    level0 = np.zeros((256, 256), dtype=np.uint8)
+    level0[:128, :128] = 1
+    level1 = level0[::2, ::2]
+
+    labels_name = "test_labels"
+    labels_lvl0 = OMEZarrImage(data=level0, axes=axes, scale={"y": 1.0, "x": 1.0}, name=labels_name)
+    labels_lvl1 = OMEZarrImage(data=level1, axes=axes, scale={"y": 2.0, "x": 2.0}, name=labels_name)
+    pyramid = [labels_lvl0, labels_lvl1]
+    labels_multiscales = OMEZarrLabels.from_pyramid(images=pyramid)
+
+    # make sure the base resolution matches the input image
+    # and that we have only one resolution level in this case
+    assert labels_multiscales.images[0] == labels_lvl0
+    assert labels_multiscales.images[1] == labels_lvl1
+    assert len(labels_multiscales.images) == 2
+
+    # make sure the transforms in the metadata check out
+    datasets = labels_multiscales.metadata.datasets
+    assert datasets[0].coordinateTransformations[0].transformations[0].scale == (1.0, 1.0)
+    assert datasets[1].coordinateTransformations[0].transformations[0].scale == (2.0, 2.0)
 
 
 def test_bad_image_label_metadata():
