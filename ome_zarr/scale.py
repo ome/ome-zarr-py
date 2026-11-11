@@ -2,26 +2,15 @@
 Methods for downsampling numpy arrays via various methods.
 """
 
-import inspect
 import logging
-from collections.abc import Callable, Iterator, Sequence
-from dataclasses import dataclass
+from collections.abc import Sequence
 from enum import Enum
-from typing import Any, Union, cast
+from typing import Union, cast
 
 import dask.array as da
 import numpy as np
-import zarr
-from deprecated import deprecated
 from scipy import __version__ as scipy_version
-from scipy.ndimage import zoom
 from skimage import __version__ as skimage_version
-from skimage.transform import (
-    downscale_local_mean,
-    pyramid_gaussian,
-    pyramid_laplacian,
-    resize,
-)
 
 from .dask_utils import local_mean as dask_local_mean
 from .dask_utils import resize as dask_resize
