@@ -1814,10 +1814,8 @@ class TestLabelWriter:
         """
         fmt = format_version_all()
         if fmt.version == "0.5":
-            img_path = self.path_v3
             group = self.root_v3
         else:
-            img_path = self.path
             group = self.root
 
         labels = np.zeros((256, 256))
