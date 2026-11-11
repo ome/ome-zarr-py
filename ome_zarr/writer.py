@@ -1075,8 +1075,6 @@ def write_labels(
     if method is None:
         method = Methods.NEAREST
 
-    image_label = metadata.get("image-label")
-
     if coordinate_transformations is not None:
         msg = (
             "The 'coordinate_transformations' argument is deprecated and will "
