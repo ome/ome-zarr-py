@@ -3,7 +3,7 @@
 # (advanced:bring_own_pyramid)=
 #
 #
-# In some scenarios, you ma already have a pre-computed multi-resolution pyramid and do not want to rely on the downsampling implemented in ome-zarr-py.
+# In some scenarios, you may already have a pre-computed multi-resolution pyramid and do not want to rely on the downsampling implemented in ome-zarr-py.
 # This can be the case if you:
 # - Want to use a particular downsampling algorithm that's not part of ome-zarr-py
 # - Already have the pyramid generated from another source and want to avoid recomputation
