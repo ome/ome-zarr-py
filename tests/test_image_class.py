@@ -237,7 +237,7 @@ def test_multiscale_from_pyramid_sanity(image_dims):
         for level in range(3)
     ]
 
-    ms = OMEZarrMultiscale(image=levels, scale_factors=None, method=None)
+    ms = OMEZarrMultiscale.from_pyramid(images=levels, method=None)
 
     assert len(ms.images) == 3
     assert len(ms.metadata.datasets) == 3
@@ -258,7 +258,7 @@ def test_multiscale_from_pyramid_axes_mismatch():
         scale={"z": 1.0, "y": 2.0, "x": 2.0},
     )
     with pytest.raises(ValueError, match="axes"):
-        OMEZarrMultiscale.from_pyramid(image=[level0, bad_axes])
+        OMEZarrMultiscale.from_pyramid(images=[level0, bad_axes])
 
     bad_units = OMEZarrImage(
         data=create_data((32, 32)),
@@ -267,7 +267,7 @@ def test_multiscale_from_pyramid_axes_mismatch():
         axes_units={"y": "millimeter", "x": "millimeter"},
     )
     with pytest.raises(ValueError, match="axes_units"):
-        OMEZarrMultiscale.from_pyramid(image=[level0, bad_units])
+        OMEZarrMultiscale.from_pyramid(images=[level0, bad_units])
 
 
 def test_image_class_writer_default_scale():
