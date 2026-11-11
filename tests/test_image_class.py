@@ -438,7 +438,9 @@ def test_label_class_from_singlescale():
 
     # make sure the base resolution matches the input image
     # and that we have base +3 resolution levels in total
-    assert np.array_equal(labels_multiscales.images[0].data.compute(), labels.data.compute())
+    assert np.array_equal(
+        labels_multiscales.images[0].data.compute(), labels.data.compute()
+    )
     assert len(labels_multiscales.images) == 4
 
 
