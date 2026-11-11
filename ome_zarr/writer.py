@@ -966,9 +966,10 @@ def write_multiscale_labels(
             )
         )
 
-    ms = OMEZarrLabels(image=images)
+    ms = OMEZarrLabels.from_pyramid(images=images)
     if label_metadata is not None:
-        ms.image_label = label_metadata
+        from ome_zarr_models.common.image_label_types import LabelBase as Label
+        ms.image_label = Label.model_validate(label_metadata)
 
     dask_delayed_jobs = ms.to_ome_zarr(
         group=sub_group,
@@ -1081,7 +1082,7 @@ def write_labels(
         is specified, that the chunks correspond to the dask chunksize. This is also the case when chunks are provided as
         `None` and no sharding is provided.
     label_metadata : dict, optional
-        Image label metadata. See :meth:`write_label_metadata` for details.
+        Image label metadata.
     compute : bool, optional
         If True, compute immediately; otherwise, return a list of dask.delayed.Delayed objects.
     scale : dict of str to float, optional
@@ -1153,7 +1154,8 @@ def write_labels(
 
     label_metadata = metadata.get("image-label")
     if label_metadata is not None:
-        multiscales.image_label = label_metadata
+        from ome_zarr_models.common.image_label_types import LabelBase as Label
+        multiscales.image_label = Label.model_validate(label_metadata)
 
     dask_delayed_jobs = multiscales.to_ome_zarr(
         group=sub_group,

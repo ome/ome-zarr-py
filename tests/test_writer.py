@@ -1807,6 +1807,48 @@ class TestLabelWriter:
             img_path, label_name, label_data, fmt, shape, transformations, scale
         )
 
+    def test_pass_image_label_metadata(self, format_version_all):
+        """
+        This test checks whether image-label metadata is
+        correctly passed and stored when writing label data.
+        """
+        fmt = format_version_all()
+        if fmt.version == "0.5":
+            img_path = self.path_v3
+            group = self.root_v3
+        else:
+            img_path = self.path
+            group = self.root
+
+        labels = np.zeros((256, 256))
+        labels[:50, :50] = 1
+
+        write_labels(
+            labels,
+            group,
+            name="test_labels",
+            fmt=fmt,
+            axes="yx",
+            label_metadata={"image-label": {}}
+        )
+
+        # check that ome metadata is present in labels group 
+        # and contains the label information
+        if fmt.version == "0.5":
+            assert "ome" in group["labels"].attrs
+            ome_attrs = group["labels"].attrs.get("ome", {})
+        elif fmt.version == "0.4":
+            ome_attrs = group["labels"].attrs
+        assert "test_labels" in ome_attrs.get("labels", [])
+
+        # check that image-label metadata exists
+        img_group = group["labels"]["test_labels"]
+        if fmt.version == "0.5":
+            ome_attrs = img_group.attrs.get("ome", {})
+        elif fmt.version == "0.4":
+            ome_attrs = img_group.attrs
+        assert "image-label" in ome_attrs
+
     @pytest.mark.parametrize(
         "fmt",
         (pytest.param(FormatV04(), id="V04"), pytest.param(FormatV05(), id="V05")),
