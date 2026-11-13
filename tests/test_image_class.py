@@ -316,6 +316,24 @@ def test_image_class_writer_storage_options(tmp_path, image_dims, storage_option
         assert first_chunk == _retuple(expected, nd_array.shape)
 
 
+def test_image_class_writer_dask_chunk_grid(tmp_path):
+    """
+    A dask chunk grid in storage_options is stored as zarr's flat chunk shape.
+    """
+    data = da.from_array(create_data((2, 128, 128)), chunks=(2, 48, 64))
+    image = OMEZarrImage(data=data, axes="cyx", scale={"y": 0.5, "x": 0.5})
+    ms = OMEZarrMultiscale(image=image, scale_factors=[{"c": 1, "y": 2, "x": 2}])
+
+    grp_path = tmp_path / "test"
+    ms.to_ome_zarr(
+        group=str(grp_path), storage_options={"chunks": data.chunks}, overwrite=True
+    )
+
+    out = zarr.open_group(grp_path)
+    assert out["s0"].chunks == (2, 48, 64)
+    assert np.array_equal(out["s0"][...], data.compute())
+
+
 @pytest.mark.parametrize("version", ["0.4", "0.5", "0.6"], ids=["V04", "V05", "V06"])
 def test_image_class_writer_labels(tmp_path, image_dims, version):
     """
