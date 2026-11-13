@@ -21,7 +21,7 @@ rng = np.random.default_rng(0)
 data = rng.poisson(10, size=(64, 64, 64)).astype(np.uint8)
 
 ngff_image = OMEZarrImage(data, axes="zyx", name="image")
-ngff_multiscales = OMEZarrMultiscale(image=ngff_image)
+ngff_multiscales = OMEZarrMultiscale.from_singlescale(image=ngff_image)
 
 # write the image data to disk
 ngff_multiscales.to_ome_zarr("image_with_labels.zarr", overwrite=True)
@@ -37,7 +37,7 @@ labels = OMEZarrImage(
     data=binary_blobs(length=64, volume_fraction=0.1, n_dim=3).astype("int8"),
     axes="zyx",
 )
-labels_multiscales = OMEZarrLabels(image=labels)
+labels_multiscales = OMEZarrLabels.from_singlescale(image=labels)
 
 # %% [markdown]
 # If we assume that the image data has been written to disk previously, we need to open the existing ome-zarr file to append our labels data to the `labels` attribute of the parent image.
@@ -83,7 +83,7 @@ labels2 = OMEZarrImage(
     data=binary_blobs(length=64, volume_fraction=0.1, n_dim=3).astype("int8"),
     axes="zyx",
 )
-labels_multiscales2 = OMEZarrLabels(image=labels2)
+labels_multiscales2 = OMEZarrLabels.from_singlescale(image=labels2)
 
 # %% [markdown]
 # ...and write the whole lot to disk.

@@ -114,12 +114,6 @@ class Format(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def generate_coordinate_transformations(
-        self, shapes: list[tuple]
-    ) -> list[list[dict[str, Any]]] | None:  # pragma: no cover
-        raise NotImplementedError()
-
-    @abstractmethod
     def validate_coordinate_transformations(
         self,
         ndim: int,
@@ -189,11 +183,6 @@ class FormatV01(Format):
                 )
             if not isinstance(well[key], key_type):
                 raise TypeError("%s path must be of %s type", well, key_type)
-
-    def generate_coordinate_transformations(
-        self, shapes: list[tuple]
-    ) -> list[list[dict[str, Any]]] | None:
-        return None
 
     def validate_coordinate_transformations(
         self,
@@ -272,26 +261,6 @@ class FormatV04(FormatV03):
             raise ValueError("%s is not defined in the plate columns", column)
         if well["columnIndex"] != columns.index(column):
             raise ValueError("Mismatching column index for %s", well)
-
-    def generate_coordinate_transformations(
-        self, shapes: list[tuple]
-    ) -> list[list[dict[str, Any]]] | None:
-        data_shape = shapes[0]
-        scale0 = [1.0] * len(data_shape)
-        coordinate_transformations: list[list[dict[str, Any]]] = []
-        # calculate minimal 'scale' transform based on pyramid dims
-        for shape in shapes:
-            assert len(shape) == len(data_shape)
-            scale = [full / level for full, level in zip(data_shape, shape)]
-            trans = [s / 2 - s0 / 2 for s, s0 in zip(scale, scale0)]
-            coordinate_transformations.append(
-                [
-                    {"type": "scale", "scale": scale},
-                    {"type": "translation", "translation": trans},
-                ]
-            )
-
-        return coordinate_transformations
 
     def validate_coordinate_transformations(
         self,
