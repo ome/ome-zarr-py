@@ -1,7 +1,6 @@
 import json
 import pathlib
 import re
-import tempfile
 from typing import Any
 
 import dask.array as da
@@ -403,6 +402,10 @@ class TestWriter:
                     assert value == 1.0
 
     def test_write_multiscale_transforms(self):
+        """
+        This test ensures that both write_image and write_multiscale correctly handle
+        coordinate transformations and store them in the resulting OME-Zarr metadata.
+        """
         ct = [
             [
                 {"type": "scale", "scale": [0.5, 0.25, 0.25]},
@@ -416,15 +419,15 @@ class TestWriter:
         axes = [{"name": d, "type": "space", "unit": "micrometer"} for d in "zyx"]
         img = np.zeros((16, 64, 64), "uint16")
 
-        for name, write in [
+        writers = [
             (
-                "write_multiscale",
+                zarr.open_group(self.path / "test_coordinate_transforms_multiscale", mode="w", zarr_format=3).create_group("test"),
                 lambda g: write_multiscale(
                     [img, img[:, ::2, ::2]], g, axes=axes, coordinate_transformations=ct
                 ),
             ),
             (
-                "write_image",
+                zarr.open_group(self.path / "test_coordinate_transforms_singlescale", mode="w", zarr_format=3).create_group("test"),
                 lambda g: write_image(
                     img,
                     g,
@@ -433,24 +436,17 @@ class TestWriter:
                     coordinate_transformations=ct,
                 ),
             ),
-        ]:
-            print("Testing:", name)
-            with tempfile.TemporaryDirectory() as d:
-                write(d)
-                json_text = (pathlib.Path(d) / "zarr.json").read_text(encoding="utf-8")
-                ome_attrs = json.loads(json_text).get("attributes", {}).get("ome", {})
-                ms = ome_attrs.get("multiscales", [])[0]
-                for a in ms["axes"]:
-                    assert a.get("unit") == "micrometer"
-                    assert a.get("name") in "zyx"
-                    assert a.get("type") == "space"
-                for i, ds in enumerate(ms["datasets"]):
-                    print("  ", ds["path"], ds["coordinateTransformations"])
-                    # check 'scale' transformation
-                    assert ds["coordinateTransformations"][0] == ct[i][0]
-                    # check 'translation' transformation
-                    assert ds["coordinateTransformations"][1] == ct[i][1]
-        assert False, "Check the printed output for verification"
+        ]
+        for group, write in writers:
+            write(group)
+            ms = group.attrs["ome"]["multiscales"][0]
+            for a in ms["axes"]:
+                assert a.get("unit") == "micrometer"
+                assert a.get("name") in "zyx"
+                assert a.get("type") == "space"
+            for i, ds in enumerate(ms["datasets"]):
+                assert ds["coordinateTransformations"][0] == ct[i][0]
+                assert ds["coordinateTransformations"][1] == ct[i][1]
 
     @pytest.mark.parametrize("read_from_zarr", [True, False])
     @pytest.mark.parametrize("compute", [True, False])
@@ -2272,4 +2268,4 @@ class TestLabelWriter:
 
 
 if __name__ == "__main__":
-    pytest.main([__file__ + "::TestWriter::test_normalize_resolution_level_paths"])
+    pytest.main([__file__ + "::TestWriter::test_write_multiscale_transforms"])
