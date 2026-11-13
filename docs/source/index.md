@@ -20,7 +20,7 @@ Install the latest release of [`ome-zarr`](https://pypi.org/project/ome-zarr/) f
 
 ```bash
 uv add ome-zarr
-# or if you are not yet using uv
+# or if you are not using uv
 pip install ome-zarr
 ```
 
