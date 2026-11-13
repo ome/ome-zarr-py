@@ -421,13 +421,21 @@ class TestWriter:
 
         writers = [
             (
-                zarr.open_group(self.path / "test_coordinate_transforms_multiscale", mode="w", zarr_format=3).create_group("test"),
+                zarr.open_group(
+                    self.path / "test_coordinate_transforms_multiscale",
+                    mode="w",
+                    zarr_format=3,
+                ).create_group("test"),
                 lambda g: write_multiscale(
                     [img, img[:, ::2, ::2]], g, axes=axes, coordinate_transformations=ct
                 ),
             ),
             (
-                zarr.open_group(self.path / "test_coordinate_transforms_singlescale", mode="w", zarr_format=3).create_group("test"),
+                zarr.open_group(
+                    self.path / "test_coordinate_transforms_singlescale",
+                    mode="w",
+                    zarr_format=3,
+                ).create_group("test"),
                 lambda g: write_image(
                     img,
                     g,
