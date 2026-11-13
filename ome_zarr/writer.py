@@ -692,10 +692,9 @@ def write_image(
     omero = metadata.get("omero")
 
     if coordinate_transformations is not None:
-        msg = (
-            """
+        msg = """
             The 'coordinate_transformations' argument is deprecated and will
-            be removed in 0.26. Please use the `scale` argument 
+            be removed in 0.26. Please use the `scale` argument
             to specify the physical pixel size for each dimension instead.
             Until removal, the coordinate_transformations argument only accepts
             transformations conforming to version 0.4 or 0.5 of the NGFF
@@ -705,7 +704,6 @@ def write_image(
             validated in the sense that it is not validated whether the transformations
             match the size of the passed data arrays.
             """
-        )
         warnings.warn(msg, DeprecationWarning)
 
         # we need to get the scale factors and number of resolution levels
@@ -713,15 +711,15 @@ def write_image(
         new_scale_factors: list[dict[str, int]] = []
         base_scale = {}
         for idx, level in enumerate(coordinate_transformations):
-            scale_transform = next(
-                            (t for t in level if t["type"] == "scale"), None
-                        )
+            scale_transform = next((t for t in level if t["type"] == "scale"), None)
             if scale_transform is None:
-                raise ValueError("Missing scale transformation in coordinate_transformations")
+                raise ValueError(
+                    "Missing scale transformation in coordinate_transformations"
+                )
             if idx == 0:
                 base_scale = dict(zip(dims, scale_transform["scale"]))
                 continue
-            
+
             # overwrite base scale with passed value
             scale = dict(zip(dims, scale_transform["scale"]))
             relative_factors: dict[str, int] = {}
@@ -747,18 +745,35 @@ def write_image(
             new_transforms = []
             for transform in ct:
                 # get the current transform sequence
-                current_tf = multiscale.metadata.datasets[idx].coordinateTransformations[0]
+                current_tf = multiscale.metadata.datasets[
+                    idx
+                ].coordinateTransformations[0]
                 if transform["type"] == "scale":
-                    new_transforms.append(current_tf.transformations[0].model_copy(update={"scale": transform["scale"]}))
+                    new_transforms.append(
+                        current_tf.transformations[0].model_copy(
+                            update={"scale": transform["scale"]}
+                        )
+                    )
                 elif transform["type"] == "translation":
-                    new_transforms.append(current_tf.transformations[1].model_copy(update={"translation": transform["translation"]}))
+                    new_transforms.append(
+                        current_tf.transformations[1].model_copy(
+                            update={"translation": transform["translation"]}
+                        )
+                    )
             new_datasets = list(multiscale.metadata.datasets)
             new_datasets[idx] = new_datasets[idx].model_copy(
-                update={"coordinateTransformations": (
-                    current_tf.model_copy(update={"transformations": tuple(new_transforms)}),
-                ) + new_datasets[idx].coordinateTransformations[1:]}
+                update={
+                    "coordinateTransformations": (
+                        current_tf.model_copy(
+                            update={"transformations": tuple(new_transforms)}
+                        ),
+                    )
+                    + new_datasets[idx].coordinateTransformations[1:]
+                }
             )
-            multiscale.metadata = multiscale.metadata.model_copy(update={"datasets": tuple(new_datasets)})
+            multiscale.metadata = multiscale.metadata.model_copy(
+                update={"datasets": tuple(new_datasets)}
+            )
 
     dask_delayed_jobs = multiscale.to_ome_zarr(
         group=group,
