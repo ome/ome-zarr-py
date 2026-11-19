@@ -1168,7 +1168,7 @@ def write_labels(
         Passing a list of integers (i.e., [2, 4, 8]) will apply the downsampling in all
         spatial dimensions *except the z dimension*, which will be left at a scale factor of 1.
         To apply downsampling to the z-dimension, pass the scale factors as a list of dicts, e.g.
-        `[{"z": 1, "y": 2, "x": 2}, {"z": 1, "y": 4, "x": 4}, {"z": 1, "y": 8, "x": 8}]`.
+        `[{"z": 2, "y": 2, "x": 2}, {"z": 4, "y": 4, "x": 4}, {"z": 8, "y": 8, "x": 8}]`.
         This default behavior may change in future versions.
     axes_units : dict of str to str, optional
         The physical units for each dimension,
