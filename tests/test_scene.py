@@ -12,7 +12,7 @@ from ome_zarr_models.v06.coordinate_transforms import (
     CoordinateSystem,
     CoordinateSystemIdentifier,
 )
-from pydantic import TypeAdapter
+from pydantic import TypeAdapter, ValidationError
 
 from ome_zarr import OMEZarrImage, OMEZarrMultiscale, OMEZarrScene
 from ome_zarr.classes.tnd_utils import (
@@ -72,6 +72,165 @@ def create_data(shape, dtype=np.uint8, mean_val=10):
     with a given mean value."""
     rng = np.random.default_rng(0)
     return rng.poisson(mean_val, size=shape).astype(dtype)
+
+
+@pytest.fixture
+def translated_scene():
+    store = zarr.storage.MemoryStore()
+    images = [
+        OMEZarrMultiscale(
+            image=OMEZarrImage(data=create_data((8, 8)), axes=["y", "x"], name=name),
+            scale_factors=(2,),
+        )
+        for name in ("left", "right", "extra")
+    ]
+    translation = ozmt.Translation(
+        translation=(2.0, 3.0),
+        input=CoordinateSystemIdentifier(path="left", name="physical"),
+        output=CoordinateSystemIdentifier(path="right", name="physical"),
+    )
+    OMEZarrScene(images, [translation]).to_ome_zarr(store)
+    return zarr.open_group(store, mode="a")
+
+
+@pytest.mark.parametrize(
+    ("invalid", "read_error", "write_error", "warning"),
+    [
+        pytest.param(
+            {"type": "affine", "path": "matrix"},
+            UnsupportedTransformation,
+            UnsupportedTransformation,
+            "Path-form transformations are not implemented",
+            id="unsupported-affine",
+        ),
+        pytest.param(
+            {"type": "translation", "input": {"path": "absent", "name": "physical"}},
+            ValueError,
+            UnsupportedTransformation,
+            "Unknown coordinate system",
+            id="missing-image",
+        ),
+        pytest.param(
+            {"type": "translation", "input": None},
+            ValidationError,
+            ValueError,
+            "Skipping invalid scene transformation",
+            id="missing-endpoint",
+        ),
+        pytest.param(
+            {"type": "translation", "translation": [1.0]},
+            ValueError,
+            ValueError,
+            "has 2 axes, got 1D",
+            id="wrong-dimensionality",
+        ),
+    ],
+)
+def test_permissive_scene_read(
+    translated_scene, invalid, read_error, write_error, warning, caplog
+):
+    attributes = translated_scene.attrs["ome"]
+    transforms = attributes["scene"]["coordinateTransformations"]
+    valid = transforms[0]
+    edge = {**valid, **invalid}
+    if edge["type"] != "translation":
+        del edge["translation"]
+    transforms.insert(0, edge)
+    translated_scene.attrs["ome"] = attributes
+
+    scene = OMEZarrScene.from_ome_zarr(translated_scene)
+    assert set(scene.images) == {"left", "right"}
+    assert warning in caplog.text
+    source, target = ("left", "physical"), ("right", "physical")
+    assert set(scene._graph.graph.edges()) == {(source, target), (target, source)}
+    forward = scene._graph.get_sequence(source, target).to_affine()
+    np.testing.assert_allclose(forward.matrix, [[1, 0, 2], [0, 1, 3], [0, 0, 1]])
+
+    with pytest.raises(read_error):
+        OMEZarrScene.from_ome_zarr(translated_scene, strict=True)
+
+    destination = zarr.storage.MemoryStore()
+    zarr.open_group(destination, mode="w").attrs["keep"] = True
+    with pytest.raises(write_error):
+        scene.to_ome_zarr(destination, overwrite=True)
+    assert zarr.open_group(destination, mode="r").attrs["keep"] is True
+
+    scene.coordinate_transformations = [valid]
+    scene.to_ome_zarr(destination, overwrite=True)
+    assert (
+        len(
+            OMEZarrScene.from_ome_zarr(
+                destination, strict=True
+            ).coordinate_transformations
+        )
+        == 1
+    )
+
+
+def test_permissive_scene_read_keeps_image_of_unparsed_transform(
+    translated_scene, caplog
+):
+    attributes = translated_scene.attrs["ome"]
+    attributes["scene"]["coordinateTransformations"].append(
+        {
+            "type": "unsupported-extension",
+            "input": {"path": "extra", "name": "physical"},
+            "output": {"path": "left", "name": "physical"},
+        }
+    )
+    translated_scene.attrs["ome"] = attributes
+
+    scene = OMEZarrScene.from_ome_zarr(translated_scene)
+    assert set(scene.images) == {"left", "right", "extra"}
+    assert len(scene.coordinate_transformations) == 1
+    assert "Skipping invalid scene transformation" in caplog.text
+
+
+@pytest.mark.parametrize(
+    ("transform", "read_error", "write_error", "warning"),
+    [
+        pytest.param(
+            {
+                "type": "affine",
+                "path": "matrix",
+                "input": {"name": "physical"},
+                "output": {"name": "physical"},
+            },
+            (NotImplementedError, UnsupportedTransformation),
+            UnsupportedTransformation,
+            "Skipping affine transformation in left",
+            id="unsupported-image-affine",
+        ),
+        pytest.param(
+            {
+                "type": "translation",
+                "translation": [2.0, 3.0],
+                "output": {"name": "physical"},
+            },
+            ValidationError,
+            ValueError,
+            "Skipping invalid transformation 0 in left",
+            id="malformed-image-transform",
+        ),
+    ],
+)
+def test_permissive_scene_read_skips_unusable_image_transform(
+    translated_scene, transform, read_error, write_error, warning, caplog
+):
+    image = translated_scene["left"]
+    attributes = image.attrs["ome"]
+    attributes["multiscales"][0]["coordinateTransformations"] = [transform]
+    image.attrs["ome"] = attributes
+
+    scene = OMEZarrScene.from_ome_zarr(translated_scene)
+    assert set(scene.images) == {"left", "right"}
+    assert warning in caplog.text
+    assert image.attrs["ome"] == attributes
+    with pytest.raises(read_error):
+        OMEZarrScene.from_ome_zarr(translated_scene, strict=True)
+    scene.coordinate_transformations = ()
+    with pytest.raises(write_error):
+        scene.to_ome_zarr(zarr.storage.MemoryStore())
 
 
 @pytest.mark.parametrize("transform", TRANSFORMS)

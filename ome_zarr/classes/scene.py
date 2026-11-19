@@ -1,8 +1,10 @@
 # the class for storage representation, not exposed to the user
 from __future__ import annotations
 
+import logging
 import os
 from collections.abc import Sequence
+from functools import partial
 from typing import Any, cast
 
 import transformnd as tnd
@@ -11,16 +13,79 @@ from ome_zarr_models.v06.coordinate_transforms import (
     AnyTransform,
     CoordinateSystem,
 )
-from ome_zarr_models.v06.scene import SceneAttrs
+from ome_zarr_models.v06.multiscales import Multiscale
+from ome_zarr_models.v06.scene import BaseSceneAttrs, SceneAttrs
+from pydantic import TypeAdapter, ValidationError
 from zarr.storage import StoreLike
 
 from .image import OMEZarrMultiscale
 from .tnd_utils import (
+    UnsupportedTransformation,
     ozmp_tf_to_tnd_spaced,
 )
 
+LOGGER = logging.getLogger(__name__)
+TRANSFORM_ADAPTER = TypeAdapter(AnyTransform)
+
 VECTOR_FIELD_AXIS = 0
 """Which dimension of a vector field array contains the vectors."""
+
+
+def _read_scene_metadata(
+    attributes: Any, *, strict: bool
+) -> tuple[SceneAttrs, tuple[Any, ...]]:
+    try:
+        return BaseSceneAttrs.model_validate(attributes).scene, ()
+    except ValidationError as error:
+        if strict:
+            raise
+
+        invalid: dict[int, str] = {}
+        for item in error.errors(include_input=False, include_url=False):
+            location = item["loc"]
+            if (
+                len(location) < 3
+                or location[:2] != ("scene", "coordinateTransformations")
+                or not isinstance(location[2], int)
+            ):
+                raise
+            invalid.setdefault(location[2], item["msg"])
+
+        scene = attributes["scene"]
+        transforms = scene["coordinateTransformations"]
+        valid = [tf for i, tf in enumerate(transforms) if i not in invalid]
+        metadata = BaseSceneAttrs.model_validate(
+            {**attributes, "scene": {**scene, "coordinateTransformations": valid}}
+        )
+        for i, message in invalid.items():
+            LOGGER.warning("Skipping invalid scene transformation %d (%s)", i, message)
+        return metadata.scene, tuple(transforms[i] for i in invalid)
+
+
+def _read_image_metadata(
+    attributes: dict[str, Any], *, path: str, unparsed_images: set[str]
+) -> Multiscale:
+    transforms = attributes.get("coordinateTransformations")
+    if not isinstance(transforms, list | tuple):
+        return Multiscale.model_validate(attributes)
+
+    # The image model checks transform dimensionality while parsing. Defer
+    # those checks for optional edges to the scene graph, where unavailable
+    # transforms can be skipped without discarding the image.
+    metadata = Multiscale.model_validate(
+        {**attributes, "coordinateTransformations": None}
+    )
+    valid = []
+    for i, transform in enumerate(transforms):
+        try:
+            valid.append(TRANSFORM_ADAPTER.validate_python(transform))
+        except ValidationError as error:
+            message = error.errors(include_input=False, include_url=False)[0]["msg"]
+            LOGGER.warning(
+                "Skipping invalid transformation %d in %s (%s)", i, path, message
+            )
+            unparsed_images.add(path)
+    return metadata.model_copy(update={"coordinateTransformations": tuple(valid)})
 
 
 class OMEZarrScene:
@@ -30,6 +95,8 @@ class OMEZarrScene:
         coordinate_transformations: Sequence[AnyTransform],
         coordinate_systems: Sequence[CoordinateSystem] = (),
         coordinate_displacements: dict[str, OMEZarrMultiscale] | None = None,
+        *,
+        strict: bool = True,
     ):
         """
         Parameters
@@ -54,12 +121,16 @@ class OMEZarrScene:
             A dictionary mapping zarr group paths to displacement field images
             or coordinate arrays, which are referenced by the [displacements and
             coordinates transformations](https://ngff.openmicroscopy.org/specifications/dev/index.html#coordinates-and-displacements) in the scene metadata.
+        strict : bool, optional
+            Require every transformation to be usable when building the graph.
+            With False, unusable transformations are logged and skipped.
+            Writing a scene always requires strict validation.
 
         Methods
         -------
         to_ome_zarr(store: StoreLike, overwrite: bool = False, compute: bool = True)
             Write the scene to OME-Zarr format in the specified store.
-        from_ome_zarr(store: StoreLike)
+        from_ome_zarr(store: StoreLike, *, strict: bool = False)
             Load an existing scene from OME-Zarr format in the specified store.
         get_coordinate_system(path: str | None, name: str | None = None)
             Retrieve coordinate systems matching the path (if given) and name (if given).
@@ -82,7 +153,9 @@ class OMEZarrScene:
             coordinateTransformations=tuple(coordinate_transformations),
         )
 
-        self._graph = self._setup_graph()
+        self._unparsed_transformations: tuple[Any, ...] = ()
+        self._images_with_unparsed_transforms: dict[str, OMEZarrMultiscale] = {}
+        self._graph = self._setup_graph(strict=strict)
 
     @property
     def coordinate_systems(self) -> tuple[CoordinateSystem, ...]:
@@ -100,9 +173,13 @@ class OMEZarrScene:
     def coordinate_transformations(
         self, value: Sequence[AnyTransform] | list[dict[str, Any]]
     ) -> None:
-        self._metadata = self._metadata.model_copy(
-            update={"coordinateTransformations": value}
+        self._metadata = SceneAttrs.model_validate(
+            {
+                "coordinateSystems": self._metadata.coordinateSystems,
+                "coordinateTransformations": value,
+            }
         )
+        self._unparsed_transformations = ()
 
     @property
     def metadata(self) -> SceneAttrs:
@@ -118,8 +195,15 @@ class OMEZarrScene:
 
     @metadata.setter
     def metadata(self, value: SceneAttrs) -> None:
+        previous = self._metadata
         self._metadata = value
-        self._graph = self._setup_graph()
+        try:
+            graph = self._setup_graph()
+        except Exception:
+            self._metadata = previous
+            raise
+        self._graph = graph
+        self._unparsed_transformations = ()
 
     def get_coordinate_system(
         self, path: str | None = None, name: str | None = None
@@ -160,69 +244,93 @@ class OMEZarrScene:
 
         return matches
 
-    def _setup_graph(self) -> tnd.TransformGraph:
-        g = tnd.TransformGraph()
-        # Add scene-level transformations (empty context = root level)
-        for tf in self.coordinate_transformations:
-            if tf.input is None or tf.output is None:
+    def _add_transform(
+        self,
+        graph: tnd.TransformGraph,
+        transform: AnyTransform,
+        *,
+        strict: bool,
+        subgroup: str | None = None,
+    ) -> None:
+        try:
+            source, target = transform.input, transform.output
+            if source is None or target is None:
                 raise ValueError(
-                    f"Coordinate transformation {tf} is missing input or output information."
+                    f"Coordinate transformation {transform} is missing input or output information."
                 )
-            source_cs_dict = self.get_coordinate_system(tf.input.path, tf.input.name)
-            source_cs = source_cs_dict[(tf.input.path or "", tf.input.name)]
 
-            # convert to transformnd transform and add to graph
-            target_cs_dict = self.get_coordinate_system(tf.output.path, tf.output.name)
-            target_cs = target_cs_dict[(tf.output.path or "", tf.output.name)]
-            tnd_transform = ozmp_tf_to_tnd_spaced(
-                tf,
-                zarr_context="",
+            if subgroup is None:
+                if source.name is None or target.name is None:
+                    raise UnsupportedTransformation(
+                        "Scene coordinate systems must be named", transform
+                    )
+                source_cs = self.get_coordinate_system(source.path, source.name).get(
+                    (source.path or "", source.name)
+                )
+                target_cs = self.get_coordinate_system(target.path, target.name).get(
+                    (target.path or "", target.name)
+                )
+                if source_cs is None or target_cs is None:
+                    unknown = source if source_cs is None else target
+                    raise UnsupportedTransformation(
+                        f"Unknown coordinate system {unknown}", transform
+                    )
+            else:
+                image = self.images[subgroup]
+                source_cs = image._get_descendant_coordinate_system(source)
+                target_cs = image._get_descendant_coordinate_system(target)
+
+            spaced = ozmp_tf_to_tnd_spaced(
+                transform,
+                zarr_context=subgroup or "",
                 source_cs=source_cs,
                 target_cs=target_cs,
                 coordinate_displacements=self.coordinate_displacements,
             )
-            g.add_transform(tnd_transform)
+            inverse = spaced.invert()
 
-            # Add inverse edge if transform is invertible
-            inverse = tnd_transform.invert()
-            if inverse is not None:
-                g.add_transform(inverse)
+            # Check both spaces before insertion. TransformGraph adds its
+            # source node before checking the target dimension.
+            spaces, dims = spaced.spaces, spaced.transform.ndims
+            if spaces.source == spaces.target and dims.source != dims.target:
+                raise ValueError(f"Inconsistent dimensions for space {spaces.source}")
+            endpoints = (
+                (spaces.source, dims.source, source_cs),
+                (spaces.target, dims.target, target_cs),
+            )
+            for space, ndim, coordinate_system in endpoints:
+                if (
+                    coordinate_system is not None
+                    and len(coordinate_system.axes) != ndim
+                ):
+                    raise ValueError(
+                        f"Coordinate system {space} has {len(coordinate_system.axes)} axes, got {ndim}D"
+                    )
+                known = graph.ndim(space)
+                if known is not None and ndim != known:
+                    raise ValueError(f"Space {space} is {known}D, got {ndim}D")
+        except (UnsupportedTransformation, ValueError) as error:
+            if strict:
+                raise
+            LOGGER.warning(
+                "Skipping %s transformation in %s (%s)",
+                transform.type,
+                subgroup or "the scene",
+                error,
+            )
+            return
 
-            # check if input/output are defined
-            subgroups = []
-            if tf.input.path is not None:
-                subgroups.append(tf.input.path)
-            if tf.output.path is not None:
-                subgroups.append(tf.output.path)
+        graph.add_transform(spaced)
+        if inverse is not None:
+            graph.add_transform(inverse)
 
-            for subgroup in subgroups:
-                img = self.images.get(subgroup)
-                if img is None:
-                    # Image not found in scene - skip or warn
-                    continue
-                if img.metadata.coordinateTransformations:
-                    for img_tf in img.metadata.coordinateTransformations:
-                        src_cs = None
-                        if img_tf.input is not None:
-                            src_cs = img._get_descendant_coordinate_system(img_tf.input)
-                        tgt_cs = None
-                        if img_tf.output is not None:
-                            tgt_cs = img._get_descendant_coordinate_system(
-                                img_tf.output
-                            )
-                        ind_transform = ozmp_tf_to_tnd_spaced(
-                            img_tf,
-                            zarr_context=subgroup,
-                            source_cs=src_cs,
-                            target_cs=tgt_cs,
-                            coordinate_displacements=self.coordinate_displacements,
-                        )
-
-                        g.add_transform(ind_transform)
-                        # Add inverse edge if transform is invertible
-                        inverse = ind_transform.invert()
-                        if inverse is not None:
-                            g.add_transform(inverse)
+    def _setup_graph(self, *, strict: bool = True) -> tnd.TransformGraph:
+        g = tnd.TransformGraph()
+        for tf in self.coordinate_transformations:
+            self._add_transform(g, tf, strict=strict)
+        for subgroup, image in self.images.items():
+            for tf in image.metadata.coordinateTransformations or ():
+                self._add_transform(g, tf, strict=strict, subgroup=subgroup)
         return g
 
     def to_ome_zarr(
@@ -244,6 +352,19 @@ class OMEZarrScene:
 
         """
         import shutil
+
+        if self._unparsed_transformations:
+            raise ValueError(
+                "The scene contains invalid coordinate transformation metadata. "
+                "Replace coordinate_transformations before writing."
+            )
+        for path, image in self._images_with_unparsed_transforms.items():
+            if self.images.get(path) is image:
+                raise ValueError(
+                    f"Image {path!r} contains invalid coordinate transformation metadata. "
+                    "Replace the image before writing."
+                )
+        self._setup_graph()
 
         if overwrite and os.path.exists(str(store)):
             # Clear the store if it already exists and we're not doing incremental writes
@@ -288,18 +409,15 @@ class OMEZarrScene:
         return delayed
 
     @classmethod
-    def from_ome_zarr(cls, store: StoreLike):
+    def from_ome_zarr(cls, store: StoreLike | zarr.Group, *, strict: bool = False):
         """
         Load an existing scene from OME-Zarr format.
 
-        Args:
-            path: Path to the OME-Zarr scene
-
-        Returns:
-            NgffScene instance with images and metadata loaded from disk
+        By default, invalid or unusable coordinate transformations are logged
+        and skipped when building the graph. Use ``strict=True`` to require
+        every transformation to be valid and usable. Correct or replace
+        invalid transformations before writing a scene.
         """
-        from ome_zarr_models.v06.scene import BaseSceneAttrs
-
         # Handle both StoreLike (string, dict, etc.) and zarr.Group objects
         if isinstance(store, zarr.Group):
             zarr_group = store
@@ -319,45 +437,63 @@ class OMEZarrScene:
             coordinate_displacements = None
 
         # Load scene metadata
-        scene_metadata = BaseSceneAttrs.model_validate(zarr_group.attrs.get("ome", {}))
-        transformations = scene_metadata.scene.coordinateTransformations
-        coordinate_systems = scene_metadata.scene.coordinateSystems
+        scene_metadata, unparsed = _read_scene_metadata(
+            zarr_group.attrs.get("ome", {}), strict=strict
+        )
+        transformations = scene_metadata.coordinateTransformations
+        coordinate_systems = scene_metadata.coordinateSystems
 
         # Load all image subgroups, keyed by their zarr path
-        images = {}
-        for tf in transformations:
-            if tf.input is not None:
-                path = tf.input.path
-                if path is not None and path in zarr_group:
-                    img_group = zarr_group[path]
-                    img = cast(
-                        OMEZarrMultiscale, OMEZarrMultiscale.from_ome_zarr(img_group)
-                    )
-                    images[path] = img
-                elif path is not None and path not in zarr_group:
-                    raise ValueError(
-                        f"Image specified in metadata at '{path}' not found in zarr group."
-                    )
-            if tf.output is not None:
-                path = tf.output.path
-                if path is not None and path in zarr_group:
-                    img_group = zarr_group[path]
-                    img = cast(
-                        OMEZarrMultiscale, OMEZarrMultiscale.from_ome_zarr(img_group)
-                    )
-                    images[path] = img
-                elif path is not None and path not in zarr_group:
-                    raise ValueError(
-                        f"Image specified in metadata at '{path}' not found in zarr group."
-                    )
+        paths = dict.fromkeys(
+            endpoint.path
+            for tf in transformations
+            for endpoint in (tf.input, tf.output)
+            if endpoint is not None and endpoint.path is not None
+        )
+        # A malformed transform can still identify an image in the scene.
+        for tf in unparsed:
+            if not isinstance(tf, dict):
+                continue
+            for endpoint in (tf.get("input"), tf.get("output")):
+                if isinstance(endpoint, dict) and isinstance(endpoint.get("path"), str):
+                    paths.setdefault(endpoint["path"], None)
 
-        scene = OMEZarrScene(
+        images = {}
+        unparsed_images: set[str] = set()
+        for path in paths:
+            img_group = zarr_group.get(path)
+            if not isinstance(img_group, zarr.Group):
+                if strict:
+                    raise ValueError(
+                        f"Image specified in metadata at '{path}' not found in zarr group."
+                    )
+                continue
+            if strict:
+                images[path] = OMEZarrMultiscale.from_ome_zarr(img_group)
+            else:
+                images[path] = cast(
+                    OMEZarrMultiscale,
+                    OMEZarrMultiscale._load_from_ome_zarr(
+                        img_group,
+                        parse_multiscale=partial(
+                            _read_image_metadata,
+                            path=path,
+                            unparsed_images=unparsed_images,
+                        ),
+                    ),
+                )
+
+        scene = cls(
             images=images,
             coordinate_transformations=transformations,
             coordinate_systems=(
                 coordinate_systems if coordinate_systems is not None else ()
             ),
             coordinate_displacements=coordinate_displacements,
+            strict=strict,
         )
-
+        scene._unparsed_transformations = unparsed
+        scene._images_with_unparsed_transforms = {
+            path: images[path] for path in unparsed_images
+        }
         return scene

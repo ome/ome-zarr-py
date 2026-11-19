@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from abc import abstractmethod
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal, cast
@@ -483,6 +483,17 @@ class OMEZarrMultiscaleBase:
         OMEZarrMultiscale | OMEZarrLabels
             A container with the loaded images and metadata.
         """
+        return cls._load_from_ome_zarr(group)
+
+    @classmethod
+    def _load_from_ome_zarr(
+        cls,
+        group: zarr.Group | str,
+        *,
+        parse_multiscale: Callable[
+            [dict[str, Any]], MultiscaleV06
+        ] = MultiscaleV06.model_validate,
+    ) -> OMEZarrMultiscale | OMEZarrLabels:
         from ome_zarr.utils import _get_version
 
         if isinstance(group, str):
@@ -551,7 +562,7 @@ class OMEZarrMultiscaleBase:
                     "is currently not supported."
                 )
 
-            metadata = MultiscaleV06.model_validate(metadata_json)
+            metadata = parse_multiscale(metadata_json)
 
             if "image-label" in ome_attrs:
                 is_label = True
