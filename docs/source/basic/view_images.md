@@ -23,5 +23,5 @@ pip install napari napari-ome-zarr
 To open any local or remote ome-zarr image, just pass the URL to napari:
 
 ```bash
-napari https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.5/idr0062A/6001240_labels.zarr
+napari https://livingobjects.ebi.ac.uk/idr/zarr/v0.5/idr0062A/6001240_labels.zarr
 ```
