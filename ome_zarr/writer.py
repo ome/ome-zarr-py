@@ -344,6 +344,11 @@ def write_multiscale(
         image=images,
     )
 
+    # post-hoc inject passed coordinate transformation as multiscale transformations
+    # remove after coordinate_transformations argument is fully deprecated
+    if coordinate_transformations is not None:
+        _apply_downsampling_transformations(ms, coordinate_transformations)
+
     if fmt.version not in ("0.4", "0.5", "0.6"):
         raise ValueError(f"Unsupported format version: {fmt.version}")
 
@@ -444,6 +449,44 @@ def write_well_metadata(
     else:
         # Zarr v3 metadata under 'ome' with top-level version
         group.attrs["ome"] = {"version": fmt.version, "well": well}
+
+
+def _apply_downsampling_transformations(
+    multiscale: Any, coordinate_transformations: list[list[dict[str, Any]]]
+) -> None:
+    # Overwrite the metadata transforms with the passed value so that possible
+    # translations are passed along.
+    for idx, ct in enumerate(coordinate_transformations):
+        new_transforms = []
+        for transform in ct:
+            # get the current transform sequence
+            current_tf = multiscale.metadata.datasets[idx].coordinateTransformations[0]
+            if transform["type"] == "scale":
+                new_transforms.append(
+                    current_tf.transformations[0].model_copy(
+                        update={"scale": transform["scale"]}
+                    )
+                )
+            elif transform["type"] == "translation":
+                new_transforms.append(
+                    current_tf.transformations[1].model_copy(
+                        update={"translation": transform["translation"]}
+                    )
+                )
+        new_datasets = list(multiscale.metadata.datasets)
+        new_datasets[idx] = new_datasets[idx].model_copy(
+            update={
+                "coordinateTransformations": (
+                    current_tf.model_copy(
+                        update={"transformations": tuple(new_transforms)}
+                    ),
+                )
+                + new_datasets[idx].coordinateTransformations[1:]
+            }
+        )
+        multiscale.metadata = multiscale.metadata.model_copy(
+            update={"datasets": tuple(new_datasets)}
+        )
 
 
 def write_image(
@@ -617,42 +660,10 @@ def write_image(
     )
     multiscale.omero = omero
 
+    # post-hoc inject passed coordinate transformation as multiscale transformations
+    # remove after coordinate_transformations argument is fully deprecated
     if coordinate_transformations is not None:
-        # We also need to overwrite the coordinate transformations in the metadata
-        # with the passed value to ensure possible translations are passed along
-        for idx, ct in enumerate(coordinate_transformations):
-            new_transforms = []
-            for transform in ct:
-                # get the current transform sequence
-                current_tf = multiscale.metadata.datasets[
-                    idx
-                ].coordinateTransformations[0]
-                if transform["type"] == "scale":
-                    new_transforms.append(
-                        current_tf.transformations[0].model_copy(
-                            update={"scale": transform["scale"]}
-                        )
-                    )
-                elif transform["type"] == "translation":
-                    new_transforms.append(
-                        current_tf.transformations[1].model_copy(
-                            update={"translation": transform["translation"]}
-                        )
-                    )
-            new_datasets = list(multiscale.metadata.datasets)
-            new_datasets[idx] = new_datasets[idx].model_copy(
-                update={
-                    "coordinateTransformations": (
-                        current_tf.model_copy(
-                            update={"transformations": tuple(new_transforms)}
-                        ),
-                    )
-                    + new_datasets[idx].coordinateTransformations[1:]
-                }
-            )
-            multiscale.metadata = multiscale.metadata.model_copy(
-                update={"datasets": tuple(new_datasets)}
-            )
+        _apply_downsampling_transformations(multiscale, coordinate_transformations)
 
     dask_delayed_jobs = multiscale.to_ome_zarr(
         group=group,
@@ -1130,11 +1141,18 @@ def write_labels(
         method = Methods.NEAREST
 
     if coordinate_transformations is not None:
-        msg = (
-            "The 'coordinate_transformations' argument is deprecated and will "
-            "be removed in a future version. Please use the `scale` argument "
-            "to specify the physical pixel size for each dimension instead. "
-        )
+        msg = """
+        The 'coordinate_transformations' argument is deprecated and will
+        be removed in 0.26. Please use the `scale` argument
+        to specify the physical pixel size for each dimension instead.
+        Until removal, the coordinate_transformations argument only accepts
+        transformations conforming to version 0.4 or 0.5 of the NGFF
+        specification.
+
+        The coordinate transformations passed via this kwarg are not
+        validated in the sense that it is not validated whether the transformations
+        match the size of the passed data arrays.
+        """
         warnings.warn(msg, DeprecationWarning)
 
     singlescale = OMEZarrImage(

@@ -2076,3 +2076,7 @@ class TestLabelWriter:
 
         ms_test = OMEZarrMultiscale.from_ome_zarr(group)
         assert "third_labels" in ms_test.labels
+
+
+if __name__ == "__main__":
+    pytest.main(["-k", "test_write_multiscale_transforms"])
