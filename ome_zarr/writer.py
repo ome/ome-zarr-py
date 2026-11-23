@@ -327,9 +327,9 @@ def write_multiscale(
 
     images = []
     for level in pyramid:
-        relative_factor = np.asarray(level.shape) / np.asarray(pyramid[0].shape)
+        relative_factor = np.asarray(pyramid[0].shape) / np.asarray(level.shape)
         level_scale = {
-            d: s * relative_factor[i] for i, (d, s) in enumerate(scale.items())
+            d: float(s * relative_factor[i]) for i, (d, s) in enumerate(scale.items())
         }
         img = OMEZarrImage(
             data=level,
