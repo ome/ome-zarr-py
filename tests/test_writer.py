@@ -401,6 +401,61 @@ class TestWriter:
                     # non-spatial dimensions (t, c) are not downsampled
                     assert value == 1.0
 
+    def test_write_multiscale_transforms(self):
+        """
+        This test ensures that both write_image and write_multiscale correctly handle
+        coordinate transformations and store them in the resulting OME-Zarr metadata.
+        """
+        ct = [
+            [
+                {"type": "scale", "scale": [0.5, 0.25, 0.25]},
+                {"type": "translation", "translation": [10.0, 20.0, 30.0]},
+            ],
+            [
+                {"type": "scale", "scale": [0.5, 0.5, 0.5]},
+                {"type": "translation", "translation": [10.0, 20.125, 30.125]},
+            ],
+        ]
+        axes = [{"name": d, "type": "space", "unit": "micrometer"} for d in "zyx"]
+        img = np.zeros((16, 64, 64), "uint16")
+
+        writers = [
+            (
+                zarr.open_group(
+                    self.path / "test_coordinate_transforms_multiscale",
+                    mode="w",
+                    zarr_format=3,
+                ).create_group("test"),
+                lambda g: write_multiscale(
+                    [img, img[:, ::2, ::2]], g, axes=axes, coordinate_transformations=ct
+                ),
+            ),
+            (
+                zarr.open_group(
+                    self.path / "test_coordinate_transforms_singlescale",
+                    mode="w",
+                    zarr_format=3,
+                ).create_group("test"),
+                lambda g: write_image(
+                    img,
+                    g,
+                    scale_factors=[{"z": 1, "y": 2, "x": 2}],
+                    axes=axes,
+                    coordinate_transformations=ct,
+                ),
+            ),
+        ]
+        for group, write in writers:
+            write(group)
+            ms = group.attrs["ome"]["multiscales"][0]
+            for a in ms["axes"]:
+                assert a.get("unit") == "micrometer"
+                assert a.get("name") in "zyx"
+                assert a.get("type") == "space"
+            for i, ds in enumerate(ms["datasets"]):
+                assert ds["coordinateTransformations"][0] == ct[i][0]
+                assert ds["coordinateTransformations"][1] == ct[i][1]
+
     @pytest.mark.parametrize("read_from_zarr", [True, False])
     @pytest.mark.parametrize("compute", [True, False])
     @pytest.mark.parametrize("zarr_format", [2, 3])
@@ -2221,4 +2276,4 @@ class TestLabelWriter:
 
 
 if __name__ == "__main__":
-    pytest.main([__file__ + "::TestWriter::test_normalize_resolution_level_paths"])
+    pytest.main([__file__ + "::TestWriter::test_write_multiscale_transforms"])
