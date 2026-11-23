@@ -120,11 +120,15 @@ def _build_pyramid(
     image : dask.array.Array or numpy.ndarray
         The input image to downscale.
     scale_factors : list of dict or list of int or tuple of int
-        The downscaling factors for each pyramid level. Each dictionary should
-        map dimension names to their respective downscaling factors.
-        I.e., [{"y": 2, "x": 2}, {"y": 4, "x": 4}] to create two levels with downsampling factors of 2 and 4.
-        Alternatively, a list or tuple of integers can be provided, which will be
-        converted to dictionaries with spatial dimensions only.
+        The downscaling factors for each pyramid level relative to the input
+        image. A list or tuple of integers applies each factor to ``y`` and
+        ``x`` and leaves ``z`` unchanged. For example, ``[2, 4]`` produces two
+        downsampled levels with factors of 2 and 4 along ``y`` and ``x``.
+
+        Use a list of dictionaries to set per-axis factors, including ``z``.
+        For example, ``[{"z": 2, "y": 2, "x": 2}, {"z": 4, "y": 4, "x": 4}]``
+        downsamples all three spatial dimensions. Omitted dimensions default
+        to a factor of 1. Non-spatial dimensions remain unchanged.
     dims : sequence of str
         The dimension names corresponding to the image axes.
     method : str or Methods, optional
