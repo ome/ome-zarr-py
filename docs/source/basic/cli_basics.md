@@ -2,12 +2,23 @@
 (basics:cli)
 
 Open Zarr filesets containing images with associated OME metadata.
-The examples below use the image at http://idr.openmicroscopy.org/webclient/?show=image-6001240.
+The examples below use the image at <http://idr.openmicroscopy.org/webclient/?show=image-6001240>.
 
 All examples can be made more or less verbose by passing `-v` or `-q` one or more times:
 
 ```bash
 ome_zarr -vvv ...
+```
+
+You can use the CLI without managing your own python environment with `uv`:
+
+```sh
+# ephemeral environment; always prefix with `uvx`
+uvx ome_zarr ...
+
+# install once and then use normally
+uv tool install ome_zarr
+ome_zarr ...
 ```
 
 ## info
@@ -17,7 +28,7 @@ Use the `ome_zarr` command to interrogate Zarr datasets.
 Remote data:
 
 ```bash
-ome_zarr info https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.5/idr0062A/6001240_labels.zarr/
+ome_zarr info https://livingobjects.ebi.ac.uk/idr/zarr/v0.5/idr0062A/6001240_labels.zarr/
 ```
 
 Local data:
@@ -53,13 +64,13 @@ app, which allows you to browse thumbnails of all images:
 To download all the resolutions and metadata for an image use ``ome_zarr download``. This creates ``6001240.zarr`` locally:
 
 ```bash
-ome_zarr download https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.5/idr0062A/6001240_labels.zarr
+ome_zarr download https://livingobjects.ebi.ac.uk/idr/zarr/v0.5/idr0062A/6001240_labels.zarr
 ```
 
 Specify a different output directory:
 
 ```bash
-ome_zarr download https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.5/idr0062A/6001240_labels.zarr --output image_dir
+ome_zarr download https://livingobjects.ebi.ac.uk/idr/zarr/v0.5/idr0062A/6001240_labels.zarr --output image_dir
 ```
 
 ## scale
