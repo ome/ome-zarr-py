@@ -28,6 +28,3 @@ OMEZarrHCSPlate.from_ome_zarr("test_hcs.ome.zarr")
 plate_loaded = OMEZarrHCSPlate.from_ome_zarr("https://livingobjects.ebi.ac.uk/idr/zarr/v0.5/idr0010/76-45.ome.zarr")
 
 # %%
-
-
-

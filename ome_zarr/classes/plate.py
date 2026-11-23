@@ -52,7 +52,7 @@ class OMEZarrHCSPlate:
         self.rows = []
         self.columns = []
         self.wells = []
-        for (row_name, column_name), value in self.images.items():
+        for row_name, column_name in self.images:
             if row_name not in self.rows:
                 self.rows.append(row_name)
             if column_name not in self.columns:
@@ -63,7 +63,7 @@ class OMEZarrHCSPlate:
         self.columns = [Column(name=column) for column in self.columns]
 
         # iterate over images again to find correct rowIndex and columnIndex for each well
-        for (row_name, column_name), value in self.images.items():
+        for row_name, column_name in self.images:
             row_index = next(
                 i for i, row in enumerate(self.rows) if row.name == row_name
             )
@@ -142,7 +142,7 @@ class OMEZarrHCSPlate:
                     "version": str(version),
                 }
                 well_group.attrs.update({"ome": metadata})
-            elif version in {"0.4"}:
+            elif version == "0.4":
                 metadata = {
                     "well": well_attrs.model_dump(exclude_none=True),
                     "version": str(version),
@@ -160,8 +160,7 @@ class OMEZarrHCSPlate:
                 "plate": self.metadata.model_dump(exclude_none=True),
                 "version": str(version),
             }
-            ome_attrs: dict = group.attrs or {}
-            ome_attrs.update(metadata)
+            group.attrs.update(metadata)
 
         return delayed
 
