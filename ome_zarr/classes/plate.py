@@ -156,3 +156,59 @@ class OMEZarrHCSPlate:
             ome_attrs.update(metadata)
 
         return delayed
+
+    @classmethod
+    def from_ome_zarr(cls, group: Any) -> "OMEZarrHCSPlate":
+        """
+        Create a Plate instance from an OME-Zarr group.
+
+        Parameters
+        ----------
+        group : Any
+            The OME-Zarr group containing the plate data.
+
+        Returns
+        -------
+        self
+            An instance of the Plate class populated with data from the OME-Zarr group.
+        """
+        from ome_zarr.utils import _get_version
+        from ome_zarr.classes.image import OMEZarrMultiscale
+
+        if isinstance(group, str):
+            opened = zarr.open(group, mode="r")
+            if not isinstance(opened, zarr.Group):
+                raise TypeError(f"Expected a zarr.Group but got {type(opened)}")
+            group = opened
+
+        version = _get_version(group)
+
+        if version not in {"0.4", "0.5", "0.6"}:
+            raise ValueError(f"Unsupported OME-Zarr version: {version}")
+
+        if version in {"0.5", "0.6"}:
+            ome_metadata = group.attrs.get("ome", {})
+            metadata = PlateBase.model_validate(ome_metadata.get("plate", {}))
+        elif version == "0.4":
+            ome_metadata = group.attrs
+            metadata = PlateBase.model_validate(ome_metadata.get("plate", {}))
+        else:
+            raise ValueError(f"Unsupported OME-Zarr version: {version}")
+
+        images: dict[tuple[str, str], list[OMEZarrMultiscale]] = {}
+        for well in metadata.wells:
+            if version in {"0.5", "0.6"}:
+                ome_meta = group[well.path].attrs.get("ome", {})
+            elif version == "0.4":
+                ome_meta = group[well.path].attrs
+
+            well_meta = WellMeta.model_validate(ome_meta.get("well", {}))
+
+            well_images = []
+            for well_image in well_meta.images:
+                img_path = group[f"{well.path}/{well_image.path}"]
+                img = OMEZarrMultiscale.from_ome_zarr(img_path)
+                well_images.append(img)
+            images[(well.path.split("/")[0], well.path.split("/")[1])] = well_images
+
+        return cls(images=images)
