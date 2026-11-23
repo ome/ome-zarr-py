@@ -34,11 +34,11 @@ class TestCli:
     @pytest.fixture(params=["0.1", "0.2", "0.3"], ids=["v0.1", "v0.2", "v0.3"])
     def s3_address(self, request):
         urls = {
-            "0.1": "https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.1/6001240.zarr",
-            "0.2": "https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.2/6001240.zarr",
-            "0.3": "https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.3/9836842.zarr",
-            "0.4": "https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.4/idr0062A/6001240.zarr",
-            "0.5": "https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.5/idr0062A/6001240_labels.zarr",
+            "0.1": "https://livingobjects.ebi.ac.uk/idr/zarr/v0.1/6001240.zarr",
+            "0.2": "https://livingobjects.ebi.ac.uk/idr/zarr/v0.2/6001240.zarr",
+            "0.3": "https://livingobjects.ebi.ac.uk/idr/zarr/v0.3/9836842.zarr",
+            "0.4": "https://livingobjects.ebi.ac.uk/idr/zarr/v0.4/idr0062A/6001240.zarr",
+            "0.5": "https://livingobjects.ebi.ac.uk/idr/zarr/v0.5/idr0062A/6001240_labels.zarr",
         }
         return urls[request.param]
 
