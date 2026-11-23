@@ -2,7 +2,13 @@ from dataclasses import dataclass
 from typing import Any, Literal
 
 import zarr
-from ome_zarr_models.common.plate import Acquisition, Column, PlateBase, Row, WellInPlate
+from ome_zarr_models.common.plate import (
+    Acquisition,
+    Column,
+    PlateBase,
+    Row,
+    WellInPlate,
+)
 from ome_zarr_models.common.well_types import WellImage, WellMeta
 
 from .image import OMEZarrMultiscale
@@ -28,7 +34,9 @@ class OMEZarrHCSPlate:
 
         self.metadata = self._populate_plate_metadata(self.images)
 
-    def _populate_plate_metadata(self, images: dict[tuple[str, str], list[OMEZarrMultiscale]]) -> PlateBase:
+    def _populate_plate_metadata(
+        self, images: dict[tuple[str, str], list[OMEZarrMultiscale]]
+    ) -> PlateBase:
         """
         Populate the metadata for the plate based on the provided images.
         This includes sorting the images, creating rows, columns, and wells,
@@ -71,11 +79,11 @@ class OMEZarrHCSPlate:
             )
 
         return PlateBase(
-                rows=self.rows,
-                columns=self.columns,
-                wells=self.wells,
-                acquisitions=[Acquisition(id=1, maximumfieldcount=1)],
-            )
+            rows=self.rows,
+            columns=self.columns,
+            wells=self.wells,
+            acquisitions=[Acquisition(id=1, maximumfieldcount=1)],
+        )
 
     def to_ome_zarr(
         self,
@@ -131,28 +139,28 @@ class OMEZarrHCSPlate:
             if version in {"0.5", "0.6"}:
                 metadata = {
                     "well": well_attrs.model_dump(exclude_none=True),
-                    "version": str(version)
+                    "version": str(version),
                 }
                 well_group.attrs.update({"ome": metadata})
             elif version in {"0.4"}:
                 metadata = {
                     "well": well_attrs.model_dump(exclude_none=True),
-                    "version": str(version)
+                    "version": str(version),
                 }
                 well_group.attrs.update(metadata)
 
         if version in {"0.5", "0.6"}:
             metadata = {
                 "plate": self.metadata.model_dump(exclude_none=True),
-                "version": str(version)
+                "version": str(version),
             }
             group.attrs.update({"ome": metadata})
         elif version == "0.4":
             metadata = {
                 "plate": self.metadata.model_dump(exclude_none=True),
-                "version": str(version)
+                "version": str(version),
             }
-            ome_attrs: dict = group.attrs if group.attrs else {}
+            ome_attrs: dict = group.attrs or {}
             ome_attrs.update(metadata)
 
         return delayed
@@ -172,8 +180,8 @@ class OMEZarrHCSPlate:
         self
             An instance of the Plate class populated with data from the OME-Zarr group.
         """
-        from ome_zarr.utils import _get_version
         from ome_zarr.classes.image import OMEZarrMultiscale
+        from ome_zarr.utils import _get_version
 
         if isinstance(group, str):
             opened = zarr.open(group, mode="r")
