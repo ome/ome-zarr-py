@@ -6,6 +6,7 @@ import sys
 
 from .csv import csv_to_zarr
 from .data import astronaut, coins, create_zarr
+from .export import ExportFormat
 from .format import CurrentFormat, Format, format_from_version
 from .utils import download as zarr_download
 from .utils import finder as bff_finder
@@ -68,6 +69,29 @@ def create(args: argparse.Namespace) -> None:
         fmt = format_from_version(args.format)
 
     create_zarr(args.path, method=method, label_name=label_name, fmt=fmt)
+
+
+def export(args: argparse.Namespace) -> None:
+    """Wrap the :func:`~ome_zarr.export.export` method."""
+    import contextlib
+
+    import dask
+    from dask.diagnostics import ProgressBar
+
+    from .classes import OMEZarrMultiscale
+    from .export import export as zarr_export
+
+    config_logging(logging.WARNING, args)
+    image = OMEZarrMultiscale.from_ome_zarr(args.input)
+    tasks = zarr_export(
+        image,
+        args.output,
+        args.format,
+        overwrite=args.overwrite,
+        level=args.level,
+    )
+    with ProgressBar() if args.progress else contextlib.nullcontext():
+        dask.compute(*tasks)
 
 
 def scale(args: argparse.Namespace) -> None:
@@ -175,6 +199,38 @@ def main(args: list[str] | None = None) -> None:
         "--format", help="OME-Zarr version to create. e.g. '0.4'"
     )
     parser_create.set_defaults(func=create)
+
+    # export
+    parser_export = subparsers.add_parser(
+        "export", help="Export an OME-Zarr image to another file format"
+    )
+    parser_export.add_argument("input", help="Path or URL of the input image.zarr")
+    parser_export.add_argument(
+        "output", help="Output location (a directory for TIFF stacks)"
+    )
+    parser_export.add_argument(
+        "--format",
+        required=True,
+        choices=[f.value for f in ExportFormat],
+        help="Output format",
+    )
+    parser_export.add_argument(
+        "--level",
+        type=int,
+        default=0,
+        help="Pyramid level to export. 0 is full resolution, -1 the lowest "
+        "resolution (default: 0)",
+    )
+    parser_export.add_argument(
+        "--overwrite", action="store_true", help="Overwrite existing output"
+    )
+    parser_export.add_argument(
+        "--progress",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Show a progress bar while exporting (default: on)",
+    )
+    parser_export.set_defaults(func=export)
 
     parser_scale = subparsers.add_parser("scale")
     parser_scale.add_argument("input_array")
