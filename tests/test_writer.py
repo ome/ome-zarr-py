@@ -557,6 +557,88 @@ class TestWriter:
             pytest.param(FormatV05, id="V05"),
         ),
     )
+    def test_write_image_dask_chunk_grid(self, format_version):
+        """
+        A regular chunk grid in dask's nested form, such as the ``chunks``
+        attribute of a dask array, is stored as the flat chunk shape it describes.
+        """
+        data = da.from_array(self.create_data((3, 128, 128)), chunks=(3, 48, 64))
+        path = self.path / "test_write_image_dask_chunk_grid"
+        write_image(
+            image=data,
+            group=str(path),
+            axes="cyx",
+            fmt=format_version(),
+            storage_options={"chunks": data.chunks},
+        )
+        test_group = zarr.open_group(path)
+        assert np.array_equal(test_group["s0"][...], data.compute())
+        for array in test_group.array_values():
+            assert array.chunks in (
+                (3, 48, 64),
+                tuple(min(c, s) for c, s in zip((3, 48, 64), array.shape)),
+            )
+
+    @pytest.mark.parametrize(
+        "format_version",
+        (
+            pytest.param(FormatV04, id="V04"),
+            pytest.param(FormatV05, id="V05"),
+        ),
+    )
+    def test_write_image_irregular_dask_chunk_grid(self, format_version):
+        """
+        A chunk grid with uneven chunks along an axis raises a ValueError
+        that names the axis.
+        """
+        data = da.from_array(self.create_data((3, 128, 128)), chunks=(3, 48, 64))
+        chunks = ((3,), (28, 100), (64, 64))
+        with pytest.raises(ValueError, match="not a regular chunk grid along axis 1"):
+            write_image(
+                image=data,
+                group=str(self.path / "test_write_image_irregular_dask_chunk_grid"),
+                axes="cyx",
+                fmt=format_version(),
+                storage_options={"chunks": chunks},
+            )
+
+    @pytest.mark.parametrize(
+        "chunks, expected",
+        [
+            (64, 64),
+            ("auto", "auto"),
+            ((3, 64, 64), (3, 64, 64)),
+            (((3,), (48, 48, 32), (64, 64)), (3, 48, 64)),
+            ([(3,), [48, 48, 32], 64], (3, 48, 64)),
+        ],
+    )
+    def test_flatten_chunk_grid(self, chunks, expected):
+        from ome_zarr.writer import _flatten_chunk_grid
+
+        assert _flatten_chunk_grid(chunks) == expected
+
+    @pytest.mark.parametrize(
+        "chunks, message",
+        [
+            (((3,), (28, 100)), "not a regular chunk grid along axis 1"),
+            (((3,), (48, 32, 48)), "not a regular chunk grid along axis 1"),
+            (((), (64,)), "not a regular chunk grid along axis 0"),
+            (((3,), (float("nan"), float("nan"))), "unknown"),
+        ],
+    )
+    def test_flatten_chunk_grid_rejects(self, chunks, message):
+        from ome_zarr.writer import _flatten_chunk_grid
+
+        with pytest.raises(ValueError, match=message):
+            _flatten_chunk_grid(chunks)
+
+    @pytest.mark.parametrize(
+        "format_version",
+        (
+            pytest.param(FormatV04, id="V04"),
+            pytest.param(FormatV05, id="V05"),
+        ),
+    )
     def test_write_image_compressed(self, array_constructor, format_version):
         shape = (64, 64, 64)
         data = self.create_data(shape)

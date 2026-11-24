@@ -788,7 +788,7 @@ def _write_pyramid_to_zarr(
         if "compressors" not in zarr_array_kwargs_copy and USE_DASK_ARRAY_KWARGS:
             zarr_array_kwargs_copy["compressors"] = options.pop("compressors", "auto")
 
-        chunks_opt = options.get("chunks", None)
+        chunks_opt = _flatten_chunk_grid(options.get("chunks", None))
         shards_opt = options.get("shards", None)
 
         # If shards are defined, one dask chunk should correspond to 1 shard to prevent concurrent writes to 1 shard.
@@ -1278,6 +1278,46 @@ def write_labels(
     )
 
     return dask_delayed_jobs
+
+
+def _flatten_chunk_grid(chunks: Any) -> Any:
+    """
+    Turn a regular chunk grid in dask's nested form into a flat chunk shape.
+
+    E.g. ((3,), (512, 512, 100)) becomes (3, 512). In a regular grid every
+    chunk along a dimension has the same size except the last, which may be
+    smaller. ome-zarr-py writes regular chunk grids only, so any other grid
+    raises ValueError. Integers, strings and flat tuples are returned as is.
+    """
+    if not isinstance(chunks, (tuple, list)) or not any(
+        isinstance(c, (tuple, list)) for c in chunks
+    ):
+        return chunks
+
+    flat = []
+    for axis, dim_chunks in enumerate(chunks):
+        if not isinstance(dim_chunks, (tuple, list)):
+            flat.append(dim_chunks)
+            continue
+        if any(isinstance(c, float) and np.isnan(c) for c in dim_chunks):
+            raise ValueError(
+                f"chunks has unknown (NaN) sizes along axis {axis}. Call "
+                "compute_chunk_sizes() on the dask array first."
+            )
+        size = dim_chunks[0] if dim_chunks else None
+        if (
+            size is None
+            or any(c != size for c in dim_chunks[:-1])
+            or dim_chunks[-1] > size
+        ):
+            raise ValueError(
+                f"chunks is not a regular chunk grid along axis {axis}: "
+                f"{tuple(dim_chunks)}. ome-zarr-py writes regular chunk grids "
+                "only: pass a flat tuple such as (1, 512, 512), or rechunk the "
+                "dask array to a regular grid first."
+            )
+        flat.append(size)
+    return tuple(flat)
 
 
 def _retuple(chunks: tuple[Any, ...] | int, shape: tuple[Any, ...]) -> tuple[Any, ...]:
